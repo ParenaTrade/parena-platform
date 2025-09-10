@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firma Profil ve Belgeler Yönetimi - İhracat CRM</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .document-module {
+            padding: 20px;
+        }
+        
+        .module-header {
+            background-color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .module-card {
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .module-card-header {
+            background-color: white;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+            padding: 15px 20px;
+        }
+        
+        .module-card-body {
+            padding: 20px;
+        }
+        
+        .document-card {
+            border-left: 4px solid var(--primary-color);
+            transition: all 0.3s ease;
+        }
+        
+        .document-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .document-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-expired {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        
+        .badge-active {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .badge-pending {
+            background-color: #fff3e0;
+            color: #ef6c00;
+        }
+        
+        .btn-primary { 
+            background-color: var(--primary-color); 
+            border-color: var(--primary-color); 
+        }
+        
+        .btn-primary:hover { 
+            background-color: #2980b9; 
+            border-color: #2980b9; 
+        }
+        
+        .file-upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 25px;
+            text-align: center;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload-area:hover {
+            border-color: var(--primary-color);
+            background-color: #e8f4fd;
+        }
+        
+        .file-preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        
+        .access-table tr {
+            transition: background-color 0.2s;
+        }
+        
+        .access-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .locked-field {
+            background-color: #f8f9fa;
+            cursor: not-allowed;
+        }
+        
+        .timer-badge {
+            background-color: #fff3e0;
+            color: #ef6c00;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast bildirimleri -->
+    <div class="toast-container"></div>
+
+    <!-- Firma Profil ve Belgeler Modülü -->
+    <div class="document-module">
+        <!-- Başlık ve Arama -->
+        <div class="module-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0"><i class="fas fa-building me-2"></i>Firma Profil ve Belgeler Yönetimi</h4>
+            <div class="d-flex">
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#shareAccessModal">
+                    <i class="fas fa-share-alt me-1"></i> Erişim Paylaş
+                </button>
+            </div>
+        </div>
+
+        <!-- Kullanıcı Bilgileri -->
+        <div class="user-info mb-3">
+            <i class="fas fa-user me-1"></i> <span id="userName">Kullanıcı Yükleniyor...</span>
+            <span class="badge bg-primary ms-2" id="userRole"></span>
+        </div>
+
+        <!-- Firma Bilgileri Kartı -->
+        <div class="module-card">
+            <div class="module-card-header">
+                <span>Firma Bilgileri</span>
+            </div>
+            <div class="module-card-body">
+                <form id="companyForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Firma Ünvanı <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control locked-field" id="companyName" required readonly>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Vergi No <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control locked-field" id="taxNumber" required readonly>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Yetkili Kişi <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control locked-field" id="authorizedPerson" required readonly>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Telefon <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control locked-field" id="phone" required readonly>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">E-posta <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control locked-field" id="email" required readonly>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Web Sitesi</label>
+                            <input type="url" class="form-control locked-field" id="website" readonly>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label">Firma Tanıtımı</label>
+                            <textarea class="form-control" id="companyDescription" rows="4" placeholder="Firmanızı tanıtan bir açıklama yazın..."></textarea>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary" id="saveCompanyInfo">
+                                <i class="fas fa-save me-1"></i> Bilgileri Güncelle
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Belgeler Yükleme Alanı -->
+        <div class="module-card">
+            <div class="module-card-header">
+                <span>Belge Yükleme</span>
+            </div>
+            <div class="module-card-body">
+                <div class="file-upload-area" id="dropZone">
+                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                    <h5>Belgeleri sürükleyip bırakın veya seçin</h5>
+                    <p class="text-muted">PDF, JPG, PNG formatları desteklenmektedir (Maks. 10MB)</p>
+                    <input type="file" class="d-none" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png">
+                    <button class="btn btn-primary mt-2" id="selectFileButton">
+                        <i class="fas fa-folder-open me-1"></i> Dosya Seç
+                    </button>
+                    <div id="filePreview" class="mt-3"></div>
+                </div>
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Belge Türü <span class="text-danger">*</span></label>
+                            <select class="form-select" id="documentType" required>
+                                <option value="">Seçiniz</option>
+                                <option value="vergi_levhası">Vergi Levhası</option>
+                                <option value="faaliyet_belgesi">Faaliyet Belgesi</option>
+                                <option value="uretim_belgesi">Sanayi Üretim Belgesi</option>
+                                <option value="sertifika">Kalite Sertifikası</option>
+                                <option value="katalog">Ürün Kataloğu</option>
+                                <option value="diger">Diğer</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Geçerlilik Tarihi</label>
+                            <input type="date" class="form-control" id="expiryDate">
+                        </div>
+                    </div>
+                    <button class="btn btn-success" id="uploadButton">
+                        <i class="fas fa-upload me-1"></i> Belgeyi Yükle
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Yüklenen Belgeler -->
+        <div class="module-card">
+            <div class="module-card-header d-flex justify-content-between align-items-center">
+                <span>Yüklenen Belgeler</span>
+                <small>Toplam <strong id="totalDocuments">0</strong> belge</small>
+            </div>
+            <div class="module-card-body">
+                <div class="row" id="documentsContainer">
+                    <div class="col-12 text-center py-4">
+                        <div class="spinner-border text-primary"></div>
+                        <p class="mt-2">Belgeler yükleniyor...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paylaşılan Erişimler -->
+        <div class="module-card">
+            <div class="module-card-header d-flex justify-content-between align-items-center">
+                <span>Paylaşılan Erişimler</span>
+                <small>Toplam <strong id="totalAccess">0</strong> aktif erişim</small>
+            </div>
+            <div class="module-card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover access-table">
+                        <thead>
+                            <tr>
+                                <th>Müşteri</th>
+                                <th>E-posta</th>
+                                <th>Başlangıç</th>
+                                <th>Bitiş</th>
+                                <th>Durum</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accessList">
+                            <tr>
+                                <td colspan="6" class="text-center py-4">Erişim listesi yükleniyor...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Erişim Paylaşma Modal -->
+    <div class="modal fade" id="shareAccessModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Müşteriye Erişim Paylaş</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Müşteri Seçin</label>
+                        <select class="form-select" id="customerSelect">
+                            <option value="">Müşteri seçin veya yeni ekleyin</option>
+                            <option value="1">Global Export Inc. - contact@globalexport.com</option>
+                            <option value="2">Euro Import GmbH - info@euroimport.de</option>
+                            <option value="3">Trade Partners Ltd. - admin@tradepartners.uk</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Veya Yeni Müşteri Ekle</label>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <input type="text" class="form-control" id="newCustomerName" placeholder="Firma Adı">
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <input type="email" class="form-control" id="newCustomerEmail" placeholder="E-posta">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Erişim Süresi</label>
+                        <div class="input-group">
+                            <span class="input-group-text">Saat</span>
+                            <select class="form-select" id="accessHours">
+                                <option value="1">1</option>
+                                <option value="3">3</option>
+                                <option value="6">6</option>
+                                <option value="12">12</option>
+                                <option value="24" selected>24</option>
+                                <option value="48">48</option>
+                                <option value="72">72</option>
+                            </select>
+                            <span class="input-group-text">Saat</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">İzin Verilen Belgeler</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="checkAll" checked>
+                            <label class="form-check-label" for="checkAll">
+                                Tümünü Seç
+                            </label>
+                        </div>
+                        <hr class="my-2">
+                        <div id="documentCheckboxes">
+                            <!-- Belgeler JavaScript ile buraya eklenecek -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-primary" id="shareAccessButton">
+                        <i class="fas fa-share-alt me-1"></i> Erişim Paylaş
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap & jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Supabase yapılandırması - BU BİLGİLERİ KENDİ PROJENİZLE DEĞİŞTİRİN
+        const supabaseUrl = "https://xliutvspwodhoavysks.supabase.co";
+        const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+        
+        // Global değişkenler
+        let currentUser = null;
+        let currentUserId = null;
+        let currentUserRole = null;
+        let selectedFiles = [];
+        let companyData = null;
+        let documents = [];
+        let accessList = [];
+
+        // DOM yüklendikten sonra çalışacak kodlar
+        $(document).ready(function() {
+            // Oturum durumunu kontrol et
+            checkSession();
+            
+            // Dosya seçme butonu
+            $('#selectFileButton').click(function() {
+                $('#fileInput').click();
+            });
+            
+            // Dosya değişikliği
+            $('#fileInput').change(handleFileSelect);
+            
+            // Sürükle bırak olayları
+            initDragAndDrop();
+            
+            // Belge yükleme butonu
+            $('#uploadButton').click(uploadDocument);
+            
+            // Firma bilgileri formu
+            $('#companyForm').submit(saveCompanyInfo);
+            
+            // Tümünü seç checkbox
+            $('#checkAll').change(toggleAllDocuments);
+            
+            // Erişim paylaşma butonu
+            $('#shareAccessButton').click(shareAccess);
+            
+            // Modal açıldığında
+            $('#shareAccessModal').on('show.bs.modal', function() {
+                loadDocumentCheckboxes();
+            });
+        });
+        
+        // Oturum kontrolü
+        async function checkSession() {
+            const { data, error } = await supabase.auth.getSession();
+            
+            if (error) {
+                showToast('Oturum kontrolü hatası: ' + error.message, 'danger');
+                window.location.href = "login.html";
+                return;
+            }
+            
+            if (data.session) {
+                currentUser = data.session.user;
+                currentUserId = data.session.user.id;
+                await loadUserData(currentUserId);
+                await checkAndCreateTables();
+                await loadCompanyData();
+                await loadDocuments();
+                await loadAccessList();
+            } else {
+                window.location.href = "login.html";
+            }
+        }
+        
+        // Kullanıcı verilerini yükle
+        async function loadUserData(userId) {
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', userId)
+                .single();
+                
+            if (error) {
+                console.error('Kullanıcı verisi alınırken hata oluştu:', error);
+                return;
+            }
+            
+            currentUserRole = data.role;
+            $("#userName").text(data.name || data.email);
+            $("#userRole").text(currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı');
+        }
+        
+        // Gerekli tabloları kontrol et ve oluştur
+        async function checkAndCreateTables() {
+            // Companies tablosu
+            const { data: companyTable, error: companyError } = await supabase
+                .from('companies')
+                .select('id')
+                .limit(1);
+                
+            if (companyError) {
+                // Tablo yoksa oluştur
+                const { error: createError } = await supabase.rpc('create_companies_table');
+                if (createError) {
+                    console.error('Companies tablosu oluşturulurken hata:', createError);
+                }
+            }
+            
+            // Documents tablosu
+            const { data: documentsTable, error: documentsError } = await supabase
+                .from('documents')
+                .select('id')
+                .limit(1);
+                
+            if (documentsError) {
+                // Tablo yoksa oluştur
+                const { error: createError } = await supabase.rpc('create_documents_table');
+                if (createError) {
+                    console.error('Documents tablosu oluşturulurken hata:', createError);
+                }
+            }
+            
+            // Document_access tablosu
+            const { data: accessTable, error: accessError } = await supabase
+                .from('document_access')
+                .select('id')
+                .limit(1);
+                
+            if (accessError) {
+                // Tablo yoksa oluştur
+                const { error: createError } = await supabase.rpc('create_document_access_table');
+                if (createError) {
+                    console.error('Document_access tablosu oluşturulurken hata:', createError);
+                }
+            }
+        }
+        
+        // Firma verilerini yükle
+        async function loadCompanyData() {
+            const { data, error } = await supabase
+                .from('companies')
+                .select('*')
+                .eq('user_id', currentUserId)
+                .maybeSingle();
+                
+            if (error) {
+                showToast('Firma bilgileri yüklenirken hata oluştu: ' + error.message, 'danger');
+                return;
+            }
+            
+            if (data) {
+                companyData = data;
+                $('#companyName').val(data.company_name || '');
+                $('#taxNumber').val(data.tax_number || '');
+                $('#authorizedPerson').val(data.authorized_person || '');
+                $('#phone').val(data.phone || '');
+                $('#email').val(data.email || '');
+                $('#website').val(data.website || '');
+                $('#companyDescription').val(data.description || '');
+            } else {
+                // Yeni firma oluştur
+                const { error: insertError } = await supabase
+                    .from('companies')
+                    .insert([{
+                        user_id: currentUserId,
+                        company_name: currentUser.email.split('@')[0],
+                        email: currentUser.email
+                    }])
+                    .select()
+                    .single();
+                    
+                if (insertError) {
+                    showToast('Firma oluşturulurken hata oluştu: ' + insertError.message, 'danger');
+                } else {
+                    await loadCompanyData(); // Verileri tekrar yükle
+                }
+            }
+        }
+        
+        // Firma bilgilerini kaydet
+        async function saveCompanyInfo(e) {
+            e.preventDefault();
+            
+            const saveButton = $('#saveCompanyInfo');
+            saveButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Kaydediliyor...');
+            
+            const { error } = await supabase
+                .from('companies')
+                .update({
+                    description: $('#companyDescription').val(),
+                    updated_at: new Date().toISOString()
+                })
+                .eq('user_id', currentUserId);
+                
+            if (error) {
+                showToast('Firma bilgileri güncellenirken hata oluştu: ' + error.message, 'danger');
+            } else {
+                showToast('Firma bilgileri başarıyla güncellendi.', 'success');
+            }
+            
+            saveButton.prop('disabled', false).html('<i class="fas fa-save me-1"></i> Bilgileri Güncelle');
+        }
+        
+        // Sürükle bırak işlevselliği
+        function initDragAndDrop() {
+            const dropZone = document.getElementById('dropZone');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dropZone.classList.add('bg-light');
+            }
+            
+            function unhighlight() {
+                dropZone.classList.remove('bg-light');
+            }
+            
+            dropZone.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+        }
+        
+        // Dosya seçme işlemi
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+        
+        // Dosyaları işle
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            updateFilePreview();
+        }
+        
+        // Dosya önizlemesini güncelle
+        function updateFilePreview() {
+            const preview = document.getElementById('filePreview');
+            preview.innerHTML = '';
+            
+            if (selectedFiles.length === 0) return;
+            
+            const fileList = document.createElement('div');
+            fileList.className = 'list-group';
+            
+            selectedFiles.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                
+                const fileInfo = document.createElement('div');
+                fileInfo.innerHTML = `<i class="fas fa-file-pdf text-danger me-2"></i> ${file.name} <small class="text-muted">(${formatFileSize(file.size)})</small>`;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'btn btn-sm btn-outline-danger';
+                removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                removeBtn.onclick = () => {
+                    selectedFiles.splice(index, 1);
+                    updateFilePreview();
+                };
+                
+                item.appendChild(fileInfo);
+                item.appendChild(removeBtn);
+                fileList.appendChild(item);
+            });
+            
+            preview.appendChild(fileList);
+        }
+        
+        // Dosya boyutunu formatla
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Belge yükle
+        async function uploadDocument() {
+            if (selectedFiles.length === 0) {
+                showToast('Lütfen yüklenecek bir dosya seçin.', 'warning');
+                return;
+            }
+            
+            if (!$('#documentType').val()) {
+                showToast('Lütfen bir belge türü seçin.', 'warning');
+                return;
+            }
+            
+            const uploadButton = $('#uploadButton');
+            uploadButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Yükleniyor...');
+            
+            try {
+                for (const file of selectedFiles) {
+                    // Dosyayı Supabase Storage'a yükle
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${Math.random()}.${fileExt}`;
+                    const filePath = `documents/${currentUserId}/${fileName}`;
+                    
+                    const { error: uploadError } = await supabase.storage
+                        .from('company-documents')
+                        .upload(filePath, file);
+                    
+                    if (uploadError) {
+                        throw new Error(uploadError.message);
+                    }
+                    
+                    // Public URL al
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('company-documents')
+                        .getPublicUrl(filePath);
+                    
+                    // Veritabanına belge kaydını ekle
+                    const { error: dbError } = await supabase
+                        .from('documents')
+                        .insert([{
+                            user_id: currentUserId,
+                            company_id: companyData.id,
+                            name: file.name,
+                            type: $('#documentType').val(),
+                            file_path: filePath,
+                            file_url: publicUrl,
+                            expiry_date: $('#expiryDate').val() || null,
+                            file_size: file.size
+                        }]);
+                    
+                    if (dbError) {
+                        throw new Error(dbError.message);
+                    }
+                }
+                
+                showToast('Belge(ler) başarıyla yüklendi.', 'success');
+                selectedFiles = [];
+                updateFilePreview();
+                await loadDocuments();
+                
+            } catch (error) {
+                showToast('Belge yüklenirken hata oluştu: ' + error.message, 'danger');
+            }
+            
+            uploadButton.prop('disabled', false).html('<i class="fas fa-upload me-1"></i> Belgeyi Yükle');
+        }
+        
+        // Belgeleri yükle
+        async function loadDocuments() {
+            const { data, error } = await supabase
+                .from('documents')
+                .select('*')
+                .eq('company_id', companyData.id)
+                .order('created_at', { ascending: false });
+                
+            if (error) {
+                showToast('Belgeler yüklenirken hata oluştu: ' + error.message, 'danger');
+                return;
+            }
+            
+            documents = data || [];
+            renderDocuments();
+        }
+        
+        // Belgeleri listele
+        function renderDocuments() {
+            const container = $('#documentsContainer');
+            $('#totalDocuments').text(documents.length);
+            
+            if (documents.length === 0) {
+                container.html(`
+                    <div class="col-12 text-center py-4">
+                        <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">Henüz belge bulunmamaktadır.</p>
+                    </div>
+                `);
+                return;
+            }
+            
+            let html = '';
+            documents.forEach(doc => {
+                const createdDate = new Date(doc.created_at).toLocaleDateString('tr-TR');
+                const expiryDate = doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('tr-TR') : 'Belirtilmemiş';
+                
+                // Durum kontrolü
+                let statusClass = 'badge-active';
+                let statusText = 'Aktif';
+                
+                if (doc.expiry_date && new Date(doc.expiry_date) < new Date()) {
+                    statusClass = 'badge-expired';
+                    statusText = 'Süresi Dolmuş';
+                }
+                
+                html += `
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card document-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="card-title mb-0">${getDocumentTypeText(doc.type)}</h5>
+                                    <span class="document-badge ${statusClass}">${statusText}</span>
+                                </div>
+                                <p class="card-text text-muted small">${doc.name}</p>
+                                <p class="card-text text-muted small">Yüklenme: ${createdDate}</p>
+                                <p class="card-text">Geçerlilik: ${expiryDate}</p>
+                            </div>
+                            <div class="card-footer bg-transparent d-flex justify-content-between">
+                                <a href="${doc.file_url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye me-1"></i> Görüntüle
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteDocument('${doc.id}')">
+                                    <i class="fas fa-trash me-1"></i> Sil
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.html(html);
+        }
+        
+        // Belge türü metnini al
+        function getDocumentTypeText(type) {
+            const types = {
+                'vergi_levhası': 'Vergi Levhası',
+                'faaliyet_belgesi': 'Faaliyet Belgesi',
+                'uretim_belgesi': 'Üretim Belgesi',
+                'sertifika': 'Sertifika',
+                'katalog': 'Katalog',
+                'diger': 'Diğer'
+            };
+            
+            return types[type] || type;
+        }
+        
+        // Belge sil
+        async function deleteDocument(documentId) {
+            if (!confirm('Bu belgeyi silmek istediğinize emin misiniz?')) return;
+            
+            // Önce storage'dan dosyayı sil
+            const document = documents.find(d => d.id === documentId);
+            if (document) {
+                const { error: storageError } = await supabase.storage
+                    .from('company-documents')
+                    .remove([document.file_path]);
+                    
+                if (storageError) {
+                    showToast('Dosya silinirken hata oluştu: ' + storageError.message, 'danger');
+                    return;
+                }
+            }
+            
+            // Sonra veritabanından kaydı sil
+            const { error } = await supabase
+                .from('documents')
+                .delete()
+                .eq('id', documentId);
+                
+            if (error) {
+                showToast('Belge silinirken hata oluştu: ' + error.message, 'danger');
+            } else {
+                showToast('Belge başarıyla silindi.', 'success');
+                await loadDocuments();
+            }
+        }
+        
+        // Erişim listesini yükle
+        async function loadAccessList() {
+            const { data, error } = await supabase
+                .from('document_access')
+                .select('*')
+                .eq('company_id', companyData.id)
+                .order('created_at', { ascending: false });
+                
+            if (error) {
+                showToast('Erişim listesi yüklenirken hata oluştu: ' + error.message, 'danger');
+                return;
+            }
+            
+            accessList = data || [];
+            renderAccessList();
+        }
+        
+        // Erişim listesini render et
+        function renderAccessList() {
+            const container = $('#accessList');
+            $('#totalAccess').text(accessList.filter(a => a.status === 'active').length);
+            
+            if (accessList.length === 0) {
+                container.html(`
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            <i class="fas fa-share-alt fa-2x text-muted mb-2"></i>
+                            <p class="text-muted">Henüz paylaşılan erişim bulunmamaktadır.</p>
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+            
+            let html = '';
+            accessList.forEach(access => {
+                const startDate = new Date(access.start_time).toLocaleString('tr-TR');
+                const endDate = new Date(access.end_time).toLocaleString('tr-TR');
+                
+                // Durum kontrolü
+                let statusClass = 'badge-active';
+                let statusText = 'Aktif';
+                
+                if (access.status === 'expired') {
+                    statusClass = 'badge-expired';
+                    statusText = 'Süresi Dolmuş';
+                } else if (access.status === 'pending') {
+                    statusClass = 'badge-pending';
+                    statusText = 'Beklemede';
+                }
+                
+                // Geri sayım
+                let timerHtml = '';
+                if (access.status === 'active' && new Date(access.end_time) > new Date()) {
+                    const diff = Math.floor((new Date(access.end_time) - new Date()) / 1000);
+                    const hours = Math.floor(diff / 3600);
+                    const minutes = Math.floor((diff % 3600) / 60);
+                    const seconds = diff % 60;
+                    
+                    timerHtml = `<span class="timer-badge ms-1">${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}</span>`;
+                }
+                
+                html += `
+                    <tr>
+                        <td>${access.customer_name}</td>
+                        <td>${access.customer_email}</td>
+                        <td>${startDate}</td>
+                        <td>${endDate} ${timerHtml}</td>
+                        <td><span class="document-badge ${statusClass}">${statusText}</span></td>
+                        <td>
+                            ${access.status === 'active' ? `
+                                <button class="btn btn-sm btn-outline-danger" onclick="revokeAccess('${access.id}')">
+                                    <i class="fas fa-ban me-1"></i> İptal Et
+                                </button>
+                            ` : ''}
+                            ${access.status === 'expired' ? `
+                                <button class="btn btn-sm btn-outline-primary" onclick="renewAccess('${access.id}')">
+                                    <i class="fas fa-redo me-1"></i> Yenile
+                                </button>
+                            ` : ''}
+                            ${access.status === 'pending' ? `
+                                <button class="btn btn-sm btn-outline-success" onclick="activateAccess('${access.id}')">
+                                    <i class="fas fa-play me-1"></i> Aktif Et
+                                </button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            container.html(html);
+            
+            // Geri sayım timer'larını başlat
+            startTimers();
+        }
+        
+        // Geri sayım timer'larını başlat
+        function startTimers() {
+            setInterval(() => {
+                $('.timer-badge').each(function() {
+                    let time = $(this).text().split(':');
+                    let hours = parseInt(time[0]);
+                    let minutes = parseInt(time[1]);
+                    let seconds = parseInt(time[2]);
+                    
+                    seconds--;
+                    if (seconds < 0) {
+                        seconds = 59;
+                        minutes--;
+                        if (minutes < 0) {
+                            minutes = 59;
+                            hours--;
+                            if (hours < 0) {
+                                $(this).text("SÜRE DOLDU");
+                                $(this).removeClass('timer-badge').addClass('badge-expired');
+                                return;
+                            }
+                        }
+                    }
+                    
+                    $(this).text(
+                        (hours < 10 ? '0' + hours : hours) + ':' + 
+                        (minutes < 10 ? '0' + minutes : minutes) + ':' + 
+                        (seconds < 10 ? '0' + seconds : seconds)
+                    );
+                });
+            }, 1000);
+        }
+        
+        // Belge checkbox'larını yükle
+        function loadDocumentCheckboxes() {
+            const container = $('#documentCheckboxes');
+            container.html('');
+            
+            if (documents.length === 0) {
+                container.html('<div class="text-muted">Yüklenmiş belge bulunamadı.</div>');
+                return;
+            }
+            
+            documents.forEach((doc, index) => {
+                const docTypeText = getDocumentTypeText(doc.type);
+                container.append(`
+                    <div class="form-check">
+                        <input class="form-check-input doc-checkbox" type="checkbox" value="${doc.id}" id="doc${index}" checked>
+                        <label class="form-check-label" for="doc${index}">
+                            ${docTypeText} - ${doc.name}
+                        </label>
+                    </div>
+                `);
+            });
+        }
+        
+        // Tüm belgeleri seç/deselect et
+        function toggleAllDocuments() {
+            const isChecked = $('#checkAll').is(':checked');
+            $('.doc-checkbox').prop('checked', isChecked);
+        }
+        
+        // Erişim paylaş
+        async function shareAccess() {
+            const customerSelect = $('#customerSelect').val();
+            const newCustomerName = $('#newCustomerName').val();
+            const newCustomerEmail = $('#newCustomerEmail').val();
+            const accessHours = $('#accessHours').val();
+            const selectedDocuments = $('.doc-checkbox:checked').map(function() {
+                return this.value;
+            }).get();
+            
+            if (!customerSelect && (!newCustomerName || !newCustomerEmail)) {
+                showToast('Lütfen bir müşteri seçin veya yeni müşteri bilgilerini girin.', 'warning');
+                return;
+            }
+            
+            if (selectedDocuments.length === 0) {
+                showToast('Lütfen en az bir belge seçin.', 'warning');
+                return;
+            }
+            
+            const shareButton = $('#shareAccessButton');
+            shareButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Paylaşılıyor...');
+            
+            try {
+                let customerName, customerEmail;
+                
+                if (customerSelect) {
+                    // Seçilen müşteriyi al
+                    const selectedOption = $('#customerSelect option:selected');
+                    const textParts = selectedOption.text().split(' - ');
+                    customerName = textParts[0];
+                    customerEmail = textParts[1];
+                } else {
+                    customerName = newCustomerName;
+                    customerEmail = newCustomerEmail;
+                }
+                
+                // Erişim sürelerini hesapla
+                const startTime = new Date();
+                const endTime = new Date(startTime.getTime() + (accessHours * 60 * 60 * 1000));
+                
+                // Erişim kaydını oluştur
+                const { error } = await supabase
+                    .from('document_access')
+                    .insert([{
+                        company_id: companyData.id,
+                        customer_name: customerName,
+                        customer_email: customerEmail,
+                        document_ids: selectedDocuments,
+                        start_time: startTime.toISOString(),
+                        end_time: endTime.toISOString(),
+                        status: 'active'
+                    }]);
+                
+                if (error) {
+                    throw new Error(error.message);
+                }
+                
+                showToast('Erişim başarıyla paylaşıldı.', 'success');
+                $('#shareAccessModal').modal('hide');
+                await loadAccessList();
+                
+            } catch (error) {
+                showToast('Erişim paylaşılırken hata oluştu: ' + error.message, 'danger');
+            }
+            
+            shareButton.prop('disabled', false).html('<i class="fas fa-share-alt me-1"></i> Erişim Paylaş');
+        }
+        
+        // Erişimi iptal et
+        async function revokeAccess(accessId) {
+            const { error } = await supabase
+                .from('document_access')
+                .update({ status: 'revoked' })
+                .eq('id', accessId);
+                
+            if (error) {
+                showToast('Erişim iptal edilirken hata oluştu: ' + error.message, 'danger');
+            } else {
+                showToast('Erişim başarıyla iptal edildi.', 'success');
+                await loadAccessList();
+            }
+        }
+        
+        // Erişimi yenile
+        async function renewAccess(accessId) {
+            const access = accessList.find(a => a.id === accessId);
+            if (!access) return;
+            
+            // Erişimi 24 saat uzat
+            const newEndTime = new Date();
+            newEndTime.setHours(newEndTime.getHours() + 24);
+            
+            const { error } = await supabase
+                .from('document_access')
+                .update({ 
+                    status: 'active',
+                    start_time: new Date().toISOString(),
+                    end_time: newEndTime.toISOString()
+                })
+                .eq('id', accessId);
+                
+            if (error) {
+                showToast('Erişim yenilenirken hata oluştu: ' + error.message, 'danger');
+            } else {
+                showToast('Erişim başarıyla yenilendi.', 'success');
+                await loadAccessList();
+            }
+        }
+        
+        // Bekleyen erişimi aktif et
+        async function activateAccess(accessId) {
+            const { error } = await supabase
+                .from('document_access')
+                .update({ status: 'active' })
+                .eq('id', accessId);
+                
+            if (error) {
+                showToast('Erişim aktif edilirken hata oluştu: ' + error.message, 'danger');
+            } else {
+                showToast('Erişim başarıyla aktif edildi.', 'success');
+                await loadAccessList();
+            }
+        }
+        
+        // Toast bildirimi göster
+        function showToast(message, type = 'info') {
+            const toast = $(`
+                <div class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `);
+            
+            $('.toast-container').append(toast);
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+            
+            // Toast otomatik kapanma
+            setTimeout(() => {
+                bsToast.dispose();
+                toast.remove();
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

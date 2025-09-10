@@ -7,6 +7,8 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
             font-family: 'Montserrat', sans-serif;
@@ -54,6 +56,56 @@
             filter: grayscale(0%);
             opacity: 1;
         }
+        .order-step {
+            position: relative;
+            padding-left: 3rem;
+        }
+        .order-step:before {
+            content: attr(data-step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 2.5rem;
+            height: 2.5rem;
+            background: #4f46e5;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .order-summary-item {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0.75rem 0;
+        }
+        #order-confirmation {
+            display: none;
+        }
+        .category-btn.active {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .product-card {
+            transition: all 0.3s ease;
+        }
+        .cart-item {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0.75rem 0;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -71,6 +123,7 @@
                 <nav class="hidden md:flex space-x-8 items-center">
                     <a href="#services" class="hover:text-blue-600 font-medium">Hizmetler</a>
                     <a href="#sectors" class="hover:text-blue-600 font-medium">Sektörler</a>
+                    <a href="#products" class="hover:text-blue-600 font-medium">Ürünler</a>
                     <a href="#about" class="hover:text-blue-600 font-medium">Hakkımızda</a>
                     <a href="#ai" class="hover:text-blue-600 font-medium">AI Çözümleri</a>
                     <a href="#contact" class="hover:text-blue-600 font-medium">İletişim</a>
@@ -93,6 +146,7 @@
                 <div class="flex flex-col space-y-4">
                     <a href="#services" class="hover:text-blue-600 font-medium">Hizmetler</a>
                     <a href="#sectors" class="hover:text-blue-600 font-medium">Sektörler</a>
+                    <a href="#products" class="hover:text-blue-600 font-medium">Ürünler</a>
                     <a href="#about" class="hover:text-blue-600 font-medium">Hakkımızda</a>
                     <a href="#ai" class="hover:text-blue-600 font-medium">AI Çözümleri</a>
                     <a href="#contact" class="hover:text-blue-600 font-medium">İletişim</a>
@@ -114,7 +168,7 @@
                     <p class="text-xl mb-8">Yapay zeka destekli B2B platformumuz ile ihracatınızı küresel pazarlara güvenle taşıyoruz.</p>
                     <div class="flex flex-wrap gap-4">
                         <a href="#contact" class="bg-white text-indigo-700 font-semibold px-6 py-3 rounded-lg shadow hover:bg-gray-100 transition duration-300">Hemen Teklif Alın</a>
-                        <a href="#services" class="border-2 border-white text-white font-semibold px-6 py-3 rounded-lg hover:bg-white hover:text-indigo-700 transition duration-300">Hizmetlerimiz</a>
+                        <a href="#products" class="border-2 border-white text-white font-semibold px-6 py-3 rounded-lg hover:bg-white hover:text-indigo-700 transition duration-300">Ürünleri İncele</a>
                     </div>
                 </div>
                 <div class="md:w-1/2 flex justify-center">
@@ -170,6 +224,126 @@
                 <div>
                     <div class="stats-number">7</div>
                     <p class="text-gray-600">Sektör</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Products Section -->
+    <section id="products" class="py-16 bg-gray-100">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Ürün Kataloğu</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">7 farklı sektörde yüzlerce kaliteli ürünü keşfedin ve kolayca sipariş verin</p>
+            </div>
+            
+            <!-- Category Filters -->
+            <div class="flex flex-wrap justify-center gap-3 mb-10">
+                <button class="category-btn active px-4 py-2 rounded-full bg-indigo-600 text-white" data-category="all">
+                    Tüm Ürünler
+                </button>
+                <button class="category-btn px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300" data-category="gıda">
+                    Gıda
+                </button>
+                <button class="category-btn px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300" data-category="tekstil">
+                    Tekstil
+                </button>
+                <button class="category-btn px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300" data-category="kimya">
+                    Kimya
+                </button>
+                <button class="category-btn px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300" data-category="ambalaj">
+                    Ambalaj
+                </button>
+                <button class="category-btn px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300" data-category="plastik">
+                    Plastik
+                </button>
+		<button class="category-btn px-4 py-2 rounded-full bg-gray-200 hover:bg-gray-300" data-category="otomotiv">
+                    Otomotiv
+                </button>
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div id="products-loading" class="flex justify-center my-12">
+                <div class="loading-spinner"></div>
+            </div>
+            
+            <!-- Products Grid -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 hidden" id="products-grid">
+                <!-- Product cards will be dynamically loaded here from Supabase -->
+            </div>
+
+            <!-- Error Message -->
+            <div id="products-error" class="text-center py-8 hidden">
+                <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+                <h3 class="text-xl font-bold mb-2">Ürünler yüklenirken bir hata oluştu</h3>
+                <p class="text-gray-600">Lütfen daha sonra tekrar deneyiniz.</p>
+                <button id="retry-loading" class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300">
+                    Tekrar Dene
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Order Process Section -->
+    <section id="order" class="py-16 bg-white">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Kolay Sipariş Süreci</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">4 adımda hızlı ve güvenli sipariş oluşturun</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-12">
+                <div>
+                    <div class="order-step mb-8" data-step="1">
+                        <h3 class="text-xl font-bold mb-2">Ürünleri Keşfedin</h3>
+                        <p class="text-gray-600">İhtiyacınız olan ürünleri kategorilere göre filtreleyerek kolayca bulun.</p>
+                    </div>
+                    
+                    <div class="order-step mb-8" data-step="2">
+                        <h3 class="text-xl font-bold mb-2">Sepete Ekleyin</h3>
+                        <p class="text-gray-600">Beğendiğiniz ürünleri sepete ekleyin ve miktarlarını ayarlayın.</p>
+                    </div>
+                    
+                    <div class="order-step mb-8" data-step="3">
+                        <h3 class="text-xl font-bold mb-2">Siparişi Tamamlayın</h3>
+                        <p class="text-gray-600">İletişim bilgilerinizi girerek siparişinizi tamamlayın.</p>
+                    </div>
+                    
+                    <div class="order-step" data-step="4">
+                        <h3 class="text-xl font-bold mb-2">Onay Alın</h3>
+                        <p class="text-gray-600">Siparişiniz en kısa sürede tarafınıza onaylanacak ve iletişime geçilecektir.</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="bg-gray-50 p-6 rounded-xl shadow-md sticky top-24">
+                        <h3 class="text-2xl font-bold mb-6 flex items-center">
+                            <i class="fas fa-shopping-cart mr-3 text-indigo-600"></i> Sipariş Özeti
+                        </h3>
+                        
+                        <div id="cart-items" class="mb-6">
+                            <p class="text-gray-500 text-center py-4">Sepetinizde ürün bulunmamaktadır</p>
+                        </div>
+                        
+                        <div class="border-t border-gray-200 pt-4 mb-6">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-600">Ara Toplam</span>
+                                <span id="cart-subtotal" class="font-semibold">0₺</span>
+                            </div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-gray-600">KDV (%18)</span>
+                                <span id="cart-tax" class="font-semibold">0₺</span>
+                            </div>
+                            <div class="flex justify-between text-lg font-bold">
+                                <span>Toplam</span>
+                                <span id="cart-total" class="text-indigo-600">0₺</span>
+                            </div>
+                        </div>
+                        
+                        <button id="complete-order" class="w-full bg-indigo-600 text-white font-semibold px-4 py-3 rounded-lg hover:bg-indigo-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            Siparişi Tamamla
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -597,8 +771,8 @@
                     <ul class="space-y-2">
                         <li><a href="#services" class="text-gray-400 hover:text-white transition duration-300">Hizmetler</a></li>
                         <li><a href="#sectors" class="text-gray-400 hover:text-white transition duration-300">Sektörler</a></li>
+                        <li><a href="#products" class="text-gray-400 hover:text-white transition duration-300">Ürünler</a></li>
                         <li><a href="#ai" class="text-gray-400 hover:text-white transition duration-300">AI Çözümleri</a></li>
-                        <li><a href="#about" class="text-gray-400 hover:text-white transition duration-300">Hakkımızda</a></li>
                         <li><a href="#contact" class="text-gray-400 hover:text-white transition duration-300">İletişim</a></li>
                     </ul>
                 </div>
@@ -639,27 +813,489 @@
         </div>
     </footer>
 
+    <!-- Order Modal -->
+    <div id="order-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-11/12 md:w-3/4 lg:w-2/3 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold">Siparişi Tamamla</h3>
+                <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div id="order-confirmation">
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+                    <p>Siparişiniz başarıyla alınmıştır. En kısa sürede sizinle iletişime geçilecektir.</p>
+                </div>
+                <div class="mb-6">
+                    <h4 class="text-lg font-bold mb-3">Sipariş Özeti</h4>
+                    <div id="order-summary"></div>
+                </div>
+                <div class="text-center">
+                    <button id="new-order" class="bg-indigo-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-indigo-700 transition duration-300">
+                        Yeni Sipariş Oluştur
+                    </button>
+                </div>
+            </div>
+            
+            <form id="order-form" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-700 mb-2">Adınız</label>
+                        <input type="text" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 mb-2">Soyadınız</label>
+                        <input type="text" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 mb-2">E-posta Adresiniz</label>
+                    <input type="email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 mb-2">Telefon Numaranız</label>
+                    <input type="tel" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 mb-2">Şirket Adı</label>
+                    <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 mb-2">Teslimat Adresi</label>
+                    <textarea rows="3" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 mb-2">Sipariş Notları (Opsiyonel)</label>
+                    <textarea rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+                
+                <div class="pt-4 border-t border-gray-200">
+                    <button type="submit" class="w-full bg-indigo-600 text-white font-semibold px-4 py-3 rounded-lg hover:bg-indigo-700 transition duration-300">
+                        Siparişi Onayla
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+        // Supabase bağlantı bilgileri
+         const SUPABASE_URL = "https://xliutvspwodhoavysks.supabase.co";
+	  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+        // Supabase client'ı oluştur
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Sepet verisi
+        let cart = [];
+        
         // Mobile menu toggle
         document.getElementById('mobile-menu-button').addEventListener('click', function() {
             const menu = document.getElementById('mobile-menu');
             menu.classList.toggle('hidden');
         });
 
-        // Simple slider functionality
-        let currentSlide = 0;
-        const slides = document.querySelectorAll('.slide');
+        // Ürünleri yükle
+        async function loadProducts(category = 'all') {
+            try {
+                // Yükleniyor göster
+                document.getElementById('products-loading').classList.remove('hidden');
+                document.getElementById('products-grid').classList.add('hidden');
+                document.getElementById('products-error').classList.add('hidden');
+                
+                let query = supabase
+                    .from('products')
+                    .select('*');
+                
+                if (category !== 'all') {
+                    query = query.eq('category', category);
+                }
+                
+                const { data: products, error } = await query;
+                
+                if (error) throw error;
+                
+                // Ürünleri göster
+                displayProducts(products);
+                
+                // Yükleniyor gizle, ürünleri göster
+                document.getElementById('products-loading').classList.add('hidden');
+                document.getElementById('products-grid').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Ürünler yüklenirken hata oluştu:', error);
+                document.getElementById('products-loading').classList.add('hidden');
+                document.getElementById('products-error').classList.remove('hidden');
+            }
+        }
+
+        // Ürünleri ekranda göster
+        function displayProducts(products) {
+            const productsGrid = document.getElementById('products-grid');
+            productsGrid.innerHTML = '';
+            
+            if (products.length === 0) {
+                productsGrid.innerHTML = `
+                    <div class="col-span-3 text-center py-8">
+                        <i class="fas fa-box-open text-4xl text-gray-400 mb-4"></i>
+                        <h3 class="text-xl font-bold text-gray-600">Bu kategoride ürün bulunamadı</h3>
+                    </div>
+                `;
+                return;
+            }
+            
+            products.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'bg-white rounded-xl shadow-md overflow-hidden product-card card-hover';
+                productCard.innerHTML = `
+                    <div class="relative">
+                        <img src="${product.image_url || 'https://placehold.co/300x200/e2e8f0/4f46e5?text=Ürün+Görseli'}" 
+                             alt="${product.name}" 
+                             class="w-full h-48 object-cover">
+                        <span class="absolute top-3 right-3 bg-indigo-600 text-white text-xs font-semibold px-2 py-1 rounded">
+                            ${product.category}
+                        </span>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="text-xl font-bold mb-2">${product.name}</h3>
+                        <p class="text-gray-600 text-sm mb-4">${product.description || 'Açıklama bulunmamaktadır.'}</p>
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-2xl font-bold text-indigo-600">${product.price}₺</span>
+                            <span class="text-sm text-gray-500">${product.unit || 'Adet'}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <button class="decrease-quantity bg-gray-200 rounded-l-lg px-3 py-1" data-id="${product.id}">
+                                    -
+                                </button>
+                                <input type="number" 
+                                       min="1" 
+                                       value="1" 
+                                       class="quantity-input w-12 text-center border-y border-gray-300 py-1" 
+                                       data-id="${product.id}">
+                                <button class="increase-quantity bg-gray-200 rounded-r-lg px-3 py-1" data-id="${product.id}">
+                                    +
+                                </button>
+                            </div>
+                            <button class="add-to-cart bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300" 
+                                    data-id="${product.id}" 
+                                    data-name="${product.name}" 
+                                    data-price="${product.price}">
+                                Sepete Ekle
+                            </button>
+                        </div>
+                    </div>
+                `;
+                productsGrid.appendChild(productCard);
+            });
+            
+            // Sepete ekleme event listener'ları ekle
+            attachCartEventListeners();
+        }
+
+        // Sepet event listener'larını ekle
+        function attachCartEventListeners() {
+            // Miktar artırma/azaltma
+            document.querySelectorAll('.increase-quantity').forEach(button => {
+                button.addEventListener('click', function() {
+                    const productId = this.getAttribute('data-id');
+                    const input = document.querySelector(`.quantity-input[data-id="${productId}"]`);
+                    input.value = parseInt(input.value) + 1;
+                });
+            });
+            
+            document.querySelectorAll('.decrease-quantity').forEach(button => {
+                button.addEventListener('click', function() {
+                    const productId = this.getAttribute('data-id');
+                    const input = document.querySelector(`.quantity-input[data-id="${productId}"]`);
+                    if (parseInt(input.value) > 1) {
+                        input.value = parseInt(input.value) - 1;
+                    }
+                });
+            });
+            
+            // Sepete ekleme
+            document.querySelectorAll('.add-to-cart').forEach(button => {
+                button.addEventListener('click', function() {
+                    const productId = this.getAttribute('data-id');
+                    const productName = this.getAttribute('data-name');
+                    const productPrice = parseFloat(this.getAttribute('data-price'));
+                    const quantity = parseInt(document.querySelector(`.quantity-input[data-id="${productId}"]`).value);
+                    
+                    addToCart(productId, productName, productPrice, quantity);
+                });
+            });
+        }
+
+        // Sepete ürün ekle
+        function addToCart(id, name, price, quantity) {
+            // Ürün sepette var mı kontrol et
+            const existingItemIndex = cart.findIndex(item => item.id === id);
+            
+            if (existingItemIndex > -1) {
+                // Ürün zaten sepette, miktarı güncelle
+                cart[existingItemIndex].quantity += quantity;
+            } else {
+                // Yeni ürünü sepete ekle
+                cart.push({
+                    id,
+                    name,
+                    price,
+                    quantity
+                });
+            }
+            
+            updateCartDisplay();
+            
+            // Kullanıcıya bildirim göster
+            showNotification(`${quantity} adet ${name} sepete eklendi`);
+        }
+
+        // Sepeti güncelle
+        function updateCartDisplay() {
+            const cartItems = document.getElementById('cart-items');
+            const cartSubtotal = document.getElementById('cart-subtotal');
+            const cartTax = document.getElementById('cart-tax');
+            const cartTotal = document.getElementById('cart-total');
+            const completeOrderBtn = document.getElementById('complete-order');
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<p class="text-gray-500 text-center py-4">Sepetinizde ürün bulunmamaktadır</p>';
+                cartSubtotal.textContent = '0₺';
+                cartTax.textContent = '0₺';
+                cartTotal.textContent = '0₺';
+                completeOrderBtn.disabled = true;
+                return;
+            }
+            
+            // Sepet öğelerini oluştur
+            cartItems.innerHTML = '';
+            let subtotal = 0;
+            
+            cart.forEach(item => {
+                const itemTotal = item.price * item.quantity;
+                subtotal += itemTotal;
+                
+                const cartItem = document.createElement('div');
+                cartItem.className = 'cart-item';
+                cartItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-semibold">${item.name}</h4>
+                            <p class="text-sm text-gray-600">${item.price}₺ x ${item.quantity} ${item.unit || 'adet'}</p>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="font-bold mr-3">${itemTotal}₺</span>
+                            <button class="remove-from-cart text-red-500 hover:text-red-700" data-id="${item.id}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                cartItems.appendChild(cartItem);
+            });
+            
+            // Sepetten kaldırma event listener'larını ekle
+            document.querySelectorAll('.remove-from-cart').forEach(button => {
+                button.addEventListener('click', function() {
+                    const productId = this.getAttribute('data-id');
+                    removeFromCart(productId);
+                });
+            });
+            
+            // Toplamları hesapla ve göster
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+            
+            cartSubtotal.textContent = `${subtotal.toFixed(2)}₺`;
+            cartTax.textContent = `${tax.toFixed(2)}₺`;
+            cartTotal.textContent = `${total.toFixed(2)}₺`;
+            completeOrderBtn.disabled = false;
+        }
+
+        // Sepetten ürün kaldır
+        function removeFromCart(id) {
+            cart = cart.filter(item => item.id !== id);
+            updateCartDisplay();
+            showNotification('Ürün sepetten kaldırıldı');
+        }
+
+        // Bildirim göster
+        function showNotification(message) {
+            // Basit bir bildirim oluştur
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // 3 saniye sonra bildirimi kaldır
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Kategori filtreleme
+        document.querySelectorAll('.category-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                // Aktif butonu güncelle
+                document.querySelectorAll('.category-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.classList.add('bg-gray-200', 'hover:bg-gray-300');
+                });
+                this.classList.add('active');
+                this.classList.remove('bg-gray-200', 'hover:bg-gray-300');
+                
+                // Ürünleri filtrele
+                const category = this.getAttribute('data-category');
+                loadProducts(category);
+            });
+        });
+
+        // Siparişi tamamla
+        document.getElementById('complete-order').addEventListener('click', function() {
+            if (cart.length === 0) return;
+            
+            const orderModal = document.getElementById('order-modal');
+            orderModal.classList.remove('hidden');
+        });
+
+        // Modal'ı kapat
+        document.getElementById('close-modal').addEventListener('click', function() {
+            const orderModal = document.getElementById('order-modal');
+            orderModal.classList.add('hidden');
+        });
+
+        // Yeni sipariş
+        document.getElementById('new-order').addEventListener('click', function() {
+            cart = [];
+            updateCartDisplay();
+            
+            const orderModal = document.getElementById('order-modal');
+            orderModal.classList.add('hidden');
+            
+            document.getElementById('order-confirmation').style.display = 'none';
+            document.getElementById('order-form').style.display = 'block';
+        });
+
+        // Sipariş formu gönderimi
+        document.getElementById('order-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+           // Siparişi Supabase'e kaydet
+	async function saveOrderToSupabase() {
+   	 // Müşteri bilgilerini al
+   	 const customerName = document.getElementById('customerName').value;
+   	 const customerEmail = document.getElementById('customerEmail').value;
+    	const customerPhone = document.getElementById('customerPhone').value;
+    
+    // Validasyon
+    if (!customerName || !customerEmail || !customerPhone) {
+        showNotification('Lütfen tüm müşteri bilgilerini doldurun.', 'error');
+        return;
+    }
+    
+    // Sipariş verilerini hazırla
+    const orderData = {
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        total_amount: 350, // Örnek toplam tutar
+        status: 'pending',
+        order_date: new Date().toISOString(),
+        items: [
+            {
+                product_id: 1,
+                product_name: 'Organik Zeytinyağı',
+                quantity: 1,
+                unit_price: 125,
+                total_price: 125
+            },
+            {
+                product_id: 2,
+                product_name: 'Pamuklu Kumaş',
+                quantity: 5,
+                unit_price: 45,
+                total_price: 225
+            }
+        ]
+    };
+    
+    try {
+        // Siparişi Supabase'e kaydet
+        const { data, error } = await supabase
+            .from('orders')
+            .insert([orderData])
+            .select();
         
-        function showSlide(n) {
-            slides.forEach(slide => slide.classList.remove('active'));
-            currentSlide = (n + slides.length) % slides.length;
-            slides[currentSlide].classList.add('active');
+        if (error) {
+            console.error('Supabase error:', error);
+            showNotification('Sipariş kaydedilirken bir hata oluştu: ' + error.message, 'error');
+            return;
         }
         
-        // Auto slide every 5 seconds
-        setInterval(() => {
-            showSlide(currentSlide + 1);
-        }, 5000);
+        // Başarılı kayıt
+        showNotification('Sipariş başarıyla kaydedildi!');
+        console.log('Sipariş kaydedildi:', data);
+        
+        // Formu temizle
+        document.getElementById('customerName').value = '';
+        document.getElementById('customerEmail').value = '';
+        document.getElementById('customerPhone').value = '';
+        
+    } catch (err) {
+        console.error('Sipariş kaydetme hatası:', err);
+        showNotification('Sipariş kaydedilirken bir hata oluştu.', 'error');
+    }
+}
+            
+            // Sipariş onayını göster
+            document.getElementById('order-form').style.display = 'none';
+            document.getElementById('order-confirmation').style.display = 'block';
+            
+            // Sipariş özetini oluştur
+            const orderSummary = document.getElementById('order-summary');
+            orderSummary.innerHTML = '';
+            
+            cart.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'order-summary-item';
+                itemElement.innerHTML = `
+                    <div class="flex justify-between">
+                        <span>${item.name} x ${item.quantity}</span>
+                        <span>${(item.price * item.quantity).toFixed(2)}₺</span>
+                    </div>
+                `;
+                orderSummary.appendChild(itemElement);
+            });
+            
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+            
+            orderSummary.innerHTML += `
+                <div class="order-summary-item font-bold">
+                    <div class="flex justify-between">
+                        <span>Toplam:</span>
+                        <span>${total.toFixed(2)}₺</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        // Sayfa yüklendiğinde tüm ürünleri getir
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProducts();
+            
+            // Tekrar dene butonu
+            document.getElementById('retry-loading').addEventListener('click', function() {
+                loadProducts();
+            });
+        });
     </script>
 </body>
 </html>
