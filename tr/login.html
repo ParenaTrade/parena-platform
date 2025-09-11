@@ -405,78 +405,88 @@
     });
 
     // 🔹 Kayıt işlemi
-    document.getElementById("registerForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const name = document.getElementById("regName").value;
-      const email = document.getElementById("regEmail").value;
-      const password = document.getElementById("regPassword").value;
-      const confirm = document.getElementById("regPasswordConfirm").value;
-      let role = selectedRoleInput.value;
-      
-      // Özel rol seçildiyse, input değerini al
-      if (role === 'custom') {
-        role = customRoleField.value;
-        if (!role) {
-          showMessage("Lütfen özel rolünüzü belirtin!");
-          return;
-        }
-      }
-      
-      // Rol seçilmemişse hata ver
-      if (!role) {
-        showMessage("Lütfen bir rol seçin!");
-        return;
-      }
-      
-      if (password !== confirm) {
-        showMessage("Şifreler eşleşmiyor!");
-        return;
-      }
+document.getElementById("registerForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = document.getElementById("regName").value;
+  const email = document.getElementById("regEmail").value;
+  const password = document.getElementById("regPassword").value;
+  const confirm = document.getElementById("regPasswordConfirm").value;
+  let role = selectedRoleInput.value;
 
-      // Buton durumunu güncelle
-      registerButton.classList.add("btn-loading");
+  // Özel rol seçildiyse, input değerini al
+  if (role === 'custom') {
+    role = customRoleField.value;
+    if (!role) {
+      showMessage("Lütfen özel rolünüzü belirtin!");
+      return;
+    }
+  }
 
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: name,
-              role: role
-            }
-          }
-        });
+  // Rol seçilmemişse hata ver
+  if (!role) {
+    showMessage("Lütfen bir rol seçin!");
+    return;
+  }
 
-        if (error) {
-          showMessage("Kayıt başarısız: " + error.message);
-          registerButton.classList.remove("btn-loading");
-          return;
-        }
+  if (password !== confirm) {
+    showMessage("Şifreler eşleşmiyor!");
+    return;
+  }
 
-        showMessage("Kayıt başarılı! Giriş yapabilirsiniz.", "success");
-        
-        // Formu temizle
-        document.getElementById("registerForm").reset();
-        
-        // Rol seçimini sıfırla
-        roleOptions.forEach(opt => opt.classList.remove('selected'));
-        selectedRoleInput.value = '';
-        customRoleInput.style.display = 'none';
-        
-        // Giriş sayfasına dön
-        setTimeout(() => {
-          registerSection.classList.remove("active");
-          loginSection.classList.add("active");
-          registerButton.classList.remove("btn-loading");
-        }, 2000);
-        
-      } catch (error) {
-        showMessage("Beklenmeyen bir hata oluştu: " + error.message);
-        registerButton.classList.remove("btn-loading");
+  registerButton.classList.add("btn-loading");
+
+  try {
+    // 1) Auth'a kayıt
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: name } // metadata
       }
     });
 
+    if (error) {
+      showMessage("Kayıt başarısız: " + error.message);
+      registerButton.classList.remove("btn-loading");
+      return;
+    }
+
+    const user = data.user;
+
+    // 2) Profiles tablosuna ekleme
+    if (user) {
+      const { error: insertError } = await supabase.from("profiles").insert([{
+        id: user.id,          // Auth UID
+        email: email,
+        full_name: name,
+        role: role,
+        phone: null,
+        confirm: false,
+        status: "Active",
+        created_at: new Date().toISOString()
+      }]);
+
+      if (insertError) {
+        console.error("Profiles insert hatası:", insertError);
+        showMessage("Kullanıcı profili eklenirken hata oluştu!");
+      }
+    }
+
+    // 3) Başarılı kayıt mesajı
+    showMessage("Kayıt başarılı! Email onayı yapmalısınız.", "success");
+
+    // 2 saniye sonra login ekranına dön
+    setTimeout(() => {
+      registerSection.classList.remove("active");
+      loginSection.classList.add("active");
+    }, 2000);
+
+  } catch (err) {
+    showMessage("Beklenmeyen bir hata oluştu: " + err.message);
+  } finally {
+    registerButton.classList.remove("btn-loading");
+  }
+});
     // 🔹 Şifre sıfırlama
     document.getElementById("forgotPassword").addEventListener("click", async (e) => {
       e.preventDefault();
