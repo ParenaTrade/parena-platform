@@ -301,75 +301,139 @@
   
 
 async function loadSellerUserInfo() {
-  // iframe içindeyken parent.supabase'i kullan
-  const supa = window.parent?.supabase || supabase;
+ document.addEventListener('DOMContentLoaded', function() {
+            // DOM elementlerini seç
+            const userIdInput = document.getElementById('userId');
+            const fetchButton = document.getElementById('fetchUserData');
+            const messageDiv = document.getElementById('message');
+            const userDetailsDiv = document.getElementById('userDetails');
+            
+            // Kullanıcı bilgileri elementleri
+            const userName = document.getElementById('userName');
+            const userRole = document.getElementById('userRole');
+            const userStatus = document.getElementById('userStatus');
+            
+            // Kullanıcı detay elementleri
+            const detailId = document.getElementById('detailId');
+            const detailFullName = document.getElementById('detailFullName');
+            const detailRole = document.getElementById('detailRole');
+            const detailEmail = document.getElementById('detailEmail');
+            const detailCreatedAt = document.getElementById('detailCreatedAt');
+            
+            // Sayfa yüklendiğinde mevcut oturumu kontrol et
+            checkCurrentSession();
+            
+            // Kullanıcı bilgilerini getir butonuna tıklandığında
+            fetchButton.addEventListener('click', function() {
+                const userId = userIdInput.value.trim();
+                if (userId) {
+                    fetchUserData(userId);
+                } else {
+                    showMessage('Lütfen bir kullanıcı ID girin.', 'error');
+                }
+            });
+            
+            // Mevcut oturumu kontrol et
+            async function checkCurrentSession() {
+                try {
+                    const { data: { session }, error } = await supabase.auth.getSession();
+                    
+                    if (error) {
+                        console.error('Oturum kontrol hatası:', error);
+                        showMessage('Oturum kontrolü sırasında hata oluştu. Demo modunda çalışıyorsunuz.', 'error');
+                        return;
+                    }
+                    
+                    if (session && session.user) {
+                        // Oturum açıkken kullanıcı bilgilerini göster
+                        userIdInput.value = session.user.id;
+                        fetchUserData(session.user.id);
+                    }
+                } catch (err) {
+                    console.error('Oturum kontrol hatası:', err);
+                    showMessage('Oturum kontrolü sırasında hata oluştu.', 'error');
+                }
+            }
+            
+            // Kullanıcı verilerini getir
+            async function fetchUserData(userId) {
+                try {
+                    showMessage('<span class="loading"></span> Kullanıcı bilgileri getiriliyor...', 'loading');
+                    
+                    // Supabase'den kullanıcı bilgilerini çek
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, role, email, created_at')
+                        .eq('id', userId)
+                        .single();
+                    
+                    if (error) {
+                        throw error;
+                    }
+                    
+                    if (data) {
+                        // Kullanıcı bilgilerini göster
+                        displayUserData(data);
+                        showMessage('Kullanıcı bilgileri başarıyla getirildi.', 'success');
+                    } else {
+                        showMessage('Kullanıcı bulunamadı.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Kullanıcı bilgileri getirme hatası:', error);
+                    showMessage('Kullanıcı bilgileri getirilirken hata oluştu: ' + error.message, 'error');
+                    
+                    // Demo modu: Gerçek veri yerine örnek veri göster
+                    displayDemoUserData(userId);
+                }
+            }
+            
+            // Kullanıcı bilgilerini ekranda göster
+            function displayUserData(userData) {
+                // Üst bilgi çubuğundaki kullanıcı bilgilerini güncelle
+                userName.textContent = userData.full_name || 'Kullanıcı';
+                userRole.textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+                
+                // Detaylı kullanıcı bilgilerini göster
+                detailId.textContent = userData.id;
+                detailFullName.textContent = userData.full_name || 'Belirtilmemiş';
+                detailRole.textContent = userData.role || 'Belirtilmemiş';
+                detailEmail.textContent = userData.email || 'Belirtilmemiş';
+                
+                if (userData.created_at) {
+                    const date = new Date(userData.created_at);
+                    detailCreatedAt.textContent = date.toLocaleDateString('tr-TR');
+                } else {
+                    detailCreatedAt.textContent = 'Belirtilmemiş';
+                }
+                
+                userDetailsDiv.style.display = 'block';
+            }
+            
+            // Demo modu için örnek kullanıcı bilgilerini göster
+            function displayDemoUserData(userId) {
+                const demoData = {
+                    id: userId,
+                    full_name: 'Demo Kullanıcı',
+                    role: 'Administrator',
+                    email: 'demo@example.com',
+                    created_at: new Date().toISOString()
+                };
+                
+                displayUserData(demoData);
+                showMessage('Supabase bağlantısı kurulamadı. Demo veriler gösteriliyor.', 'error');
+            }
+            
+            // Mesaj göster
+            function showMessage(text, type) {
+                messageDiv.innerHTML = text;
+                messageDiv.className = 'message';
+                if (type) {
+                    messageDiv.classList.add(type);
+                }
+                messageDiv.style.display = 'block';
+            }
+        });
 
-  const { data: { user }, error } = await supa.auth.getUser();
-  if (error || !user) {
-    window.location.href = "../login.html";
-    return;
-  }
-
-  // Profiles tablosundan bilgileri çek
-  const { data: profile, error: profileError } = await supa
-    .from("profiles")
-    .select("full_name, role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError) {
-    console.error("Profil alınamadı:", profileError);
-    $("userName").textContent = user.email;
-    $("userRole").textContent = "Rol: Bilinmiyor";
-  } else {
-    $("userName").textContent = profile.full_name || user.email;
-    $("userRole").textContent = "Rol: " + (profile.role || "Belirtilmemiş");
-  }
-
-  const userStatus = $("userStatus");
-  userStatus.classList.remove("animate-pulse");
-  userStatus.style.backgroundColor = "#10B981";
-}
-
-
-// Çıkış
-$("signOut").addEventListener("click", async () => {
-await supabase.auth.signOut();
-window.location.href = "../login.html";
-});
-
-
-// Satıcı listesini yükle
-async function loadUsers() {
-const { data: users, error } = await supabase
-.from("profiles")
-.select("*")
-.eq("role", "seller")
-.order("created_at", { ascending: false });
-
-
-if (error) {
-console.error("Satıcılar yüklenirken hata:", error);
-return;
-}
-
-
-const list = $("sellerList");
-list.innerHTML = "";
-
-
-users.forEach(user => {
-const div = document.createElement("div");
-div.className = "bg-white p-4 rounded shadow";
-div.innerHTML = `
-<p><strong>${user.full_name || "İsimsiz"}</strong></p>
-<p>Email: ${user.email}</p>
-<p>Rol: ${user.role}</p>
-<p>Durum: ${user.status}</p>
-`;
-list.appendChild(div);
-});
-}
 
 
 // Sayfa yüklenince çalıştır
@@ -719,3 +783,4 @@ loadUsers();
 </script>
 </body>
 </html>
+
