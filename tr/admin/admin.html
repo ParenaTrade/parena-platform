@@ -565,123 +565,75 @@
     </main>
   </div>
 
-  <script>
-    // 🔹 Supabase bağlantı bilgileri
-    const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhbmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
-    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+<script>
+  const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w"; 
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    // Çıkış butonu işlevi
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      try {
-        // Supabase'den çıkış yap
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-          console.error('Çıkış yapılamadı:', error);
-          alert('Çıkış yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
-          return;
-        }
-        
-        // LocalStorage'ı temizle
-        localStorage.removeItem("userEmail");
-        
-        // Login sayfasına yönlendir
-        window.location.href = "login.html";
-      } catch (error) {
-        console.error('Çıkış yapılamadı:', error);
-        alert('Çıkış yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
-      }
-    });
+  // Çıkış
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem("userEmail");
+    window.location.href = "login.html";
+  });
 
-    // Kullanıcı oturumunu kontrol et
-    async function checkUserSession() {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error || !session) {
-        // Kullanıcı oturumu yoksa login sayfasına yönlendir
-        window.location.href = "login.html";
-        return null;
-      }
-      
-      return session;
+  // Kullanıcı bilgilerini yükle
+  async function loadUserInfo() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session) {
+      window.location.href = "tr/admin/admin.html";
+
+      return;
     }
 
-    // Kullanıcı bilgilerini al
-    async function getUserInfo() {
-      try {
-        const session = await checkUserSession();
-        if (!session) return;
-        
-        const { data: { user }, error } = await supabase.auth.getUser();
-        
-        if (error) {
-          console.error('Kullanıcı bilgileri alınamadı:', error);
-          return;
-        }
-        
-        // Kullanıcı bilgilerini göster
-        document.getElementById("userName").textContent = user.user_metadata?.full_name || user.email || "Kullanıcı";
-        document.getElementById("userRole").textContent = `Rol: ${user.user_metadata?.role || "Belirtilmemiş"}`;
-        
-        // Kullanıcı durumunu güncelle
-        const userStatus = document.getElementById("userStatus");
-        userStatus.classList.remove("animate-pulse");
-        userStatus.style.backgroundColor = "#10B981"; // Online rengi
-        
-      } catch (error) {
-        console.error('Kullanıcı bilgileri alınamadı:', error);
-        window.location.href = "login.html";
-      }
+    const user = session.user;
+
+    // profiles tablosundan bilgileri çek
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      console.error("Profil bilgisi alınamadı:", profileError);
+      document.getElementById("userName").textContent = user.email;
+      document.getElementById("userRole").textContent = "Rol: Bilinmiyor";
+    } else {
+      document.getElementById("userName").textContent = profile.full_name || user.email;
+      document.getElementById("userRole").textContent = "Rol: " + (profile.role || "Belirtilmemiş");
     }
 
-    // Sayfa yüklendiğinde kullanıcı bilgilerini al
-    document.addEventListener('DOMContentLoaded', () => {
-      getUserInfo();
-    });
+    // Kullanıcı durumunu yeşil yap
+    const userStatus = document.getElementById("userStatus");
+    userStatus.classList.remove("animate-pulse");
+    userStatus.style.backgroundColor = "#10B981";
+  }
 
-    function loadPage(url) {
-      document.getElementById('contentFrame').src = url;
-      
-      // Tüm aktif menü öğelerini temizle
-      document.querySelectorAll('.menu-item').forEach(item => {
-        item.classList.remove('active');
-      });
-      
-      // Yeni aktif menü öğesini bul ve vurgula
-      const currentMenu = document.querySelector(`.menu-item[onclick*="${url}"]`);
-      if (currentMenu) {
-        currentMenu.classList.add('active');
-      }
-      
-      // Alt menü öğeleri için de aynı işlemi yap
-      document.querySelectorAll('.submenu-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.getAttribute('onclick') && item.getAttribute('onclick').includes(url)) {
-          item.classList.add('active');
-          
-          // Üst menüyü de aktif yap
-          const parentMenu = item.closest('.submenu').previousElementSibling;
-          if (parentMenu) {
-            parentMenu.classList.add('active');
-          }
-        }
-      });
+  document.addEventListener('DOMContentLoaded', () => {
+    loadUserInfo();
+    loadPage('dashboard.html'); // ilk açılışta dashboard
+  });
+
+  // Menü fonksiyonları aynı kalabilir
+  function loadPage(url) {
+    document.getElementById('contentFrame').src = url;
+    document.querySelectorAll('.menu-item, .submenu-item').forEach(i => i.classList.remove('active'));
+    const currentMenu = document.querySelector(`[onclick*="${url}"]`);
+    if (currentMenu) currentMenu.classList.add('active');
+  }
+
+  function toggleMenu(menuId) {
+    const menu = document.getElementById(menuId);
+    const arrow = menu.previousElementSibling.querySelector('.menu-arrow');
+    menu.classList.toggle('open');
+    if (arrow) {
+      arrow.classList.toggle('fa-chevron-down');
+      arrow.classList.toggle('fa-chevron-up');
     }
+  }
+</script>
 
-    // İlk yükleme
-    loadPage('dashboard.html');
-
-    function toggleMenu(menuId) {
-      const menu = document.getElementById(menuId);
-      const arrow = menu.previousElementSibling.querySelector('.menu-arrow');
-      
-      menu.classList.toggle('open');
-      
-      if (arrow) {
-        arrow.classList.toggle('fa-chevron-down');
-        arrow.classList.toggle('fa-chevron-up');
-      }
-    }
-  </script>
 </body>
 </html>
