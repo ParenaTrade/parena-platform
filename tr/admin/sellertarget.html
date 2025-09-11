@@ -653,25 +653,46 @@
             setupEventListeners();
         });
         
-        // Kullanıcı verilerini yükle
-        async function loadUserData() {
-            const { data: userData, error } = await supabase
-                .from("users")
-                .select("name, role")
-                .eq("id", currentUser.id)
-                .single();
-                
-            if (error) {
-                console.error("Kullanıcı verileri yüklenirken hata:", error);
-                showToast("Kullanıcı verileri yüklenirken hata oluştu", "error");
-                return;
-            }
-            
-            currentUserRole = userData.role;
-            document.getElementById("userName").textContent = userData.name;
-            document.getElementById("userRole").textContent = currentUserRole === "admin" ? "Yönetici" : "Satıcı";
+         
+  // Kullanıcı bilgilerini yükleme fonksiyonu
+  async function loadSellerUserInfo() {
+    try {
+      // Mevcut oturumu kontrol et
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Oturum kontrol hatası:', sessionError);
+        return;
+      }
+      
+      if (session && session.user) {
+        // Kullanıcı bilgilerini Supabase'den çek
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (userError) {
+          console.error('Kullanıcı bilgileri getirme hatası:', userError);
+          return;
         }
         
+        if (userData) {
+          // Kullanıcı bilgilerini göster
+          document.getElementById('userName').textContent = userData.full_name || 'Kullanıcı';
+          document.getElementById('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+          document.getElementById('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
+          document.getElementById('userStatus').classList.add('bg-green-500');
+        }
+      } else {
+        // Oturum yoksa login sayfasına yönlendir
+        window.location.href = "login.html";
+      }
+    } catch (error) {
+      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+    }
+  }        
         // Satıcıları yükle
         async function loadSellers() {
             const sellerSelect = document.getElementById("sellerSelect");
