@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin Panel — Satıcı Yönetim Sistemi</title>
+  <!-- Tailwind CSS production için CDN (geliştirme için değil) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -299,154 +300,45 @@
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
   const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
   
-
-async function loadSellerUserInfo() {
- document.addEventListener('DOMContentLoaded', function() {
-            // DOM elementlerini seç
-            const userIdInput = document.getElementById('userId');
-            const fetchButton = document.getElementById('fetchUserData');
-            const messageDiv = document.getElementById('message');
-            const userDetailsDiv = document.getElementById('userDetails');
-            
-            // Kullanıcı bilgileri elementleri
-            const userName = document.getElementById('userName');
-            const userRole = document.getElementById('userRole');
-            const userStatus = document.getElementById('userStatus');
-            
-            // Kullanıcı detay elementleri
-            const detailId = document.getElementById('detailId');
-            const detailFullName = document.getElementById('detailFullName');
-            const detailRole = document.getElementById('detailRole');
-            const detailEmail = document.getElementById('detailEmail');
-            const detailCreatedAt = document.getElementById('detailCreatedAt');
-            
-            // Sayfa yüklendiğinde mevcut oturumu kontrol et
-            checkCurrentSession();
-            
-            // Kullanıcı bilgilerini getir butonuna tıklandığında
-            fetchButton.addEventListener('click', function() {
-                const userId = userIdInput.value.trim();
-                if (userId) {
-                    fetchUserData(userId);
-                } else {
-                    showMessage('Lütfen bir kullanıcı ID girin.', 'error');
-                }
-            });
-            
-            // Mevcut oturumu kontrol et
-            async function checkCurrentSession() {
-                try {
-                    const { data: { session }, error } = await supabase.auth.getSession();
-                    
-                    if (error) {
-                        console.error('Oturum kontrol hatası:', error);
-                        showMessage('Oturum kontrolü sırasında hata oluştu. Demo modunda çalışıyorsunuz.', 'error');
-                        return;
-                    }
-                    
-                    if (session && session.user) {
-                        // Oturum açıkken kullanıcı bilgilerini göster
-                        userIdInput.value = session.user.id;
-                        fetchUserData(session.user.id);
-                    }
-                } catch (err) {
-                    console.error('Oturum kontrol hatası:', err);
-                    showMessage('Oturum kontrolü sırasında hata oluştu.', 'error');
-                }
-            }
-            
-            // Kullanıcı verilerini getir
-            async function fetchUserData(userId) {
-                try {
-                    showMessage('<span class="loading"></span> Kullanıcı bilgileri getiriliyor...', 'loading');
-                    
-                    // Supabase'den kullanıcı bilgilerini çek
-                    const { data, error } = await supabase
-                        .from('profiles')
-                        .select('id, full_name, role, email, created_at')
-                        .eq('id', userId)
-                        .single();
-                    
-                    if (error) {
-                        throw error;
-                    }
-                    
-                    if (data) {
-                        // Kullanıcı bilgilerini göster
-                        displayUserData(data);
-                        showMessage('Kullanıcı bilgileri başarıyla getirildi.', 'success');
-                    } else {
-                        showMessage('Kullanıcı bulunamadı.', 'error');
-                    }
-                } catch (error) {
-                    console.error('Kullanıcı bilgileri getirme hatası:', error);
-                    showMessage('Kullanıcı bilgileri getirilirken hata oluştu: ' + error.message, 'error');
-                    
-                    // Demo modu: Gerçek veri yerine örnek veri göster
-                    displayDemoUserData(userId);
-                }
-            }
-            
-            // Kullanıcı bilgilerini ekranda göster
-            function displayUserData(userData) {
-                // Üst bilgi çubuğundaki kullanıcı bilgilerini güncelle
-                userName.textContent = userData.full_name || 'Kullanıcı';
-                userRole.textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
-                
-                // Detaylı kullanıcı bilgilerini göster
-                detailId.textContent = userData.id;
-                detailFullName.textContent = userData.full_name || 'Belirtilmemiş';
-                detailRole.textContent = userData.role || 'Belirtilmemiş';
-                detailEmail.textContent = userData.email || 'Belirtilmemiş';
-                
-                if (userData.created_at) {
-                    const date = new Date(userData.created_at);
-                    detailCreatedAt.textContent = date.toLocaleDateString('tr-TR');
-                } else {
-                    detailCreatedAt.textContent = 'Belirtilmemiş';
-                }
-                
-                userDetailsDiv.style.display = 'block';
-            }
-            
-            // Demo modu için örnek kullanıcı bilgilerini göster
-            function displayDemoUserData(userId) {
-                const demoData = {
-                    id: userId,
-                    full_name: 'Demo Kullanıcı',
-                    role: 'Administrator',
-                    email: 'demo@example.com',
-                    created_at: new Date().toISOString()
-                };
-                
-                displayUserData(demoData);
-                showMessage('Supabase bağlantısı kurulamadı. Demo veriler gösteriliyor.', 'error');
-            }
-            
-            // Mesaj göster
-            function showMessage(text, type) {
-                messageDiv.innerHTML = text;
-                messageDiv.className = 'message';
-                if (type) {
-                    messageDiv.classList.add(type);
-                }
-                messageDiv.style.display = 'block';
-            }
-        });
-
-
-
-// Sayfa yüklenince çalıştır
-document.addEventListener("DOMContentLoaded", () => {
-loadSellerUserInfo();
-loadUsers();
-});
-
-// Sayfa yüklenince çalıştır
-document.addEventListener("DOMContentLoaded", () => {
-loadSellerUserInfo();
-loadUsers();
-});
+  // Kullanıcı bilgilerini yükleme fonksiyonu
+  async function loadSellerUserInfo() {
+    try {
+      // Mevcut oturumu kontrol et
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Oturum kontrol hatası:', sessionError);
+        return;
+      }
+      
+      if (session && session.user) {
+        // Kullanıcı bilgilerini Supabase'den çek
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (userError) {
+          console.error('Kullanıcı bilgileri getirme hatası:', userError);
+          return;
+        }
+        
+        if (userData) {
+          // Kullanıcı bilgilerini göster
+          document.getElementById('userName').textContent = userData.full_name || 'Kullanıcı';
+          document.getElementById('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+          document.getElementById('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
+          document.getElementById('userStatus').classList.add('bg-green-500');
+        }
+      } else {
+        // Oturum yoksa login sayfasına yönlendir
+        window.location.href = "login.html";
+      }
+    } catch (error) {
+      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+    }
+  }
 
   // DOM elementlerini seçme
   const $ = id => document.getElementById(id);
@@ -592,6 +484,9 @@ loadUsers();
   
   // Sayfa yüklendiğinde
   document.addEventListener('DOMContentLoaded', function() {
+    // Kullanıcı bilgilerini yükle
+    loadSellerUserInfo();
+    
     // Oturum kontrolü
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
@@ -783,4 +678,3 @@ loadUsers();
 </script>
 </body>
 </html>
-
