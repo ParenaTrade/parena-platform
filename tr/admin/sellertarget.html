@@ -329,6 +329,8 @@
         
         .modal-body {
             padding: 1.5rem;
+            max-height: calc(90vh - 130px);
+            overflow-y: auto;
         }
         
         .modal-footer {
@@ -619,9 +621,9 @@
     
     <script>
         // Supabase bağlantı bilgileri
-        const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+        const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhbmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
         
         let currentUser = null;
         let currentUserRole = null;
@@ -631,15 +633,6 @@
         
         // DOM yüklendikten sonra
         document.addEventListener("DOMContentLoaded", async () => {
-            // Oturum kontrolü
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                window.location.href = "login.html";
-                return;
-            }
-            
-            currentUser = session.user;
-            
             // Kullanıcı bilgilerini yükle
             await loadUserData();
             
@@ -653,46 +646,47 @@
             setupEventListeners();
         });
         
-         
-  // Kullanıcı bilgilerini yükleme fonksiyonu
-  async function loadSellerUserInfo() {
-    try {
-      // Mevcut oturumu kontrol et
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('Oturum kontrol hatası:', sessionError);
-        return;
-      }
-      
-      if (session && session.user) {
-        // Kullanıcı bilgilerini Supabase'den çek
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('full_name, role')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (userError) {
-          console.error('Kullanıcı bilgileri getirme hatası:', userError);
-          return;
+        // Kullanıcı bilgilerini yükleme fonksiyonu
+        async function loadUserData() {
+            try {
+                // Iframe ile gelen kullanıcı ID'sini al
+                const urlParams = new URLSearchParams(window.location.search);
+                const userId = urlParams.get('user_id');
+                
+                if (!userId) {
+                    console.error("Kullanıcı ID'si bulunamadı");
+                    document.getElementById("userName").textContent = "Kullanıcı bilgisi yüklenemedi";
+                    return;
+                }
+                
+                // Supabase'den kullanıcı bilgilerini çek
+                const { data: userData, error } = await supabase
+                    .from('profiles')
+                    .select('full_name, role')
+                    .eq('id', userId)
+                    .single();
+                
+                if (error) {
+                    console.error('Kullanıcı bilgileri getirme hatası:', error);
+                    document.getElementById("userName").textContent = "Kullanıcı bilgisi yüklenemedi";
+                    return;
+                }
+                
+                if (userData) {
+                    // Kullanıcı bilgilerini göster
+                    document.getElementById('userName').textContent = userData.full_name || 'Kullanıcı';
+                    document.getElementById('userRole').textContent = userData.role || 'Belirtilmemiş';
+                    
+                    // Global değişkenlere atama
+                    currentUser = { id: userId };
+                    currentUserRole = userData.role;
+                }
+            } catch (error) {
+                console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+                document.getElementById("userName").textContent = "Kullanıcı bilgisi yüklenemedi";
+            }
         }
         
-        if (userData) {
-          // Kullanıcı bilgilerini göster
-          document.getElementById('userName').textContent = userData.full_name || 'Kullanıcı';
-          document.getElementById('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
-          document.getElementById('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
-          document.getElementById('userStatus').classList.add('bg-green-500');
-        }
-      } else {
-        // Oturum yoksa login sayfasına yönlendir
-        window.location.href = "login.html";
-      }
-    } catch (error) {
-      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
-    }
-  }        
         // Satıcıları yükle
         async function loadSellers() {
             const sellerSelect = document.getElementById("sellerSelect");
@@ -704,8 +698,8 @@
             if (currentUserRole === "admin") {
                 // Admin tüm satıcıları görür
                 const { data: sellers, error } = await supabase
-                    .from("users")
-                    .select("id, name")
+                    .from("profiles")
+                    .select("id, full_name")
                     .eq("role", "seller");
                     
                 if (error) {
@@ -714,8 +708,8 @@
                 }
                 
                 sellers.forEach(seller => {
-                    sellerSelect.innerHTML += `<option value="${seller.id}">${seller.name}</option>`;
-                    filterSeller.innerHTML += `<option value="${seller.id}">${seller.name}</option>`;
+                    sellerSelect.innerHTML += `<option value="${seller.id}">${seller.full_name}</option>`;
+                    filterSeller.innerHTML += `<option value="${seller.id}">${seller.full_name}</option>`;
                 });
             } else {
                 // Satıcı sadece kendisini görür
@@ -761,9 +755,9 @@
                 return;
             }
             
-            allTargets = data;
-            updateStatistics(data);
-            renderTargetsTable(data);
+            allTargets = data || [];
+            updateStatistics(data || []);
+            renderTargetsTable(data || []);
         }
         
         // İstatistikleri güncelle
@@ -783,7 +777,6 @@
             
             // Tamamlanan hedef sayısı (basit bir örnek)
             const completedTargets = targets.filter(target => {
-                // Burada daha karmaşık bir tamamlama kontrolü yapılabilir
                 return target.progress >= 100;
             }).length;
             document.getElementById("completedTargets").textContent = completedTargets;
@@ -834,12 +827,12 @@
                 
                 return `
                     <tr>
-                        <td class="font-medium">${target.seller_name}</td>
-                        <td>${target.product_name}</td>
-                        <td>${target.target_quantity} ${target.quantity_unit || "adet"}</td>
-                        <td>${formatCurrency(target.target_revenue)}</td>
-                        <td>${target.growth_rate}%</td>
-                        <td>${target.duration}</td>
+                        <td class="font-medium">${target.seller_name || "Bilinmiyor"}</td>
+                        <td>${target.product_name || "Bilinmiyor"}</td>
+                        <td>${target.target_quantity || 0} ${target.quantity_unit || "adet"}</td>
+                        <td>${formatCurrency(target.target_revenue || 0)}</td>
+                        <td>${target.growth_rate || 0}%</td>
+                        <td>${target.duration || 0}</td>
                         <td>${statusBadge}</td>
                         <td>
                             <div class="flex items-center">
@@ -940,8 +933,8 @@
             if (searchTerm) {
                 const term = searchTerm.toLowerCase();
                 filteredTargets = filteredTargets.filter(target => 
-                    target.product_name.toLowerCase().includes(term) || 
-                    target.seller_name.toLowerCase().includes(term)
+                    (target.product_name && target.product_name.toLowerCase().includes(term)) || 
+                    (target.seller_name && target.seller_name.toLowerCase().includes(term))
                 );
             }
             
@@ -954,7 +947,7 @@
             // Durum filtresi
             const statusFilter = document.getElementById("filterStatus").value;
             if (statusFilter) {
-                // Basit bir durum filtresi - gerçek uygulamada daha karmaşık olabilir
+                // Basit bir durum filtresi
                 filteredTargets = filteredTargets.filter(target => {
                     if (statusFilter === "completed") return (target.progress || 0) >= 100;
                     if (statusFilter === "active") return target.status === "active";
