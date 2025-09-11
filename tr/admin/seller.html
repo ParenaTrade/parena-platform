@@ -300,32 +300,20 @@
   const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
   
 
-
 // ✅ Yardımcı fonksiyon
-const $ = id => document.getElementById(id);
-
-
-// Kullanıcı bilgilerini yükle
-async function loadSellerUserInfo() {
-const { data: { session }, error } = await supabase.auth.getSession();
-if (error || !session) {
-window.location.href = "../login.html";
-return;
-}
-const user = session.user;
 const { data: profile, error: profileError } = await supabase
 .from("profiles")
 .select("full_name, role")
-.eq("id", user.id)
+.eq("id", uid)
 .single();
 
 
 if (profileError) {
 console.error("Profil alınamadı:", profileError);
-$("userName").textContent = user.email;
+$("userName").textContent = "Bilinmiyor";
 $("userRole").textContent = "Rol: Bilinmiyor";
 } else {
-$("userName").textContent = profile.full_name || user.email;
+$("userName").textContent = profile.full_name || "Bilinmiyor";
 $("userRole").textContent = "Rol: " + (profile.role || "Belirtilmemiş");
 }
 
@@ -375,6 +363,12 @@ list.appendChild(div);
 });
 }
 
+
+// Sayfa yüklenince çalıştır
+document.addEventListener("DOMContentLoaded", () => {
+loadSellerUserInfo();
+loadUsers();
+});
 
 // Sayfa yüklenince çalıştır
 document.addEventListener("DOMContentLoaded", () => {
