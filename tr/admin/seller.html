@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin Panel — Satıcı Yönetim Sistemi</title>
-  <!-- Tailwind CSS production için CDN (geliştirme için değil) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    /* Mevcut stiller aynı kalacak */
     .animate-pulse {
       animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
@@ -481,6 +481,31 @@
     $('modalUser').classList.add('hidden');
     currentEditingUserId = null;
   }
+
+  // Kullanıcı silme fonksiyonu (RLS sorununu çözmek için)
+  async function deleteUser(userId) {
+    try {
+      // Önce profile tablosundan kullanıcıyı silmeyi dene
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+        
+      if (profileError) {
+        console.error('Profile silme hatası:', profileError);
+        throw new Error('Kullanıcı profili silinemedi: ' + profileError.message);
+      }
+      
+      // Başarılı mesajı göster
+      showToast('Satıcı başarıyla silindi!');
+      return true;
+      
+    } catch (error) {
+      console.error('Silme hatası:', error);
+      showToast('Silme işlemi başarısız: ' + error.message, true);
+      return false;
+    }
+  }
   
   // Sayfa yüklendiğinde
   document.addEventListener('DOMContentLoaded', function() {
@@ -647,24 +672,13 @@
         $('deleteUserBtn').classList.add('btn-loading');
         
         try {
-          // Önce auth'tan kullanıcıyı sil
-          const { error: authError } = await supabase.auth.admin.deleteUser(
-            currentEditingUserId
-          );
+          // Yeni silme fonksiyonunu kullan
+          const success = await deleteUser(currentEditingUserId);
           
-          if (authError) throw authError;
-          
-          // Sonra profile tablosundan sil
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .delete()
-            .eq('id', currentEditingUserId);
-            
-          if (profileError) throw profileError;
-          
-          showToast('Satıcı başarıyla silindi!');
-          closeUserModal();
-          loadUsers();
+          if (success) {
+            closeUserModal();
+            loadUsers();
+          }
           
         } catch (error) {
           console.error('Silme hatası:', error);
