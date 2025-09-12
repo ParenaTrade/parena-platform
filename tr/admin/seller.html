@@ -340,45 +340,6 @@
     }
   }
 
-  // Bu kontrol, sayfa yüklenince çalışacak
-  async function disableNonAdminControls() {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
-      console.error("Oturum bulunamadı:", sessionError);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .single();
-
-    if (error) {
-      console.error("Rol alınamadı:", error);
-      return;
-    }
-
-    if (data && data.role !== "admin") {
-      // 🔹 Sil butonunu disable et
-      const deleteBtn = document.getElementById("deleteBtn");
-      if (deleteBtn) {
-        deleteBtn.disabled = true;
-        deleteBtn.classList.add("opacity-50", "cursor-not-allowed");
-      }
-
-      // 🔹 Onay checkbox pasif
-      const confirmCheckbox = document.getElementById("confirmCheckbox");
-      if (confirmCheckbox) {
-        confirmCheckbox.disabled = true;
-      }
-    }
-  }
-
-  // Sayfa açıldığında çalışsın
-  document.addEventListener("DOMContentLoaded", disableNonAdminControls);
-
-
   // DOM elementlerini seçme
   const $ = id => document.getElementById(id);
   
@@ -565,7 +526,7 @@
     // Gerçek zamanlı oturum değişikliklerini dinle
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
-        window.location.href = "..login.html";
+        window.location.href = "login.html";
       }
     });
     
@@ -577,7 +538,7 @@
         showToast('Çıkış yapılırken hata oluştu', true);
         $('signOut').classList.remove('btn-loading');
       } else {
-        window.location.href = "..login.html";
+        window.location.href = "login.html";
       }
     });
     
@@ -663,45 +624,32 @@
               }
             }
           });
-
-const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
-  data: { full_name: fullName, role: "seller" }
-});
-
-if (error) {
-  console.error("Davet gönderilemedi:", error.message);
-  alert("Davet gönderilemedi!");
-  return;
-}
-
-const user = data.user;
-
-     
+          
           if (authError) throw authError;
           
           // Profil bilgilerini kaydet
-         const { error: profileError } = await supabase.from("profiles").insert([{
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
               id: authData.user.id,
-              full_name: fullName,
+              full_name: $('u_name').value,
               email: $('u_email').value,
               phone: $('u_phone').value,
               address: $('u_address').value,
               city: $('u_city').value,
               country: $('u_country').value,
               sector: $('u_sector').value,
-              status: "Active"
+              status: $('u_status').value,
               tax_number: $('u_taxnumber').value,
               tax_office: $('u_taxoffice').value,
-              role: "seller",
+              role: 'seller',
               confirm: $('u_confirm').checked,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
-            }]);
-                    
-if (profileError) {
-  console.error("Profil kaydı hatası:", profileError.message);
-}
-
+            });
+            
+          if (profileError) throw profileError;
+          
           showToast('Yeni satıcı başarıyla oluşturuldu!');
         }
         
@@ -744,4 +692,3 @@ if (profileError) {
 </script>
 </body>
 </html>
-
