@@ -145,165 +145,126 @@
     <div id="messageBox" class="hidden mx-4 mb-4 p-4 rounded-lg text-white text-center"></div>
   </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-// Supabase bağlantısı
-const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-const loginSection = document.getElementById("loginSection");
-const registerSection = document.getElementById("registerSection");
-const messageBox = document.getElementById("messageBox");
-const roleOptions = document.querySelectorAll('.role-option');
-const selectedRoleInput = document.getElementById('selectedRole');
-const customRoleInput = document.getElementById('customRoleInput');
-const customRoleField = document.getElementById('customRole');
+    const loginSection = document.getElementById("loginSection");
+    const registerSection = document.getElementById("registerSection");
+    const messageBox = document.getElementById("messageBox");
+    const registerButton = document.getElementById("registerButton");
+    const roleOptions = document.querySelectorAll('.role-option');
+    const selectedRoleInput = document.getElementById('selectedRole');
+    const customRoleInput = document.getElementById('customRoleInput');
+    const customRoleField = document.getElementById('customRole');
 
-function showMessage(msg, type = "error") {
-  messageBox.className = `mx-4 mb-4 p-4 rounded-lg text-white text-center ${type === "error" ? "bg-red-500" : "bg-green-500"}`;
-  messageBox.textContent = msg;
-  messageBox.classList.remove("hidden");
-  setTimeout(() => messageBox.classList.add("hidden"), 4000);
-}
-
-// Form geçişleri
-document.getElementById("showRegister").addEventListener("click", (e) => {
-  e.preventDefault();
-  loginSection.classList.remove("active");
-  registerSection.classList.add("active");
-});
-document.getElementById("backToLogin").addEventListener("click", () => {
-  registerSection.classList.remove("active");
-  loginSection.classList.add("active");
-});
-
-// Rol seçimi
-roleOptions.forEach(opt => {
-  opt.addEventListener("click", () => {
-    roleOptions.forEach(o => o.classList.remove("selected"));
-    opt.classList.add("selected");
-    selectedRoleInput.value = opt.dataset.role;
-    if (opt.dataset.role === "custom") {
-      customRoleInput.style.display = "block";
-      customRoleField.required = true;
-    } else {
-      customRoleInput.style.display = "none";
-      customRoleField.required = false;
+    function showMessage(msg, type="error") {
+      messageBox.className = `mx-4 mb-4 p-4 rounded-lg text-white text-center ${type==="error"?"bg-red-500":"bg-green-500"}`;
+      messageBox.textContent = msg;
+      messageBox.classList.remove("hidden");
+      setTimeout(()=> messageBox.classList.add("hidden"), 4000);
     }
-  });
-});
 
-// Login
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    showMessage("Giriş başarısız: " + error.message);
-    return;
-  }
-  showMessage("Giriş başarılı!", "success");
-  setTimeout(() => window.location.href = "admin/admin.html", 1500);
-});
+    // Form geçişleri
+    document.getElementById("showRegister").addEventListener("click", (e)=>{e.preventDefault(); loginSection.classList.remove("active"); registerSection.classList.add("active");});
+    document.getElementById("backToLogin").addEventListener("click", ()=>{registerSection.classList.remove("active"); loginSection.classList.add("active");});
 
-// Register
-document.getElementById("registerForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const name = document.getElementById("regName").value;
-  const email = document.getElementById("regEmail").value;
-  const password = document.getElementById("regPassword").value;
-  const confirm = document.getElementById("regPasswordConfirm").value;
-  let role = selectedRoleInput.value;
-  if (role === "custom") {
-    role = customRoleField.value;
-  }
-  if (!role) {
-    showMessage("Lütfen rol seçin!");
-    return;
-  }
-  if (password !== confirm) {
-    showMessage("Şifreler eşleşmiyor!");
-    return;
-  }
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: name, role: role } }
-  });
-  if (error) {
-    showMessage("Kayıt başarısız: " + error.message);
-    return;
-  }
-  await supabase.from("profiles").insert([{
-    id: data.user.id,
-    email,
-    full_name: name,
-    role,
-    status: "Active",
-    created_at: new Date().toISOString()
-  }]);
-  showMessage("Kayıt başarılı, emailinizi onaylayın.", "success");
-  setTimeout(() => {
-    registerSection.classList.remove("active");
-    loginSection.classList.add("active");
-  }, 2000);
-});
+    // Rol seçimi
+    roleOptions.forEach(opt=>{
+      opt.addEventListener("click", ()=>{
+        roleOptions.forEach(o=>o.classList.remove("selected"));
+        opt.classList.add("selected");
+        selectedRoleInput.value = opt.dataset.role;
+        if(opt.dataset.role==="custom"){ customRoleInput.style.display="block"; customRoleField.required=true; } 
+        else { customRoleInput.style.display="none"; customRoleField.required=false; }
+      });
+    });
 
-// Forgot Password - DÜZELTİLMİŞ
-document.getElementById("forgotPassword").addEventListener("click", async (e) => {
-  e.preventDefault();
-  const email = document.getElementById("email").value;
-  if (!email) {
-    showMessage("Lütfen e-posta adresinizi girin");
-    return;
-  }
-  
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: "https://parenatrade.vercel.app/login.html"
-  });
-  
-  if (error) {
-    showMessage("Hata: " + error.message);
-  } else {
-    showMessage("Şifre sıfırlama e-postası gönderildi! Lütfen e-posta kutunuzu kontrol edin.", "success");
-  }
-});
+    // Login
+    document.getElementById("loginForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const email=document.getElementById("email").value;
+      const password=document.getElementById("password").value;
+      const {data,error}=await supabase.auth.signInWithPassword({email,password});
+      if(error){showMessage("Giriş başarısız: "+error.message);return;}
+      showMessage("Giriş başarılı!","success");
+      setTimeout(()=>window.location.href="admin/admin.html",1500);
+    });
 
-// Recovery link kontrolü - DÜZELTİLMİŞ
-document.addEventListener("DOMContentLoaded", () => {
-  const hash = window.location.hash;
-  if (hash.includes("type=recovery")) {
-    document.getElementById("resetPasswordModal").classList.remove("hidden");
-  }
-});
+    // Register
+    document.getElementById("registerForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const name=document.getElementById("regName").value;
+      const email=document.getElementById("regEmail").value;
+      const password=document.getElementById("regPassword").value;
+      const confirm=document.getElementById("regPasswordConfirm").value;
+      let role=selectedRoleInput.value;
+      if(role==="custom"){role=customRoleField.value;}
+      if(!role){showMessage("Lütfen rol seçin!");return;}
+      if(password!==confirm){showMessage("Şifreler eşleşmiyor!");return;}
+      const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:name,role:role}}});
+      if(error){showMessage("Kayıt başarısız: "+error.message);return;}
+      await supabase.from("profiles").insert([{id:data.user.id,email,full_name:name,role,status:"Active",created_at:new Date().toISOString()}]);
+      showMessage("Kayıt başarılı, emailinizi onaylayın.","success");
+      setTimeout(()=>{registerSection.classList.remove("active"); loginSection.classList.add("active");},2000);
+    });
 
-// Modal kapatma
-document.getElementById("closeResetModal").addEventListener("click", () => {
-  document.getElementById("resetPasswordModal").classList.add("hidden");
-});
+    // Forgot Password - DÜZELTİLDİ
+    document.getElementById("forgotPassword").addEventListener("click", async (e)=>{
+      e.preventDefault();
+      const email = document.getElementById("email").value;
+      if (!email) {
+        showMessage("Lütfen e-posta adresinizi girin");
+        return;
+      }
+      
+      // Doğru yönlendirme URL'si
+      const redirectUrl = "https://parenatrade.vercel.app/tr/login.html";
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl
+      });
+      
+      if(error){
+        showMessage("Hata: "+error.message);
+      } else {
+        showMessage("Şifre sıfırlama e-postası gönderildi! Lütfen e-posta kutunuzu kontrol edin.","success");
+      }
+    });
 
-// Yeni şifre kaydet
-document.getElementById("resetPasswordForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const pass = document.getElementById("newPassword").value;
-  const confirm = document.getElementById("confirmNewPassword").value;
-  if (pass !== confirm) {
-    showMessage("Şifreler eşleşmiyor!");
-    return;
-  }
-  const { error } = await supabase.auth.updateUser({ password: pass });
-  if (error) {
-    showMessage("Şifre güncellenemedi: " + error.message);
-  } else {
-    showMessage("Şifreniz güncellendi!", "success");
-    document.getElementById("resetPasswordModal").classList.add("hidden");
-    // URL'den hash'i temizle
-    window.location.hash = "";
-  }
+    // Recovery link kontrolü - DÜZELTİLDİ
+    document.addEventListener("DOMContentLoaded", ()=>{
+      const hash = window.location.hash;
+      if (hash.includes("type=recovery")) {
+        document.getElementById("resetPasswordModal").classList.remove("hidden");
+      }
+    });
 
-});
+    // Modal kapatma
+    document.getElementById("closeResetModal").addEventListener("click", ()=>{
+      document.getElementById("resetPasswordModal").classList.add("hidden");
+      // URL'den token'i temizle
+      window.location.hash = "";
+    });
+
+    // Yeni şifre kaydet
+    document.getElementById("resetPasswordForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const pass=document.getElementById("newPassword").value;
+      const confirm=document.getElementById("confirmNewPassword").value;
+      if(pass!==confirm){showMessage("Şifreler eşleşmiyor!");return;}
+      const {error}=await supabase.auth.updateUser({password:pass});
+      if(error){showMessage("Şifre güncellenemedi: "+error.message);}
+      else{
+        showMessage("Şifreniz güncellendi!","success");
+        document.getElementById("resetPasswordModal").classList.add("hidden");
+        // URL'den token'i temizle
+        window.location.hash = "";
+      }
+    });
   </script>
 </body>
 </html>
