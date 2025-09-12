@@ -297,191 +297,120 @@
     const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    // DOM Elementleri
-    const loginSection = document.getElementById("loginSection");
-    const registerSection = document.getElementById("registerSection");
-    const messageBox = document.getElementById("messageBox");
-    const loginButton = document.getElementById("loginButton");
-    const registerButton = document.getElementById("registerButton");
-    const togglePasswordBtn = document.getElementById("togglePassword");
-    const roleOptions = document.querySelectorAll('.role-option');
-    const selectedRoleInput = document.getElementById('selectedRole');
-    const customRoleInput = document.getElementById('customRoleInput');
-    const customRoleField = document.getElementById('customRole');
+<script>
+  const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+  const supabaseKey = "YOUR_PUBLIC_ANON_KEY"; // Supabase anon key buraya
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    // Form geçişleri
-    document.getElementById("showRegister").addEventListener("click", (e) => {
-      e.preventDefault();
-      loginSection.classList.remove("active");
-      registerSection.classList.add("active");
-    });
-    
-    document.getElementById("backToLogin").addEventListener("click", () => {
-      registerSection.classList.remove("active");
-      loginSection.classList.add("active");
-    });
+  const loginSection = document.getElementById("loginSection");
+  const registerSection = document.getElementById("registerSection");
+  const messageBox = document.getElementById("messageBox");
+  const loginButton = document.getElementById("loginButton");
+  const registerButton = document.getElementById("registerButton");
+  const togglePasswordBtn = document.getElementById("togglePassword");
+  const roleOptions = document.querySelectorAll(".role-option");
+  const selectedRoleInput = document.getElementById("selectedRole");
+  const customRoleField = document.getElementById("customRole");
 
-    // Şifre görünürlüğünü değiştirme
-    togglePasswordBtn.addEventListener("click", () => {
-      const passwordInput = document.getElementById("password");
-      const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
-      passwordInput.setAttribute("type", type);
-      togglePasswordBtn.innerHTML = type === "password" ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
-    });
+  // ✅ Mesaj gösterme fonksiyonu
+  function showMessage(msg, type = "error") {
+    messageBox.textContent = msg;
+    messageBox.className =
+      type === "success"
+        ? "text-green-600 text-sm mt-2"
+        : "text-red-600 text-sm mt-2";
+  }
 
-    // Rol seçimi işlemleri
-    roleOptions.forEach(option => {
-      option.addEventListener('click', () => {
-        // Tüm seçeneklerden seçili class'ını kaldır
-        roleOptions.forEach(opt => opt.classList.remove('selected'));
-        
-        // Tıklanan seçeneğe seçili class'ını ekle
-        option.classList.add('selected');
-        
-        // Seçilen rolü hidden input'a ata
-        const selectedRole = option.getAttribute('data-role');
-        selectedRoleInput.value = selectedRole;
-        
-        // Eğer özel rol seçildiyse, özel rol input'unu göster
-        if (selectedRole === 'custom') {
-          customRoleInput.style.display = 'block';
-          customRoleField.setAttribute('required', 'true');
-        } else {
-          customRoleInput.style.display = 'none';
-          customRoleField.removeAttribute('required');
-        }
-      });
+  // ✅ Rol seçme
+  roleOptions.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      roleOptions.forEach((b) => b.classList.remove("bg-blue-600", "text-white"));
+      btn.classList.add("bg-blue-600", "text-white");
+      selectedRoleInput.value = btn.dataset.role;
     });
+  });
 
-    // Mesaj gösterme fonksiyonu
-    function showMessage(message, type = "error") {
-      messageBox.className = `mx-4 mb-4 p-4 rounded-lg text-white text-center ${type === "error" ? "bg-red-500" : "bg-green-500"}`;
-      messageBox.textContent = message;
-      messageBox.classList.remove("hidden");
-      
-      setTimeout(() => {
-        messageBox.classList.add("hidden");
-      }, 5000);
+  // ✅ Kayıt formu
+  document.getElementById("registerForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const fullName = document.getElementById("regName").value;
+    const email = document.getElementById("regEmail").value;
+    const password = document.getElementById("regPassword").value;
+    const confirmPassword = document.getElementById("regPasswordConfirm").value;
+
+    let role = selectedRoleInput.value;
+
+    // Özel rol seçildiyse
+    if (role === "custom") {
+      role = customRoleField.value;
+      if (!role) {
+        showMessage("Lütfen özel rolünüzü belirtin!");
+        return;
+      }
     }
 
-    // 🔹 Giriş işlemi
-    document.getElementById("loginForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      const rememberMe = document.getElementById("remember").checked;
-
-      // Buton durumunu güncelle
-      loginButton.classList.add("btn-loading");
-
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({ 
-          email, 
-          password 
-        });
-
-        if (error) {
-          showMessage("Giriş başarısız: " + error.message);
-          loginButton.classList.remove("btn-loading");
-          return;
-        }
-
-        showMessage("Giriş başarılı! Yönlendiriliyorsunuz...", "success");
-        
-        // Kullanıcı bilgilerini localStorage'a kaydet (isteğe bağlı)
-        if (rememberMe) {
-          localStorage.setItem("userEmail", email);
-        }
-        
-        // 2 saniye sonra yönlendirme
-        setTimeout(() => {
-          window.location.href = "admin/admin.html";
-        }, 2000);
-        
-      } catch (error) {
-        showMessage("Beklenmeyen bir hata oluştu: " + error.message);
-        loginButton.classList.remove("btn-loading");
-      }
-    });
-
-    // 🔹 Kayıt işlemi
- document.getElementById("registerForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const fullName = document.getElementById("fullName").value;
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      const phone = document.getElementById("phone").value;
-      const role = document.getElementById("role").value;
-
-  let role = selectedRoleInput.value;
-
-  // Özel rol seçildiyse, input değerini al
-  if (role === 'custom') {
-    role = customRoleField.value;
     if (!role) {
-      showMessage("Lütfen özel rolünüzü belirtin!");
+      showMessage("Lütfen bir rol seçin!");
       return;
     }
-  }
 
-  // Rol seçilmemişse hata ver
-  if (!role) {
-    showMessage("Lütfen bir rol seçin!");
-    return;
-  }
+    if (password !== confirmPassword) {
+      showMessage("Şifreler eşleşmiyor!");
+      return;
+    }
 
-  if (password !== confirm) {
-    showMessage("Şifreler eşleşmiyor!");
-    return;
-  }
+    registerButton.classList.add("opacity-50", "cursor-not-allowed");
 
-  registerButton.classList.add("btn-loading");
+    try {
+      // 1. Auth kaydı
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName, role: role },
+        },
+      });
 
-      try {
-        // 1. Auth kaydı
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName, role: role, phone: phone }
-          }
-        });
+      if (error) {
+        showMessage("Kayıt başarısız: " + error.message);
+        return;
+      }
 
-        if (error) {
-          alert("Kayıt başarısız: " + error.message);
-          return;
-        }
+      const user = data.user;
+      if (!user) {
+        showMessage("Kullanıcı oluşturulamadı!");
+        return;
+      }
 
-        const user = data.user;
-        if (!user) {
-          alert("Kullanıcı oluşturulamadı.");
-          return;
-        }
-
-        // 2. Profiles tablosuna kayıt
-        const { error: profileError } = await supabase.from("profiles").insert([{
+      // 2. Profiles tablosuna kayıt
+      const { error: profileError } = await supabase.from("profiles").insert([
+        {
           id: user.id,
           email: email,
           full_name: fullName,
           role: role,
-          phone: phone
-        }]);
+          status: "Active",
+        },
+      ]);
 
-        if (profileError) {
-          console.error("Profiles kaydı başarısız:", profileError);
-          alert("Profil kaydı başarısız oldu.");
-          return;
-        }
-
-        alert("Kayıt başarılı! Lütfen e-postanızı doğrulayın.");
-        window.location.href = "login.html";
-
-      } catch (err) {
-        console.error("Kayıt hatası:", err);
-        alert("Kayıt sırasında hata oluştu.");
+      if (profileError) {
+        console.error("Profiles kaydı hatası:", profileError);
+        showMessage("Profil kaydı başarısız oldu!");
+        return;
       }
-    });
+
+      showMessage("Kayıt başarılı! Lütfen e-postanızı doğrulayın.", "success");
+      setTimeout(() => {
+        window.location.href = "login.html";
+      }, 2000);
+    } catch (err) {
+      console.error("Kayıt hatası:", err);
+      showMessage("Kayıt sırasında hata oluştu!");
+    } finally {
+      registerButton.classList.remove("opacity-50", "cursor-not-allowed");
+    }
+  });
 
     // 🔹 Şifre sıfırlama
     document.getElementById("forgotPassword").addEventListener("click", async (e) => {
