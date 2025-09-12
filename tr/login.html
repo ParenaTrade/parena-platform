@@ -405,12 +405,15 @@
     });
 
     // 🔹 Kayıt işlemi
-document.getElementById("registerForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const name = document.getElementById("regName").value;
-  const email = document.getElementById("regEmail").value;
-  const password = document.getElementById("regPassword").value;
-  const confirm = document.getElementById("regPasswordConfirm").value;
+ document.getElementById("registerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const fullName = document.getElementById("fullName").value;
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const phone = document.getElementById("phone").value;
+      const role = document.getElementById("role").value;
+
   let role = selectedRoleInput.value;
 
   // Özel rol seçildiyse, input değerini al
@@ -435,58 +438,51 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
 
   registerButton.classList.add("btn-loading");
 
-  try {
-    // 1) Auth'a kayıt
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: name } // metadata
+      try {
+        // 1. Auth kaydı
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: fullName, role: role, phone: phone }
+          }
+        });
+
+        if (error) {
+          alert("Kayıt başarısız: " + error.message);
+          return;
+        }
+
+        const user = data.user;
+        if (!user) {
+          alert("Kullanıcı oluşturulamadı.");
+          return;
+        }
+
+        // 2. Profiles tablosuna kayıt
+        const { error: profileError } = await supabase.from("profiles").insert([{
+          id: user.id,
+          email: email,
+          full_name: fullName,
+          role: role,
+          phone: phone
+        }]);
+
+        if (profileError) {
+          console.error("Profiles kaydı başarısız:", profileError);
+          alert("Profil kaydı başarısız oldu.");
+          return;
+        }
+
+        alert("Kayıt başarılı! Lütfen e-postanızı doğrulayın.");
+        window.location.href = "login.html";
+
+      } catch (err) {
+        console.error("Kayıt hatası:", err);
+        alert("Kayıt sırasında hata oluştu.");
       }
     });
 
-    if (error) {
-      showMessage("Kayıt başarısız: " + error.message);
-      registerButton.classList.remove("btn-loading");
-      return;
-    }
-
-    const user = data.user;
-
-    // 2) Profiles tablosuna ekleme
-    if (user) {
-      const { error: insertError } = await supabase.from("profiles").insert([{
-        id: user.id,          // Auth UID
-        email: email,
-        full_name: name,
-        role: role,
-        phone: null,
-        confirm: false,
-        status: "Active",
-        created_at: new Date().toISOString()
-      }]);
-
-      if (insertError) {
-        console.error("Profiles insert hatası:", insertError);
-        showMessage("Kullanıcı profili eklenirken hata oluştu!");
-      }
-    }
-
-    // 3) Başarılı kayıt mesajı
-    showMessage("Kayıt başarılı! Email onayı yapmalısınız.", "success");
-
-    // 2 saniye sonra login ekranına dön
-    setTimeout(() => {
-      registerSection.classList.remove("active");
-      loginSection.classList.add("active");
-    }, 2000);
-
-  } catch (err) {
-    showMessage("Beklenmeyen bir hata oluştu: " + err.message);
-  } finally {
-    registerButton.classList.remove("btn-loading");
-  }
-});
     // 🔹 Şifre sıfırlama
     document.getElementById("forgotPassword").addEventListener("click", async (e) => {
       e.preventDefault();
