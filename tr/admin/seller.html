@@ -663,32 +663,45 @@
               }
             }
           });
-          
+
+const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+  data: { full_name: fullName, role: "seller" }
+});
+
+if (error) {
+  console.error("Davet gönderilemedi:", error.message);
+  alert("Davet gönderilemedi!");
+  return;
+}
+
+const user = data.user;
+
+     
           if (authError) throw authError;
           
           // Profil bilgilerini kaydet
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
+         const { error: profileError } = await supabase.from("profiles").insert([{
               id: authData.user.id,
-              full_name: $('u_name').value,
+              full_name: fullName,
               email: $('u_email').value,
               phone: $('u_phone').value,
               address: $('u_address').value,
               city: $('u_city').value,
               country: $('u_country').value,
               sector: $('u_sector').value,
-              status: $('u_status').value,
+              status: "Active"
               tax_number: $('u_taxnumber').value,
               tax_office: $('u_taxoffice').value,
-              role: 'seller',
+              role: "seller",
               confirm: $('u_confirm').checked,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
-            });
-            
-          if (profileError) throw profileError;
-          
+            }]);
+                    
+if (profileError) {
+  console.error("Profil kaydı hatası:", profileError.message);
+}
+
           showToast('Yeni satıcı başarıyla oluşturuldu!');
         }
         
