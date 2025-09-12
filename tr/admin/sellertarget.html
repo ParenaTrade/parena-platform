@@ -635,6 +635,8 @@
         document.addEventListener("DOMContentLoaded", async () => {
             // Kullanıcı bilgilerini yükle
             await loadUserData();
+
+	    await loadSellerUserInfo();
             
             // Satıcıları yükle
             await loadSellers();
@@ -646,46 +648,6 @@
             setupEventListeners();
         });
         
-        // Kullanıcı bilgilerini yükleme fonksiyonu
-        async function loadUserData() {
-            try {
-                // URL parametrelerinden kullanıcı ID'sini al
-                const urlParams = new URLSearchParams(window.location.search);
-                const userId = urlParams.get('user_id');
-                
-                if (!userId) {
-                    console.error("Kullanıcı ID'si bulunamadı");
-                    document.getElementById("userName").textContent = "Kullanıcı bilgisi yüklenemedi";
-                    return;
-                }
-                
-                // Supabase'den kullanıcı bilgilerini çek
-                const { data: userData, error } = await supabase
-                    .from('profiles')
-                    .select('full_name, role')
-                    .eq('id', userId)
-                    .single();
-                
-                if (error) {
-                    console.error('Kullanıcı bilgileri getirme hatası:', error);
-                    document.getElementById("userName").textContent = "Kullanıcı bilgisi yüklenemedi";
-                    return;
-                }
-                
-                if (userData) {
-                    // Kullanıcı bilgilerini göster
-                    document.getElementById('userName').textContent = userData.full_name || 'Kullanıcı';
-                    document.getElementById('userRole').textContent = userData.role || 'Belirtilmemiş';
-                    
-                    // Global değişkenlere atama
-                    currentUser = { id: userId };
-                    currentUserRole = userData.role;
-                }
-            } catch (error) {
-                console.error('Kullanıcı bilgileri yüklenirken hata:', error);
-                document.getElementById("userName").textContent = "Kullanıcı bilgisi yüklenemedi";
-            }
-        }
         
 
   // Kullanıcı bilgilerini yükleme fonksiyonu
@@ -727,58 +689,6 @@
       console.error('Kullanıcı bilgileri yüklenirken hata:', error);
     }
   }
-
-
-  // Kullanıcıları Supabase'den çek ve listele
-  async function loadUsers() {
-    try {
-      // Tüm satıcıları al (role='seller' olanlar)
-      const { data: users, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'seller')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      const pendingList = $('pendingUsersList');
-      const approvedList = $('approvedUsersList');
-      
-      pendingList.innerHTML = '';
-      approvedList.innerHTML = '';
-      
-      let hasPending = false;
-      let hasApproved = false;
-      
-      // Tüm satıcıları döngüyle işle
-      users.forEach((user) => {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-gray-50';
-        tr.innerHTML = `
-          <td class="p-2 border">${escapeHtml(user.full_name || '')}</td>
-          <td class="p-2 border">${escapeHtml(user.email || '')}</td>
-          <td class="p-2 border">
-            <span class="status-badge ${user.confirm ? 'status-approved' : 'status-pending'}">
-              ${user.confirm ? 'Onaylı' : 'Beklemede'}
-            </span>
-          </td>
-          <td class="p-2 border">
-            <button class="btnEditUser px-3 py-1 ${user.confirm ? 'bg-green-400' : 'bg-yellow-400'} rounded text-white hover:opacity-80 transition-opacity">
-              <i class="fas fa-edit mr-1"></i>Detay
-            </button>
-          </td>
-        `;
-        
-
-
-
-
-
-
-
-
-
-
 
 
         // Satıcıları yükle
