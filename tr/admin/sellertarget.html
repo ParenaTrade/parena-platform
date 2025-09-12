@@ -627,7 +627,6 @@
 
   let currentUser = null;
   let isAdmin = false;
-  let currentEditingUserId = null;
 
   // Toast bildirimi gösterme
   function showToast(msg, isError = false, ms = 3000) {
@@ -642,43 +641,49 @@
     }, ms);
   }
 
-  function escapeHtml(unsafe) {
-    if (unsafe === null || unsafe === undefined) return '';
-    return String(unsafe)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
   // Kullanıcı bilgilerini ve rolünü yükle
-  async function loadSellerUserInfo() {
+  async function loadUserInfo() {
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
       if (sessionError) {
         console.error('Oturum kontrol hatası:', sessionError);
         return;
       }
+      
       if (session && session.user) {
         currentUser = session.user;
+        
         // Kullanıcı bilgilerini Supabase'den çek
         const { data: userData, error: userError } = await supabase
           .from('profiles')
           .select('full_name, role')
           .eq('id', session.user.id)
           .single();
+          
         if (userError) {
           console.error('Kullanıcı bilgileri getirme hatası:', userError);
           return;
         }
+        
         if (userData) {
           isAdmin = userData.role === "admin";
+          
           // Kullanıcı bilgilerini göster
-          $('userName').textContent = userData.full_name || 'Kullanıcı';
-          $('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
-          $('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
-          $('userStatus').classList.add('bg-green-500');
+          if ($('userName')) {
+            $('userName').textContent = userData.full_name || 'Kullanıcı';
+          }
+          
+          if ($('userRole')) {
+            $('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+          }
+          
+          if ($('userStatus')) {
+            $('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
+            $('userStatus').classList.add('bg-green-500');
+          }
+          
+          return { user: currentUser, role: userData.role, isAdmin };
         }
       } else {
         window.location.href = "login.html";
@@ -686,155 +691,54 @@
     } catch (error) {
       console.error('Kullanıcı bilgileri yüklenirken hata:', error);
     }
+    
+    return null;
   }
 
-  // Kullanıcıları Supabase'den çek ve listele
-  async function loadUsers() {
-    try {
-      const pendingList = $('pendingUsersList');
-      const approvedList = $('approvedUsersList');
-      pendingList.innerHTML = '';
-      approvedList.innerHTML = '';
-
-      // Sadece admin tüm kullanıcıları görsün, normal kullanıcı sadece kendi verisini görsün
-      let users = [];
-      if (isAdmin) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('role', 'seller')
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        users = data;
-      } else {
-        // Sadece kendi verisini çek
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser.id);
-        if (error) throw error;
-        users = data;
-      }
-
-      let hasPending = false;
-      let hasApproved = false;
-
-      users.forEach((user) => {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-gray-50';
-        tr.innerHTML = `
-          <td class="p-2 border">${escapeHtml(user.full_name || '')}</td>
-          <td class="p-2 border">${escapeHtml(user.email || '')}</td>
-          <td class="p-2 border">
-            <span class="status-badge ${user.confirm ? 'status-approved' : 'status-pending'}">
-              ${user.confirm ? 'Onaylı' : 'Beklemede'}
-            </span>
-          </td>
-          <td class="p-2 border">
-            <button class="btnEditUser px-3 py-1 ${user.confirm ? 'bg-green-400' : 'bg-yellow-400'} rounded text-white hover:opacity-80 transition-opacity">
-              <i class="fas fa-edit mr-1"></i>Detay
-            </button>
-          </td>
-        `;
-        tr.querySelector('.btnEditUser').addEventListener('click', () => {
-          openUserModal(user);
-        });
-        if (user.confirm) {
-          approvedList.appendChild(tr);
-          hasApproved = true;
-        } else {
-          pendingList.appendChild(tr);
-          hasPending = true;
-        }
-      });
-
-      
-
-  
-  function closeUserModal() {
-    $('modalUser').classList.add('hidden');
-    currentEditingUserId = null;
-  }
-
-  
-  document.addEventListener('DOMContentLoaded', async function() {
-    await loadSellerUserInfo();
+  // Sayfa yüklendiğinde çalışacak ana fonksiyon
+  async function initializePage() {
     // Oturum kontrolü
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       window.location.href = "login.html";
       return;
     }
-    await loadUsers();
-
-    // Admin değilse: satırda sadece kendi verisi için "Detay" butonu gözüksün, diğerleri gizli
-    if (!isAdmin) {
-      $('addSeller').classList.add('hidden');
-      // Yenile butonu gereksiz normal kullanıcıya, isterse kaldır
-      $('refreshUsers').classList.add('hidden');
+    
+    // Kullanıcı bilgilerini yükle
+    const userInfo = await loadUserInfo();
+    
+    if (!userInfo) {
+      showToast('Kullanıcı bilgileri yüklenemedi', true);
+      return;
     }
-
+    
     // Gerçek zamanlı oturum değişikliklerini dinle
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
-        window.location.href = "..login.html";
+        window.location.href = "login.html";
       }
     });
 
-    // Çıkış butonu
-    $('signOut').addEventListener('click', async () => {
-      $('signOut').classList.add('btn-loading');
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        showToast('Çıkış yapılırken hata oluştu', true);
-        $('signOut').classList.remove('btn-loading');
-      } else {
-        window.location.href = "..login.html";
-      }
-    });
-
-   
-
-   
-
-    // Modal kapatma düğmeleri
-    $('closeModalUser').addEventListener('click', closeUserModal);
-    $('cancelUserBtn').addEventListener('click', closeUserModal);
-
-    // Yenile butonu
-    $('refreshUsers').addEventListener('click', () => {
-      $('refreshUsers').classList.add('btn-loading');
-      loadUsers();
-      setTimeout(() => {
-        $('refreshUsers').classList.remove('btn-loading');
-        showToast('Satıcı listesi yenilendi');
-      }, 1000);
-    });
-    // Kullanıcı silme
-    $('deleteUserBtn').addEventListener('click', async () => {
-      if (!currentEditingUserId) return;
-      // Sadece admin silebilir
-      if (!isAdmin) {
-        showToast('Silme yetkiniz yok.', true);
-        return;
-      }
-      if (confirm('Bu satıcıyı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) {
-        $('deleteUserBtn').classList.add('btn-loading');
-        try {
-          const success = await deleteUser(currentEditingUserId);
-          if (success) {
-            closeUserModal();
-            loadUsers();
-          }
-        } catch (error) {
-          console.error('Silme hatası:', error);
-          showToast('Silme sırasında hata oluştu: ' + error.message, true);
-        } finally {
-          $('deleteUserBtn').classList.remove('btn-loading');
+    // Çıkış butonu event listener'ı
+    if ($('signOut')) {
+      $('signOut').addEventListener('click', async () => {
+        $('signOut').classList.add('btn-loading');
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          showToast('Çıkış yapılırken hata oluştu', true);
+          $('signOut').classList.remove('btn-loading');
+        } else {
+          window.location.href = "login.html";
         }
-      }
-    });
-  });
+      });
+    }
+    
+    return userInfo;
+  }
+
+  // Sayfa yüklendiğinde initializePage fonksiyonunu çalıştır
+  document.addEventListener('DOMContentLoaded', initializePage);
+
 </script>
 </body>
 </html>
