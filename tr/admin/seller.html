@@ -7,62 +7,16 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* Mevcut stiller aynı kalacak */
-    .animate-pulse {
-      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    .status-badge {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
-      border-radius: 0.25rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-    .status-pending {
-      background-color: #f59e0b;
-      color: white;
-    }
-    .status-approved {
-      background-color: #10b981;
-      color: white;
-    }
-    .status-rejected {
-      background-color: #ef4444;
-      color: white;
-    }
-    .loading-spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255,255,255,.3);
-      border-radius: 50%;
-      border-top-color: #fff;
-      animation: spin 1s ease-in-out infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    .btn-loading {
-      position: relative;
-      color: transparent;
-    }
-    .btn-loading::after {
-      content: '';
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      top: 50%;
-      left: 50%;
-      margin: -10px 0 0 -10px;
-      border: 3px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      border-top-color: #fff;
-      animation: spin 1s ease-in-out infinite;
-    }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .status-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+    .status-pending { background-color: #f59e0b; color: white; }
+    .status-approved { background-color: #10b981; color: white; }
+    .status-rejected { background-color: #ef4444; color: white; }
+    .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-loading { position: relative; color: transparent; }
+    .btn-loading::after { content: ''; position: absolute; width: 20px; height: 20px; top: 50%; left: 50%; margin: -10px 0 0 -10px; border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -295,93 +249,17 @@
 <!-- Supabase CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  // Supabase bağlantı bilgileri
   const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
   const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
   const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-  
-  // Kullanıcı bilgilerini yükleme fonksiyonu
-  async function loadSellerUserInfo() {
-    try {
-      // Mevcut oturumu kontrol et
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('Oturum kontrol hatası:', sessionError);
-        return;
-      }
-      
-      if (session && session.user) {
-        // Kullanıcı bilgilerini Supabase'den çek
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('full_name, role')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (userError) {
-          console.error('Kullanıcı bilgileri getirme hatası:', userError);
-          return;
-        }
-        
-        if (userData) {
-          // Kullanıcı bilgilerini göster
-          document.getElementById('userName').textContent = userData.full_name || 'Kullanıcı';
-          document.getElementById('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
-          document.getElementById('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
-          document.getElementById('userStatus').classList.add('bg-green-500');
-        }
-      } else {
-        // Oturum yoksa login sayfasına yönlendir
-        window.location.href = "login.html";
-      }
-    } catch (error) {
-      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
-    }
-  }
-
-  // Bu kontrol, sayfa yüklenince çalışacak
-  async function disableNonAdminControls() {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
-      console.error("Oturum bulunamadı:", sessionError);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .single();
-
-    if (error) {
-      console.error("Rol alınamadı:", error);
-      return;
-    }
-
-    if (data && data.role !== "admin") {
-      // 🔹 Sil butonunu disable et
-      const deleteBtn = document.getElementById("deleteBtn");
-      if (deleteBtn) {
-        deleteBtn.disabled = true;
-        deleteBtn.classList.add("opacity-50", "cursor-not-allowed");
-      }
-
-      // 🔹 Onay checkbox pasif
-      const confirmCheckbox = document.getElementById("confirmCheckbox");
-      if (confirmCheckbox) {
-        confirmCheckbox.disabled = true;
-      }
-    }
-  }
-
-  // Sayfa açıldığında çalışsın
-  document.addEventListener("DOMContentLoaded", disableNonAdminControls);
-
 
   // DOM elementlerini seçme
   const $ = id => document.getElementById(id);
-  
+
+  let currentUser = null;
+  let isAdmin = false;
+  let currentEditingUserId = null;
+
   // Toast bildirimi gösterme
   function showToast(msg, isError = false, ms = 3000) {
     const t = $('toast');
@@ -394,8 +272,7 @@
       setTimeout(() => t.classList.add('invisible'), 300); 
     }, ms);
   }
-  
-  // HTML escape function
+
   function escapeHtml(unsafe) {
     if (unsafe === null || unsafe === undefined) return '';
     return String(unsafe)
@@ -405,29 +282,74 @@
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
   }
-  
+
+  // Kullanıcı bilgilerini ve rolünü yükle
+  async function loadSellerUserInfo() {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('Oturum kontrol hatası:', sessionError);
+        return;
+      }
+      if (session && session.user) {
+        currentUser = session.user;
+        // Kullanıcı bilgilerini Supabase'den çek
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', session.user.id)
+          .single();
+        if (userError) {
+          console.error('Kullanıcı bilgileri getirme hatası:', userError);
+          return;
+        }
+        if (userData) {
+          isAdmin = userData.role === "admin";
+          // Kullanıcı bilgilerini göster
+          $('userName').textContent = userData.full_name || 'Kullanıcı';
+          $('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+          $('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
+          $('userStatus').classList.add('bg-green-500');
+        }
+      } else {
+        window.location.href = "login.html";
+      }
+    } catch (error) {
+      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+    }
+  }
+
   // Kullanıcıları Supabase'den çek ve listele
   async function loadUsers() {
     try {
-      // Tüm satıcıları al (role='seller' olanlar)
-      const { data: users, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'seller')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
       const pendingList = $('pendingUsersList');
       const approvedList = $('approvedUsersList');
-      
       pendingList.innerHTML = '';
       approvedList.innerHTML = '';
-      
+
+      // Sadece admin tüm kullanıcıları görsün, normal kullanıcı sadece kendi verisini görsün
+      let users = [];
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'seller')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        users = data;
+      } else {
+        // Sadece kendi verisini çek
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id);
+        if (error) throw error;
+        users = data;
+      }
+
       let hasPending = false;
       let hasApproved = false;
-      
-      // Tüm satıcıları döngüyle işle
+
       users.forEach((user) => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-50';
@@ -445,13 +367,9 @@
             </button>
           </td>
         `;
-        
-        // Düzenleme butonuna event listener ekle
         tr.querySelector('.btnEditUser').addEventListener('click', () => {
           openUserModal(user);
         });
-        
-        // Onay durumuna göre ilgili listeye ekle
         if (user.confirm) {
           approvedList.appendChild(tr);
           hasApproved = true;
@@ -460,8 +378,7 @@
           hasPending = true;
         }
       });
-      
-      // Eğer veri yoksa mesaj göster
+
       if (!hasPending) {
         pendingList.innerHTML = `
           <tr>
@@ -471,7 +388,6 @@
           </tr>
         `;
       }
-      
       if (!hasApproved) {
         approvedList.innerHTML = `
           <tr>
@@ -481,18 +397,15 @@
           </tr>
         `;
       }
-      
     } catch (error) {
       console.error('Satıcılar yüklenirken hata:', error);
       showToast('Satıcılar yüklenirken hata oluştu', true);
     }
   }
-  
+
   // Kullanıcı modalını aç
-  let currentEditingUserId = null;
   function openUserModal(userData = null) {
     if (userData) {
-      // Modalı kullanıcı verileri ile doldur
       $('u_name').value = userData.full_name || '';
       $('u_email').value = userData.email || '';
       $('u_phone').value = userData.phone || '';
@@ -504,71 +417,80 @@
       $('u_taxnumber').value = userData.tax_number || '';
       $('u_taxoffice').value = userData.tax_office || '';
       $('u_confirm').checked = userData.confirm || false;
-      
       currentEditingUserId = userData.id;
     } else {
-      // Modalı temizle (yeni kullanıcı için)
       $('formUser').reset();
       currentEditingUserId = null;
     }
-    
+
+    // Admin değilse: sadece kendi verisini düzenleyebilir, sil/değiştir butonları kapalı, yeni kullanıcı ekleyemez
+    if (!isAdmin) {
+      // Ekleme yok, sadece kendi detayına Edit ile gelir
+      $('u_name').readOnly = true;
+      $('u_email').readOnly = true;
+      $('u_confirm').disabled = true;
+      $('addSeller').classList.add('hidden');
+      $('deleteUserBtn').classList.add('hidden');
+      // E-posta readonly, onay checkbox disable, sil butonu gizli
+    } else {
+      $('u_name').readOnly = false;
+      $('u_email').readOnly = false;
+      $('u_confirm').disabled = false;
+      $('addSeller').classList.remove('hidden');
+      $('deleteUserBtn').classList.remove('hidden');
+    }
+
     $('modalUser').classList.remove('hidden');
   }
-  
-  // Kullanıcı modalını kapat
+
   function closeUserModal() {
     $('modalUser').classList.add('hidden');
     currentEditingUserId = null;
   }
 
-  // Kullanıcı silme fonksiyonu (RLS sorununu çözmek için)
   async function deleteUser(userId) {
     try {
-      // Önce profile tablosundan kullanıcıyı silmeyi dene
       const { error: profileError } = await supabase
         .from('profiles')
         .delete()
         .eq('id', userId);
-        
       if (profileError) {
         console.error('Profile silme hatası:', profileError);
         throw new Error('Kullanıcı profili silinemedi: ' + profileError.message);
       }
-      
-      // Başarılı mesajı göster
       showToast('Satıcı başarıyla silindi!');
       return true;
-      
     } catch (error) {
       console.error('Silme hatası:', error);
       showToast('Silme işlemi başarısız: ' + error.message, true);
       return false;
     }
   }
-  
-  // Sayfa yüklendiğinde
-  document.addEventListener('DOMContentLoaded', function() {
-    // Kullanıcı bilgilerini yükle
-    loadSellerUserInfo();
-    
+
+  document.addEventListener('DOMContentLoaded', async function() {
+    await loadSellerUserInfo();
     // Oturum kontrolü
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        window.location.href = "login.html";
-        return;
-      }
-      
-      // Kullanıcıları yükle
-      loadUsers();
-    });
-    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      window.location.href = "login.html";
+      return;
+    }
+    await loadUsers();
+
+    // Admin değilse: satırda sadece kendi verisi için "Detay" butonu gözüksün, diğerleri gizli
+    if (!isAdmin) {
+      $('addSeller').classList.add('hidden');
+      // Yenile butonu gereksiz normal kullanıcıya, isterse kaldır
+      $('refreshUsers').classList.add('hidden');
+    }
+
     // Gerçek zamanlı oturum değişikliklerini dinle
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         window.location.href = "..login.html";
       }
     });
-    
+
     // Çıkış butonu
     $('signOut').addEventListener('click', async () => {
       $('signOut').classList.add('btn-loading');
@@ -580,7 +502,7 @@
         window.location.href = "..login.html";
       }
     });
-    
+
     // Tab değiştirme işlevselliği
     const tabs = document.querySelectorAll('.tab-btn');
     tabs.forEach(tab => {
@@ -589,24 +511,22 @@
         tabs.forEach(t => t.classList.add('bg-gray-200'));
         this.classList.remove('bg-gray-200');
         this.classList.add('bg-indigo-600', 'text-white');
-        
-        // Tüm sayfaları gizle, sadece tıklananı göster
         document.querySelectorAll('.page').forEach(page => {
           page.classList.add('hidden');
         });
         $(this.dataset.page).classList.remove('hidden');
       });
     });
-    
+
     // Yeni satıcı butonu
     $('addSeller').addEventListener('click', () => {
       openUserModal();
     });
-    
+
     // Modal kapatma düğmeleri
     $('closeModalUser').addEventListener('click', closeUserModal);
     $('cancelUserBtn').addEventListener('click', closeUserModal);
-    
+
     // Yenile butonu
     $('refreshUsers').addEventListener('click', () => {
       $('refreshUsers').classList.add('btn-loading');
@@ -616,19 +536,16 @@
         showToast('Satıcı listesi yenilendi');
       }, 1000);
     });
-    
+
     // Form gönderme
     $('formUser').addEventListener('submit', async (e) => {
       e.preventDefault();
-      
       $('saveUserBtn').classList.add('btn-loading');
-      
       try {
         if (currentEditingUserId) {
-          // Mevcut kullanıcıyı güncelle
-          const { error } = await supabase
-            .from('profiles')
-            .update({
+          // Sadece admin veya kendi id'si ise güncelleyebilir!
+          if (isAdmin || currentEditingUserId === currentUser.id) {
+            const updateFields = {
               full_name: $('u_name').value,
               email: $('u_email').value,
               phone: $('u_phone').value,
@@ -639,20 +556,29 @@
               status: $('u_status').value,
               tax_number: $('u_taxnumber').value,
               tax_office: $('u_taxoffice').value,
-              confirm: $('u_confirm').checked,
               updated_at: new Date().toISOString()
-            })
-            .eq('id', currentEditingUserId);
-            
-          if (error) throw error;
-          
-          showToast('Satıcı bilgileri başarıyla güncellendi!');
+            };
+            // Sadece admin onay durumunu değiştirebilir
+            if (isAdmin) {
+              updateFields.confirm = $('u_confirm').checked;
+            }
+            const { error } = await supabase
+              .from('profiles')
+              .update(updateFields)
+              .eq('id', currentEditingUserId);
+            if (error) throw error;
+            showToast('Satıcı bilgileri başarıyla güncellendi!');
+          } else {
+            showToast('Bu işlemi yapmaya yetkiniz yok.', true);
+          }
         } else {
-          // Yeni kullanıcı oluştur
-          // Önce auth'ta kullanıcı oluştur, sonra profile ekle
+          // Yalnızca admin yeni kullanıcı ekleyebilir
+          if (!isAdmin) {
+            showToast('Yeni kullanıcı ekleme yetkiniz yok.', true);
+            return;
+          }
           const email = $('u_email').value;
-          const password = Math.random().toString(36).slice(-8); // Rastgele şifre
-          
+          const password = Math.random().toString(36).slice(-8);
           const { data: authData, error: authError } = await supabase.auth.signUp({
             email,
             password,
@@ -663,10 +589,7 @@
               }
             }
           });
-          
           if (authError) throw authError;
-          
-          // Profil bilgilerini kaydet
           const { error: profileError } = await supabase
             .from('profiles')
             .insert({
@@ -686,15 +609,11 @@
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             });
-            
           if (profileError) throw profileError;
-          
           showToast('Yeni satıcı başarıyla oluşturuldu!');
         }
-        
         closeUserModal();
         loadUsers();
-        
       } catch (error) {
         console.error('İşlem hatası:', error);
         showToast('İşlem sırasında hata oluştu: ' + error.message, true);
@@ -702,23 +621,23 @@
         $('saveUserBtn').classList.remove('btn-loading');
       }
     });
-    
+
     // Kullanıcı silme
     $('deleteUserBtn').addEventListener('click', async () => {
       if (!currentEditingUserId) return;
-      
+      // Sadece admin silebilir
+      if (!isAdmin) {
+        showToast('Silme yetkiniz yok.', true);
+        return;
+      }
       if (confirm('Bu satıcıyı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) {
         $('deleteUserBtn').classList.add('btn-loading');
-        
         try {
-          // Yeni silme fonksiyonunu kullan
           const success = await deleteUser(currentEditingUserId);
-          
           if (success) {
             closeUserModal();
             loadUsers();
           }
-          
         } catch (error) {
           console.error('Silme hatası:', error);
           showToast('Silme sırasında hata oluştu: ' + error.message, true);
@@ -731,4 +650,3 @@
 </script>
 </body>
 </html>
-
