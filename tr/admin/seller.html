@@ -291,6 +291,46 @@
 
 <!-- Toast Bildirimi -->
 <div id="toast" class="fixed right-6 bottom-6 invisible bg-gray-900 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300"></div>
+<script>
+  // Supabase client zaten tanımlı olmalı (supabase değişkeni)
+  // Bu kontrol, sayfa yüklenince çalışacak
+  async function disableNonAdminControls() {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      console.error("Oturum bulunamadı:", sessionError);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .single();
+
+    if (error) {
+      console.error("Rol alınamadı:", error);
+      return;
+    }
+
+    if (data && data.role !== "admin") {
+      // 🔹 Sil butonunu disable et
+      const deleteBtn = document.getElementById("deleteBtn");
+      if (deleteBtn) {
+        deleteBtn.disabled = true;
+        deleteBtn.classList.add("opacity-50", "cursor-not-allowed");
+      }
+
+      // 🔹 Onay checkbox pasif
+      const confirmCheckbox = document.getElementById("confirmCheckbox");
+      if (confirmCheckbox) {
+        confirmCheckbox.disabled = true;
+      }
+    }
+  }
+
+  // Sayfa açıldığında çalışsın
+  document.addEventListener("DOMContentLoaded", disableNonAdminControls);
+</script>
 
 <!-- Supabase CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -626,7 +666,20 @@
           });
           
           if (authError) throw authError;
+
+ // Profil onay email gönder
           
+const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+  data: { full_name: fullName, role: "seller" }
+});
+
+if (error) {
+  console.error("Davet gönderilemedi:", error.message);
+  alert("Davet gönderilemedi!");
+  return;
+}
+
+
           // Profil bilgilerini kaydet
           const { error: profileError } = await supabase
             .from('profiles')
@@ -639,7 +692,7 @@
               city: $('u_city').value,
               country: $('u_country').value,
               sector: $('u_sector').value,
-              status: $('u_status').value,
+              status: "Active"
               tax_number: $('u_taxnumber').value,
               tax_office: $('u_taxoffice').value,
               role: 'seller',
@@ -663,7 +716,13 @@
         $('saveUserBtn').classList.remove('btn-loading');
       }
     });
+
+
+if (profileError) {
+  console.error("Profil kaydı hatası:", profileError.message);
+}
     
+
     // Kullanıcı silme
     $('deleteUserBtn').addEventListener('click', async () => {
       if (!currentEditingUserId) return;
