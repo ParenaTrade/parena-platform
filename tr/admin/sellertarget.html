@@ -613,83 +613,56 @@
         </div>
     </div>
     
-    <!-- Toast Bildirimi Konteyneri -->
-    <div id="toastContainer"></div>
+<!-- Toast Bildirimi -->
+<div id="toast" class="fixed right-6 bottom-6 invisible bg-gray-900 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300"></div>
 
-    <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.35.0/dist/supabase.min.js"></script>
-    
-    <script>
-        // Supabase bağlantı bilgileri
-        const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
-        const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
-        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
-        
-        let currentUser = null;
-        let currentUserRole = null;
-        let allTargets = [];
-        let currentPage = 1;
-        const itemsPerPage = 10;
-        
-        // DOM yüklendikten sonra
-        document.addEventListener("DOMContentLoaded", async () => {
-            // Kullanıcı bilgilerini yükle
-            await loadUserData();
-            
-            // Satıcıları yükle
-            await loadSellers();
-            
-            // Hedefleri yükle
-            await loadTargets();
-            
-            // Event listener'ları ekle
-            setupEventListeners();
-        });
-        
-
-
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // Supabase bağlantı bilgileri
+  const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+  
+  // Kullanıcı bilgilerini yükleme fonksiyonu
+  async function loadSellerUserInfo() {
+    try {
+      // Mevcut oturumu kontrol et
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-        // Kullanıcı bilgilerini yükleme fonksiyonu
-        async function loadUserData() {
-            try {
-                // URL parametrelerinden kullanıcı ID'sini al
-                const urlParams = new URLSearchParams(window.location.search);
-                const userId = urlParams.get('user_id');
-                
-                if (!userId) {
-                    console.error("Kullanıcı ID'si bulunamadı");
-                    document.getElementById("userName").textContent = "Kullanıcı bilgisi yüklenemedi";
-                    return;
-                }
-                
-                // Supabase'den kullanıcı bilgilerini çek
-                const { data: userData, error } = await supabase
-                    .from('profiles')
-                    .select('full_name, role')
-                    .eq('id', userId)
-                    .single();
-                
-                if (error) {
-                    console.error('Kullanıcı bilgileri getirme hatası:', error);
-                    document.getElementById("userName").textContent = "Kullanıcı bilgisi yüklenemedi";
-                    return;
-                }
-                
-                if (userData) {
-                    // Kullanıcı bilgilerini göster
-                    document.getElementById('userName').textContent = userData.full_name || 'Kullanıcı';
-                    document.getElementById('userRole').textContent = userData.role || 'Belirtilmemiş';
-                    
-                    // Global değişkenlere atama
-                    currentUser = { id: userId };
-                    currentUserRole = userData.role;
-                }
-            } catch (error) {
-                console.error('Kullanıcı bilgileri yüklenirken hata:', error);
-                document.getElementById("userName").textContent = "Kullanıcı bilgisi yüklenemedi";
-            }
+      if (sessionError) {
+        console.error('Oturum kontrol hatası:', sessionError);
+        return;
+      }
+      
+      if (session && session.user) {
+        // Kullanıcı bilgilerini Supabase'den çek
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (userError) {
+          console.error('Kullanıcı bilgileri getirme hatası:', userError);
+          return;
         }
-
+        
+        if (userData) {
+          // Kullanıcı bilgilerini göster
+          document.getElementById('userName').textContent = userData.full_name || 'Kullanıcı';
+          document.getElementById('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+          document.getElementById('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
+          document.getElementById('userStatus').classList.add('bg-green-500');
+        }
+      } else {
+        // Oturum yoksa login sayfasına yönlendir
+        window.location.href = "login.html";
+      }
+    } catch (error) {
+      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+    }
+  }
 
 
 
