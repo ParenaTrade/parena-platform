@@ -433,8 +433,8 @@
             <div class="card p-4">
                 <div class="flex justify-between items-start">
                     <div>
-                        <p class="text-sm font-medium text-gray-600">Aktif Hedefler</p>
-                        <h3 class="text-2xl font-bold text-gray-800 mt-1" id="activeTargets">0</h3>
+                        <p class="text-sm font-medium text-gray-600">Ortalama Büyüme</p>
+                        <h3 class="text-2xl font-bold text-gray-800 mt-1" id="avgGrowth">0%</h3>
                     </div>
                     <div class="bg-blue-100 p-3 rounded-full">
                         <i class="fas fa-chart-line text-blue-600 text-xl"></i>
@@ -481,6 +481,7 @@
                             <option value="">Tüm Durumlar</option>
                             <option value="active">Aktif</option>
                             <option value="completed">Tamamlandı</option>
+                            <option value="expired">Süresi Dolmuş</option>
                         </select>
                     </div>
                 </div>
@@ -490,18 +491,19 @@
                         <thead>
                             <tr>
                                 <th>Satıcı</th>
-                                <th>Ürün</th>
+                                <th>Hedef Ürün</th>
                                 <th>Hedef Miktar</th>
-                                <th>Hedef Tutar</th>
-                                <th>Başlangıç</th>
-                                <th>Bitiş</th>
+                                <th>Hedef Ciro (USD)</th>
+                                <th>Büyüme %</th>
+                                <th>Süre (Ay)</th>
                                 <th>Durum</th>
+                                <th>İlerleme</th>
                                 <th>İşlemler</th>
                             </tr>
                         </thead>
                         <tbody id="targetsTableBody">
                             <tr>
-                                <td colspan="8" class="text-center py-8">
+                                <td colspan="9" class="text-center py-8">
                                     <div class="flex justify-center">
                                         <div class="loader"></div>
                                     </div>
@@ -548,11 +550,9 @@
                         </select>
                     </div>
                     
-                    <div id="productSelectRow">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Ürün <span class="text-red-500">*</span></label>
-                        <select class="form-select" id="productSelect" required>
-                            <option value="">Seçin</option>
-                        </select>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hedef Ürün <span class="text-red-500">*</span></label>
+                        <input type="text" class="form-input" id="productName" placeholder="Ürün adı" required>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -574,40 +574,24 @@
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Hedef Tutar <span class="text-red-500">*</span></label>
-                            <input type="number" class="form-input" id="targetAmount" placeholder="0" min="0" step="0.01" required>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Para Birimi</label>
-                            <select class="form-select" id="targetCurrency">
-                                <option value="USD" selected>USD</option>
-                                <option value="EUR">EUR</option>
-                                <option value="TRY">TRY</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi <span class="text-red-500">*</span></label>
-                            <input type="date" class="form-input" id="startDate" required>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi <span class="text-red-500">*</span></label>
-                            <input type="date" class="form-input" id="endDate" required>
-                        </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hedef Ciro (USD) <span class="text-red-500">*</span></label>
+                        <input type="number" class="form-input" id="targetRevenue" placeholder="0" min="0" step="0.01" required>
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Durum</label>
-                        <div class="flex items-center mt-2">
-                            <input id="achieved" type="checkbox" class="h-5 w-5 rounded">
-                            <span class="ml-2">Hedef tamamlandı</span>
-                        </div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Yıllık Büyüme Oranı (%) <span class="text-red-500">*</span></label>
+                        <input type="number" class="form-input" id="growthRate" placeholder="0" min="0" step="0.01" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hedef Süresi (Ay) <span class="text-red-500">*</span></label>
+                        <input type="number" class="form-input" id="targetDuration" placeholder="0" min="1" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi</label>
+                        <input type="date" class="form-input" id="startDate">
                     </div>
                     
                     <div>
@@ -644,7 +628,6 @@
         let currentUser = null;
         let currentUserRole = null;
         let allTargets = [];
-        let allProducts = [];
         let currentPage = 1;
         const itemsPerPage = 10;
         
@@ -655,9 +638,6 @@
             
             // Satıcıları yükle
             await loadSellers();
-            
-            // Ürünleri yükle
-            await loadProducts();
             
             // Hedefleri yükle
             await loadTargets();
@@ -707,6 +687,100 @@
             }
         }
         
+
+  // Kullanıcı bilgilerini yükleme fonksiyonu
+  async function loadSellerUserInfo() {
+    try {
+      // Mevcut oturumu kontrol et
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Oturum kontrol hatası:', sessionError);
+        return;
+      }
+      
+      if (session && session.user) {
+        // Kullanıcı bilgilerini Supabase'den çek
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (userError) {
+          console.error('Kullanıcı bilgileri getirme hatası:', userError);
+          return;
+        }
+        
+        if (userData) {
+          // Kullanıcı bilgilerini göster
+          document.getElementById('userName').textContent = userData.full_name || 'Kullanıcı';
+          document.getElementById('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+          document.getElementById('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
+          document.getElementById('userStatus').classList.add('bg-green-500');
+        }
+      } else {
+        // Oturum yoksa login sayfasına yönlendir
+        window.location.href = "login.html";
+      }
+    } catch (error) {
+      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+    }
+  }
+
+
+  // Kullanıcıları Supabase'den çek ve listele
+  async function loadUsers() {
+    try {
+      // Tüm satıcıları al (role='seller' olanlar)
+      const { data: users, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'seller')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      const pendingList = $('pendingUsersList');
+      const approvedList = $('approvedUsersList');
+      
+      pendingList.innerHTML = '';
+      approvedList.innerHTML = '';
+      
+      let hasPending = false;
+      let hasApproved = false;
+      
+      // Tüm satıcıları döngüyle işle
+      users.forEach((user) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50';
+        tr.innerHTML = `
+          <td class="p-2 border">${escapeHtml(user.full_name || '')}</td>
+          <td class="p-2 border">${escapeHtml(user.email || '')}</td>
+          <td class="p-2 border">
+            <span class="status-badge ${user.confirm ? 'status-approved' : 'status-pending'}">
+              ${user.confirm ? 'Onaylı' : 'Beklemede'}
+            </span>
+          </td>
+          <td class="p-2 border">
+            <button class="btnEditUser px-3 py-1 ${user.confirm ? 'bg-green-400' : 'bg-yellow-400'} rounded text-white hover:opacity-80 transition-opacity">
+              <i class="fas fa-edit mr-1"></i>Detay
+            </button>
+          </td>
+        `;
+        
+
+
+
+
+
+
+
+
+
+
+
+
         // Satıcıları yükle
         async function loadSellers() {
             const sellerSelect = document.getElementById("sellerSelect");
@@ -740,39 +814,12 @@
             }
         }
         
-        // Ürünleri yükle
-        async function loadProducts() {
-            const productSelect = document.getElementById("productSelect");
-            productSelect.innerHTML = '<option value="">Seçin</option>';
-            
-            let query = supabase.from("products").select("id, name");
-            
-            // Satıcı ise sadece kendi ürünlerini görür
-            if (currentUserRole === "seller") {
-                query = query.eq("seller_id", currentUser.id);
-            }
-            
-            const { data: products, error } = await query;
-            
-            if (error) {
-                console.error("Ürünler yüklenirken hata:", error);
-                return;
-            }
-            
-            if (products) {
-                allProducts = products;
-                products.forEach(product => {
-                    productSelect.innerHTML += `<option value="${product.id}">${product.name}</option>`;
-                });
-            }
-        }
-        
         // Hedefleri yükle
         async function loadTargets() {
             const tableBody = document.getElementById("targetsTableBody");
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="8" class="text-center py-8">
+                    <td colspan="9" class="text-center py-8">
                         <div class="flex justify-center">
                             <div class="loader"></div>
                         </div>
@@ -781,13 +828,7 @@
                 </tr>
             `;
             
-            let query = supabase
-                .from("seller_targets")
-                .select(`
-                    *,
-                    profiles:profiles(full_name),
-                    products:products(name)
-                `);
+            let query = supabase.from("seller_targets").select("*");
             
             // Satıcı ise sadece kendi hedeflerini görür
             if (currentUserRole === "seller") {
@@ -801,7 +842,7 @@
                 showToast("Hedefler yüklenirken hata oluştu", "error");
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="text-center py-8 text-red-600">
+                        <td colspan="9" class="text-center py-8 text-red-600">
                             <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
                             <p>Hedefler yüklenirken bir hata oluştu</p>
                         </td>
@@ -821,15 +862,19 @@
             document.getElementById("totalTargets").textContent = targets.length;
             
             // Toplam ciro hedefi
-            const totalRevenue = targets.reduce((sum, target) => sum + (target.target_amount || 0), 0);
+            const totalRevenue = targets.reduce((sum, target) => sum + (target.target_revenue || 0), 0);
             document.getElementById("totalRevenue").textContent = formatCurrency(totalRevenue);
             
-            // Aktif hedef sayısı
-            const activeTargets = targets.filter(target => !target.achieved).length;
-            document.getElementById("activeTargets").textContent = activeTargets;
+            // Ortalama büyüme oranı
+            const avgGrowth = targets.length > 0 
+                ? targets.reduce((sum, target) => sum + (target.growth_rate || 0), 0) / targets.length 
+                : 0;
+            document.getElementById("avgGrowth").textContent = avgGrowth.toFixed(1) + "%";
             
-            // Tamamlanan hedef sayısı
-            const completedTargets = targets.filter(target => target.achieved).length;
+            // Tamamlanan hedef sayısı (basit bir örnek)
+            const completedTargets = targets.filter(target => {
+                return target.progress >= 100;
+            }).length;
             document.getElementById("completedTargets").textContent = completedTargets;
         }
         
@@ -840,7 +885,7 @@
             if (targets.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="text-center py-8">
+                        <td colspan="9" class="text-center py-8">
                             <div class="empty-state">
                                 <i class="fas fa-bullseye"></i>
                                 <h3 class="text-lg font-medium text-gray-900 mt-2">Henüz hedef bulunmamaktadır</h3>
@@ -862,43 +907,47 @@
             
             // Tabloyu doldur
             tableBody.innerHTML = paginatedTargets.map(target => {
-                const sellerName = target.profiles ? target.profiles.full_name : "Bilinmiyor";
-                const productName = target.products ? target.products.name : "Bilinmiyor";
+                const progress = target.progress || 0;
+                let progressClass = "progress-danger";
+                if (progress >= 70) progressClass = "progress-success";
+                else if (progress >= 30) progressClass = "progress-warning";
                 
                 let statusBadge = "";
-                if (target.achieved) {
+                if (progress >= 100) {
                     statusBadge = '<span class="status-badge badge-success">Tamamlandı</span>';
-                } else {
+                } else if (target.status === "active") {
                     statusBadge = '<span class="status-badge badge-info">Aktif</span>';
-                }
-                
-                // İşlem butonları
-                let actionButtons = '';
-                if (currentUserRole === "admin" || target.seller_id === currentUser.id) {
-                    actionButtons = `
-                        <div class="flex space-x-2">
-                            <button class="btn btn-secondary btn-sm" onclick="editTarget('${target.id}')">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            ${currentUserRole === "admin" ? `
-                            <button class="btn btn-danger btn-sm" onclick="deleteTarget('${target.id}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            ` : ''}
-                        </div>
-                    `;
+                } else {
+                    statusBadge = '<span class="status-badge badge-warning">Beklemede</span>';
                 }
                 
                 return `
                     <tr>
-                        <td class="font-medium">${sellerName}</td>
-                        <td>${productName}</td>
+                        <td class="font-medium">${target.seller_name || "Bilinmiyor"}</td>
+                        <td>${target.product_name || "Bilinmiyor"}</td>
                         <td>${target.target_quantity || 0} ${target.quantity_unit || "adet"}</td>
-                        <td>${formatCurrency(target.target_amount || 0)} ${target.target_currency || "USD"}</td>
-                        <td>${formatDate(target.start_date)}</td>
-                        <td>${formatDate(target.end_date)}</td>
+                        <td>${formatCurrency(target.target_revenue || 0)}</td>
+                        <td>${target.growth_rate || 0}%</td>
+                        <td>${target.duration || 0}</td>
                         <td>${statusBadge}</td>
-                        <td>${actionButtons}</td>
+                        <td>
+                            <div class="flex items-center">
+                                <div class="progress-bar w-full mr-2">
+                                    <div class="progress-fill ${progressClass}" style="width: ${progress}%"></div>
+                                </div>
+                                <span class="text-xs">${progress}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="flex space-x-2">
+                                <button class="btn btn-secondary btn-sm" onclick="editTarget('${target.id}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteTarget('${target.id}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                 `;
             }).join("");
@@ -979,11 +1028,10 @@
             // Arama terimi ile filtrele
             if (searchTerm) {
                 const term = searchTerm.toLowerCase();
-                filteredTargets = filteredTargets.filter(target => {
-                    const sellerName = target.profiles ? target.profiles.full_name.toLowerCase() : "";
-                    const productName = target.products ? target.products.name.toLowerCase() : "";
-                    return sellerName.includes(term) || productName.includes(term);
-                });
+                filteredTargets = filteredTargets.filter(target => 
+                    (target.product_name && target.product_name.toLowerCase().includes(term)) || 
+                    (target.seller_name && target.seller_name.toLowerCase().includes(term))
+                );
             }
             
             // Satıcı filtresi
@@ -995,11 +1043,13 @@
             // Durum filtresi
             const statusFilter = document.getElementById("filterStatus").value;
             if (statusFilter) {
-                if (statusFilter === "completed") {
-                    filteredTargets = filteredTargets.filter(target => target.achieved);
-                } else if (statusFilter === "active") {
-                    filteredTargets = filteredTargets.filter(target => !target.achieved);
-                }
+                // Basit bir durum filtresi
+                filteredTargets = filteredTargets.filter(target => {
+                    if (statusFilter === "completed") return (target.progress || 0) >= 100;
+                    if (statusFilter === "active") return target.status === "active";
+                    if (statusFilter === "expired") return target.status === "expired";
+                    return true;
+                });
             }
             
             // Filtrelenmiş hedefleri render et
@@ -1019,15 +1069,6 @@
                 modalTitle.textContent = "Yeni Hedef";
                 document.getElementById("targetForm").reset();
                 document.getElementById("editTargetId").value = "";
-                
-                // Varsayılan değerleri ayarla
-                const today = new Date().toISOString().split('T')[0];
-                document.getElementById("startDate").value = today;
-                
-                // Bitiş tarihini 1 ay sonrası olarak ayarla
-                const endDate = new Date();
-                endDate.setMonth(endDate.getMonth() + 1);
-                document.getElementById("endDate").value = endDate.toISOString().split('T')[0];
             }
             
             modal.classList.add("active");
@@ -1054,14 +1095,13 @@
             
             document.getElementById("editTargetId").value = data.id;
             document.getElementById("sellerSelect").value = data.seller_id;
-            document.getElementById("productSelect").value = data.product_id;
+            document.getElementById("productName").value = data.product_name;
             document.getElementById("targetQuantity").value = data.target_quantity;
             document.getElementById("quantityUnit").value = data.quantity_unit || "adet";
-            document.getElementById("targetAmount").value = data.target_amount;
-            document.getElementById("targetCurrency").value = data.target_currency || "USD";
+            document.getElementById("targetRevenue").value = data.target_revenue;
+            document.getElementById("growthRate").value = data.growth_rate;
+            document.getElementById("targetDuration").value = data.duration;
             document.getElementById("startDate").value = data.start_date || "";
-            document.getElementById("endDate").value = data.end_date || "";
-            document.getElementById("achieved").checked = data.achieved || false;
             document.getElementById("description").value = data.description || "";
         }
         
@@ -1069,26 +1109,19 @@
         async function saveTarget() {
             const targetId = document.getElementById("editTargetId").value;
             const sellerId = document.getElementById("sellerSelect").value;
-            const productId = document.getElementById("productSelect").value;
+            const productName = document.getElementById("productName").value;
             const targetQuantity = parseFloat(document.getElementById("targetQuantity").value);
             const quantityUnit = document.getElementById("quantityUnit").value;
-            const targetAmount = parseFloat(document.getElementById("targetAmount").value);
-            const targetCurrency = document.getElementById("targetCurrency").value;
+            const targetRevenue = parseFloat(document.getElementById("targetRevenue").value);
+            const growthRate = parseFloat(document.getElementById("growthRate").value);
+            const targetDuration = parseInt(document.getElementById("targetDuration").value);
             const startDate = document.getElementById("startDate").value;
-            const endDate = document.getElementById("endDate").value;
-            const achieved = document.getElementById("achieved").checked;
             const description = document.getElementById("description").value;
             
             // Validasyon
-            if (!sellerId || !productId || isNaN(targetQuantity) || isNaN(targetAmount) || 
-                !startDate || !endDate) {
+            if (!sellerId || !productName || isNaN(targetQuantity) || isNaN(targetRevenue) || 
+                isNaN(growthRate) || isNaN(targetDuration)) {
                 showToast("Lütfen zorunlu alanları doldurun", "error");
-                return;
-            }
-            
-            // Tarih validasyonu
-            if (new Date(startDate) > new Date(endDate)) {
-                showToast("Başlangıç tarihi, bitiş tarihinden sonra olamaz", "error");
                 return;
             }
             
@@ -1098,18 +1131,19 @@
             document.getElementById("saveTargetBtn").disabled = true;
             
             try {
+                const sellerName = document.getElementById("sellerSelect").selectedOptions[0].text;
                 const targetData = {
                     seller_id: sellerId,
-                    product_id: productId,
+                    seller_name: sellerName,
+                    product_name: productName,
                     target_quantity: targetQuantity,
                     quantity_unit: quantityUnit,
-                    target_amount: targetAmount,
-                    target_currency: targetCurrency,
-                    start_date: startDate,
-                    end_date: endDate,
-                    achieved: achieved,
+                    target_revenue: targetRevenue,
+                    growth_rate: growthRate,
+                    duration: targetDuration,
+                    start_date: startDate || null,
                     description: description || null,
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date()
                 };
                 
                 if (targetId) {
@@ -1124,7 +1158,9 @@
                     showToast("Hedef başarıyla güncellendi", "success");
                 } else {
                     // Yeni kayıt
-                    targetData.created_at = new Date().toISOString();
+                    targetData.created_at = new Date();
+                    targetData.status = "active";
+                    targetData.progress = 0;
                     
                     const { error } = await supabase
                         .from("seller_targets")
@@ -1176,16 +1212,11 @@
         // Para birimi formatı
         function formatCurrency(amount) {
             return new Intl.NumberFormat('tr-TR', { 
+                style: 'currency', 
+                currency: 'USD',
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0
             }).format(amount);
-        }
-        
-        // Tarih formatı
-        function formatDate(dateString) {
-            if (!dateString) return "-";
-            const date = new Date(dateString);
-            return date.toLocaleDateString('tr-TR');
         }
         
         // Toast bildirimi göster
