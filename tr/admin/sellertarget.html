@@ -742,31 +742,6 @@
     
       
 
-  // Kullanıcı modalını aç
-  function openUserModal(userData = null) {
-    if (userData) {
-      $('u_name').value = userData.full_name || '';
-      $('u_email').value = userData.email || '';
- 
-      currentEditingUserId = userData.id;
-    } else {
-      $('formUser').reset();
-      currentEditingUserId = null;
-    }
-
-    // Admin değilse: sadece kendi verisini düzenleyebilir, sil/değiştir butonları kapalı, yeni kullanıcı ekleyemez
-    if (!isAdmin) {
-      // Ekleme yok, sadece kendi detayına Edit ile gelir
-      $('u_name').readOnly = true;
-  
-    } else {
-      $('u_name').readOnly = false;
-   
-    }
-
-    $('modalUser').classList.remove('hidden');
-  }
-
   document.addEventListener('DOMContentLoaded', async function() {
     await loadSellerUserInfo();
     // Oturum kontrolü
@@ -777,18 +752,49 @@
     }
     await loadUsers();
 
-    // Admin değilse: satırda sadece kendi verisi için "Detay" butonu gözüksün, diğerleri gizli
-    if (!isAdmin) {
-      $('addSeller').classList.add('hidden');
-      // Yenile butonu gereksiz normal kullanıcıya, isterse kaldır
-      $('refreshUsers').classList.add('hidden');
+  
+  // Kullanıcı modalını aç
+  function openUserModal(userData = null) {
+    if (userData) {
+      $('u_name').value = userData.full_name || '';
+      $('u_email').value = userData.email || '';
+      $('u_phone').value = userData.phone || '';
+      $('u_address').value = userData.address || '';
+      $('u_city').value = userData.city || '';
+      $('u_country').value = userData.country || '';
+      $('u_sector').value = userData.sector || '';
+      $('u_status').value = userData.status || 'Active';
+      $('u_taxnumber').value = userData.tax_number || '';
+      $('u_taxoffice').value = userData.tax_office || '';
+      $('u_confirm').checked = userData.confirm || false;
+      currentEditingUserId = userData.id;
+    } else {
+      $('formUser').reset();
+      currentEditingUserId = null;
     }
 
-    // Gerçek zamanlı oturum değişikliklerini dinle
-    supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        window.location.href = "..login.html";
-      }
+    // Admin değilse: sadece kendi verisini düzenleyebilir, sil/değiştir butonları kapalı, yeni kullanıcı ekleyemez
+    if (!isAdmin) {
+      // Ekleme yok, sadece kendi detayına Edit ile gelir
+      $('u_name').readOnly = true;
+      $('u_email').readOnly = true;
+      $('u_confirm').disabled = true;
+      $('addSeller').classList.add('hidden');
+      $('deleteUserBtn').classList.add('hidden');
+      // E-posta readonly, onay checkbox disable, sil butonu gizli
+    } else {
+      $('u_name').readOnly = false;
+      $('u_email').readOnly = false;
+      $('u_confirm').disabled = false;
+      $('addSeller').classList.remove('hidden');
+      $('deleteUserBtn').classList.remove('hidden');
+    }
+
+    $('modalUser').classList.remove('hidden');
+  }
+
+
+    
     });
     });
 
