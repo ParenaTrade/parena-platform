@@ -340,6 +340,45 @@
     }
   }
 
+  // Bu kontrol, sayfa yüklenince çalışacak
+  async function disableNonAdminControls() {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      console.error("Oturum bulunamadı:", sessionError);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .single();
+
+    if (error) {
+      console.error("Rol alınamadı:", error);
+      return;
+    }
+
+    if (data && data.role !== "admin") {
+      // 🔹 Sil butonunu disable et
+      const deleteBtn = document.getElementById("deleteBtn");
+      if (deleteBtn) {
+        deleteBtn.disabled = true;
+        deleteBtn.classList.add("opacity-50", "cursor-not-allowed");
+      }
+
+      // 🔹 Onay checkbox pasif
+      const confirmCheckbox = document.getElementById("confirmCheckbox");
+      if (confirmCheckbox) {
+        confirmCheckbox.disabled = true;
+      }
+    }
+  }
+
+  // Sayfa açıldığında çalışsın
+  document.addEventListener("DOMContentLoaded", disableNonAdminControls);
+
+
   // DOM elementlerini seçme
   const $ = id => document.getElementById(id);
   
