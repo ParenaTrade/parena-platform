@@ -905,7 +905,30 @@
         showToast('Satıcı listesi yenilendi');
       }, 1000);
     });
-    
+    // Kullanıcı silme
+    $('deleteUserBtn').addEventListener('click', async () => {
+      if (!currentEditingUserId) return;
+      // Sadece admin silebilir
+      if (!isAdmin) {
+        showToast('Silme yetkiniz yok.', true);
+        return;
+      }
+      if (confirm('Bu satıcıyı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) {
+        $('deleteUserBtn').classList.add('btn-loading');
+        try {
+          const success = await deleteUser(currentEditingUserId);
+          if (success) {
+            closeUserModal();
+            loadUsers();
+          }
+        } catch (error) {
+          console.error('Silme hatası:', error);
+          showToast('Silme sırasında hata oluştu: ' + error.message, true);
+        } finally {
+          $('deleteUserBtn').classList.remove('btn-loading');
+        }
+      }
+    });
   });
 </script>
 </body>
