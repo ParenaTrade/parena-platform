@@ -289,6 +289,34 @@
     <div id="messageBox" class="hidden mx-4 mb-4 p-4 rounded-lg text-white text-center"></div>
   </div>
 
+<!-- 🔹 Şifre Resetleme Modal -->
+<div id="resetModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">Yeni Şifre Belirle</h2>
+    <p class="text-sm text-gray-600 mb-4">Lütfen yeni şifrenizi girin.</p>
+    <form id="resetForm" class="space-y-4">
+      <div>
+        <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1">Yeni Şifre</label>
+        <input type="password" id="newPassword" required
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-all duration-200"
+          placeholder="En az 6 karakter">
+      </div>
+      <div>
+        <label for="confirmNewPassword" class="block text-sm font-medium text-gray-700 mb-1">Yeni Şifre Tekrar</label>
+        <input type="password" id="confirmNewPassword" required
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus transition-all duration-200"
+          placeholder="Şifrenizi tekrar girin">
+      </div>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button type="button" id="cancelReset"
+          class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">İptal</button>
+        <button type="submit" id="resetButton"
+          class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md hover:shadow-lg">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -509,6 +537,60 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
       }
     });
 
+// Reset Modal elementleri
+const resetModal = document.getElementById("resetModal");
+const resetForm = document.getElementById("resetForm");
+const resetButton = document.getElementById("resetButton");
+const cancelReset = document.getElementById("cancelReset");
+
+// Modal kapatma
+cancelReset.addEventListener("click", () => {
+  resetModal.classList.add("hidden");
+});
+
+// Şifre reset formu submit
+resetForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const newPassword = document.getElementById("newPassword").value;
+  const confirmNewPassword = document.getElementById("confirmNewPassword").value;
+
+  if (newPassword !== confirmNewPassword) {
+    showMessage("Şifreler eşleşmiyor!");
+    return;
+  }
+
+  resetButton.classList.add("btn-loading");
+
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      showMessage("Şifre güncellenemedi: " + error.message);
+      resetButton.classList.remove("btn-loading");
+      return;
+    }
+
+    showMessage("Şifre başarıyla güncellendi! Giriş yapabilirsiniz.", "success");
+    resetModal.classList.add("hidden");
+    loginSection.classList.add("active");
+    registerSection.classList.remove("active");
+
+  } catch (err) {
+    showMessage("Beklenmeyen hata: " + err.message);
+  } finally {
+    resetButton.classList.remove("btn-loading");
+  }
+});
+
+// URL'de recovery linki varsa reset modalı aç
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.location.hash.includes("type=recovery")) {
+    resetModal.classList.remove("hidden");
+  }
+});
+
     // Sayfa yüklendiğinde e-posta bilgisini hatırla
     document.addEventListener('DOMContentLoaded', () => {
       const savedEmail = localStorage.getItem("userEmail");
@@ -517,7 +599,6 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
         document.getElementById("remember").checked = true;
       }
     });
-    
   </script>
 </body>
 </html>
