@@ -248,12 +248,85 @@
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
   
   // Supabase'i başlat
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   
   // Global değişkenler
   let currentUser = null;
   let currentUserRole = null;
   let selectedSellerId = null;
+ 
+
+// Kullanıcı bilgilerini ve rolünü yükle
+  async function loadUserInfo() {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Oturum kontrol hatası:', sessionError);
+        return;
+      }
+      
+      if (session && session.user) {
+        currentUser = session.user;
+        
+        // Kullanıcı bilgilerini Supabase'den çek
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (userError) {
+          console.error('Kullanıcı bilgileri getirme hatası:', userError);
+          return;
+        }
+        
+        if (userData) {
+          isAdmin = userData.role === "admin";
+          currentUserRole = userData.role;
+          
+          // Kullanıcı bilgilerini göster
+          if ($('userName')) {
+            $('userName').textContent = userData.full_name || 'Kullanıcı';
+          }
+          
+          if ($('userRole')) {
+            $('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+          }
+          
+          if ($('userStatus')) {
+            $('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
+            $('userStatus').classList.add('bg-green-500');
+          }
+          
+          // Çıkış butonu event listener
+          $('signOut').addEventListener('click', async () => {
+            await supabase.auth.signOut();
+            window.location.href = "login.html";
+          });
+          
+          return { user: currentUser, role: userData.role, isAdmin };
+        }
+      } else {
+        window.location.href = "login.html";
+      }
+    } catch (error) {
+      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+    }
+    
+    return null;
+  }    
+    return null;
+  }
+ 
+    
+
+  // DOM elementlerini seçme
+  const $ = id => document.getElementById(id);
+
+// Müşteri verileri
+    let customers = [];
+    let currentEditingCustomerId = null;
 
   // Toast bildirimi gösterme
   function showToast(msg, isError = false, ms = 3000) {
@@ -268,12 +341,45 @@
     }, ms);
   }
 
+  function setupCustomerButtons() {
+  // Görüntüle butonları
+  document.querySelectorAll('.view-customer').forEach(btn => {
+    btn.onclick = function() {
+      const customerId = this.getAttribute('data-id');
+      // Burada müşteri detaylarını göster
+      alert('Görüntüle: ' + customerId);
+      // Örneğin showCustomerModal(customerId); fonksiyonunu çağırabilirsin
+    };
+  });
+
+  // Düzelt (Düzenle) butonları
+  document.querySelectorAll('.edit-customer').forEach(btn => {
+    btn.onclick = function() {
+      const customerId = this.getAttribute('data-id');
+      // Düzenleme modalını aç, bilgileri doldur
+      alert('Düzenle: ' + customerId);
+      // Örneğin openEditCustomerModal(customerId); fonksiyonunu çağırabilirsin
+    };
+  });
+
+  // Sil butonları
+  document.querySelectorAll('.delete-customer').forEach(btn => {
+    btn.onclick = function() {
+      const customerId = this.getAttribute('data-id');
+      if (confirm('Silmek istediğinizden emin misiniz?')) {
+        // Burada silme fonksiyonunu çağır
+        alert('Sil: ' + customerId);
+        // Örneğin deleteCustomer(customerId); fonksiyonunu çağırabilirsin
+      }
+    };
+  });
+}
   // Satıcıları yükle
   async function loadSellers() {
     try {
       const { data, error } = await supabase
-        .from('users')
-        .select('id, name, email')
+        .from('profiles')
+        .select('id, full_name, email')
         .eq('role', 'seller');
         
       if (error) throw error;
@@ -287,7 +393,7 @@
       data.forEach((seller) => {
         const option = document.createElement('option');
         option.value = seller.id;
-        option.textContent = `${seller.name} - ${seller.email}`;
+        option.textContent = `${seller.full_name} - ${seller.email}`;
         sellerSelect.appendChild(option.cloneNode(true));
         modalSellerSelect.appendChild(option);
       });
@@ -363,6 +469,7 @@
     }
   }
 
+
   // Yeni müşteri ekleme fonksiyonu
   async function addCustomer(customerData) {
     try {
@@ -390,12 +497,12 @@
       
       const userId = authData.user.id;
 
-      // 2. Users tablosuna kullanıcıyı ekle
-      const { error: userError } = await supabase
-        .from('users')
+      // 2. Profiles tablosuna kullanıcıyı ekle
+      const { error: profileError } = await supabase
+        .from('profiles')
         .insert({
           id: userId,
-          name: customerData.name,
+          full_name: customerData.name,
           email: customerData.email,
           role: 'buyer',
           address: customerData.address,
@@ -406,16 +513,15 @@
           status: customerData.status,
           taxnumber: customerData.taxnumber,
           taxoffice: customerData.taxoffice,
-          confirm: true,
           seller_id: targetSellerId,
           created_at: new Date(),
           updated_at: new Date()
         });
         
-      if (userError) throw userError;
+      if (profileError) throw profileError;
 
       // 3. Buyer_profiles tablosuna müşteri profilini ekle
-      const { error: profileError } = await supabase
+      const { error: buyerProfileError } = await supabase
         .from('buyer_profiles')
         .insert({
           user_id: userId,
@@ -429,13 +535,12 @@
           status: customerData.status,
           taxnumber: customerData.taxnumber,
           taxoffice: customerData.taxoffice,
-          confirm: true,
           seller_id: targetSellerId,
           created_at: new Date(),
           updated_at: new Date()
         });
         
-      if (profileError) throw profileError;
+      if (buyerProfileError) throw buyerProfileError;
       
       showToast('Müşteri başarıyla eklendi!');
       closeAddCustomerModal();
@@ -459,52 +564,27 @@
   }
 
   // DOM yüklendikten sonra çalışacak kodlar
-  $(document).ready(function() {
-    // Oturum durumunu kontrol et
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        currentUser = session.user;
-        
-        // Kullanıcı bilgilerini al
-        supabase.from('users')
-          .select('*')
-          .eq('id', currentUser.id)
-          .single()
-          .then(({ data: userData, error }) => {
-            if (error) throw error;
-            
-            currentUserRole = userData.role;
-            
-            // Kullanıcı bilgilerini arayüzde göster
-            $("#userName").text(userData.name || userData.email);
-            $("#userRole").text(currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı');
-            
-            // Admin ise satıcı seçim bölümünü göster
-            if (currentUserRole === 'admin') {
-              $('.admin-only').css('display', 'block');
-              loadSellers();
-            } else {
-              // Satıcı ise müşterileri doğrudan yükle
-              loadCustomers();
-            }
-          })
-          .catch((error) => {
-            console.error("Kullanıcı verisi alınırken hata oluştu: ", error);
-            showToast('Kullanıcı bilgileri yüklenirken hata oluştu', true);
-          });
-      } else {
-        // Kullanıcı giriş yapmamışsa, giriş sayfasına yönlendir
-        window.location.href = "login.html";
-      }
-    });
-
-    // Auth state değişikliğini dinle
-    supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        window.location.href = "login.html";
-      }
-    });
+  document.addEventListener("DOMContentLoaded", async () => {
+    // Kullanıcı bilgilerini yükle
+    await loadUserInfo();
+	  loadCustomers();
+       
     
+    // Event listener'ları ekle
+    setupEventListeners();
+  });
+
+
+  
+    // Event listener'ları kur
+    function setupEventListeners() {
+        // Yeni müşteri butonu
+        $('btnNewCustomer').addEventListener('click', () => {
+            openCustomerModal();
+        });
+
+  // Event listener'ları kur
+  function setupEventListeners() {
     // Çıkış butonu
     document.getElementById('signOut').addEventListener('click', () => {
       supabase.auth.signOut().then(() => {
@@ -513,6 +593,11 @@
       }).catch((error) => {
         showToast('Çıkış yapılırken hata oluştu', true);
       });
+
+ // Yeni müşteri butonu
+        $('btnNewCustomer').addEventListener('click', () => {
+            openCustomerModal();
+        });
     });
     
     // Müşteri ekle butonu
@@ -538,6 +623,38 @@
       }
     });
     
+
+function setupCustomerButtons() {
+  // Görüntüle butonları
+  document.querySelectorAll('.view-customer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.getAttribute('data-id');
+      // Burada müşteri detayını gösteren fonksiyonunu çağır
+      alert('Görüntüle: ' + id);
+    });
+  });
+
+  // Düzenle butonları
+  document.querySelectorAll('.edit-customer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.getAttribute('data-id');
+      // Burada müşteri düzenleme fonksiyonunu çağır
+      alert('Düzenle: ' + id);
+    });
+  });
+
+  // Sil butonları
+  document.querySelectorAll('.delete-customer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.getAttribute('data-id');
+      // Burada müşteri silme fonksiyonunu çağır
+      if (confirm('Silmek istediğine emin misin?')) {
+        // Silme fonksiyonunu çağır
+        alert('Sil: ' + id);
+      }
+    });
+  });
+}
     // Modal kapatma butonları
     document.getElementById('closeModalAddCustomer').addEventListener('click', closeAddCustomerModal);
     document.getElementById('cancelAddCustomerBtn').addEventListener('click', closeAddCustomerModal);
@@ -571,6 +688,13 @@
       
       await addCustomer(customerData);
     });
+  }
+
+  // Gerçek zamanlı oturum değişikliklerini dinle
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT' || !session) {
+      window.location.href = "login.html";
+    }
   });
 </script>
 </body>
