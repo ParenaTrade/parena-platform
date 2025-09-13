@@ -350,9 +350,76 @@
             top: 0.5rem;
             color: #6b7280;
         }
+        
+        .user-info-container {
+            display: flex;
+            align-items: center;
+            background-color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        
+        .user-details {
+            margin-left: 0.75rem;
+            text-align: right;
+            flex-grow: 1;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: #1f2937;
+        }
+        
+        .user-role {
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+        
+        .user-status {
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            flex-shrink: 0;
+        }
+        
+        .user-status-online {
+            background-color: var(--success-color);
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 p-4">
+
+<!-- Kullanıcı Bilgileri -->
+<div class="user-info-container">
+  <div class="flex items-center">
+    <div class="user-status user-status-online"></div>
+    <div class="user-avatar">
+      <i class="fas fa-user"></i>
+    </div>
+  </div>
+  <div class="user-details">
+    <div id="userName" class="user-name">Yükleniyor...</div>
+    <div id="userRole" class="user-role">Rol: Yükleniyor...</div>
+  </div>
+</div>
 
 <div class="max-w-7xl mx-auto">
     <!-- Başlık ve Butonlar -->
@@ -497,19 +564,77 @@
 <div id="toastContainer"></div>
 
 <script>
+    // Supabase yapılandırması
+    const SUPABASE_URL = "https://xliutvspwodhoavysks.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9hdnlza3MiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY5ODk1OTY2MSwiZXhwIjoyMDE0NTM1NjYxfQ.owq-1_SnTbJ7yN6yM2v7VH6M6V6T0Vk6Z6Z6Z6Z6Z6Z";
+    
+    // Supabase istemcisini oluştur
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
     // DOM elementlerini seçme
     const $ = id => document.getElementById(id);
     
-    // Müşteri verileri
+    // Kullanıcı ve müşteri verileri
+    let currentUser = null;
+    let currentUserRole = null;
     let customers = [];
-    let currentEditingCustomerId = null;
     let filteredCustomers = [];
+    let currentEditingCustomerId = null;
     
     // Sayfa yüklendiğinde
     document.addEventListener('DOMContentLoaded', function() {
-        loadCustomers();
-        setupEventListeners();
+        initializeApp();
     });
+    
+    // Uygulamayı başlat
+    async function initializeApp() {
+        // Oturum kontrolü
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+            console.error("Oturum kontrolü hatası:", sessionError);
+            showToast("Oturum kontrolü sırasında hata oluştu", "error");
+            return;
+        }
+        
+        if (!session) {
+            window.location.href = "login.html";
+            return;
+        }
+        
+        currentUser = session.user;
+        
+        try {
+            // Kullanıcı bilgilerini al
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', currentUser.id)
+                .single();
+            
+            if (userError) {
+                console.error("Kullanıcı bilgileri alınamadı:", userError);
+                showToast("Kullanıcı bilgileri alınamadı", "error");
+                return;
+            }
+            
+            currentUserRole = userData.role;
+            
+            // Kullanıcı bilgilerini arayüzde göster
+            $('userName').textContent = userData.name || userData.email;
+            $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı'}`;
+            
+            // Müşterileri yükle
+            await loadCustomers();
+            
+            // Event listener'ları kur
+            setupEventListeners();
+            
+        } catch (error) {
+            console.error("Başlatma hatası:", error);
+            showToast("Sistem başlatılırken hata oluştu", "error");
+        }
+    }
     
     // Event listener'ları kur
     function setupEventListeners() {
@@ -552,55 +677,31 @@
     }
     
     // Müşterileri yükle
-    function loadCustomers() {
-        // Burada gerçek veri kaynağından müşterileri çekeceksiniz
-        // Şimdilik örnek veri kullanıyoruz
-        setTimeout(() => {
-            customers = [
-                { 
-                    id: 1, 
-                    name: "Ahmet Yılmaz", 
-                    email: "ahmet@example.com", 
-                    phone: "0532 123 4567", 
-                    city: "İstanbul", 
-                    country: "Türkiye",
-                    address: "Bağdat Caddesi No:123 Kadıköy",
-                    taxnumber: "1234567890",
-                    taxoffice: "Kadıköy",
-                    sector: "Teknoloji",
-                    status: "Active" 
-                },
-                { 
-                    id: 2, 
-                    name: "Ayşe Demir", 
-                    email: "ayse@example.com", 
-                    phone: "0533 234 5678", 
-                    city: "Ankara", 
-                    country: "Türkiye",
-                    address: "Tunalı Hilmi Caddesi No:456 Çankaya",
-                    taxnumber: "2345678901",
-                    taxoffice: "Çankaya",
-                    sector: "Eğitim",
-                    status: "Active" 
-                },
-                { 
-                    id: 3, 
-                    name: "Mehmet Kaya", 
-                    email: "mehmet@example.com", 
-                    phone: "0534 345 6789", 
-                    city: "İzmir", 
-                    country: "Türkiye",
-                    address: "Kordon Boyu No:789 Konak",
-                    taxnumber: "3456789012",
-                    taxoffice: "Konak",
-                    sector: "Turizm",
-                    status: "Inactive" 
-                }
-            ];
+    async function loadCustomers() {
+        try {
+            let query = supabase
+                .from('buyer_profiles')
+                .select('*');
             
+            // Admin değilse sadece kendi müşterilerini göster
+            if (currentUserRole !== 'admin') {
+                query = query.eq('seller_id', currentUser.id);
+            }
+            
+            const { data, error } = await query;
+            
+            if (error) {
+                throw error;
+            }
+            
+            customers = data || [];
             filteredCustomers = [...customers];
             renderCustomers();
-        }, 1000);
+            
+        } catch (error) {
+            console.error('Müşteriler yüklenirken hata:', error);
+            showToast('Müşteriler yüklenirken hata oluştu', 'error');
+        }
     }
     
     // Müşterileri filtrele
@@ -741,6 +842,12 @@
         const customer = customers.find(c => c.id == id);
         if (!customer) return;
         
+        // Kullanıcı yetkisini kontrol et (sadece admin veya müşterinin sahibi düzenleyebilir)
+        if (currentUserRole !== 'admin' && customer.seller_id !== currentUser.id) {
+            showToast('Bu müşteriyi düzenleme yetkiniz yok', 'error');
+            return;
+        }
+        
         // Formu doldur
         $('c_name').value = customer.name;
         $('c_email').value = customer.email;
@@ -767,23 +874,44 @@
         const customer = customers.find(c => c.id == id);
         if (!customer) return;
         
+        // Kullanıcı yetkisini kontrol et (sadece admin veya müşterinin sahibi silebilir)
+        if (currentUserRole !== 'admin' && customer.seller_id !== currentUser.id) {
+            showToast('Bu müşteriyi silme yetkiniz yok', 'error');
+            return;
+        }
+        
         if (confirm(`"${customer.name}" müşterisini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) {
             deleteCustomer(id);
         }
     }
     
     // Müşteri sil
-    function deleteCustomer(id) {
-        // Gerçek uygulamada burada API çağrısı yapılır
-        customers = customers.filter(c => c.id != id);
-        filteredCustomers = filteredCustomers.filter(c => c.id != id);
-        
-        renderCustomers();
-        showToast('Müşteri başarıyla silindi', 'success');
-        
-        // Eğer modal açıksa kapat
-        if (currentEditingCustomerId == id) {
-            closeCustomerModal();
+    async function deleteCustomer(id) {
+        try {
+            const { error } = await supabase
+                .from('buyer_profiles')
+                .delete()
+                .eq('id', id);
+            
+            if (error) {
+                throw error;
+            }
+            
+            // Yerel listeden de kaldır
+            customers = customers.filter(c => c.id != id);
+            filteredCustomers = filteredCustomers.filter(c => c.id != id);
+            
+            renderCustomers();
+            showToast('Müşteri başarıyla silindi', 'success');
+            
+            // Eğer modal açıksa kapat
+            if (currentEditingCustomerId == id) {
+                closeCustomerModal();
+            }
+            
+        } catch (error) {
+            console.error('Müşteri silinirken hata:', error);
+            showToast('Müşteri silinirken hata oluştu', 'error');
         }
     }
     
@@ -843,7 +971,7 @@
     }
     
     // Müşteri kaydet
-    function saveCustomer() {
+    async function saveCustomer() {
         if (!validateForm()) {
             showToast('Lütfen gerekli alanları doldurun', 'error');
             return;
@@ -859,36 +987,65 @@
             taxnumber: $('c_taxnumber').value.trim(),
             taxoffice: $('c_taxoffice').value.trim(),
             sector: $('c_sector').value.trim(),
-            status: $('c_status').value
+            status: $('c_status').value,
+            seller_id: currentUser.id,
+            updated_at: new Date().toISOString()
         };
         
-        if (currentEditingCustomerId) {
-            // Mevcut müşteriyi güncelle
-            const index = customers.findIndex(c => c.id == currentEditingCustomerId);
-            if (index !== -1) {
-                customers[index] = { ...customers[index], ...customerData };
+        try {
+            if (currentEditingCustomerId) {
+                // Mevcut müşteriyi güncelle
+                const { error } = await supabase
+                    .from('buyer_profiles')
+                    .update(customerData)
+                    .eq('id', currentEditingCustomerId);
                 
-                // Filtrelenmiş listeyi de güncelle
-                const filteredIndex = filteredCustomers.findIndex(c => c.id == currentEditingCustomerId);
-                if (filteredIndex !== -1) {
-                    filteredCustomers[filteredIndex] = { ...filteredCustomers[filteredIndex], ...customerData };
+                if (error) {
+                    throw error;
+                }
+                
+                // Yerel listeyi güncelle
+                const index = customers.findIndex(c => c.id == currentEditingCustomerId);
+                if (index !== -1) {
+                    customers[index] = { ...customers[index], ...customerData };
+                    
+                    // Filtrelenmiş listeyi de güncelle
+                    const filteredIndex = filteredCustomers.findIndex(c => c.id == currentEditingCustomerId);
+                    if (filteredIndex !== -1) {
+                        filteredCustomers[filteredIndex] = { ...filteredCustomers[filteredIndex], ...customerData };
+                    }
                 }
                 
                 showToast('Müşteri başarıyla güncellendi', 'success');
+            } else {
+                // Yeni müşteri ekle
+                customerData.created_at = new Date().toISOString();
+                
+                const { data, error } = await supabase
+                    .from('buyer_profiles')
+                    .insert([customerData])
+                    .select();
+                
+                if (error) {
+                    throw error;
+                }
+                
+                // Yerel listeye ekle
+                if (data && data.length > 0) {
+                    customers.push(data[0]);
+                    filteredCustomers.push(data[0]);
+                }
+                
+                showToast('Müşteri başarıyla eklendi', 'success');
             }
-        } else {
-            // Yeni müşteri ekle
-            const newId = customers.length > 0 ? Math.max(...customers.map(c => c.id)) + 1 : 1;
-            const newCustomer = { id: newId, ...customerData };
             
-            customers.push(newCustomer);
-            filteredCustomers.push(newCustomer);
+            renderCustomers();
+            closeCustomerModal();
             
-            showToast('Müşteri başarıyla eklendi', 'success');
+        } catch (error) {
+            console.error('Müşteri kaydedilirken hata:', error);
+            showToast('Müşteri kaydedilirken hata oluştu', 'error');
         }
-        
-        renderCustomers();
-        closeCustomerModal();
     }
     
     // Toast bildirimi göster
