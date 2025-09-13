@@ -6,6 +6,7 @@
   <title>Müşteri Yönetimi - İhracat CRM</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     .animate-pulse {
       animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -238,34 +239,21 @@
 <!-- Toast Bildirimi -->
 <div id="toast" class="fixed right-6 bottom-6 invisible bg-gray-900 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300"></div>
 
-<!-- Firebase ve jQuery -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <script>
-  // Firebase yapılandırması
-  const firebaseConfig = {
-    apiKey: "AIzaSyDKs2eGWVE3vS601pU9pNlKPIji-YRE3qs",
-    authDomain: "paketkapinda-76a34.firebaseapp.com",
-    projectId: "paketkapinda-76a34",
-    storageBucket: "paketkapinda-76a34.appspot.com",
-    messagingSenderId: "817756738289",
-    appId: "1:817756738289:web:a654656344c95acacd0f50",
-    measurementId: "G-BZ9PBDL347"
-  };
-
-  // Firebase'i başlat
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-
+  // Supabase yapılandırması
+  const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+  
+  // Supabase'i başlat
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
   // Global değişkenler
   let currentUser = null;
   let currentUserRole = null;
   let selectedSellerId = null;
-  let originalUser = null;
 
   // Toast bildirimi gösterme
   function showToast(msg, isError = false, ms = 3000) {
@@ -283,17 +271,22 @@
   // Satıcıları yükle
   async function loadSellers() {
     try {
-      const querySnapshot = await db.collection("users").where("role", "==", "seller").get();
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .eq('role', 'seller');
+        
+      if (error) throw error;
+      
       const sellerSelect = document.getElementById('sellerSelect');
       const modalSellerSelect = document.getElementById('modalSellerSelect');
       
       sellerSelect.innerHTML = '<option value="">Satıcı seçin</option>';
       modalSellerSelect.innerHTML = '<option value="">Satıcı seçin</option>';
       
-      querySnapshot.forEach((doc) => {
-        const seller = doc.data();
+      data.forEach((seller) => {
         const option = document.createElement('option');
-        option.value = doc.id;
+        option.value = seller.id;
         option.textContent = `${seller.name} - ${seller.email}`;
         sellerSelect.appendChild(option.cloneNode(true));
         modalSellerSelect.appendChild(option);
@@ -307,23 +300,26 @@
   // Müşterileri yükle
   async function loadCustomers(sellerId = null) {
     try {
-      let querySnapshot;
+      let query = supabase
+        .from('buyer_profiles')
+        .select('*');
       
       if (sellerId) {
         // Belirli bir satıcının müşterilerini yükle
-        querySnapshot = await db.collection("buyerProfiles").where("sellerId", "==", sellerId).get();
+        query = query.eq('seller_id', sellerId);
       } else if (currentUserRole === 'seller') {
         // Satıcı ise kendi müşterilerini yükle
-        querySnapshot = await db.collection("buyerProfiles").where("sellerId", "==", currentUser.uid).get();
-      } else {
-        // Admin ise tüm müşterileri yükle
-        querySnapshot = await db.collection("buyerProfiles").get();
+        query = query.eq('seller_id', currentUser.id);
       }
+      // Admin ise tüm müşterileri yükle (filtre uygulanmaz)
+      
+      const { data, error } = await query;
+      if (error) throw error;
       
       const customersList = document.getElementById('customersList');
       customersList.innerHTML = '';
       
-      if (querySnapshot.empty) {
+      if (!data || data.length === 0) {
         customersList.innerHTML = `
           <tr>
             <td colspan="6" class="p-4 text-center text-gray-500">
@@ -334,8 +330,7 @@
         return;
       }
       
-      querySnapshot.forEach((doc) => {
-        const customer = doc.data();
+      data.forEach((customer) => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-50';
         tr.innerHTML = `
@@ -349,13 +344,13 @@
             </span>
           </td>
           <td class="p-3 border">
-            <button class="px-2 py-1 bg-blue-500 text-white rounded view-customer" data-id="${doc.id}">
+            <button class="px-2 py-1 bg-blue-500 text-white rounded view-customer" data-id="${customer.id}">
               <i class="fas fa-eye"></i>
             </button>
-            <button class="px-2 py-1 bg-yellow-500 text-white rounded edit-customer ml-1" data-id="${doc.id}">
+            <button class="px-2 py-1 bg-yellow-500 text-white rounded edit-customer ml-1" data-id="${customer.id}">
               <i class="fas fa-edit"></i>
             </button>
-            <button class="px-2 py-1 bg-red-500 text-white rounded delete-customer ml-1" data-id="${doc.id}">
+            <button class="px-2 py-1 bg-red-500 text-white rounded delete-customer ml-1" data-id="${customer.id}">
               <i class="fas fa-trash"></i>
             </button>
           </td>
@@ -376,57 +371,71 @@
       
       // Eğer admin değilse veya satıcı seçilmemişse, mevcut kullanıcıyı kullan
       if (currentUserRole !== 'admin' || !targetSellerId) {
-        targetSellerId = currentUser.uid;
+        targetSellerId = currentUser.id;
       }
 
-      // Mevcut kullanıcının oturum bilgilerini sakla
-      originalUser = auth.currentUser;
+      // 1. Auth'da kullanıcı oluştur
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: customerData.email,
+        password: customerData.password,
+        options: {
+          data: {
+            name: customerData.name,
+            role: 'buyer'
+          }
+        }
+      });
       
-      // 1. Firebase Authentication'da kullanıcı oluştur
-      const userCredential = await auth.createUserWithEmailAndPassword(customerData.email, customerData.password);
-      const userId = userCredential.user.uid;
+      if (authError) throw authError;
+      
+      const userId = authData.user.id;
 
-      // 2. Firestore 'users' koleksiyonuna kullanıcıyı ekle
-      await db.collection("users").doc(userId).set({
-        name: customerData.name,
-        email: customerData.email,
-        role: 'buyer',
-        address: customerData.address,
-        city: customerData.city,
-        country: customerData.country,
-        phone: customerData.phone,
-        sector: customerData.sector,
-        status: customerData.status,
-        taxnumber: customerData.taxnumber,
-        taxoffice: customerData.taxoffice,
-        confirm: true,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        sellerId: targetSellerId
-      });
+      // 2. Users tablosuna kullanıcıyı ekle
+      const { error: userError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          name: customerData.name,
+          email: customerData.email,
+          role: 'buyer',
+          address: customerData.address,
+          city: customerData.city,
+          country: customerData.country,
+          phone: customerData.phone,
+          sector: customerData.sector,
+          status: customerData.status,
+          taxnumber: customerData.taxnumber,
+          taxoffice: customerData.taxoffice,
+          confirm: true,
+          seller_id: targetSellerId,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+        
+      if (userError) throw userError;
 
-      // 3. Firestore 'buyerProfiles' koleksiyonuna müşteri profilini ekle
-      await db.collection("buyerProfiles").doc(userId).set({
-        userId: userId,
-        name: customerData.name,
-        email: customerData.email,
-        address: customerData.address,
-        city: customerData.city,
-        country: customerData.country,
-        phone: customerData.phone,
-        sector: customerData.sector,
-        status: customerData.status,
-        taxnumber: customerData.taxnumber,
-        taxoffice: customerData.taxoffice,
-        confirm: true,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        sellerId: targetSellerId
-      });
-
-      // 4. Orijinal kullanıcıya geri dön
-      await auth.signOut();
-      await auth.signInWithEmailAndPassword(originalUser.email, getOriginalUserPassword());
+      // 3. Buyer_profiles tablosuna müşteri profilini ekle
+      const { error: profileError } = await supabase
+        .from('buyer_profiles')
+        .insert({
+          user_id: userId,
+          name: customerData.name,
+          email: customerData.email,
+          address: customerData.address,
+          city: customerData.city,
+          country: customerData.country,
+          phone: customerData.phone,
+          sector: customerData.sector,
+          status: customerData.status,
+          taxnumber: customerData.taxnumber,
+          taxoffice: customerData.taxoffice,
+          confirm: true,
+          seller_id: targetSellerId,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+        
+      if (profileError) throw profileError;
       
       showToast('Müşteri başarıyla eklendi!');
       closeAddCustomerModal();
@@ -435,57 +444,35 @@
     } catch (error) {
       console.error('Müşteri ekleme hatası:', error);
       showToast('Müşteri eklenirken hata oluştu: ' + error.message, true);
-      
-      // Hata durumunda orijinal kullanıcıya geri dönmeyi dene
-      try {
-        await auth.signOut();
-        await auth.signInWithEmailAndPassword(originalUser.email, getOriginalUserPassword());
-      } catch (signInError) {
-        console.error('Orijinal kullanıcıya geri dönüş hatası:', signInError);
-        showToast('Oturum sorunu oluştu, lütfen yeniden giriş yapın', true);
-        window.location.href = "login.html";
-      }
     }
-  }
-
-  // Bu fonksiyon gerçek uygulamada farklı şekilde yönetilmeli
-  // Şifre güvenliği için bu yöntem önerilmez, demo amaçlıdır
-  function getOriginalUserPassword() {
-    // Gerçek uygulamada bu bilgi güvenli bir şekilde saklanmalı
-    // Veya Cloud Functions kullanılmalı
-    return localStorage.getItem('originalUserPassword') || prompt("Lütfen şifrenizi tekrar girin");
   }
 
   // Müşteri ekleme modalını aç
   function openAddCustomerModal() {
     document.getElementById('formAddCustomer').reset();
     document.getElementById('modalAddCustomer').classList.remove('hidden');
-    
-    // Demo amaçlı: Gerçek uygulamada bu yöntem kullanılmamalı
-    if (currentUser && currentUser.email) {
-      localStorage.setItem('originalUserPassword', prompt("Müşteri ekleme işlemi için şifrenizi girin"));
-    }
   }
 
   // Müşteri ekleme modalını kapat
   function closeAddCustomerModal() {
     document.getElementById('modalAddCustomer').classList.add('hidden');
-    // Şifreyi temizle
-    localStorage.removeItem('originalUserPassword');
   }
 
   // DOM yüklendikten sonra çalışacak kodlar
   $(document).ready(function() {
-    // Firebase auth state değişikliğini dinle
-    auth.onAuthStateChanged((user) => {
-      if (user) {
-        currentUser = user;
+    // Oturum durumunu kontrol et
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        currentUser = session.user;
         
-        // Kullanıcı bilgilerini Firestore'dan al
-        db.collection("users").doc(user.uid).get()
-        .then((doc) => {
-          if (doc.exists) {
-            const userData = doc.data();
+        // Kullanıcı bilgilerini al
+        supabase.from('users')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single()
+          .then(({ data: userData, error }) => {
+            if (error) throw error;
+            
             currentUserRole = userData.role;
             
             // Kullanıcı bilgilerini arayüzde göster
@@ -500,24 +487,27 @@
               // Satıcı ise müşterileri doğrudan yükle
               loadCustomers();
             }
-          } else {
-            console.error("Kullanıcı verisi bulunamadı!");
-            showToast('Kullanıcı bilgileri bulunamadı', true);
-          }
-        })
-        .catch((error) => {
-          console.error("Kullanıcı verisi alınırken hata oluştu: ", error);
-          showToast('Kullanıcı bilgileri yüklenirken hata oluştu', true);
-        });
+          })
+          .catch((error) => {
+            console.error("Kullanıcı verisi alınırken hata oluştu: ", error);
+            showToast('Kullanıcı bilgileri yüklenirken hata oluştu', true);
+          });
       } else {
         // Kullanıcı giriş yapmamışsa, giriş sayfasına yönlendir
+        window.location.href = "login.html";
+      }
+    });
+
+    // Auth state değişikliğini dinle
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
         window.location.href = "login.html";
       }
     });
     
     // Çıkış butonu
     document.getElementById('signOut').addEventListener('click', () => {
-      auth.signOut().then(() => {
+      supabase.auth.signOut().then(() => {
         showToast('Çıkış yapıldı');
         window.location.href = "login.html";
       }).catch((error) => {
