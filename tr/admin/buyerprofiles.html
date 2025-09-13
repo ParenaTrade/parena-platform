@@ -552,57 +552,73 @@
     }
     
     // Müşterileri yükle
-    function loadCustomers() {
-        // Burada gerçek veri kaynağından müşterileri çekeceksiniz
-        // Şimdilik örnek veri kullanıyoruz
-        setTimeout(() => {
-            customers = [
-                { 
-                    id: 1, 
-                    name: "Ahmet Yılmaz", 
-                    email: "ahmet@example.com", 
-                    phone: "0532 123 4567", 
-                    city: "İstanbul", 
-                    country: "Türkiye",
-                    address: "Bağdat Caddesi No:123 Kadıköy",
-                    taxnumber: "1234567890",
-                    taxoffice: "Kadıköy",
-                    sector: "Teknoloji",
-                    status: "Active" 
-                },
-                { 
-                    id: 2, 
-                    name: "Ayşe Demir", 
-                    email: "ayse@example.com", 
-                    phone: "0533 234 5678", 
-                    city: "Ankara", 
-                    country: "Türkiye",
-                    address: "Tunalı Hilmi Caddesi No:456 Çankaya",
-                    taxnumber: "2345678901",
-                    taxoffice: "Çankaya",
-                    sector: "Eğitim",
-                    status: "Active" 
-                },
-                { 
-                    id: 3, 
-                    name: "Mehmet Kaya", 
-                    email: "mehmet@example.com", 
-                    phone: "0534 345 6789", 
-                    city: "İzmir", 
-                    country: "Türkiye",
-                    address: "Kordon Boyu No:789 Konak",
-                    taxnumber: "3456789012",
-                    taxoffice: "Konak",
-                    sector: "Turizm",
-                    status: "Inactive" 
-                }
-            ];
-            
-            filteredCustomers = [...customers];
-            renderCustomers();
-        }, 1000);
-    }
     
+  // Müşterileri yükle
+  async function loadCustomers(sellerId = null) {
+    try {
+      let query = supabase
+        .from('buyer_profiles')
+        .select('*');
+      
+      if (sellerId) {
+        // Belirli bir satıcının müşterilerini yükle
+        query = query.eq('seller_id', sellerId);
+      } else if (currentUserRole === 'seller') {
+        // Satıcı ise kendi müşterilerini yükle
+        query = query.eq('seller_id', currentUser.id);
+      }
+      // Admin ise tüm müşterileri yükle (filtre uygulanmaz)
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      const customersList = document.getElementById('customersList');
+      customersList.innerHTML = '';
+      
+      if (!data || data.length === 0) {
+        customersList.innerHTML = `
+          <tr>
+            <td colspan="6" class="p-4 text-center text-gray-500">
+              Müşteri bulunamadı
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      
+      data.forEach((customer) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50';
+        tr.innerHTML = `
+          <td class="p-3 border">${customer.name || ''}</td>
+          <td class="p-3 border">${customer.email || ''}</td>
+          <td class="p-3 border">${customer.phone || ''}</td>
+          <td class="p-3 border">${customer.city || ''} / ${customer.country || ''}</td>
+          <td class="p-3 border">
+            <span class="status-badge ${customer.status === 'Active' ? 'status-approved' : 'status-pending'}">
+              ${customer.status === 'Active' ? 'Aktif' : 'Pasif'}
+            </span>
+          </td>
+          <td class="p-3 border">
+            <button class="px-2 py-1 bg-blue-500 text-white rounded view-customer" data-id="${customer.id}">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button class="px-2 py-1 bg-yellow-500 text-white rounded edit-customer ml-1" data-id="${customer.id}">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="px-2 py-1 bg-red-500 text-white rounded delete-customer ml-1" data-id="${customer.id}">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        `;
+        customersList.appendChild(tr);
+      });
+    } catch (error) {
+      console.error('Müşteriler yüklenirken hata:', error);
+      showToast('Müşteriler yüklenirken hata oluştu', true);
+    }
+  }
+
     // Müşterileri filtrele
     function filterCustomers(searchTerm) {
         if (!searchTerm) {
