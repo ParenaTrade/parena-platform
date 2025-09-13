@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTIP İşleme & Firestore Yükleme</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3a0ca3;
+            --success: #4cc9f0;
+            --danger: #f72585;
+            --warning: #fca311;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+            --light-gray: #e9ecef;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: var(--dark);
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        .upload-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--light-gray);
+        }
+        
+        .file-input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .file-input-container input[type="file"] {
+            flex: 1;
+            padding: 10px;
+            border: 2px dashed var(--primary);
+            border-radius: 8px;
+            background: var(--light);
+            min-width: 250px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--secondary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #d81159;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #3a86ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .progress-section {
+            padding: 20px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 25px;
+            background: var(--light-gray);
+            border-radius: 50px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        
+        .progress-bar-inner {
+            height: 100%;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            border-radius: 50px;
+            width: 0;
+            transition: width 0.4s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .stat-card h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            color: var(--gray);
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .results-section {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .results-section {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .result-box {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .result-header {
+            background: var(--primary);
+            color: white;
+            padding: 12px 15px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .result-body {
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .log-entry, .gtip-item, .error-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        
+        .log-entry {
+            background: var(--light);
+            border-left: 3px solid var(--primary);
+        }
+        
+        .gtip-item {
+            background: #e8f5e9;
+            border-left: 3px solid #4caf50;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .error-item {
+            background: #ffebee;
+            border-left: 3px solid var(--danger);
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .error-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+        }
+        
+        .actions-section {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            border-top: 1px solid var(--light-gray);
+        }
+        
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: var(--success);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast.error {
+            background: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GTIP Excel İşleme & Firestore Yükleme</h1>
+            <p class="subtitle">Excel dosyalarını işleyip Firebase Firestore'a yükleyin</p>
+        </header>
+        
+        <section class="upload-section">
+            <div class="file-input-container">
+                <input type="file" id="excelFiles" multiple accept=".xlsx,.xls">
+                <button id="processBtn" class="btn btn-primary">
+                    <i class="fas fa-cogs"></i> Excel Dosyalarını İşle
+                </button>
+                <button id="clearBtn" class="btn btn-danger">
+                    <i class="fas fa-trash"></i> Temizle
+                </button>
+            </div>
+            <p>Toplam seçilen dosya: <span id="fileCount">0</span></p>
+        </section>
+        
+        <section class="progress-section">
+            <div class="progress-bar">
+                <div class="progress-bar-inner" id="progressBar">0%</div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Toplam Satır</h3>
+                    <div class="stat-value" id="totalRows">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Eklenen GTIP</h3>
+                    <div class="stat-value" id="addedRows">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Hatalı Satır</h3>
+                    <div class="stat-value" id="skippedRows">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Düzeltilen Satır</h3>
+                    <div class="stat-value" id="fixedRows">0</div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="results-section">
+            <div class="result-box">
+                <div class="result-header">
+                    <span>İşlem Geçmişi</span>
+                    <span id="logCount">0</span>
+                </div>
+                <div class="result-body" id="log"></div>
+            </div>
+            
+            <div class="result-box">
+                <div class="result-header">
+                    <span>Ayıklanan GTIP Kodları</span>
+                    <span id="gtipCount">0</span>
+                </div>
+                <div class="result-body" id="ayiklanan"></div>
+            </div>
+            
+            <div class="result-box">
+                <div class="result-header">
+                    <span>Hatalı / Atlanan Satırlar</span>
+                    <span id="errorCount">0</span>
+                </div>
+                <div class="result-body" id="hatali"></div>
+            </div>
+            
+            <div class="result-box">
+                <div class="result-header">
+                    <span>Düzeltme Paneli</span>
+                    <span id="editCount">0</span>
+                </div>
+                <div class="result-body" id="duzeltme"></div>
+            </div>
+        </section>
+        
+        <section class="actions-section">
+            <button id="saveBtn" class="btn btn-success" disabled>
+                <i class="fas fa-cloud-upload-alt"></i> Firebase'e Kaydet
+            </button>
+            <button id="exportBtn" class="btn btn-primary" disabled>
+                <i class="fas fa-download"></i> Dışa Aktar
+            </button>
+        </section>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Firebase yapılandırması
+        const firebaseConfig = {
+
+        
+        // Firebase'i başlat
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        // DOM elementleri
+        const excelFilesInput = document.getElementById('excelFiles');
+        const processBtn = document.getElementById('processBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const progressBar = document.getElementById('progressBar');
+        const totalRowsSpan = document.getElementById('totalRows');
+        const addedRowsSpan = document.getElementById('addedRows');
+        const skippedRowsSpan = document.getElementById('skippedRows');
+        const fixedRowsSpan = document.getElementById('fixedRows');
+        const logDiv = document.getElementById('log');
+        const gtipDiv = document.getElementById('ayiklanan');
+        const errorDiv = document.getElementById('hatali');
+        const editDiv = document.getElementById('duzeltme');
+        const fileCountSpan = document.getElementById('fileCount');
+        const logCountSpan = document.getElementById('logCount');
+        const gtipCountSpan = document.getElementById('gtipCount');
+        const errorCountSpan = document.getElementById('errorCount');
+        const editCountSpan = document.getElementById('editCount');
+        const toast = document.getElementById('toast');
+        
+        // Global değişkenler
+        let allGTIPs = [];
+        let allErrors = [];
+        let currentFileIndex = 0;
+        let totalProcessedRows = 0;
+        let totalAdded = 0;
+        let totalSkipped = 0;
+        let totalFixed = 0;
+        
+        // Toast mesajı göster
+        function showToast(message, isError = false) {
+            toast.textContent = message;
+            toast.className = isError ? 'toast error show' : 'toast show';
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+        
+        // İlerleme çubuğunu güncelle
+        function updateProgress(percent) {
+            progressBar.style.width = percent + "%";
+            progressBar.textContent = percent + "%";
+        }
+        
+        // İstatistikleri güncelle
+        function updateStats() {
+            totalRowsSpan.textContent = totalProcessedRows;
+            addedRowsSpan.textContent = totalAdded;
+            skippedRowsSpan.textContent = totalSkipped;
+            fixedRowsSpan.textContent = totalFixed;
+            
+            gtipCountSpan.textContent = allGTIPs.length;
+            errorCountSpan.textContent = allErrors.length;
+        }
+        
+        // Log ekle
+        function addLog(message) {
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry fade-in';
+            logEntry.innerHTML = `<i class="fas fa-info-circle"></i> ${new Date().toLocaleTimeString()}: ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            logCountSpan.textContent = parseInt(logCountSpan.textContent) + 1;
+        }
+        
+        // GTIP listesine ekle
+        function addToGTIPList(gtipObj) {
+            const gtipItem = document.createElement('div');
+            gtipItem.className = 'gtip-item fade-in';
+            gtipItem.innerHTML = `
+                <div>
+                    <strong>${gtipObj.code}</strong>: ${gtipObj.name.substring(0, 50)}...
+                </div>
+                <div>
+                    <i class="fas fa-check"></i>
+                </div>
+            `;
+            gtipDiv.appendChild(gtipItem);
+            gtipDiv.scrollTop = gtipDiv.scrollHeight;
+        }
+        
+        // Hata listesine ekle
+        function addToErrorList(errorObj, index) {
+            const errorItem = document.createElement('div');
+            errorItem.className = 'error-item fade-in';
+            errorItem.innerHTML = `
+                <div>
+                    <strong>Satır ${errorObj.row}</strong>: ${errorObj.desc || 'Açıklama yok'}
+                </div>
+                <div class="error-actions">
+                    <button class="btn btn-primary btn-sm" onclick="fixError(${index})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="removeError(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            errorDiv.appendChild(errorItem);
+            errorDiv.scrollTop = errorDiv.scrollHeight;
+        }
+        
+        // Hata düzeltme fonksiyonu
+        function fixError(index) {
+            const error = allErrors[index];
+            const editItem = document.createElement('div');
+            editItem.className = 'error-item fade-in';
+            editItem.innerHTML = `
+                <div>
+                    <strong>Satır ${error.row}</strong>
+                    <input type="text" value="${error.code || ''}" placeholder="GTIP Kodu" class="gtip-code-input">
+                    <textarea placeholder="Açıklama">${error.desc || ''}</textarea>
+                </div>
+                <div class="error-actions">
+                    <button class="btn btn-success btn-sm" onclick="saveFix(${index}, this)">
+                        <i class="fas fa-save"></i>
+                    </button>
+                </div>
+            `;
+            editDiv.appendChild(editItem);
+            editCountSpan.textContent = parseInt(editCountSpan.textContent) + 1;
+        }
+        
+        // Düzeltmeyi kaydet
+        function saveFix(index, btn) {
+            const editItem = btn.parentElement.parentElement;
+            const codeInput = editItem.querySelector('.gtip-code-input');
+            const descTextarea = editItem.querySelector('textarea');
+            
+            const code = codeInput.value.trim();
+            const desc = descTextarea.value.trim();
+            
+            if (code.length !== 12) {
+                showToast('GTIP kodu 12 haneli olmalıdır!', true);
+                return;
+            }
+            
+            if (!desc) {
+                showToast('Açıklama alanı boş olamaz!', true);
+                return;
+            }
+            
+            // GTIP listesine ekle
+            allGTIPs.push({
+                code: code,
+                name: desc,
+                size: "",
+                taxrate: ""
+            });
+            
+            addToGTIPList(allGTIPs[allGTIPs.length - 1]);
+            
+            // Hata listesinden kaldır
+            allErrors.splice(index, 1);
+            errorDiv.innerHTML = '';
+            allErrors.forEach((error, idx) => addToErrorList(error, idx));
+            
+            // Düzeltme panelinden kaldır
+            editItem.remove();
+            
+            // İstatistikleri güncelle
+            totalAdded++;
+            totalSkipped--;
+            totalFixed++;
+            updateStats();
+            
+            showToast('Hata düzeltildi ve GTIP listesine eklendi!');
+        }
+        
+        // Hatayı kaldır
+        function removeError(index) {
+            allErrors.splice(index, 1);
+            errorDiv.innerHTML = '';
+            allErrors.forEach((error, idx) => addToErrorList(error, idx));
+            totalSkipped--;
+            updateStats();
+            showToast('Hata listeden kaldırıldı!');
+        }
+        
+        // Excel dosyasını ayrıştır
+        function parseExcel(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type:'array'});
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header:1, defval:""});
+                    resolve({fileName: file.name, data: jsonData});
+                };
+                reader.onerror = err => reject(err);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        // Dosyaları işleme fonksiyonu
+        async function processFiles() {
+            const files = excelFilesInput.files;
+            if(files.length === 0) {
+                showToast('Lütfen Excel dosyası seçin!', true);
+                return;
+            }
+            
+            processBtn.disabled = true;
+            processBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> İşleniyor...';
+            addLog(`Toplam ${files.length} dosya işlenmeye başlandı.`);
+            
+            // Tüm listeleri ve sayaçları sıfırla
+            allGTIPs = [];
+            allErrors = [];
+            gtipDiv.innerHTML = '';
+            errorDiv.innerHTML = '';
+            editDiv.innerHTML = '';
+            totalProcessedRows = 0;
+            totalAdded = 0;
+            totalSkipped = 0;
+            totalFixed = 0;
+            updateStats();
+            updateProgress(0);
+            
+            let currentGroup = { code: "", name: "" };
+            let currentSubGroup = { code: "", name: "" };
+            
+            for(let i = 0; i < files.length; i++) {
+                currentFileIndex = i;
+                const file = files[i];
+                
+                addLog(`${file.name} dosyası işleniyor...`);
+                
+                try {
+                    const { data } = await parseExcel(file);
+                    totalProcessedRows += data.length;
+                    
+                    for(let j = 0; j < data.length; j++) {
+                        let row = data[j];
+                        let pos = (row[0] || "").toString().trim();
+                        let desc = (row[1] || "").toString().trim();
+                        
+                        // Başlık satırlarını atla
+                        if(pos.toLowerCase().includes("pozisyon") || desc.toLowerCase().includes("eşya")) continue;
+                        if(pos === "" && desc === "") continue;
+                        
+                        // Seviye takibi
+                        const cleanPos = pos.replace(/\./g, "");
+                        
+                        if(cleanPos.length === 4) {
+                            // Ana grup
+                            currentGroup = { code: cleanPos, name: desc };
+                            currentSubGroup = { code: "", name: "" };
+                        } else if(cleanPos.length === 6) {
+                            // Alt grup
+                            currentSubGroup = { code: cleanPos, name: desc };
+                        } else if(cleanPos.length === 12) {
+                            // 12 haneli GTIP kodu
+                            let fullDesc = "";
+                            
+                            if(currentGroup.name) {
+                                fullDesc += currentGroup.name;
+                            }
+                            
+                            if(currentSubGroup.name) {
+                                if(fullDesc) fullDesc += " - ";
+                                fullDesc += currentSubGroup.name;
+                            }
+                            
+                            if(desc) {
+                                if(fullDesc) fullDesc += " - ";
+                                fullDesc += desc;
+                            }
+                            
+                            allGTIPs.push({
+                                code: cleanPos,
+                                name: fullDesc,
+                                size: "",
+                                taxrate: ""
+                            });
+                            
+                            addToGTIPList(allGTIPs[allGTIPs.length - 1]);
+                            totalAdded++;
+                        } else {
+                            // Hatalı satır
+                            allErrors.push({
+                                row: j + 1,
+                                code: cleanPos,
+                                desc: desc,
+                                fileName: file.name
+                            });
+                            
+                            addToErrorList(allErrors[allErrors.length - 1], allErrors.length - 1);
+                            totalSkipped++;
+                        }
+                        
+                        // İlerleme çubuğunu güncelle
+                        const progress = Math.floor(((j + 1) / data.length) * 100);
+                        updateProgress(progress);
+                        updateStats();
+                    }
+                    
+                    addLog(`${file.name} dosyası işlendi.`);
+                } catch(err) {
+                    addLog(`${file.name} dosyası işlenirken hata oluştu: ${err.message}`);
+                    showToast(`${file.name} işlenirken hata oluştu!`, true);
+                }
+            }
+            
+            addLog("Tüm dosyalar işlendi.");
+            updateProgress(100);
+            processBtn.disabled = false;
+            processBtn.innerHTML = '<i class="fas fa-cogs"></i> Excel Dosyalarını İşle';
+            saveBtn.disabled = allGTIPs.length === 0;
+            exportBtn.disabled = allGTIPs.length === 0;
+            
+            if(allErrors.length > 0) {
+                showToast(`İşlem tamamlandı! ${allGTIPs.length} GTIP kodu, ${allErrors.length} hatalı satır bulundu.`, true);
+            } else {
+                showToast(`İşlem tamamlandı! ${allGTIPs.length} GTIP kodu başarıyla işlendi.`);
+            }
+        }
+        
+        // Firebase'e kaydet
+        async function saveToFirebase() {
+            if(allGTIPs.length === 0) {
+                showToast('Kaydedilecek GTIP kodu bulunamadı!', true);
+                return;
+            }
+            
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...';
+            addLog("Firebase'e kayıt işlemi başlatıldı.");
+            
+            let successCount = 0;
+            let errorCount = 0;
+            
+            // Firestore güvenlik kurallarını kontrol et
+            try {
+                // Önce basit bir test yapalım
+                const testDoc = await db.collection("GTIP").add({
+                    test: "test",
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Test dokümanını sil
+                await db.collection("GTIP").doc(testDoc.id).delete();
+                
+                addLog("Firestore güvenlik kuralları testi başarılı.");
+            } catch (err) {
+                addLog(`Firestore güvenlik kuralları hatası: ${err.message}`);
+                showToast("Firestore güvenlik kuralları hatası! Lütfen kuralları kontrol edin.", true);
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Firebase\'e Kaydet';
+                return;
+            }
+            
+            for(let i = 0; i < allGTIPs.length; i++) {
+                try {
+                    await db.collection("GTIP").add({
+                        code: allGTIPs[i].code,
+                        name: allGTIPs[i].name,
+                        size: allGTIPs[i].size,
+                        taxrate: allGTIPs[i].taxrate,
+                        created: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    successCount++;
+                    addLog(`${allGTIPs[i].code} kodu Firestore'a eklendi.`);
+                } catch(err) {
+                    errorCount++;
+                    addLog(`${allGTIPs[i].code} kodu Firestore'a eklenirken hata oluştu: ${err.message}`);
+                }
+                
+                // İlerleme çubuğunu güncelle
+                const progress = Math.floor(((i + 1) / allGTIPs.length) * 100);
+                updateProgress(progress);
+            }
+            
+            addLog(`Firebase'e kayıt işlemi tamamlandı: ${successCount} başarılı, ${errorCount} hatalı.`);
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Firebase\'e Kaydet';
+            
+            if(errorCount > 0) {
+                showToast(`Kayıt işlemi tamamlandı: ${successCount} başarılı, ${errorCount} hatalı.`, true);
+            } else {
+                showToast(`Tüm ${successCount} kayıt başarıyla Firestore'a eklendi.`);
+            }
+        }
+        
+        // Dışa aktar
+        function exportData() {
+            if(allGTIPs.length === 0) {
+                showToast('Dışa aktarılacak veri bulunamadı!', true);
+                return;
+            }
+            
+            const worksheet = XLSX.utils.json_to_sheet(allGTIPs);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "GTIP Kodları");
+            XLSX.writeFile(workbook, "gtip_kodlari.xlsx");
+            
+            addLog("GTIP kodları Excel dosyası olarak dışa aktarıldı.");
+            showToast("GTIP kodları Excel dosyası olarak dışa aktarıldı.");
+        }
+        
+        // Temizle
+        function clearAll() {
+            excelFilesInput.value = '';
+            fileCountSpan.textContent = '0';
+            gtipDiv.innerHTML = '';
+            errorDiv.innerHTML = '';
+            editDiv.innerHTML = '';
+            logDiv.innerHTML = '';
+            totalProcessedRows = 0;
+            totalAdded = 0;
+            totalSkipped = 0;
+            totalFixed = 0;
+            updateStats();
+            updateProgress(0);
+            logCountSpan.textContent = '0';
+            gtipCountSpan.textContent = '0';
+            errorCountSpan.textContent = '0';
+            editCountSpan.textContent = '0';
+            saveBtn.disabled = true;
+            exportBtn.disabled = true;
+            
+            addLog("Tüm veriler temizlendi.");
+            showToast("Tüm veriler temizlendi.");
+        }
+        
+        // Event listener'ları bağla
+        processBtn.addEventListener('click', processFiles);
+        clearBtn.addEventListener('click', clearAll);
+        saveBtn.addEventListener('click', saveToFirebase);
+        exportBtn.addEventListener('click', exportData);
+        
+        // Sayfa yüklendiğinde
+        addLog("Sistem hazır. Excel dosyalarını yükleyin.");
+    </script>
+</body>
+</html>
