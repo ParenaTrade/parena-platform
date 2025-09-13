@@ -280,64 +280,53 @@
 
   // Kullanıcı bilgilerini ve rolünü yükle
   async function loadUserInfo() {
-    try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('Oturum kontrol hatası:', sessionError);
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.error('Oturum kontrol hatası:', sessionError);
+      return;
+    }
+    if (session && session.user) {
+      currentUser = session.user;
+      console.log("Kullanıcı ID:", currentUser.id);
+      // Profil çek
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (userError) {
+        console.error('Kullanıcı bilgileri getirme hatası:', userError);
         return;
       }
-      
-      if (session && session.user) {
-        currentUser = session.user;
-        
-        // Kullanıcı bilgilerini Supabase'den çek
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('full_name, role')
-          .eq('id', session.user.id)
-          .single();
-          
-        if (userError) {
-          console.error('Kullanıcı bilgileri getirme hatası:', userError);
-          return;
-        }
-        
-        if (userData) {
-          currentUserRole = userData.role;
-          
-          // Kullanıcı bilgilerini göster
-          if ($('userName')) {
-            $('userName').textContent = userData.full_name || 'Kullanıcı';
-          }
-          
-          if ($('userRole')) {
-            $('userRole').textContent = currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı';
-          }
-          
-          // Admin ise satıcı seçim bölümünü göster
-          if (currentUserRole === 'admin') {
-            document.querySelectorAll('.admin-only').forEach(el => {
-              el.style.display = 'block';
-            });
-            loadSellers();
-          } else {
-            // Satıcı ise müşterileri doğrudan yükle
-            loadCustomers();
-          }
-          
-          return { user: currentUser, role: userData.role };
-        }
-      } else {
-        window.location.href = "login.html";
-      }
-    } catch (error) {
-      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
-    }
-    
-    return null;
-  }
+      if (userData) {
+        currentUserRole = userData.role;
+        console.log("Kullanıcı Adı:", userData.full_name, "Rol:", currentUserRole);
 
+        // DOM elementlerini kontrol et ve yazdır
+        if ($('userName')) $('userName').textContent = userData.full_name || 'Kullanıcı';
+        if ($('userRole')) $('userRole').textContent = currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı';
+
+        // Admin ise admin-only alanlarını aç
+        if (currentUserRole === 'admin') {
+          document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = 'block';
+          });
+          loadSellers();
+        } else {
+          loadCustomers();
+        }
+        return { user: currentUser, role: userData.role };
+      }
+    } else {
+      window.location.href = "login.html";
+    }
+  } catch (error) {
+    console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+  }
+  return null;
+}
   // Satıcıları yükle
   async function loadSellers() {
     try {
@@ -432,6 +421,38 @@
       showToast('Müşteriler yüklenirken hata oluştu', true);
     }
   }
+
+function setupCustomerButtons() {
+  // Görüntüle butonları
+  document.querySelectorAll('.view-customer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.getAttribute('data-id');
+      // Burada müşteri detayını gösteren fonksiyonunu çağır
+      alert('Görüntüle: ' + id);
+    });
+  });
+
+  // Düzenle butonları
+  document.querySelectorAll('.edit-customer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.getAttribute('data-id');
+      // Burada müşteri düzenleme fonksiyonunu çağır
+      alert('Düzenle: ' + id);
+    });
+  });
+
+  // Sil butonları
+  document.querySelectorAll('.delete-customer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const id = this.getAttribute('data-id');
+      // Burada müşteri silme fonksiyonunu çağır
+      if (confirm('Silmek istediğine emin misin?')) {
+        // Silme fonksiyonunu çağır
+        alert('Sil: ' + id);
+      }
+    });
+  });
+}
 
   // Yeni müşteri ekleme fonksiyonu
   async function addCustomer(customerData) {
