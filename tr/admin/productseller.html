@@ -1,4 +1,4 @@
-<!DOCTYPE html>xxxxxx
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
@@ -821,11 +821,10 @@
 <!-- Toast bildirimi konteyneri -->
 <div id="toastContainer"></div>
 
-
 <script>
   // Supabase yapılandırması
   const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhbmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
   
   // Supabase'i başlat
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -847,47 +846,29 @@
   
   // Yükleniyor
   document.addEventListener("DOMContentLoaded", async () => {
-    // Oturum kontrolü
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.error("Oturum kontrolü hatası:", sessionError);
-      showToast("Oturum kontrolü sırasında hata oluştu", "error");
-      return;
-    }
-    
-    if (!session) {
-      window.location.href = "login.html";
-      return;
-    }
-    
-    currentUser = session.user;
-    
     try {
-      // Kullanıcı bilgilerini veritabanından al
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', currentUser.id)
-        .single();
+      // Önce oturumu kontrol et
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (userError) {
-        console.error("Kullanıcı bilgileri alınamadı:", userError);
-        showToast("Kullanıcı bilgileri alınamadı", "error");
+      if (sessionError) {
+        console.error("Oturum kontrolü hatası:", sessionError);
+        showToast("Oturum kontrolü sırasında hata oluştu", "error");
+        setTimeout(() => window.location.href = "login.html", 2000);
         return;
       }
       
-      currentUserRole = userData.role;
-      currentUserData = userData;
+      if (!session) {
+        window.location.href = "login.html";
+        return;
+      }
       
-      // Kullanıcı bilgilerini arayüzde göster
-      $('userName').textContent = userData.name || userData.email;
-      $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı'}`;
+      currentUser = session.user;
+      console.log("Oturum açık, kullanıcı:", currentUser);
       
-      // Kullanıcı bilgilerini localStorage'a kaydet
-      localStorage.setItem('userInfo', JSON.stringify(userData));
+      // Kullanıcı bilgilerini al
+      await getUserData();
       
-      // Veritabanı şemasını kontrol et ve gerekli tabloları oluştur
+      // Veritabanı şemasını kontrol et
       await checkAndCreateTables();
       
       // Admin ise satıcı filtreleme alanını göster
@@ -908,11 +889,110 @@
       
     } catch (error) {
       console.error("Başlatma hatası:", error);
-      showToast("Sistem başlatılırken hata oluştu", "error");
+      showToast("Sistem başlatılırken hata oluştu: " + error.message, "error");
     }
   });
 
- // Event listener'ları kur
+  // Kullanıcı verilerini alma fonksiyonu
+  async function getUserData() {
+    try {
+      console.log("Kullanıcı verileri alınıyor...");
+      
+      // Önce localStorage'dan kontrol et
+      const storedUserInfo = localStorage.getItem('userInfo');
+      if (storedUserInfo) {
+        const userInfo = JSON.parse(storedUserInfo);
+        if (userInfo && userInfo.id) {
+          console.log("Kullanıcı bilgileri localStorage'dan alındı:", userInfo);
+          currentUserRole = userInfo.role;
+          currentUserData = userInfo;
+          
+          // Kullanıcı bilgilerini arayüzde göster
+          $('userName').textContent = userInfo.name || userInfo.email;
+          $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı'}`;
+          return;
+        }
+      }
+      
+      console.log("LocalStorage'da kullanıcı bilgisi yok, veritabanından alınıyor...");
+      
+      // localStorage'da yoksa veritabanından al
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single();
+      
+      if (userError) {
+        console.error("Kullanıcı bilgileri alınamadı:", userError);
+        
+        // Alternatif olarak auth tablosundan kullanıcı bilgilerini al
+        const { data: authUser, error: authError } = await supabase.auth.getUser();
+        
+        if (authError) {
+          console.error("Auth kullanıcı bilgileri alınamadı:", authError);
+          throw new Error("Kullanıcı bilgileri alınamadı");
+        }
+        
+        // Temel kullanıcı bilgilerini oluştur
+        currentUserRole = 'seller'; // Varsayılan rol
+        currentUserData = {
+          id: authUser.user.id,
+          email: authUser.user.email,
+          name: authUser.user.email.split('@')[0] // E-posta'dan isim oluştur
+        };
+        
+        console.log("Auth'dan temel kullanıcı bilgileri alındı:", currentUserData);
+        
+        // Kullanıcı bilgilerini arayüzde göster
+        $('userName').textContent = currentUserData.name;
+        $('userRole').textContent = `Rol: Satıcı`;
+        
+        // Basit kullanıcı bilgilerini localStorage'a kaydet
+        localStorage.setItem('userInfo', JSON.stringify(currentUserData));
+        return;
+      }
+      
+      currentUserRole = userData.role;
+      currentUserData = userData;
+      
+      console.log("Kullanıcı bilgileri veritabanından alındı:", userData);
+      
+      // Kullanıcı bilgilerini arayüzde göster
+      $('userName').textContent = userData.name || userData.email;
+      $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı'}`;
+      
+      // Kullanıcı bilgilerini localStorage'a kaydet
+      localStorage.setItem('userInfo', JSON.stringify(userData));
+      
+    } catch (error) {
+      console.error("Kullanıcı verileri alınırken hata:", error);
+      // Hata durumunda bile temel bilgileri göster
+      $('userName').textContent = currentUser?.email || "Kullanıcı";
+      $('userRole').textContent = "Rol: Bilinmiyor";
+      throw error;
+    }
+  }
+
+  // Veritabanı şemasını kontrol et
+  async function checkAndCreateTables() {
+    try {
+      // Sadece kontrol et, hata olursa devam et
+      const { error: productsError } = await supabase
+        .from('products')
+        .select('id')
+        .limit(1);
+      
+      if (productsError) {
+        console.warn("Products tablosu erişim hatası:", productsError);
+      }
+      
+    } catch (error) {
+      console.warn("Tablo kontrol hatası:", error);
+    }
+  }
+
+  // Event listener'ları kur
   function setupEventListeners() {
     // Yeni ürün butonuna event listener ekle
     $('btnNewProduct').addEventListener('click', () => {
@@ -924,6 +1004,13 @@
       searchGtip(this.value);
     });
     
+    // GTIP alanına odaklanınca dropdown'u göster
+    $('p_gtipno').addEventListener('focus', function() {
+      if (this.value.length >= 2) {
+        searchGtip(this.value);
+      }
+    });
+    
     // Ürün arama işlevselliği
     $('p_name').addEventListener('input', function() {
       searchProducts(this.value);
@@ -931,8 +1018,10 @@
     
     // GTIP dropdown dışına tıklanınca kapat
     document.addEventListener('click', function(e) {
-      if (!e.target.closest('.relative')) {
+      if (!e.target.closest('#p_gtipno') && !e.target.closest('.gtip-results')) {
         $('gtipDropdown').classList.add('hidden');
+      }
+      if (!e.target.closest('#p_name') && !e.target.closest('.product-results')) {
         $('productSearchResults').classList.add('hidden');
       }
     });
@@ -1026,19 +1115,63 @@
   // GTIP verilerini yükle
   async function loadGtipData() {
     try {
+      console.log("GTIP verileri yükleniyor...");
       const { data, error } = await supabase
         .from('gtip_codes')
-        .select('*');
+        .select('*')
+        .limit(100); // İlk 100 kaydı getir
       
       if (error) {
         console.error('GTIP verileri yüklenirken hata:', error);
+        // Hata durumunda örnek GTIP verileri oluştur
+        createSampleGtipData();
         return;
       }
       
       gtipData = data || [];
+      console.log(`${gtipData.length} GTIP kodu yüklendi`);
+      
+      if (gtipData.length === 0) {
+        createSampleGtipData();
+      }
+      
     } catch (error) {
       console.error('GTIP verileri yüklenirken hata:', error);
+      createSampleGtipData();
     }
+  }
+  
+  // Örnek GTIP verileri oluştur
+  function createSampleGtipData() {
+    console.log("Örnek GTIP verileri oluşturuluyor...");
+    gtipData = [
+      { code: "0101210000", name: "Canlı at, eşek, katır ve bardolar" },
+      { code: "0101290000", name: "Canlı at, eşek, katır ve bardolar (diğer)" },
+      { code: "0101300000", name: "Canlı at, eşek, katır ve bardolar (yarış atları)" },
+      { code: "0101900000", name: "Canlı at, eşek, katır ve bardolar (diğer)" },
+      { code: "0102210000", name: "Canlı sığırlar (saf ırk damızlık)" },
+      { code: "0102290000", name: "Canlı sığırlar (diğer)" },
+      { code: "0102310000", name: "Canlı bufalolar (saf ırk damızlık)" },
+      { code: "0102390000", name: "Canlı bufalolar (diğer)" },
+      { code: "0102900000", name: "Canlı sığır ve bufalolar (diğer)" },
+      { code: "0103100000", name: "Canlı domuzlar (saf ırk damızlık)" },
+      { code: "0103910000", name: "Canlı domuzlar (diğer, ağırlığı 50 kg'dan az)" },
+      { code: "0103920000", name: "Canlı domuzlar (diğer, ağırlığı 50 kg veya daha fazla)" },
+      { code: "0104100000", name: "Canlı koyunlar (saf ırk damızlık)" },
+      { code: "0104200000", name: "Canlı koyunlar (diğer)" },
+      { code: "0105100000", name: "Canlı keçiler (saf ırk damızlık)" },
+      { code: "0105900000", name: "Canlı keçiler (diğer)" },
+      { code: "0106110000", name: "Canlı hayvanlar (diğer, maymunlar)" },
+      { code: "0106190000", name: "Canlı hayvanlar (diğer, primatlar)" },
+      { code: "0106200000", name: "Canlı hayvanlar (balinalar, yunuslar, deniz inekleri)" },
+      { code: "0106310000", name: "Canlı hayvanlar (diğer, yırtıcı hayvanlar)" },
+      { code: "0106320000", name: "Canlı hayvanlar (diğer, kemirgenler)" },
+      { code: "0106390000", name: "Canlı hayvanlar (diğer, memeliler)" },
+      { code: "0106410000", name: "Canlı hayvanlar (diğer, sürüngenler)" },
+      { code: "0106490000", name: "Canlı hayvanlar (diğer, diğer hayvanlar)" },
+      { code: "0106900000", name: "Canlı hayvanlar (diğer)" }
+    ];
+    console.log(`${gtipData.length} örnek GTIP kodu oluşturuldu`);
   }
   
   // GTIP arama fonksiyonu
@@ -1059,7 +1192,7 @@
         // Metin ise name alanında içerenleri ara
         return item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase());
       }
-    });
+    }).slice(0, 10); // Sadece ilk 10 sonucu göster
     
     displayGtipResults(results);
   }
@@ -1099,7 +1232,7 @@
     
     const results = allProducts.filter(product => 
       product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ).slice(0, 5); // Sadece ilk 5 sonucu göster
     
     displayProductSearchResults(results);
   }
@@ -1178,9 +1311,14 @@
     const toastContainer = document.getElementById('toastContainer');
     const toast = document.createElement('div');
     
+    let iconClass = 'fa-info-circle';
+    if (type === 'success') iconClass = 'fa-check-circle';
+    if (type === 'error') iconClass = 'fa-exclamation-circle';
+    if (type === 'warning') iconClass = 'fa-exclamation-triangle';
+    
     toast.className = `toast toast-${type}`;
     toast.innerHTML = `
-      <i class="toast-icon ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+      <i class="toast-icon fas ${iconClass}"></i>
       <span>${message}</span>
     `;
     
@@ -1239,10 +1377,11 @@
   // Dosya input metnini güncelle
   function updateImageInputText() {
     const totalImages = imageFiles.length + existingImages.length;
+    const label = $('p_images').nextElementSibling;
     if (totalImages > 0) {
-      $('p_images').nextElementSibling.textContent = `Ürün Görselleri (${totalImages} seçili)`;
+      label.querySelector('p:first-child').textContent = `Görseller (${totalImages} seçili) - yeni eklemek için tıklayın`;
     } else {
-      $('p_images').nextElementSibling.textContent = 'Ürün Görselleri';
+      label.querySelector('p:first-child').textContent = 'Görselleri sürükleyip bırakın veya tıklayarak seçin';
     }
   }
   
@@ -1256,362 +1395,4 @@
       
       if (error) {
         console.error('Satıcılar yüklenirken hata:', error);
-        showToast('Satıcılar yüklenirken hata oluştu', 'error');
-        return;
-      }
-      
-      sellers = data || [];
-      
-      // Satıcı seçim dropdown'larını doldur
-      populateSellerDropdowns();
-      
-    } catch (error) {
-      console.error('Satıcılar yüklenirken hata:', error);
-      showToast('Satıcılar yüklenirken hata oluştu', 'error');
-    }
-  }
-  
-  // Satıcı dropdown'larını doldur
-  function populateSellerDropdowns() {
-    const sellerSelect = $('sellerSelect');
-    const modalSellerSelect = $('modalSellerSelect');
-    
-    // Mevcut seçenekleri temizle (ilk seçenek hariç)
-    sellerSelect.innerHTML = '<option value="">Tüm Satıcılar</option>';
-    modalSellerSelect.innerHTML = '<option value="" selected disabled>Satıcı Seçin</option>';
-    
-    // Satıcıları ekle
-    sellers.forEach(seller => {
-      const option1 = document.createElement('option');
-      option1.value = seller.id;
-      option1.textContent = seller.company_name || seller.name || seller.email;
-      sellerSelect.appendChild(option1);
-      
-      const option2 = document.createElement('option');
-      option2.value = seller.id;
-      option2.textContent = seller.company_name || seller.name || seller.email;
-      modalSellerSelect.appendChild(option2);
-    });
-  }
-  
-  // Ürünleri yükle
-  async function loadProducts() {
-    try {
-      let query = supabase.from('products').select('*');
-      
-      if (selectedSellerId) {
-        // Belirli bir satıcının ürünlerini getir
-        query = query.eq('seller_id', selectedSellerId);
-      } else if (currentUserRole === 'admin') {
-        // Admin ise tüm ürünleri getir
-        // Hiçbir filtre uygulanmaz
-      } else {
-        // Satıcı ise sadece kendi ürünlerini getir
-        query = query.eq('seller_id', currentUser.id);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Ürünler yüklenirken hata:', error);
-        showToast('Ürünler yüklenirken hata oluştu', 'error');
-        return;
-      }
-      
-      const productsList = $('productsList');
-      productsList.innerHTML = '';
-      allProducts = data || [];
-      
-      // Ürün sayacını güncelle
-      $('productCount').textContent = allProducts.length;
-      
-      if (allProducts.length === 0) {
-        productsList.innerHTML = `
-          <tr>
-            <td colspan="9" class="p-4 text-center text-gray-500">
-              Henüz ürün bulunmamaktadır
-            </td>
-          </tr>
-        `;
-        return;
-      }
-      
-      allProducts.forEach(product => {
-        const seller = sellers.find(s => s.id === product.seller_id) || {};
-        
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-gray-50';
-        
-        // Görsel hücresi - ilk görseli küçük resim olarak göster
-        let imageCellContent = '';
-        if (product.images && product.images.length > 0) {
-          imageCellContent = `
-            <img src="${product.images[0]}" class="product-image" 
-                 alt="${product.name || ''}"
-                 onclick="openImageModal('${product.images[0]}')">
-          `;
-        } else {
-          imageCellContent = `
-            <div class="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-              <i class="fas fa-image text-gray-400"></i>
-            </div>
-          `;
-        }
-        
-        tr.innerHTML = `
-          <td class="p-3">${imageCellContent}</td>
-          <td class="p-3 font-medium">${product.name || ''}</td>
-          <td class="p-3">${seller.company_name || seller.name || 'Bilinmiyor'}</td>
-          <td class="p-3">${product.barcod_no || ''}</td>
-          <td class="p-3">${product.gtipno || ''}</td>
-          <td class="p-3">${product.price || 0} ${product.currency || 'TL'}</td>
-          <td class="p-3">${product.stock || 0}</td>
-          <td class="p-3">
-            <span class="status-badge ${product.is_active ? 'status-active' : 'status-inactive'}">
-              ${product.is_active ? 'Aktif' : 'Pasif'}
-            </span>
-          </td>
-          <td class="p-3">
-            <div class="flex space-x-2">
-              <button class="btn btn-secondary btn-sm btnEditProduct">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-danger btn-sm btnDeleteProduct">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        `;
-        
-        // Düzenleme butonuna event listener ekle
-        tr.querySelector('.btnEditProduct').addEventListener('click', () => {
-          openProductModal(product);
-        });
-        
-        // Silme butonuna event listener ekle
-        tr.querySelector('.btnDeleteProduct').addEventListener('click', () => {
-          deleteProduct(product.id);
-        });
-        
-        productsList.appendChild(tr);
-      });
-      
-    } catch (error) {
-      console.error('Ürünler yüklenirken hata:', error);
-      showToast('Ürünler yüklenirken hata oluştu', 'error');
-    }
-  }
-
-  
-  // Formu ürün verileriyle doldur
-  function fillFormWithProductData(product) {
-    $('p_name').value = product.name || '';
-    $('p_barcod_no').value = product.barcod_no || '';
-    $('p_gtipno').value = product.gtipno || '';
-    $('p_sku').value = product.sku || '';
-    $('p_brand').value = product.brand || '';
-    $('p_categories').value = product.categories || '';
-    $('p_price').value = product.price || '';
-    $('p_currency').value = product.currency || 'TRY';
-    $('p_stock').value = product.stock || '';
-    $('p_vat').value = product.vat || '';
-    $('p_description').value = product.description || '';
-    $('p_isActive').value = product.is_active ? 'true' : 'false';
-    
-    // Mevcut görselleri yükle
-    if (product.images && product.images.length > 0) {
-      existingImages = product.images;
-      $('imagePreview').innerHTML = '';
-      product.images.forEach((url, index) => {
-        createImagePreview(null, index, true, url);
-      });
-      updateImageInputText();
-    }
-    
-    // Satıcı seçimi
-    if (currentUserRole === 'admin') {
-      $('modalSellerSelect').value = product.seller_id || '';
-    }
-    
-    currentEditingProductId = product.id;
-    $('modalProductTitle').textContent = 'Ürünü Düzenle';
-    $('deleteProductBtn').classList.remove('hidden');
-  }
-  
-  // Ürün modalını aç
-  function openProductModal(product = null) {
-    // Kullanıcı giriş yapmamışsa uyarı ver
-    if (!currentUser) {
-      showToast('Lütfen önce giriş yapın', 'error');
-      return;
-    }
-    
-    const adminContainer = $('adminSellerContainer');
-    
-    // Tüm hata mesajlarını temizle
-    document.querySelectorAll('.error-message').forEach(el => {
-      el.style.display = 'none';
-    });
-    
-    // Admin ise satıcı seçim alanını göster
-    if (currentUserRole === 'admin') {
-      adminContainer.classList.remove('hidden');
-    } else {
-      adminContainer.classList.add('hidden');
-    }
-    
-    // Görsel durumunu sıfırla
-    imageFiles = [];
-    existingImages = [];
-    $('imagePreview').innerHTML = '';
-    updateImageInputText();
-    
-    if (product) {
-      // Düzenleme modu
-      fillFormWithProductData(product);
-    } else {
-      // Yeni ürün modu
-      $('modalProductTitle').textContent = 'Yeni Ürün Ekle';
-      $('deleteProductBtn').classList.add('hidden');
-      
-      // Formu temizle
-      $('formProduct').reset();
-      
-      // Varsayılan satıcıyı ayarla
-      if (currentUserRole === 'admin') {
-        $('modalSellerSelect').value = selectedSellerId || '';
-      }
-      
-      currentEditingProductId = null;
-    }
-    
-    $('#modalProduct').classList.add('active');
-  }
-  
-  // Ürün modalını kapat
-  function closeProductModal() {
-    $('#modalProduct').classList.remove('active');
-    currentEditingProductId = null;
-    imageFiles = [];
-    existingImages = [];
-  }
-  
-  // Ürün sil
-  async function deleteProduct(productId) {
-    if (!confirm('Bu ürünü silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
-    
-    try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
-      
-      if (error) {
-        throw new Error('Ürün silinemedi: ' + error.message);
-      }
-      
-      showToast('Ürün başarıyla silindi', 'success');
-      loadProducts();
-    } catch (error) {
-      console.error('Ürün silinirken hata:', error);
-      showToast('Ürün silinirken hata oluştu: ' + error.message, 'error');
-    }
-  }
-
-
-  // Ürün kaydet
-  async function saveProduct() {
-    // Form doğrulama
-    if (!validateForm()) {
-      showToast('Lütfen gerekli alanları doldurun', 'error');
-      return;
-    }
-    
-    // Doğru sellerId'yi belirle
-    let sellerId, sellerName;
-    if (currentUserRole === 'admin') {
-      sellerId = $('modalSellerSelect').value;
-      if (!sellerId) {
-        showToast('Lütfen bir satıcı seçin', 'error');
-        return;
-      }
-      
-      // Seçilen satıcının bilgilerini al
-      const selectedSeller = sellers.find(s => s.id === sellerId);
-      sellerName = selectedSeller?.company_name || selectedSeller?.name || '';
-    } else {
-      sellerId = currentUser.id;
-      sellerName = currentUserData?.company_name || currentUserData?.name || currentUser.email;
-    }
-    
-    // Kaydet butonunu devre dışı bırak
-    $('saveProductBtn').disabled = true;
-    $('saveProductBtn').innerHTML = '<div class="loading-spinner"></div> Kaydediliyor...';
-    
-    try {
-      // Görselleri yükle (bu örnekte mevcut görselleri koruyoruz, gerçek uygulamada yükleme yapılmalı)
-      const imageUrls = [...existingImages];
-      
-      // Yeni görselleri yükleme işlemi buraya eklenmeli
-      // Örnek: imageUrls.push(await uploadImage(file));
-      
-      let productData = {
-        name: $('p_name').value.trim(),
-        barcod_no: $('p_barcod_no').value.trim(),
-        gtipno: $('p_gtipno').value.trim(),
-        sku: $('p_sku').value.trim(),
-        brand: $('p_brand').value.trim(),
-        categories: $('p_categories').value.trim(),
-        price: parseFloat($('p_price').value) || 0,
-        currency: $('p_currency').value,
-        stock: parseInt($('p_stock').value) || 0,
-        vat: parseFloat($('p_vat').value) || 0,
-        description: $('p_description').value.trim(),
-        is_active: $('p_isActive').value === 'true',
-        seller_id: sellerId,
-        seller_name: sellerName,
-        images: imageUrls,
-        updated_at: new Date().toISOString()
-      };
-      
-      if (currentEditingProductId) {
-        // Mevcut ürünü güncelle
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', currentEditingProductId);
-        
-        if (error) {
-          throw new Error('Ürün güncellenemedi: ' + error.message);
-        }
-        
-        showToast('Ürün başarıyla güncellendi', 'success');
-      } else {
-        // Yeni ürün ekle
-        productData.created_at = new Date().toISOString();
-        
-        const { error } = await supabase
-          .from('products')
-          .insert([productData]);
-        
-        if (error) {
-          throw new Error('Ürün eklenemedi: ' + error.message);
-        }
-        
-        showToast('Ürün başarıyla eklendi', 'success');
-      }
-      
-      closeProductModal();
-      loadProducts();
-    } catch (error) {
-      console.error('Ürün kaydedilirken hata:', error);
-      showToast('Ürün kaydedilirken hata oluştu: ' + error.message, 'error');
-    } finally {
-      // Kaydet butonunu tekrar etkinleştir
-      $('saveProductBtn').disabled = false;
-      $('saveProductBtn').innerHTML = '<i class="fas fa-save mr-1"></i>Kaydet';
-    }
-  }
-</script>
-</body>
-</html>
+        showToast('Satıcı
