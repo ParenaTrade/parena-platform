@@ -822,12 +822,12 @@
 <div id="toastContainer"></div>
 
 <script>
-  // Supabase yapılandırması
+ // Supabase yapılandırması
   const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
   
-  // Supabase istemcisini oluştur
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Supabase'i başlat
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   
   // DOM elementlerini seçme
   const $ = id => document.getElementById(id);
@@ -856,35 +856,51 @@
     }
     
     if (!session) {
-      window.location.href = "..login.html";
+      window.location.href = "login.html";
       return;
     }
     
     currentUser = session.user;
     
     try {
-      // Veritabanı şemasını kontrol et ve gerekli tabloları oluştur
-      await checkAndCreateTables();
+      // Kullanıcı bilgilerini localStorage'dan al
+      const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
       
-      // Kullanıcı bilgilerini al
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', currentUser.id)
-        .single();
-      
-      if (userError) {
-        console.error("Kullanıcı bilgileri alınamadı:", userError);
-        showToast("Kullanıcı bilgileri alınamadı", "error");
-        return;
+      if (userInfo && userInfo.id) {
+        // localStorage'dan kullanıcı bilgilerini kullan
+        currentUserRole = userInfo.role;
+        currentUserData = userInfo;
+        
+        // Kullanıcı bilgilerini arayüzde göster
+        $('userName').textContent = userInfo.name || userInfo.email;
+        $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı'}`;
+      } else {
+        // Eğer localStorage'da yoksa veritabanından al
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single();
+        
+        if (userError) {
+          console.error("Kullanıcı bilgileri alınamadı:", userError);
+          showToast("Kullanıcı bilgileri alınamadı", "error");
+          return;
+        }
+        
+        currentUserRole = userData.role;
+        currentUserData = userData;
+        
+        // Kullanıcı bilgilerini arayüzde göster
+        $('userName').textContent = userData.name || userData.email;
+        $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı'}`;
+        
+        // Kullanıcı bilgilerini localStorage'a kaydet
+        localStorage.setItem('userInfo', JSON.stringify(userData));
       }
       
-      currentUserRole = userData.role;
-      currentUserData = userData;
-      
-      // Kullanıcı bilgilerini arayüzde göster
-      $('userName').textContent = userData.name || userData.email;
-      $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı'}`;
+      // Veritabanı şemasını kontrol et ve gerekli tabloları oluştur
+      await checkAndCreateTables();
       
       // Admin ise satıcı filtreleme alanını göster
       if (currentUserRole === 'admin') {
@@ -1662,5 +1678,4 @@
   }
 </script>
 </body>
-
 </html>
