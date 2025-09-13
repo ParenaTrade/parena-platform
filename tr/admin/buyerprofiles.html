@@ -48,6 +48,95 @@
     .seller-only {
       display: none;
     }
+    
+    /* Modal stilleri */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .modal-container {
+      background-color: white;
+      border-radius: 0.5rem;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow: auto;
+      transform: translateY(20px);
+      transition: transform 0.3s ease;
+    }
+    
+    .modal-overlay.active .modal-container {
+      transform: translateY(0);
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: #6b7280;
+      cursor: pointer;
+    }
+    
+    .modal-body {
+      padding: 1.5rem;
+    }
+    
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    /* Detay görünümü */
+    .detail-view {
+      background-color: #f9fafb;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+    
+    .detail-row {
+      display: flex;
+      margin-bottom: 0.5rem;
+    }
+    
+    .detail-label {
+      font-weight: 600;
+      min-width: 120px;
+    }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -126,31 +215,29 @@
 </div>
 
 <!-- Müşteri Ekleme Modal -->
-<div id="modalAddCustomer" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-    <div class="flex justify-between items-center mb-3 p-5 border-b">
-      <h3 class="text-lg font-medium">Yeni Müşteri Ekle</h3>
-      <button id="closeModalAddCustomer" class="text-gray-500">
-        <i class="fas fa-times text-xl"></i>
+<div id="modalAddCustomer" class="modal-overlay">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Yeni Müşteri Ekle</h3>
+      <button class="modal-close" id="closeModalAddCustomer">
+        <i class="fas fa-times"></i>
       </button>
     </div>
 
-    <form id="formAddCustomer" class="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
+    <form id="formAddCustomer" class="modal-body">
       <!-- Satıcı Seçimi (Sadece Admin için) -->
-      <div id="sellerSelectionSection" class="md:col-span-2 admin-only bg-indigo-50 p-3 rounded">
+      <div id="sellerSelectionSection" class="mb-4 admin-only bg-indigo-50 p-3 rounded">
         <h4 class="font-medium text-indigo-700 mb-2">Satıcı Seçimi</h4>
-        <div class="grid grid-cols-1 gap-3">
-          <div>
-            <label class="block text-sm text-gray-600 mb-1">Satıcı <span class="text-red-500">*</span></label>
-            <select id="modalSellerSelect" class="w-full p-2 border rounded" required>
-              <option value="">Satıcı seçin</option>
-            </select>
-          </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Satıcı <span class="text-red-500">*</span></label>
+          <select id="modalSellerSelect" class="w-full p-2 border rounded" required>
+            <option value="">Satıcı seçin</option>
+          </select>
         </div>
       </div>
 
       <!-- Temel Bilgiler -->
-      <div class="md:col-span-2 bg-green-50 p-3 rounded">
+      <div class="mb-4 bg-green-50 p-3 rounded">
         <h4 class="font-medium text-green-700 mb-2">Temel Bilgiler</h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -173,7 +260,7 @@
       </div>
 
       <!-- İletişim Bilgileri -->
-      <div class="md:col-span-2 bg-green-50 p-3 rounded">
+      <div class="mb-4 bg-green-50 p-3 rounded">
         <h4 class="font-medium text-green-700 mb-2">İletişim Bilgileri</h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -196,7 +283,7 @@
       </div>
 
       <!-- İş Bilgileri -->
-      <div class="md:col-span-2 bg-green-50 p-3 rounded">
+      <div class="mb-4 bg-green-50 p-3 rounded">
         <h4 class="font-medium text-green-700 mb-2">İş Bilgileri</h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -221,26 +308,128 @@
         </div>
       </div>
 
-      <div class="md:col-span-2 flex justify-between pt-4 border-t">
-        <div></div>
-        <div class="space-x-2">
-          <button type="button" id="cancelAddCustomerBtn" class="px-4 py-2 border rounded">
-            <i class="fas fa-times mr-1"></i>İptal
-          </button>
-          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">
-            <i class="fas fa-save mr-1"></i>Müşteriyi Kaydet
-          </button>
+      <div class="modal-footer">
+        <button type="button" id="cancelAddCustomerBtn" class="px-4 py-2 border rounded">
+          <i class="fas fa-times mr-1"></i>İptal
+        </button>
+        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">
+          <i class="fas fa-save mr-1"></i>Müşteriyi Kaydet
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Müşteri Detay Modal -->
+<div id="modalCustomerDetail" class="modal-overlay">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Müşteri Detayları</h3>
+      <button class="modal-close" id="closeModalCustomerDetail">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="customerDetailContent">
+        <!-- Müşteri detayları buraya dinamik olarak yüklenecek -->
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="closeDetailBtn" class="px-4 py-2 border rounded">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- Müşteri Düzenleme Modal -->
+<div id="modalEditCustomer" class="modal-overlay">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 class="modal-title">Müşteriyi Düzenle</h3>
+      <button class="modal-close" id="closeModalEditCustomer">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <form id="formEditCustomer" class="modal-body">
+      <input type="hidden" id="edit_customer_id">
+      
+      <!-- Temel Bilgiler -->
+      <div class="mb-4 bg-blue-50 p-3 rounded">
+        <h4 class="font-medium text-blue-700 mb-2">Temel Bilgiler</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Ad <span class="text-red-500">*</span></label>
+            <input type="text" id="edit_c_name" placeholder="Ad" class="w-full p-2 border rounded" required />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">E-posta <span class="text-red-500">*</span></label>
+            <input type="email" id="edit_c_email" placeholder="E-posta" class="w-full p-2 border rounded" required />
+          </div>
         </div>
+      </div>
+
+      <!-- İletişim Bilgileri -->
+      <div class="mb-4 bg-blue-50 p-3 rounded">
+        <h4 class="font-medium text-blue-700 mb-2">İletişim Bilgileri</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Adres</label>
+            <input type="text" id="edit_c_address" placeholder="Adres" class="w-full p-2 border rounded" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Şehir</label>
+            <input type="text" id="edit_c_city" placeholder="Şehir" class="w-full p-2 border rounded" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Ülke</label>
+            <input type="text" id="edit_c_country" placeholder="Ülke" class="w-full p-2 border rounded" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Telefon</label>
+            <input type="text" id="edit_c_phone" placeholder="Telefon" class="w-full p-2 border rounded" />
+          </div>
+        </div>
+      </div>
+
+      <!-- İş Bilgileri -->
+      <div class="mb-4 bg-blue-50 p-3 rounded">
+        <h4 class="font-medium text-blue-700 mb-2">İş Bilgileri</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Sektör</label>
+            <input type="text" id="edit_c_sector" placeholder="Sektör" class="w-full p-2 border rounded" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Durum</label>
+            <select id="edit_c_status" class="w-full p-2 border rounded">
+              <option value="Active">Aktif</option>
+              <option value="Pasive">Pasif</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Vergi No</label>
+            <input type="text" id="edit_c_taxnumber" placeholder="Vergi No" class="w-full p-2 border rounded" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Vergi Dairesi</label>
+            <input type="text" id="edit_c_taxoffice" placeholder="Vergi Dairesi" class="w-full p-2 border rounded" />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="cancelEditCustomerBtn" class="px-4 py-2 border rounded">
+          <i class="fas fa-times mr-1"></i>İptal
+        </button>
+        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">
+          <i class="fas fa-save mr-1"></i>Değişiklikleri Kaydet
+        </button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- Toast Bildirimi -->
-<div id="toast" class="fixed right-6 bottom-6 invisible bg-gray-900 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300"></div>
-
-<!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<div id="toast" class="fixed right-6 bottom-6 px-4 py-2 rounded shadow-lg transition-opacity duration-300 bg-gray-900 text-white invisible opacity-0"></div>
 
 <script>
   // Supabase yapılandırması
@@ -254,6 +443,7 @@
   let currentUser = null;
   let currentUserRole = null;
   let selectedSellerId = null;
+  let customers = [];
 
   // DOM elementlerini seçme
   const $ = id => document.getElementById(id);
@@ -269,6 +459,15 @@
       t.style.opacity = '0'; 
       setTimeout(() => t.classList.add('invisible'), 300); 
     }, ms);
+  }
+
+  // Modal açma/kapama fonksiyonları
+  function openModal(modalId) {
+    $(modalId).classList.add('active');
+  }
+
+  function closeModal(modalId) {
+    $(modalId).classList.remove('active');
   }
 
   // Kullanıcı bilgilerini ve rolünü yükle
@@ -379,6 +578,7 @@
       const { data, error } = await query;
       if (error) throw error;
       
+      customers = data || [];
       const customersList = document.getElementById('customersList');
       customersList.innerHTML = '';
       
@@ -393,7 +593,6 @@
         return;
       }
 
-   
       data.forEach((customer) => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-50';
@@ -422,40 +621,8 @@
         customersList.appendChild(tr);
       });
 
-     function setupCustomerButtons() {
-  // Görüntüle butonları
-  document.querySelectorAll('.view-customer').forEach(btn => {
-    btn.onclick = function() {
-      const customerId = this.getAttribute('data-id');
-      // Burada müşteri detaylarını göster
-      alert('Görüntüle: ' + customerId);
-      // Örneğin showCustomerModal(customerId); fonksiyonunu çağırabilirsin
-    };
-  });
-
-  // Düzelt (Düzenle) butonları
-  document.querySelectorAll('.edit-customer').forEach(btn => {
-    btn.onclick = function() {
-      const customerId = this.getAttribute('data-id');
-      // Düzenleme modalını aç, bilgileri doldur
-      alert('Düzenle: ' + customerId);
-      // Örneğin openEditCustomerModal(customerId); fonksiyonunu çağırabilirsin
-    };
-  });
-
-  // Sil butonları
-  document.querySelectorAll('.delete-customer').forEach(btn => {
-    btn.onclick = function() {
-      const customerId = this.getAttribute('data-id');
-      if (confirm('Silmek istediğinizden emin misiniz?')) {
-        // Burada silme fonksiyonunu çağır
-        alert('Sil: ' + customerId);
-        // Örneğin deleteCustomer(customerId); fonksiyonunu çağırabilirsin
-      }
-    };
-  });
-}
-   
+      // Buton event listener'larını ekle
+      setupCustomerButtons();
     
     } catch (error) {
       console.error('Müşteriler yüklenirken hata:', error);
@@ -463,7 +630,175 @@
     }
   }
 
-  
+  // Müşteri butonlarını ayarla
+  function setupCustomerButtons() {
+    // Görüntüle butonları
+    document.querySelectorAll('.view-customer').forEach(btn => {
+      btn.onclick = function() {
+        const customerId = this.getAttribute('data-id');
+        viewCustomer(customerId);
+      };
+    });
+
+    // Düzelt (Düzenle) butonları
+    document.querySelectorAll('.edit-customer').forEach(btn => {
+      btn.onclick = function() {
+        const customerId = this.getAttribute('data-id');
+        editCustomer(customerId);
+      };
+    });
+
+    // Sil butonları
+    document.querySelectorAll('.delete-customer').forEach(btn => {
+      btn.onclick = function() {
+        const customerId = this.getAttribute('data-id');
+        deleteCustomer(customerId);
+      };
+    });
+  }
+
+  // Müşteri detaylarını görüntüle
+  function viewCustomer(customerId) {
+    const customer = customers.find(c => c.id == customerId);
+    if (!customer) return;
+    
+    const detailContent = `
+      <div class="detail-view">
+        <h4 class="font-semibold text-lg mb-4">${customer.name || ''}</h4>
+        <div class="detail-row">
+          <span class="detail-label">E-posta:</span>
+          <span>${customer.email || ''}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Telefon:</span>
+          <span>${customer.phone || '-'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Şehir:</span>
+          <span>${customer.city || '-'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Ülke:</span>
+          <span>${customer.country || '-'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Adres:</span>
+          <span>${customer.address || '-'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Sektör:</span>
+          <span>${customer.sector || '-'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Vergi No:</span>
+          <span>${customer.taxnumber || '-'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Vergi Dairesi:</span>
+          <span>${customer.taxoffice || '-'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Durum:</span>
+          <span class="status-badge ${customer.status === 'Active' ? 'status-approved' : 'status-pending'}">
+            ${customer.status === 'Active' ? 'Aktif' : 'Pasif'}
+          </span>
+        </div>
+      </div>
+    `;
+    
+    $('customerDetailContent').innerHTML = detailContent;
+    openModal('modalCustomerDetail');
+  }
+
+  // Müşteri düzenleme modalını aç
+  function editCustomer(customerId) {
+    const customer = customers.find(c => c.id == customerId);
+    if (!customer) return;
+    
+    // Formu doldur
+    $('edit_customer_id').value = customer.id;
+    $('edit_c_name').value = customer.name || '';
+    $('edit_c_email').value = customer.email || '';
+    $('edit_c_address').value = customer.address || '';
+    $('edit_c_city').value = customer.city || '';
+    $('edit_c_country').value = customer.country || '';
+    $('edit_c_phone').value = customer.phone || '';
+    $('edit_c_sector').value = customer.sector || '';
+    $('edit_c_status').value = customer.status || 'Active';
+    $('edit_c_taxnumber').value = customer.taxnumber || '';
+    $('edit_c_taxoffice').value = customer.taxoffice || '';
+    
+    openModal('modalEditCustomer');
+  }
+
+  // Müşteri silme işlemi
+  async function deleteCustomer(customerId) {
+    const customer = customers.find(c => c.id == customerId);
+    if (!customer) return;
+    
+    if (!confirm(`"${customer.name}" müşterisini silmek istediğinizden emin misiniz?`)) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('buyer_profiles')
+        .delete()
+        .eq('id', customerId);
+        
+      if (error) throw error;
+      
+      showToast('Müşteri başarıyla silindi');
+      
+      // Müşteri listesini yenile
+      if (currentUserRole === 'admin' && selectedSellerId) {
+        loadCustomers(selectedSellerId);
+      } else {
+        loadCustomers();
+      }
+    } catch (error) {
+      console.error('Müşteri silinirken hata:', error);
+      showToast('Müşteri silinirken hata oluştu', true);
+    }
+  }
+
+  // Müşteri güncelleme işlemi
+  async function updateCustomer(customerData) {
+    try {
+      const { error } = await supabase
+        .from('buyer_profiles')
+        .update({
+          name: customerData.name,
+          email: customerData.email,
+          address: customerData.address,
+          city: customerData.city,
+          country: customerData.country,
+          phone: customerData.phone,
+          sector: customerData.sector,
+          status: customerData.status,
+          taxnumber: customerData.taxnumber,
+          taxoffice: customerData.taxoffice,
+          updated_at: new Date()
+        })
+        .eq('id', customerData.id);
+        
+      if (error) throw error;
+      
+      showToast('Müşteri başarıyla güncellendi');
+      closeModal('modalEditCustomer');
+      
+      // Müşteri listesini yenile
+      if (currentUserRole === 'admin' && selectedSellerId) {
+        loadCustomers(selectedSellerId);
+      } else {
+        loadCustomers();
+      }
+    } catch (error) {
+      console.error('Müşteri güncellenirken hata:', error);
+      showToast('Müşteri güncellenirken hata oluştu', true);
+    }
+  }
+
   // Yeni müşteri ekleme fonksiyonu
   async function addCustomer(customerData) {
     try {
@@ -537,24 +872,19 @@
       if (buyerProfileError) throw buyerProfileError;
       
       showToast('Müşteri başarıyla eklendi!');
-      closeAddCustomerModal();
-      loadCustomers(currentUserRole === 'admin' ? selectedSellerId : null);
+      closeModal('modalAddCustomer');
+      
+      // Müşteri listesini yenile
+      if (currentUserRole === 'admin' && selectedSellerId) {
+        loadCustomers(selectedSellerId);
+      } else {
+        loadCustomers();
+      }
       
     } catch (error) {
       console.error('Müşteri ekleme hatası:', error);
       showToast('Müşteri eklenirken hata oluştu: ' + error.message, true);
     }
-  }
-
-  // Müşteri ekleme modalını aç
-  function openAddCustomerModal() {
-    document.getElementById('formAddCustomer').reset();
-    document.getElementById('modalAddCustomer').classList.remove('hidden');
-  }
-
-  // Müşteri ekleme modalını kapat
-  function closeAddCustomerModal() {
-    document.getElementById('modalAddCustomer').classList.add('hidden');
   }
 
   // DOM yüklendikten sonra çalışacak kodlar
@@ -566,8 +896,6 @@
     setupEventListeners();
   });
 
-
-  
   // Event listener'ları kur
   function setupEventListeners() {
     // Çıkış butonu
@@ -581,7 +909,9 @@
     });
     
     // Müşteri ekle butonu
-    document.getElementById('addCustomerBtn').addEventListener('click', openAddCustomerModal);
+    document.getElementById('addCustomerBtn').addEventListener('click', () => {
+      openModal('modalAddCustomer');
+    });
     
     // Müşterileri yenile butonu
     document.getElementById('refreshCustomers').addEventListener('click', () => {
@@ -603,12 +933,25 @@
       }
     });
     
-
-  
-
     // Modal kapatma butonları
-    document.getElementById('closeModalAddCustomer').addEventListener('click', closeAddCustomerModal);
-    document.getElementById('cancelAddCustomerBtn').addEventListener('click', closeAddCustomerModal);
+    document.getElementById('closeModalAddCustomer').addEventListener('click', () => {
+      closeModal('modalAddCustomer');
+    });
+    document.getElementById('cancelAddCustomerBtn').addEventListener('click', () => {
+      closeModal('modalAddCustomer');
+    });
+    document.getElementById('closeModalCustomerDetail').addEventListener('click', () => {
+      closeModal('modalCustomerDetail');
+    });
+    document.getElementById('closeDetailBtn').addEventListener('click', () => {
+      closeModal('modalCustomerDetail');
+    });
+    document.getElementById('closeModalEditCustomer').addEventListener('click', () => {
+      closeModal('modalEditCustomer');
+    });
+    document.getElementById('cancelEditCustomerBtn').addEventListener('click', () => {
+      closeModal('modalEditCustomer');
+    });
     
     // Müşteri ekleme formu
     document.getElementById('formAddCustomer').addEventListener('submit', async (e) => {
@@ -638,6 +981,27 @@
       }
       
       await addCustomer(customerData);
+    });
+    
+    // Müşteri düzenleme formu
+    document.getElementById('formEditCustomer').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const customerData = {
+        id: document.getElementById('edit_customer_id').value,
+        name: document.getElementById('edit_c_name').value,
+        email: document.getElementById('edit_c_email').value,
+        address: document.getElementById('edit_c_address').value,
+        city: document.getElementById('edit_c_city').value,
+        country: document.getElementById('edit_c_country').value,
+        phone: document.getElementById('edit_c_phone').value,
+        sector: document.getElementById('edit_c_sector').value,
+        status: document.getElementById('edit_c_status').value,
+        taxnumber: document.getElementById('edit_c_taxnumber').value,
+        taxoffice: document.getElementById('edit_c_taxoffice').value
+      };
+      
+      await updateCustomer(customerData);
     });
   }
 
