@@ -364,7 +364,7 @@
   async function loadCustomers(sellerId = null) {
     try {
       let query = supabase
-        .from('profiles')
+        .from('buyer_profiles')
         .select('*');
       
       if (sellerId) {
@@ -476,7 +476,29 @@
         
       if (profileError) throw profileError;
 
-      
+      // 3. Buyer_profiles tablosuna müşteri profilini ekle
+      const { error: profileError } = await supabase
+        .from('buyer_profiles')
+        .insert({
+          user_id: userId,
+          name: customerData.name,
+          email: customerData.email,
+          address: customerData.address,
+          city: customerData.city,
+          country: customerData.country,
+          phone: customerData.phone,
+          sector: customerData.sector,
+          status: customerData.status,
+          taxnumber: customerData.taxnumber,
+          taxoffice: customerData.taxoffice,
+          confirm: true,
+          seller_id: targetSellerId,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+        
+      if (profileError) throw profileError;
+
       showToast('Müşteri başarıyla eklendi!');
       closeAddCustomerModal();
       loadCustomers(currentUserRole === 'admin' ? selectedSellerId : null);
