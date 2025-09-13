@@ -580,110 +580,88 @@
     let customers = [];
     let filteredCustomers = [];
     let currentEditingCustomerId = null;
-    
-    // Sayfa yüklendiğinde
-    document.addEventListener('DOMContentLoaded', function() {
-        initializeApp();
-    });
-    
-    // Uygulamayı başlat
-    async function initializeApp() {
-        // Oturum kontrolü
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-            console.error("Oturum kontrolü hatası:", sessionError);
-            showToast("Oturum kontrolü sırasında hata oluştu", "error");
-            return;
-        }
-        
-        if (!session) {
-            window.location.href = "login.html";
-            return;
-        }
-        
-        currentUser = session.user;
-        
-        try {
-            // Kullanıcı bilgilerini al
-            const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', currentUser.id)
-                .single();
-            
-            if (userError) {
-                console.error("Kullanıcı bilgileri alınamadı:", userError);
-                showToast("Kullanıcı bilgileri alınamadı", "error");
-                return;
-            }
-            
-            currentUserRole = userData.role;
-            
-            // Kullanıcı bilgilerini arayüzde göster
-            $('userName').textContent = userData.name || userData.email;
-            $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı'}`;
-            
-            // Müşterileri yükle
-            await loadCustomers();
-            
-            // Event listener'ları kur
-            setupEventListeners();
-            
-        } catch (error) {
-            console.error("Başlatma hatası:", error);
-            showToast("Sistem başlatılırken hata oluştu", "error");
-        }
-    }
-    
-async function loadUserInfo() {
-  try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) {
-      console.error('Oturum kontrol hatası:', sessionError);
-      return;
-    }
-    if (session && session.user) {
-      currentUser = session.user;
-      console.log("Kullanıcı ID:", currentUser.id);
-      // Profil çek
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
-        .select('full_name, role')
-        .eq('id', currentUser.id)
-        .single();
+  let currentPage = 1;
+  let isAdmin = false;
+  const itemsPerPage = 10;
 
-      if (userError) {
-        console.error('Kullanıcı bilgileri getirme hatası:', userError);
+	    
+
+  // DOM yüklendikten sonra
+  document.addEventListener("DOMContentLoaded", async () => {
+      // Kullanıcı bilgilerini yükle
+      await loadUserInfo();
+      
+      // Satıcıları yükle
+      await loadSellers();
+      
+      // Hedefleri yükle
+      await loadTargets();
+      
+      // Event listener'ları ekle
+      setupEventListeners();
+  });
+
+  // Kullanıcı bilgilerini ve rolünü yükle
+  async function loadUserInfo() {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Oturum kontrol hatası:', sessionError);
         return;
       }
-      if (userData) {
-        currentUserRole = userData.role;
-        console.log("Kullanıcı Adı:", userData.full_name, "Rol:", currentUserRole);
-
-        // DOM elementlerini kontrol et ve yazdır
-        if ($('userName')) $('userName').textContent = userData.full_name || 'Kullanıcı';
-        if ($('userRole')) $('userRole').textContent = currentUserRole === 'admin' ? 'Yönetici' : 'Satıcı';
-
-        // Admin ise admin-only alanlarını aç
-        if (currentUserRole === 'admin') {
-          document.querySelectorAll('.admin-only').forEach(el => {
-            el.style.display = 'block';
-          });
-          loadSellers();
-        } else {
-          loadCustomers();
+      
+      if (session && session.user) {
+        currentUser = session.user;
+        
+        // Kullanıcı bilgilerini Supabase'den çek
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (userError) {
+          console.error('Kullanıcı bilgileri getirme hatası:', userError);
+          return;
         }
-        return { user: currentUser, role: userData.role };
+        
+        if (userData) {
+          isAdmin = userData.role === "admin";
+          currentUserRole = userData.role;
+          
+          // Kullanıcı bilgilerini göster
+          if ($('userName')) {
+            $('userName').textContent = userData.full_name || 'Kullanıcı';
+          }
+          
+          if ($('userRole')) {
+            $('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+          }
+          
+          if ($('userStatus')) {
+            $('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
+            $('userStatus').classList.add('bg-green-500');
+          }
+          
+          // Çıkış butonu event listener
+          $('signOut').addEventListener('click', async () => {
+            await supabase.auth.signOut();
+            window.location.href = "login.html";
+          });
+          
+          return { user: currentUser, role: userData.role, isAdmin };
+        }
+      } else {
+        window.location.href = "login.html";
       }
-    } else {
-      window.location.href = "login.html";
+    } catch (error) {
+      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
     }
-  } catch (error) {
-    console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+    
+    return null;
   }
-  return null;
-}
+
     // Event listener'ları kur
     function setupEventListeners() {
         // Yeni müşteri butonu
