@@ -160,30 +160,6 @@
             cursor: not-allowed;
         }
         
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .tab {
-            padding: 12px 20px;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.15);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-        }
-        
-        .tab.active {
-            background: var(--accent);
-        }
-        
-        .tab:hover {
-            background: rgba(255, 255, 255, 0.25);
-        }
-        
         .leads-container {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -378,6 +354,20 @@
             background: var(--danger);
         }
         
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
         @media (max-width: 768px) {
             .form-row {
                 flex-direction: column;
@@ -407,9 +397,6 @@
                     <label for="sellerSelect">Satıcı Seçin</label>
                     <select id="sellerSelect" class="form-control">
                         <option value="">Lütfen bir satıcı seçin</option>
-                        <option value="seller1">ABC Gıda Ltd. Şti.</option>
-                        <option value="seller2">XYZ Tarım Ürünleri</option>
-                        <option value="seller3">MNO İhracat A.Ş.</option>
                     </select>
                 </div>
                 
@@ -466,7 +453,7 @@
                 <div class="form-group" style="display: flex; align-items: center; gap: 20px;">
                     <button id="searchLeadsBtn" class="btn btn-success" disabled><i class="fas fa-search"></i> Potansiyel Lead'leri Ara</button>
                     <div id="searchProgress" style="display: none;">
-                        <i class="fas fa-spinner fa-spin"></i> <span id="progressText">Aranıyor...</span>
+                        <div class="loading"></div> <span id="progressText">Aranıyor...</span>
                     </div>
                 </div>
             </div>
@@ -513,7 +500,6 @@
             const searchLeadsBtn = document.getElementById('searchLeadsBtn');
             const resultsCard = document.getElementById('resultsCard');
             const leadsContainer = document.getElementById('leadsContainer');
-            const criteriaList = document.getElementById('criteriaList');
             const selectAllBtn = document.getElementById('selectAllBtn');
             const saveSupabaseBtn = document.getElementById('saveSupabaseBtn');
             const saveSheetsBtn = document.getElementById('saveSheetsBtn');
@@ -536,43 +522,117 @@
             const criteriaSector = document.getElementById('criteriaSector');
             const criteriaGtip = document.getElementById('criteriaGtip');
             
-            // Supabase bağlantı ayarları
-            const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";    
-            const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhbmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+            // Supabase bağlantı ayarları (Bu bilgileri kendi projenizle değiştirin)
+            const supabaseUrl = 'https://your-project.supabase.co';
+            const supabaseKey = 'your-anon-key';
             const supabase = supabase.createClient(supabaseUrl, supabaseKey);
             
-            // Örnek satıcı hedef verileri
-            const sellerTargets = {
-                seller1: [
-                    { id: 'target1', name: 'Almanya Salça Hedefi', country: 'Almanya', product: 'Salça', sector: 'Gıda', gtip: '200290', quantity: '1000 ton', revenue: '500,000 USD' },
-                    { id: 'target2', name: 'Fransa Zeytinyağı Hedefi', country: 'Fransa', product: 'Zeytinyağı', sector: 'Gıda', gtip: '150910', quantity: '5000 litre', revenue: '250,000 USD' }
-                ],
-                seller2: [
-                    { id: 'target3', name: 'ABD Kuru Meyve Hedefi', country: 'Amerika', product: 'Kuru Kayısı', sector: 'Gıda', gtip: '081330', quantity: '2000 kg', revenue: '150,000 USD' },
-                    { id: 'target4', name: 'İngiltere Fındık Hedefi', country: 'İngiltere', product: 'Fındık', sector: 'Gıda', gtip: '080222', quantity: '5000 kg', revenue: '300,000 USD' }
-                ],
-                seller3: [
-                    { id: 'target5', name: 'İtalya Zeytin Hedefi', country: 'İtalya', product: 'Zeytin', sector: 'Gıda', gtip: '070990', quantity: '3000 kg', revenue: '120,000 USD' },
-                    { id: 'target6', name: 'Japonya İncir Hedefi', country: 'Japonya', product: 'Kuru İncir', sector: 'Gıda', gtip: '080420', quantity: '1000 kg', revenue: '80,000 USD' }
-                ]
-            };
+            // Sayfa yüklendiğinde satıcıları çek
+            loadSellers();
+            
+            // Satıcıları yükleme fonksiyonu
+            async function loadSellers() {
+                try {
+                    sellerSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+                    
+                    // Supabase'den satıcıları çek
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('id, company_name, sector')
+                        .order('company_name');
+                    
+                    if (error) {
+                        throw error;
+                    }
+                    
+                    // Eğer veri yoksa örnek veri kullan
+                    if (!data || data.length === 0) {
+                        sellerSelect.innerHTML = '<option value="">Satıcı bulunamadı</option>';
+                        showNotification('Supabase bağlantısı başarılı ancak satıcı bulunamadı. Örnek veriler kullanılıyor.', true);
+                        loadSampleSellers();
+                        return;
+                    }
+                    
+                    // Satıcıları dropdown'a ekle
+                    sellerSelect.innerHTML = '<option value="">Lütfen bir satıcı seçin</option>';
+                    data.forEach(seller => {
+                        const option = document.createElement('option');
+                        option.value = seller.id;
+                        option.textContent = seller.company_name || `Satıcı-${seller.id.substring(0, 8)}`;
+                        sellerSelect.appendChild(option);
+                    });
+                    
+                    showNotification('Satıcılar başarıyla yüklendi');
+                } catch (error) {
+                    console.error('Satıcı yükleme hatası:', error);
+                    sellerSelect.innerHTML = '<option value="">Yükleme hatası</option>';
+                    showNotification('Satıcılar yüklenirken hata oluştu. Örnek veriler kullanılıyor.', true);
+                    loadSampleSellers();
+                }
+            }
+            
+            // Örnek satıcı yükleme (Supabase bağlantısı başarısız olursa)
+            function loadSampleSellers() {
+                const sampleSellers = [
+                    { id: 'seller1', company_name: 'ABC Gıda Ltd. Şti.', sector: 'Gıda' },
+                    { id: 'seller2', company_name: 'XYZ Tarım Ürünleri', sector: 'Tarım' },
+                    { id: 'seller3', company_name: 'MNO İhracat A.Ş.', sector: 'İhracat' }
+                ];
+                
+                sampleSellers.forEach(seller => {
+                    const option = document.createElement('option');
+                    option.value = seller.id;
+                    option.textContent = seller.company_name;
+                    sellerSelect.appendChild(option);
+                });
+            }
             
             // Satıcı seçimi değiştiğinde
-            sellerSelect.addEventListener('change', function() {
+            sellerSelect.addEventListener('change', async function() {
                 const sellerId = this.value;
                 
                 if (sellerId) {
-                    targetSelect.disabled = false;
-                    loadTargetBtn.disabled = false;
+                    targetSelect.disabled = true;
+                    loadTargetBtn.disabled = true;
+                    targetSelect.innerHTML = '<option value="">Hedefler yükleniyor...</option>';
                     
-                    // Hedefleri doldur
-                    targetSelect.innerHTML = '<option value="">Lütfen bir hedef seçin</option>';
-                    sellerTargets[sellerId].forEach(target => {
-                        const option = document.createElement('option');
-                        option.value = target.id;
-                        option.textContent = target.name;
-                        targetSelect.appendChild(option);
-                    });
+                    try {
+                        // Supabase'den satıcı hedeflerini çek
+                        const { data, error } = await supabase
+                            .from('seller_targets')
+                            .select('*')
+                            .eq('seller_id', sellerId)
+                            .order('created_at', { ascending: false });
+                        
+                        if (error) {
+                            throw error;
+                        }
+                        
+                        // Hedefleri doldur
+                        targetSelect.innerHTML = '<option value="">Lütfen bir hedef seçin</option>';
+                        
+                        if (!data || data.length === 0) {
+                            targetSelect.innerHTML = '<option value="">Bu satıcı için hedef bulunamadı</option>';
+                            showNotification('Bu satıcı için hedef bulunamadı', true);
+                            return;
+                        }
+                        
+                        data.forEach(target => {
+                            const option = document.createElement('option');
+                            option.value = target.id;
+                            option.textContent = `${target.product_name} - ${target.target_quantity} ${target.quantity_unit}`;
+                            option.dataset.target = JSON.stringify(target);
+                            targetSelect.appendChild(option);
+                        });
+                        
+                        targetSelect.disabled = false;
+                        loadTargetBtn.disabled = false;
+                        
+                    } catch (error) {
+                        console.error('Hedef yükleme hatası:', error);
+                        targetSelect.innerHTML = '<option value="">Hedef yükleme hatası</option>';
+                        showNotification('Hedefler yüklenirken hata oluştu', true);
+                    }
                 } else {
                     targetSelect.disabled = true;
                     loadTargetBtn.disabled = true;
@@ -582,19 +642,18 @@
             
             // Hedef yükleme butonu
             loadTargetBtn.addEventListener('click', function() {
-                const targetId = targetSelect.value;
-                const sellerId = sellerSelect.value;
+                const selectedOption = targetSelect.options[targetSelect.selectedIndex];
                 
-                if (targetId) {
-                    const target = sellerTargets[sellerId].find(t => t.id === targetId);
+                if (selectedOption && selectedOption.value) {
+                    const target = JSON.parse(selectedOption.dataset.target);
                     
                     // Form alanlarını doldur
-                    targetCountry.value = target.country;
-                    targetProduct.value = target.product;
-                    targetSector.value = target.sector;
-                    targetGtip.value = target.gtip;
-                    targetQuantity.value = target.quantity;
-                    targetRevenue.value = target.revenue;
+                    targetCountry.value = target.country || 'Belirtilmemiş';
+                    targetProduct.value = target.product_name;
+                    targetSector.value = target.sector || 'Belirtilmemiş';
+                    targetGtip.value = target.gtip_code || 'Belirtilmemiş';
+                    targetQuantity.value = `${target.target_quantity} ${target.quantity_unit}`;
+                    targetRevenue.value = `$${target.target_revenue?.toLocaleString('tr-TR') || '0'}`;
                     
                     // Arama butonunu aktif et
                     searchLeadsBtn.disabled = false;
@@ -746,52 +805,6 @@
                         timeline: '2 ay',
                         match_percentage: 85,
                         priceUSD: 4.20
-                    },
-                    {
-                        id: 'lead3',
-                        company_name: 'BioMarkt Deutschland',
-                        contact_name: 'Thomas Weber',
-                        email: 'thomas.weber@biomarkt.de',
-                        phone: '+49 555 123 456',
-                        website: 'www.biomarkt-deutschland.de',
-                        industry: 'Perakende',
-                        company_size: 'Büyük Ölçekli',
-                        country: 'Almanya',
-                        city: 'Münih',
-                        address: 'BioStraße 78, Münih',
-                        status: 'new',
-                        source: 'referral',
-                        priority: 'high',
-                        score: 88,
-                        description: 'Organik ürünler satan büyük market zinciri',
-                        notes: 'Yeni tedarikçi arayışında',
-                        budget: 400000,
-                        timeline: '6 ay',
-                        match_percentage: 90,
-                        priceUSD: 4.75
-                    },
-                    {
-                        id: 'lead4',
-                        company_name: 'Feinkost Import',
-                        contact_name: 'Sabine Fischer',
-                        email: 'sabine.fischer@feinkost-import.de',
-                        phone: '+49 321 987 654',
-                        website: 'www.feinkost-import.de',
-                        industry: 'Gıda İthalatı',
-                        company_size: 'Küçük Ölçekli',
-                        country: 'Almanya',
-                        city: 'Köln',
-                        address: 'Feinkostweg 12, Köln',
-                        status: 'new',
-                        source: 'event',
-                        priority: 'low',
-                        score: 65,
-                        description: 'Özel gıda ürünleri ithalatı yapan firma',
-                        notes: 'Daha çok İtalyan ürünleri ile çalışıyor',
-                        budget: 120000,
-                        timeline: '1 ay',
-                        match_percentage: 70,
-                        priceUSD: 4.00
                     }
                 ];
                 
@@ -906,26 +919,6 @@
                     notification.classList.remove('show');
                 }, 3000);
             }
-            
-            // Sayfa yüklendiğinde Supabase bağlantısını test et
-            async function testSupabaseConnection() {
-                try {
-                    const { data, error } = await supabase
-                        .from('seller_targets')
-                        .select('count');
-                    
-                    if (error) {
-                        console.warn('Supabase bağlantı hatası:', error.message);
-                    } else {
-                        console.log('Supabase bağlantısı başarılı');
-                    }
-                } catch (error) {
-                    console.error('Supabase bağlantı testi hatası:', error);
-                }
-            }
-            
-            // Sayfa yüklendiğinde bağlantı testi yap
-            testSupabaseConnection();
         });
     </script>
 </body>
