@@ -844,22 +844,28 @@
   let allProducts = [];
   let currentEditingProductId = null;
   
-  // Yükleniyor
  document.addEventListener("DOMContentLoaded", async () => {
-    // 1) URL’den userId parametresini al
-    const params = new URLSearchParams(window.location.search);
-    const userId = params.get("id");
+  const params = new URLSearchParams(window.location.search);
+  let currentUserId = params.get("id");
 
-    if (!userId) {
-      console.error("Kullanıcı ID bulunamadı!");
-      document.getElementById("userName").textContent = "Kullanıcı bulunamadı";
-      return;
+  alert("URL'den gelen id: " + currentUserId);
+
+  if (!currentUserId) {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (session && session.user) {
+      currentUserId = session.user.id;
     }
+    alert("Session'dan gelen id: " + currentUserId);
+  }
 
+  if (!currentUserId) {
+    alert("Kullanıcı ID bulunamadı!");
+    return;
+  }
 
-    
-    currentUser = session.user;
-    
+  alert("Kullanıcı ID bulundu: " + currentUserId);
+});
+
     try {
       // Veritabanı şemasını kontrol et ve gerekli tabloları oluştur
       await checkAndCreateTables();
@@ -882,7 +888,7 @@
       profile.role === "admin" ? "Yönetici" : (profile.role || "Kullanıcı");
 
     // 4) Satıcı listesini yükle
-    await loadSellers();
+    loadSellers();
   });
 
 
@@ -1654,5 +1660,4 @@
   }
 </script>
 </body>
-
 </html>
