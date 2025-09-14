@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Sesli Sipariş Sistemi</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+    button { padding: 15px 25px; font-size: 18px; margin-top: 20px; cursor: pointer; }
+    #status { margin-top: 20px; font-size: 16px; color: green; }
+  </style>
+</head>
+<body>
+  <h1>🍽️ Sesli Sipariş Sistemi</h1>
+  <p>“Acıktım” de, sana menüyü okuyayım.</p>
+
+  <button id="startBtn">🎤 Dinlemeye Başla</button>
+  <div id="status">Beklemede...</div>
+
+  <script>
+    const startBtn = document.getElementById("startBtn");
+    const statusDiv = document.getElementById("status");
+
+    // Menü
+    const menu = [
+      "Adana Kebap",
+      "Kuzu Şiş",
+      "Tavuk Kanat",
+      "Lahmacun",
+      "Pide"
+    ];
+
+    // Sesle cevap verme
+    function speak(text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "tr-TR";
+      speechSynthesis.speak(utterance);
+    }
+
+    // Mikrofonla dinleme
+    function startListening() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("Tarayıcın ses tanımayı desteklemiyor!");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = "tr-TR";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.start();
+      statusDiv.textContent = "🎤 Dinleniyor...";
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.toLowerCase();
+        statusDiv.textContent = "👉 Söyledin: " + transcript;
+
+        if (transcript.includes("acıktım")) {
+          let cevap = "Hoşgeldiniz efendim! Bugün menümüzde: " + menu.join(", ") + ". Ne sipariş edersiniz?";
+          speak(cevap);
+        } else if (menu.some(item => transcript.includes(item.toLowerCase()))) {
+          let cevap = "Siparişiniz alındı efendim, afiyet olsun!";
+          speak(cevap);
+        } else {
+          speak("Anlayamadım efendim, tekrar eder misiniz?");
+        }
+      };
+
+      recognition.onerror = (event) => {
+        statusDiv.textContent = "❌ Hata: " + event.error;
+        speak("Bir sorun oluştu efendim.");
+      };
+
+      recognition.onend = () => {
+        statusDiv.textContent = "Beklemede...";
+      };
+    }
+
+    startBtn.addEventListener("click", startListening);
+  </script>
+</body>
+</html>
