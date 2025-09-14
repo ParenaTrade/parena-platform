@@ -588,7 +588,8 @@
     }
 
     const user = session.user;
-
+    currentUserId = user.id; // <<<<< burada id’yi saklıyoruz
+	  
     // profiles tablosundan bilgileri çek
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -617,13 +618,17 @@
   });
 
   // Menü fonksiyonları aynı kalabilir
-  function loadPage(url) {
+ function loadPage(url) {
+  if (currentUserId) {
+    document.getElementById('contentFrame').src = `${url}?id=${currentUserId}`;
+  } else {
     document.getElementById('contentFrame').src = url;
-    document.querySelectorAll('.menu-item, .submenu-item').forEach(i => i.classList.remove('active'));
-    const currentMenu = document.querySelector(`[onclick*="${url}"]`);
-    if (currentMenu) currentMenu.classList.add('active');
   }
 
+  document.querySelectorAll('.menu-item, .submenu-item').forEach(i => i.classList.remove('active'));
+  const currentMenu = document.querySelector(`[onclick*="${url}"]`);
+  if (currentMenu) currentMenu.classList.add('active');
+}
   function toggleMenu(menuId) {
     const menu = document.getElementById(menuId);
     const arrow = menu.previousElementSibling.querySelector('.menu-arrow');
