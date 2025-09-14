@@ -821,13 +821,13 @@
 <!-- Toast bildirimi konteyneri -->
 <div id="toastContainer"></div>
 
-<script><script>
-  // Supabase yapılandırması
-  const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhbmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+ const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
   
   // Supabase'i başlat
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);	
   
   // DOM elementlerini seçme
   const $ = id => document.getElementById(id);
@@ -845,33 +845,47 @@
   let currentEditingProductId = null;
   
   // Yükleniyor
-  document.addEventListener("DOMContentLoaded", async () => {
-    // Oturum kontrolü
-   const { data: userProfile, error: profileError } = await supabase
-  .from('profiles')          // <- burayı profiles yaptık
-  .select('*')
-  .eq('id', currentUser.id)
-  .single();
+ document.addEventListener("DOMContentLoaded", async () => {
+    // 1) URL’den userId parametresini al
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get("id");
 
-if (profileError) {
-  console.error("profiles tablosundan kullanıcı bilgileri alınamadı:", profileError);
-  showToast("Kullanıcı profil bilgileri alınamadı", "error");
-  return;
-}
+    if (!userId) {
+      console.error("Kullanıcı ID bulunamadı!");
+      document.getElementById("userName").textContent = "Kullanıcı bulunamadı";
+      return;
+    }
 
-currentUserRole = userProfile.role;
-currentUserData = userProfile;
 
-// Kullanıcı bilgilerini arayüzde göster (alan isimlerine göre düzeltme)
-$('userName').textContent = userProfile.full_name || userProfile.name || userProfile.email;
-$('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : (currentUserRole || 'Kullanıcı')}`;
-   
-      // Admin ise satıcı filtreleme alanını göster
-      if (currentUserRole === 'admin') {
-        $('adminSellerFilter').classList.remove('hidden');
-        $('adminSellerContainer').classList.remove('hidden');
-        await f();
-      }
+    
+    currentUser = session.user;
+    
+    try {
+      // Veritabanı şemasını kontrol et ve gerekli tabloları oluştur
+      await checkAndCreateTables();
+      
+       // --- 2) profiles tablosundan kullanıcı bilgilerini çek
+    const { data: userProfile, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Kullanıcı bilgisi alınamadı:", error);
+      return;
+    }
+     // 3) UI’de kullanıcı bilgilerini göster
+    document.getElementById("userName").textContent =
+      profile.full_name || profile.email;
+    document.getElementById("userRole").textContent =
+      profile.role === "admin" ? "Yönetici" : (profile.role || "Kullanıcı");
+
+    // 4) Satıcı listesini yükle
+    loadSellers();
+  });
+
+
       
       // GTIP verilerini yükle
       await loadGtipData();
@@ -1276,25 +1290,23 @@ $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 
     }
   }
   
-  // Satıcıları yükle
+  // 5) Satıcıları profiles tablosundan çek
   async function loadSellers() {
-    try {
-   const { data, error } = await supabase
-  .from('profiles')         // <- profiles olmalı
-  .select('*')
-  .eq('role', 'seller');
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, company_name")
+      .eq("role", "seller");
 
-      
-      if (error) {
-        console.error('Satıcılar yüklenirken hata:', error);
-        showToast('Satıcılar yüklenirken hata oluştu', 'error');
-        return;
-      }
-      
-      sellers = data || [];
+    if (error) {
+      console.error("Satıcılar alınamadı:", error);
+      return;
+    }
+
+    populateSellerDropdowns(data);
+  }
       
       // Satıcı seçim dropdown'larını doldur
-      option1.textContent = seller.company_name || seller.full_name || seller.name || seller.email;
+      populateSellerDropdowns();
       
     } catch (error) {
       console.error('Satıcılar yüklenirken hata:', error);
@@ -1302,26 +1314,25 @@ $('userRole').textContent = `Rol: ${currentUserRole === 'admin' ? 'Yönetici' : 
     }
   }
   
-  // Satıcı dropdown'larını doldur
-  function populateSellerDropdowns() {
-    const sellerSelect = $('sellerSelect');
-    const modalSellerSelect = $('modalSellerSelect');
-    
-    // Mevcut seçenekleri temizle (ilk seçenek hariç)
-    sellerSelect.innerHTML = '<option value="">Tüm Satıcılar</option>';
-    modalSellerSelect.innerHTML = '<option value="" selected disabled>Satıcı Seçin</option>';
-    
-    // Satıcıları ekle
-    sellers.forEach(seller => {
-      const option1 = document.createElement('option');
+
+ // 6) Dropdown’u doldur
+  function populateSellerDropdowns(sellers) {
+    const select1 = document.getElementById("sellerSelect1");
+    const select2 = document.getElementById("sellerSelect2");
+
+    select1.innerHTML = "";
+    select2.innerHTML = "";
+
+    sellers.forEach((seller) => {
+      const option1 = document.createElement("option");
       option1.value = seller.id;
-      option1.textContent = seller.company_name || seller.name || seller.email;
-      sellerSelect.appendChild(option1);
-      
-      const option2 = document.createElement('option');
-      option2.value = seller.id;
-      option2.textContent = seller.company_name || seller.name || seller.email;
-      modalSellerSelect.appendChild(option2);
+      option1.textContent =
+        seller.company_name || seller.full_name || seller.email;
+
+      const option2 = option1.cloneNode(true);
+
+      select1.appendChild(option1);
+      select2.appendChild(option2);
     });
   }
   
