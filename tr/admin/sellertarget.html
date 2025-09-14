@@ -1214,108 +1214,228 @@ function createTargetRow(target) {
           maximumFractionDigits: 0
       }).format(amount);
   }
+// Hedef durumunu ve progress'ini hesapla (DÜZELTİLMİŞ)
+function calculateTargetStatus(target) {
+    const now = new Date();
+    const startDate = new Date(target.start_date);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + (target.duration || 1));
+    
+    console.log('Hedef analizi:', {
+        şimdi: now.toLocaleDateString('tr-TR'),
+        başlangıç: startDate.toLocaleDateString('tr-TR'),
+        bitiş: endDate.toLocaleDateString('tr-TR'),
+        süre: target.duration + ' ay'
+    });
 
-// Hedef tamamlanma durumunu kontrol eden fonksiyon
-function isTargetCompleted(target) {
-    // Progress %100 ise
-    if (target.progress >= 100) {
-        return true;
+    // Başlama tarihi gelecekte ise (13.09.2024 gibi)
+    if (startDate > now) {
+        return {
+            status: 'pending',
+            progress: 0,
+            statusText: 'Beklemede',
+            endDate: endDate
+        };
     }
     
-    // Status completed ise
-    if (target.status === 'completed' || target.status === 'tamamlandı') {
-        return true;
+    // Süre dolmuşsa (bitiş tarihi geçmişse)
+    if (endDate < now) {
+        // Mevcut progress'i koru, %100 yapma!
+        const finalProgress = Math.min(target.progress || 0, 100);
+        return {
+            status: finalProgress >= 100 ? 'completed' : 'expired',
+            progress: finalProgress,
+            statusText: finalProgress >= 100 ? 'Tamamlandı' : 'Süresi Doldu',
+            endDate: endDate
+        };
     }
     
-    // Süre dolmuşsa ve progress yüksekse
-    if (target.end_date && new Date(target.end_date) < new Date() && target.progress >= 80) {
-        return true;
-    }
+    // Devam ediyorsa zaman bazlı progress hesapla
+    const totalDuration = endDate - startDate;
+    const elapsedTime = now - startDate;
+    const timeBasedProgress = Math.min((elapsedTime / totalDuration) * 100, 100);
     
-    return false;
+    // Mevcut progress ile zaman bazlı progress'in maksimumunu al
+    const currentProgress = target.progress || 0;
+    const overallProgress = Math.max(currentProgress, timeBasedProgress);
+    
+    return {
+        status: 'active',
+        progress: overallProgress,
+        statusText: `Devam Ediyor (${Math.round(overallProgress)}%)`,
+        endDate: endDate
+    };
 }
 
-// Hedef durumunu güncelle
-async function updateTargetStatus(targetId) {
-    const progress = await calculateTargetProgress(targetId);
-    const isCompleted = progress >= 100;
-    
-    const { error } = await supabase
-        .from('seller_targets')
-        .update({
-            progress: progress,
-            status: isCompleted ? 'completed' : 'active',
-            updated_at: new Date().toISOString()
-        })
-        .eq('id', targetId);
-    
-    return { progress, isCompleted };
+    // Tarihin geçmiş mi gelecek mi olduğunu kontrol et
+function isPastDate(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    return date < now;
 }
 
+// Tarihin bugünden ne kadar süre önce/sonra olduğunu hesapla
+function getDateStatus(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = date - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-// UI'da tamamlanma durumunu göster
-function displayCompletionStatus(target) {
-    const isCompleted = isTargetCompleted(target);
-    
-    if (isCompleted) {
-        return `
-            <span class="status-badge status-completed">
-                <i class="fas fa-check-circle mr-1"></i>Tamamlandı
-            </span>
-        `;
+    if (diffDays > 0) {
+        return `${diffDays} gün sonra`;
+    } else if (diffDays < 0) {
+        return `${Math.abs(diffDays)} gün önce`;
     } else {
-        return `
-            <span class="status-badge status-active">
-                <i class="fas fa-spinner mr-1"></i>Devam Ediyor (${Math.round(target.progress || 0)}%)
-            </span>
-        `;
+        return 'Bugün';
     }
 }
 
-// Tablo satırında gösterim
-function createTargetRow(target) {
-    const isCompleted = isTargetCompleted(target);
-    const statusBadge = displayCompletionStatus(target);
+    // UI'da detaylı durum göster
+function displayTargetStatus(target) {
+    const statusInfo = calculateTargetStatus(target);
+    
+    let statusClass = '';
+    let icon = '';
+    let details = '';
+    
+    switch(statusInfo.status) {
+        case 'pending':
+            statusClass = 'status-pending';
+            icon = '<i class="fas fa-clock mr-1"></i>';
+            details = `Başlama: ${formatDate(target.start_date)}`;
+            break;
+        case 'active':
+            statusClass = 'status-active';
+            icon = '<i class="fas fa-spinner mr-1"></i>';
+            details = `Bitiş: ${formatDate(statusInfo.endDate)}`;
+            break;
+        case 'completed':
+            statusClass = 'status-completed';
+            icon = '<i class="fas fa-check-circle mr-1"></i>';
+            details = `Tamamlandı: ${formatDate(statusInfo.endDate)}`;
+            break;
+        case 'expired':
+            statusClass = 'status-expired';
+            icon = '<i class="fas fa-exclamation-triangle mr-1"></i>';
+            details = `Süre doldu: ${formatDate(statusInfo.endDate)}`;
+            break;
+    }
     
     return `
-        <tr class="${isCompleted ? 'bg-green-50' : ''}">
-            <td class="p-3">${target.product_name}</td>
-            <td class="p-3">${target.target_quantity} ${target.quantity_unit}</td>
-            <td class="p-3">${target.target_revenue} TL</td>
-            <td class="p-3">
-                ${statusBadge}
-                <div class="progress-bar-container">
-                    <div class="progress-bar-fill" style="width: ${target.progress || 0}%"></div>
-                </div>
-            </td>
-            <td class="p-3">
-                ${isCompleted ? 
-                    '<i class="fas fa-check text-green-500"></i>' : 
-                    '<i class="fas fa-clock text-yellow-500"></i>'
-                }
-            </td>
-        </tr>
+        <div class="mb-2">
+            <span class="status-badge ${statusClass}">
+                ${icon}${statusInfo.statusText}
+            </span>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width: ${statusInfo.progress}%"></div>
+        </div>
+        <div class="text-xs text-gray-500 mt-1">${details}</div>
+        <div class="text-xs text-gray-400">İlerleme: ${Math.round(statusInfo.progress)}%</div>
     `;
 }
 
-    // Sayfa yüklendiğinde tüm hedeflerin durumunu güncelle
-async function refreshAllTargetsStatus() {
-    const { data: targets, error } = await supabase
-        .from('seller_targets')
-        .select('*')
-        .eq('status', 'active');
-    
-    if (error) return;
-    
-    for (const target of targets) {
-        await updateTargetStatus(target.id);
+    // Test senaryoları
+const testTargets = [
+    {
+        start_date: '2024-09-13', // Gelecek tarih
+        duration: 12,
+        progress: 0
+    },
+    {
+        start_date: '2023-09-13', // Geçmiş tarih (süre dolmuş)
+        duration: 12,
+        progress: 75 // %75 ilerleme
+    },
+    {
+        start_date: '2023-09-13', // Geçmiş tarih (süre dolmuş)
+        duration: 12,
+        progress: 100 // %100 ilerleme
+    },
+    {
+        start_date: '2024-01-01', // Devam eden
+        duration: 12,
+        progress: 30
     }
-    
-    loadTargets(); // Hedefleri yeniden yükle
+];
+
+testTargets.forEach((target, index) => {
+    const status = calculateTargetStatus(target);
+    console.log(`Senaryo ${index + 1}:`, status);
+});
+
+    // Satış verilerine göre gerçek ilerleme hesapla
+async function calculateRealProgress(target) {
+    try {
+        // Bu hedefe ait satışları getir
+        const { data: sales, error } = await supabase
+            .from('sales')
+            .select('quantity, revenue, sale_date')
+            .eq('target_id', target.id)
+            .gte('sale_date', target.start_date);
+        
+        if (error) return target.progress || 0;
+        
+        let quantityProgress = 0;
+        let revenueProgress = 0;
+        
+        if (target.target_quantity > 0) {
+            const totalQuantity = sales.reduce((sum, sale) => sum + (sale.quantity || 0), 0);
+            quantityProgress = (totalQuantity / target.target_quantity) * 100;
+        }
+        
+        if (target.target_revenue > 0) {
+            const totalRevenue = sales.reduce((sum, sale) => sum + (sale.revenue || 0), 0);
+            revenueProgress = (totalRevenue / target.target_revenue) * 100;
+        }
+        
+        // İki progress'ten yüksek olanı al veya ortalamasını al
+        const realProgress = Math.max(quantityProgress, revenueProgress);
+        
+        return Math.min(realProgress, 100);
+        
+    } catch (error) {
+        console.error('İlerleme hesaplama hatası:', error);
+        return target.progress || 0;
+    }
 }
 
-// Belirli aralıklarla otomatik güncelleme
-setInterval(refreshAllTargetsStatus, 300000); // 5 dakikada bir
+    // Tüm hedeflerin ilerlemesini güncelle
+async function updateAllTargetsProgress() {
+    try {
+        const { data: targets, error } = await supabase
+            .from('seller_targets')
+            .select('*');
+        
+        if (error) throw error;
+        
+        for (const target of targets) {
+            const realProgress = await calculateRealProgress(target);
+            const statusInfo = calculateTargetStatus({
+                ...target,
+                progress: realProgress
+            });
+            
+            await supabase
+                .from('seller_targets')
+                .update({
+                    progress: realProgress,
+                    status: statusInfo.status,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', target.id);
+        }
+        
+        console.log('Tüm hedefler güncellendi');
+        loadTargets();
+        
+    } catch (error) {
+        console.error('Hedef güncelleme hatası:', error);
+    }
+}
+
+// Her gün otomatik güncelle
+setInterval(updateAllTargetsProgress, 24 * 60 * 60 * 1000);
     
   // Toast bildirimi göster
   function showToast(message, type) {
