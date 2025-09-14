@@ -1298,7 +1298,24 @@ function createTargetRow(target) {
     `;
 }
 
+    // Sayfa yüklendiğinde tüm hedeflerin durumunu güncelle
+async function refreshAllTargetsStatus() {
+    const { data: targets, error } = await supabase
+        .from('seller_targets')
+        .select('*')
+        .eq('status', 'active');
     
+    if (error) return;
+    
+    for (const target of targets) {
+        await updateTargetStatus(target.id);
+    }
+    
+    loadTargets(); // Hedefleri yeniden yükle
+}
+
+// Belirli aralıklarla otomatik güncelleme
+setInterval(refreshAllTargetsStatus, 300000); // 5 dakikada bir
     
   // Toast bildirimi göster
   function showToast(message, type) {
