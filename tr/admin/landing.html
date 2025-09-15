@@ -1,433 +1,407 @@
 <!doctype html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>PaketKapinda - Sesli Market Demo</title>
-
-  <!-- Tailwind CDN (dev only) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Supabase JS -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
-
-  <!-- QR lib -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
-
-  <style>
-    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-    .fade { transition: all .25s ease; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Voiza Simülasyon — Market & Restaurant (Demo)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial; background: linear-gradient(180deg,#f8fafc,#eef2ff); }
+  .container { max-width:1100px; margin:24px auto; }
+  .card { background:#fff; border-radius:12px; box-shadow:0 8px 30px rgba(2,6,23,0.06); overflow:hidden; }
+  .hero { padding:22px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .btn { padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
+  .btn-prim { background:#0ea5a4; color:white; }
+  .btn-voice { background:#2563eb; color:white; }
+  .stage { padding:18px; display:grid; grid-template-columns: 1fr 360px; gap:16px; }
+  .scene { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:10px; padding:12px; min-height:420px; position:relative; overflow:hidden; }
+  .panel { background:#fff; border-radius:10px; padding:12px; box-shadow:0 6px 18px rgba(2,6,23,0.06); }
+  .shelf { background:linear-gradient(180deg,#fff,#f1f5f9); border-radius:10px; padding:8px; margin-bottom:12px; box-shadow:0 6px 18px rgba(2,6,23,0.05); display:flex; gap:8px; align-items:center; }
+  .prod-thumb { width:62px; height:62px; border-radius:8px; object-fit:cover; }
+  .price { font-weight:700; color:#0f172a; }
+  .price-tag { position:absolute; right:12px; top:12px; background:#111827; color:#fff; padding:6px 10px; border-radius:8px; transform-origin:center; transition: transform .25s ease; }
+  .price-tag.pulse { transform:scale(1.3); }
+  .cart-floating { position:fixed; right:18px; bottom:18px; background:#0ea5a4; color:#fff; padding:12px 16px; border-radius:12px; box-shadow:0 12px 30px rgba(2,6,23,0.12); z-index:3000; }
+  .floating { position:fixed; right:120px; bottom:120px; width:120px; transition: transform .6s cubic-bezier(.2,.9,.25,1); z-index:3001; display:none; }
+  .overlay { position:fixed; left:50%; transform:translateX(-50%); top:18px; background:#fff; padding:10px 14px; border-radius:8px; box-shadow:0 8px 30px rgba(2,6,23,0.08); display:none; z-index:3002;}
+  .speech-ind { font-size:13px; color:#334155; }
+  .mode-badge { display:inline-block; padding:6px 10px; border-radius:999px; background:#f1f5f9; font-weight:600; }
+  .hidden { display:none; }
+</style>
 </head>
-<body class="bg-slate-50 min-h-screen">
-
-  <div class="max-w-5xl mx-auto p-6">
-    <header class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-slate-800">PaketKapinda — Sesli Market Demo</h1>
-        <p class="text-sm text-slate-500">QR ile davet, sesle sipariş, anında sepet görüntüsü.</p>
-      </div>
-      <div class="text-right">
-        <div id="greeting" class="text-sm text-slate-700">Yükleniyor...</div>
-        <div id="refInfo" class="text-xs text-slate-400"></div>
-      </div>
-    </header>
-
-    <!-- Main grid -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-      <!-- Left: Controls -->
-      <div class="md:col-span-1 bg-white p-4 rounded-lg shadow">
-        <h3 class="font-semibold mb-2">Hızlı Başlangıç</h3>
-
-        <div class="mb-3">
-          <label class="block text-xs text-slate-600 mb-1">Telefon (manuel veya sesle kayıt)</label>
-          <input id="phoneInput" type="text" placeholder="05xx..." class="w-full p-2 border rounded" />
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="hero">
+        <div>
+          <h1 class="text-2xl font-bold">Voiza Simülasyon — Market & Restaurant (Demo)</h1>
+          <p class="text-sm text-slate-500">Sesi kullan, reyon aç, fiyat sor, miktar söyle sepete ekle — teyze dostu deneyim.</p>
         </div>
-
-        <div class="flex gap-2 mb-3">
-          <button id="btnVoiceRegister" class="flex-1 bg-indigo-600 text-white p-2 rounded">🎙 Sesle Kayıt</button>
-          <button id="btnSavePhone" class="flex-1 bg-gray-200 p-2 rounded">💾 Kaydet</button>
-        </div>
-
-        <div class="mb-3">
-          <label class="block text-xs text-slate-600 mb-1">Test sesle ara</label>
-          <button id="btnListen" class="w-full bg-rose-500 text-white p-2 rounded">🎧 Ne var söyle</button>
-        </div>
-
-        <div class="mb-3">
-          <label class="block text-xs text-slate-600 mb-1">QR (paylaş)</label>
-          <div id="qrCanvas" class="p-2 bg-slate-50 rounded"></div>
-          <div class="text-xs text-slate-500 mt-2">QR davet linkini paylaş. Gelenler bu sayfaya yönlendirilecek.</div>
-        </div>
-
-        <div class="mt-4">
-          <button id="btnSendOrder" class="w-full bg-emerald-600 text-white p-2 rounded">🟢 Siparişi Sunucuya Gönder</button>
-          <div class="text-xs text-slate-500 mt-2">(Sunucu fonksiyonu yoksa önce backend kur)</div>
+        <div class="flex gap-3 items-center">
+          <div id="greeting" class="text-sm text-slate-600">Merhaba Ayşe Teyze (demo)</div>
+          <button id="btnMarket" class="btn btn-prim">Market</button>
+          <button id="btnRestaurant" class="btn btn-prim">Restaurant</button>
+          <button id="btnVoice" class="btn btn-voice">🎤 Sesle</button>
         </div>
       </div>
 
-      <!-- Middle: Product / Voice result -->
-      <div class="md:col-span-2 bg-white p-4 rounded-lg shadow">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-semibold">Sesli Arama & Ürün Kartı</h3>
+      <div class="stage">
+        <!-- Scene -->
+        <div class="scene" id="scene">
+          <div id="welcomeScreen">
+            <img src="https://images.unsplash.com/photo-1507476299244-0a3e9ff9899f?auto=format&fit=crop&w=1400&q=60" alt="" style="width:100%; height:220px; object-fit:cover; border-radius:8px; margin-bottom:12px;">
+            <div style="padding:8px 6px;">
+              <div class="text-lg font-semibold">Hoşgeldiniz! Market veya Restaurant seçin, sonra sesi kullanın.</div>
+              <div class="text-sm text-slate-500 mt-2">Örnek komutlar: "Manav reyonu", "Domates kaç para", "1 kilo ver", "Döner istiyorum", "Et olsun".</div>
+            </div>
+          </div>
+
+          <!-- Market view -->
+          <div id="marketView" class="hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <div><h3 class="text-lg font-semibold">Market — Reyonlar</h3><div class="text-xs text-slate-500">Sesle reyon aç, ürün sor, sepet eklensin.</div></div>
+              <div class="mode-badge" id="currentMode">Mode: Market</div>
+            </div>
+            <div id="marketShelves">
+              <!-- dynamic shelves -->
+            </div>
+          </div>
+
+          <!-- Restaurant view -->
+          <div id="restaurantView" class="hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <div><h3 class="text-lg font-semibold">Restaurant — Menü</h3><div class="text-xs text-slate-500">Sesle sipariş ver, et/tavuk seç, porsiyon belirt.</div></div>
+              <div class="mode-badge">Mode: Restaurant</div>
+            </div>
+
+            <div id="menuList">
+              <!-- dynamic menu -->
+            </div>
+          </div>
+
+          <div class="price-tag hidden" id="priceTag">0₺</div>
+        </div>
+
+        <!-- Right panel -->
+        <div class="panel">
+          <div class="mb-3">
+            <div class="flex justify-between items-center">
+              <div><strong>Durum</strong></div>
+              <div class="speech-ind" id="speechState">Ses: Hazır</div>
+            </div>
+            <div class="text-xs text-slate-500 mt-2">Tuşla veya sesle komut verin. Komut örnekleri üstte.</div>
+          </div>
+
+          <div class="mb-3">
+            <div class="flex gap-2">
+              <input id="manualInput" class="w-full p-2 border rounded" placeholder="Komut yaz (ör: domates kaç para)" />
+              <button id="btnManual" class="btn btn-prim">Ara</button>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <h4 class="font-semibold">Sepet</h4>
+            <ul id="cartList" class="mt-2 text-sm"></ul>
+            <div class="mt-2 flex justify-between items-center">
+              <div>Toplam: <span id="cartTotal">0₺</span></div>
+              <div><button id="checkout" class="btn btn-prim">Siparişi Gönder</button></div>
+            </div>
+          </div>
+
           <div>
-            <span id="langTag" class="text-xs text-slate-500"></span>
-          </div>
-        </div>
-
-        <div class="mb-4">
-          <div class="flex gap-2">
-            <input id="textQuery" class="flex-1 p-2 border rounded" placeholder="Ürün adı yaz veya sesle ara (ör: salça, zeytin)" />
-            <button id="btnTextSearch" class="bg-indigo-600 text-white px-4 rounded">Ara</button>
-            <button id="btnVoiceSearch" class="bg-sky-500 text-white px-3 rounded">🎤</button>
-          </div>
-        </div>
-
-        <div id="productArea" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-
-        <hr class="my-4">
-
-        <div id="cartOverlay" class="hidden p-3 bg-slate-50 rounded">
-          <h4 class="font-semibold">Sepetiniz</h4>
-          <ul id="cartList" class="mt-2"></ul>
-          <div class="mt-2 flex justify-between items-center">
-            <div class="text-sm font-medium">Toplam: <span id="cartTotal">0₺</span></div>
-            <button id="clearCart" class="bg-red-500 text-white px-3 py-1 rounded">Temizle</button>
+            <h4 class="font-semibold">Kısa Komutlar</h4>
+            <div class="text-xs text-slate-500 mt-2">
+              Market: "Manav reyonu", "Süt reyonu", "Salça fiyatı kaç" <br>
+              Restaurant: "Döner istiyorum", "Et olsun", "1 porsiyon"
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Footer: Debug / notes -->
-    <div class="mt-6 p-4 bg-white rounded shadow">
-      <h4 class="font-semibold">Notlar & Gereken Backend</h4>
-      <ul class="list-disc pl-5 text-sm text-slate-600">
-        <li>Bu demo <strong>okuma</strong> amaçlı Supabase sorguları yapabilir (ürün listeleme). Yazma (orders/profiles) için backend function gereklidir.</li>
-        <li>Aşağıda örnek <strong>server endpoint</strong> ve <strong>SQL</strong> snippetleri ekledim; bunları sunucuna koyunca <em>“Siparişi Sunucuya Gönder”</em> butonu çalışır.</li>
-        <li>Production için Supabase anon key'ını direkt tarayıcıda kullanma; bir sunucu middleware / function ile güvenli hale getir.</li>
-      </ul>
+    <!-- floating UI -->
+    <div class="cart-floating" id="cartBtn">🛒 Sepet (<span id="cartCount">0</span>)</div>
+    <img class="floating" id="floatingImg" src="" alt="floating">
 
-      <pre class="mt-3 text-xs bg-slate-100 p-2 rounded text-slate-700 overflow-auto">
-Server endpoint (örnek, Express.js):
-POST /api/place_order
-Body:
-{
-  "ref": "FATMA123",
-  "phone": "0532...",
-  "items": [
-    { "product_id": "uuid", "quantity": 2 }
-  ]
-}
-Sunucu: 
-- yeni profil oluştur (auth ile veya profiles kaydı),
-- referral_tracking ekle,
-- orders + order_details insert işlemlerini tek transaction olarak yap,
-- referral_bonus ekle.
-</pre>
-    </div>
+    <div class="overlay" id="overlay"></div>
   </div>
 
 <script>
-/* ----------------------- CONFIG: Supabase bilgilerini kendi projenle doldur ----------------------- */
-cons const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
-/* ---------------------------------------------------------------------------------------------------- */
+/* ----------------- Config & Data ----------------- */
+const localUser = { name: 'Ayşe Teyze' }; // demo personalization
 
-const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
+const PRODUCTS = {
+  tomato: { id:'tomato', name:'Domates', price:40, unit:'kg', img:'https://images.unsplash.com/photo-1572441710260-e8aa3ca5f0a6?auto=format&fit=crop&w=200&q=60', aisle:'manav' },
+  onion: { id:'onion', name:'Soğan', price:9, unit:'kg', img:'https://images.unsplash.com/photo-1580711200959-7b1a0b6be5d8?auto=format&fit=crop&w=200&q=60', aisle:'manav' },
+  cheese: { id:'cheese', name:'Beyaz Peynir', price:120, unit:'kg', img:'https://images.unsplash.com/photo-1563431986-7b3d5b8a27b4?auto=format&fit=crop&w=200&q=60', aisle:'sut' },
+  paste: { id:'paste', name:'Domates Salçası', price:95, unit:'2kg', img:'https://images.unsplash.com/photo-1542444459-db8a60b0b96f?auto=format&fit=crop&w=200&q=60', aisle:'kiler' }
+};
 
-// State
-let refCode = null;
-let refOwner = null; // {owner_phone, owner_user_id}
-let localUser = { phone: null, name: null, id: null }; // client-side demo identity
+const MENU = {
+  doner: { id:'doner', name:'Döner', basePrice:85, variants: ['Et','Tavuk'], img:'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=60' },
+  pizza: { id:'pizza', name:'Pizza', basePrice:150, variants: ['Klasik','Peynirli'], img:'https://images.unsplash.com/photo-1604908177522-6f4591a9a7e5?auto=format&fit=crop&w=400&q=60' }
+};
+
+/* ----------------- State ----------------- */
+let mode = null; // 'market' | 'restaurant'
 let cart = [];
-
-// Dom helpers
 const $ = id => document.getElementById(id);
 
-// Language detection
-const userLang = navigator.language || navigator.userLanguage || "tr-TR";
-$("langTag").innerText = userLang;
+/* ----------------- UI init ----------------- */
+function showWelcome() {
+  $('welcomeScreen').classList.remove('hidden');
+  $('marketView').classList.add('hidden');
+  $('restaurantView').classList.add('hidden');
+  $('priceTag').classList.add('hidden');
+}
+function openMarket() {
+  mode = 'market';
+  $('welcomeScreen').classList.add('hidden');
+  $('marketView').classList.remove('hidden');
+  $('restaurantView').classList.add('hidden');
+  $('currentMode').innerText = 'Mode: Market';
+  renderMarketShelves();
+  speak(`${localUser.name} market seçtiniz. Hangi reyon?`);
+}
+function openRestaurant() {
+  mode = 'restaurant';
+  $('welcomeScreen').classList.add('hidden');
+  $('marketView').classList.add('hidden');
+  $('restaurantView').classList.remove('hidden');
+  renderMenu();
+  speak(`${localUser.name} restaurant seçtiniz. Ne istersiniz?`);
+}
+showWelcome();
 
-/* ------------------ Parse referral from URL ------------------ */
-function parseReferral() {
-  const u = new URL(window.location.href);
-  // support both ?ref=CODE and /ref/CODE (path)
-  if (u.searchParams.has("ref")) {
-    return u.searchParams.get("ref");
+/* ----------------- Render functions ----------------- */
+function renderMarketShelves() {
+  const container = $('marketShelves');
+  container.innerHTML = '';
+  // group by aisle
+  const aisles = {};
+  Object.values(PRODUCTS).forEach(p => {
+    if (!aisles[p.aisle]) aisles[p.aisle] = [];
+    aisles[p.aisle].push(p);
+  });
+  for (const [aisle, items] of Object.entries(aisles)) {
+    const sec = document.createElement('div');
+    sec.className = 'shelf';
+    sec.dataset.aisle = aisle;
+    sec.innerHTML = `<div style="flex:1"><strong style="text-transform:capitalize">${aisle}</strong><div class="text-xs text-slate-500">Tıklayın veya sesle açın</div></div>`;
+    const list = document.createElement('div');
+    list.style.display = 'flex'; list.style.flexDirection='column'; list.style.gap='6px';
+    items.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'prod-row';
+      row.style.display='flex'; row.style.gap='8px'; row.style.alignItems='center';
+      row.innerHTML = `<img src="${it.img}" class="prod-thumb" alt=""><div><div style="font-weight:600">${it.name}</div><div class="text-xs text-slate-500">${it.unit}</div></div><div style="margin-left:auto" class="price">${it.price}₺</div>`;
+      row.dataset.prodId = it.id;
+      row.onclick = ()=> { addToCart(it.id,1); animatePrice(it.id); };
+      list.appendChild(row);
+    });
+    sec.appendChild(list);
+    container.appendChild(sec);
   }
-  const path = u.pathname.split("/").filter(Boolean);
-  const refIndex = path.indexOf("ref");
-  if (refIndex !== -1 && path.length > refIndex+1) return path[refIndex+1];
-  return null;
 }
 
-/* --------------- Load referral info from Supabase --------------- */
-async function loadReferralInfo(code) {
-  if (!code) { $("refInfo").innerText = ""; return; }
-  $("refInfo").innerText = "Davet kodu algılandı: " + code;
-  // Try to fetch from referral_links table
-  const { data, error } = await supabase
-    .from("referral_links")
-    .select("owner_user_id, owner_phone, created_at")
-    .eq("referral_code", code)
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    console.error("Referral fetch error", error);
-    return;
-  }
-  if (data) {
-    refOwner = data;
-    speak(`Hoş geldiniz. Sizi ${data.owner_phone} numaralı teyzeniz davet etti.`);
-    $("greeting").innerText = `Sizi ${data.owner_phone} numaralı teyzeniz davet etti.`;
-  } else {
-    $("greeting").innerText = `Davet kodu: ${code}`;
-  }
-}
-
-/* ------------------ QR generation ------------------ */
-function renderQR(code) {
-  const url = new URL(window.location.href);
-  // make absolute link to /ref/CODE
-  const link = `${url.origin}/ref/${code}`;
-  const qrCanvas = $("qrCanvas");
-  qrCanvas.innerHTML = "";
-  QRCode.toCanvas(link, { width: 150 }, function (err, canvas) {
-    if (err) {
-      console.error(err);
-      qrCanvas.innerText = "QR oluşturulamadı";
-      return;
-    }
-    qrCanvas.appendChild(canvas);
+function renderMenu() {
+  const list = $('menuList');
+  list.innerHTML = '';
+  Object.values(MENU).forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'shelf';
+    div.innerHTML = `<img src="${m.img}" class="prod-thumb" style="width:72px;height:72px"><div style="margin-left:10px"><div style="font-weight:700">${m.name}</div><div class="text-xs text-slate-500">Seçenek: ${m.variants.join(', ')}</div></div><div style="margin-left:auto" class="price">${m.basePrice}₺</div>`;
+    div.onclick = ()=> { speak(`${m.name} seçildi. Et mi tavuk mu istersiniz?`); lastMenuChoice = m; mode = 'restaurant'; };
+    list.appendChild(div);
   });
 }
 
-/* ------------------ TTS helper ------------------ */
+/* ----------------- Cart ----------------- */
+function addToCart(productId, qty) {
+  if (PRODUCTS[productId]) {
+    const p = PRODUCTS[productId];
+    cart.push({ id:p.id, name:p.name, qty, unit:p.unit, price:p.price });
+    updateCartUI();
+    showFloating(p.img);
+    speak(`${qty} ${p.unit} ${p.name} sepete eklendi efendim`);
+  } else {
+    // menu
+    const m = MENU[productId];
+    if (m) {
+      const variant = selectedVariant || m.variants[0];
+      cart.push({ id:m.id, name:m.name + ' - ' + variant, qty: selectedQty || 1, unit:'porsiyon', price:m.basePrice });
+      updateCartUI();
+      showFloating(m.img);
+      speak(`${selectedQty||1} porsiyon ${m.name} sepete eklendi efendim`);
+      selectedQty = null; selectedVariant = null;
+    }
+  }
+}
+
+function updateCartUI() {
+  const ul = $('cartList'); ul.innerHTML='';
+  let total = 0;
+  cart.forEach((it,idx)=>{
+    total += it.qty * it.price;
+    const li = document.createElement('li');
+    li.style.display='flex'; li.style.justifyContent='space-between'; li.style.padding='6px 0';
+    li.innerHTML = `<div>${it.qty} x ${it.name}</div><div>${(it.qty*it.price).toFixed(2)}₺</div>`;
+    ul.appendChild(li);
+  });
+  $('cartTotal').innerText = total.toFixed(2) + '₺';
+  $('cartCount').innerText = cart.length;
+}
+
+/* ----------------- Animations ----------------- */
+function animatePrice(prodId) {
+  // find shelf and pulse
+  const prod = Object.values(PRODUCTS).find(p=>p.id===prodId);
+  if (!prod) return;
+  // find shelf element matching aisle
+  const shelf = Array.from(document.querySelectorAll('.shelf')).find(s=>s.dataset.aisle===prod.aisle);
+  const tag = $('priceTag');
+  tag.innerText = `${prod.price}₺`;
+  tag.classList.remove('hidden');
+  tag.style.left = ''; tag.style.right = '12px';
+  tag.classList.add('pulse');
+  setTimeout(()=> tag.classList.remove('pulse'),800);
+  setTimeout(()=> tag.classList.add('hidden'),1800);
+}
+
+function showFloating(src) {
+  const f = $('floatingImg'); f.src = src; f.style.display='block';
+  f.style.transform='translateY(0)';
+  setTimeout(()=> { f.style.transform='translateY(-180px)'; setTimeout(()=> { f.style.display='none'; f.style.transform='translateY(0)'; },700); }, 300);
+}
+
+/* ----------------- Voice Recognition ----------------- */
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let lastMenuChoice = null;
+let selectedVariant = null;
+let selectedQty = null;
+
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.lang = 'tr-TR';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.onstart = ()=> { $('speechState').innerText = 'Ses: Dinleniyor...'; };
+  recognition.onend = ()=> { $('speechState').innerText = 'Ses: Hazır'; };
+  recognition.onerror = (e)=> { $('speechState').innerText = 'Ses hatası'; speak('Anlamadım, tekrar eder misiniz?'); };
+  recognition.onresult = (ev)=> {
+    const text = ev.results[0][0].transcript.toLowerCase();
+    $('speechState').innerText = 'Duydu: ' + text;
+    handleVoice(text);
+  };
+}
+
+/* start voice */
+$('btnVoice').addEventListener('click', ()=> {
+  if (!mode) { speak('Önce Market veya Restaurant seçin lütfen'); return; }
+  if (!recognition) { alert('Tarayıcınız konuşma tanımayı desteklemiyor'); return; }
+  try { recognition.start(); } catch(e){ console.log(e); speak('Mikrofon başlatılamadı'); }
+});
+
+/* manual */
+$('btnManual').addEventListener('click', ()=> { handleVoice($('manualInput').value.toLowerCase()); $('manualInput').value=''; });
+
+/* mode buttons */
+$('btnMarket').addEventListener('click', openMarket);
+$('btnRestaurant').addEventListener('click', openRestaurant);
+
+/* checkout */
+$('checkout').addEventListener('click', ()=> {
+  if (cart.length===0) { alert('Sepet boş'); return; }
+  alert('Sipariş demo: konsola bakın. (Sunucu endpoint ile kaydedilebilir.)');
+  console.log('ORDER PAYLOAD', { user: localUser, cart });
+  speak('Siparişiniz kayıt altına alındı. Teşekkürler.');
+});
+
+/* ----------------- Voice Command Handler ----------------- */
+function handleVoice(text) {
+  // quick helpers: quantity detection
+  const qtyMatch = text.match(/(\d+)\s*(kilo|kg|adet|porsiyon|porsiyon|tane)?/);
+  const quantity = qtyMatch ? parseInt(qtyMatch[1]) : null;
+
+  // Market mode commands
+  if (mode === 'market') {
+    if (text.includes('manav') || text.includes('sebze')) { highlightAisle('manav'); speak('Manav reyonu açıldı efendim'); return; }
+    if (text.includes('süt') || text.includes('peynir')) { highlightAisle('sut'); speak('Süt reyonu açıldı efendim'); return; }
+    if (text.includes('salça') || text.includes('salca')) { highlightAisle('kiler'); speak('Kiler reyonu açıldı efendim'); return; }
+    // price question
+    if (text.includes('kaç') || text.includes('fiyat')) {
+      const found = findProductByName(text);
+      if (found) { animatePrice(found.id); speak(`${found.name} şu anda ${found.price} lira efendim`); return; }
+      speak('Hangisinin fiyatını öğrenmek istiyorsunuz?');
+      return;
+    }
+    // add to cart by name
+    const found = findProductByName(text);
+    if (found) {
+      const q = quantity || 1;
+      addToCart(found.id, q); animatePrice(found.id);
+      return;
+    }
+    speak('Markette aradığınızı bulamadım, tekrar deneyin lütfen');
+  }
+
+  // Restaurant mode
+  if (mode === 'restaurant') {
+    if (text.includes('döner') || text.includes('doner')) {
+      lastMenuChoice = MENU.doner;
+      speak('Döner seçtiniz. Et mi tavuk mu olsun?');
+      return;
+    }
+    if ((text.includes('et') || text.includes('tavuk')) && lastMenuChoice) {
+      selectedVariant = text.includes('et') ? 'Et' : 'Tavuk';
+      speak(`${selectedVariant} seçtiniz. Kaç porsiyon olsun?`);
+      return;
+    }
+    if (quantity && lastMenuChoice && selectedVariant) {
+      selectedQty = quantity;
+      // add to cart
+      addToCart(lastMenuChoice.id, selectedQty);
+      // reset menu flow
+      lastMenuChoice = null; selectedVariant = null; selectedQty = null;
+      return;
+    }
+    // price ask for menu
+    if (text.includes('fiyat') || text.includes('kaç')) {
+      const f = Object.values(MENU).find(m=> text.includes(m.name.toLowerCase()) || text.includes('döner'));
+      if (f) { speak(`${f.name} fiyatı ${f.basePrice} lira efendim`); return; }
+    }
+    speak('Restoranda nasıl yardımcı olayım?');
+  }
+}
+
+/* ----------------- Helpers ----------------- */
+function findProductByName(text) {
+  for (const k in PRODUCTS) {
+    const p = PRODUCTS[k];
+    if (text.includes(p.name.toLowerCase()) || text.includes(k)) return p;
+  }
+  return null;
+}
+function highlightAisle(aisle) {
+  const shelf = Array.from(document.querySelectorAll('.shelf')).find(s=>s.dataset.aisle===aisle);
+  if (!shelf) { speak('O reyon bulunamadı'); return; }
+  shelf.style.boxShadow = '0 18px 40px rgba(14,165,164,0.12)';
+  setTimeout(()=> shelf.style.boxShadow='', 2500);
+}
+
+/* TTS */
 function speak(text) {
   try {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = userLang;
+    u.lang = 'tr-TR';
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
-  } catch (e) { console.log("TTS hata", e); }
+  } catch(e){ console.log(e); }
 }
 
-/* ------------------ Speech Recognition (web) ------------------ */
-function startRecognition(lang = userLang, onResult = ()=>{}) {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    alert("Tarayıcınız konuşma tanımayı desteklemiyor.");
-    return null;
-  }
-  const rec = new SpeechRecognition();
-  rec.lang = lang;
-  rec.interimResults = false;
-  rec.maxAlternatives = 1;
-  rec.start();
-  rec.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    onResult(text);
-  };
-  rec.onerror = (e) => {
-    console.error("Speech error", e);
-    speak("Anlamadım, tekrar eder misiniz?");
-  };
-  return rec;
-}
-
-/* ------------------ Product search (Supabase) ------------------ */
-async function searchProductsByName(query) {
-  if (!query || query.trim().length < 1) return [];
-  // naive search: name ILIKE %query% OR description ILIKE
-  const { data, error } = await supabase
-    .from("products")
-    .select("id, name, price, currency, imgurl, seller_id, category")
-    .ilike("name", `%${query}%`)
-    .limit(10);
-  if (error) {
-    console.error("product fetch err", error);
-    return [];
-  }
-  return data || [];
-}
-
-/* ------------------ Render products ------------------ */
-function renderProducts(list) {
-  const area = $("productArea");
-  area.innerHTML = "";
-  if (!list || list.length === 0) {
-    area.innerHTML = `<div class="text-slate-500">Ürün bulunamadı.</div>`;
-    return;
-  }
-  list.forEach(p => {
-    const div = document.createElement("div");
-    div.className = "p-3 border rounded flex gap-3 items-center";
-    div.innerHTML = `
-      <img src="${p.imgurl || 'https://via.placeholder.com/120'}" class="w-24 h-24 object-cover rounded" alt="${escapeHtml(p.name)}" />
-      <div class="flex-1">
-        <div class="font-semibold">${escapeHtml(p.name)}</div>
-        <div class="text-slate-500 text-sm">${p.category || ''}</div>
-        <div class="mt-2 font-medium">${p.price || 0} ${p.currency || 'TRY'}</div>
-        <div class="mt-2 flex gap-2">
-          <button class="btnAdd bg-indigo-600 text-white px-3 py-1 rounded" data-id="${p.id}" data-price="${p.price}">Sepete Ekle</button>
-          <button class="btnDetail bg-gray-200 px-3 py-1 rounded" data-id="${p.id}">Detay</button>
-        </div>
-      </div>
-    `;
-    area.appendChild(div);
-  });
-
-  // attach add handlers
-  document.querySelectorAll(".btnAdd").forEach(b => {
-    b.onclick = () => {
-      const pid = b.dataset.id;
-      const price = parseFloat(b.dataset.price || 0);
-      addToCart(pid, 1, price);
-    };
-  });
-}
-
-/* ------------------ Cart functions (client-side) ------------------ */
-function addToCart(product_id, qty, unit_price) {
-  // find product info quickly (we might want to fetch product name)
-  cart.push({ product_id, quantity: qty, unit_price });
-  showCartOverlay();
-  renderCart();
-  speak("Siparişiniz eklendi efendim.");
-}
-
-function renderCart() {
-  const list = $("cartList");
-  list.innerHTML = "";
-  let total = 0;
-  cart.forEach((it, idx) => {
-    total += (it.quantity * it.unit_price);
-    const li = document.createElement("li");
-    li.className = "py-1 flex justify-between items-center";
-    li.innerHTML = `<div class="text-sm">${it.quantity} x ${it.product_id}</div>
-                    <div class="text-sm font-medium">${(it.quantity * it.unit_price).toFixed(2)}₺</div>`;
-    list.appendChild(li);
-  });
-  $("cartTotal").innerText = total.toFixed(2) + "₺";
-}
-
-function showCartOverlay() {
-  $("cartOverlay").classList.remove("hidden");
-}
-
-/* ------------------ Utility escape ------------------ */
-function escapeHtml(s) {
-  if (!s) return "";
-  return s.replace(/[&<>"']/g, function (m) {
-    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);
-  });
-}
-
-/* ------------------ Event bindings ------------------ */
-document.addEventListener("DOMContentLoaded", async () => {
-  // parse ref
-  refCode = parseReferral();
-  if (refCode) {
-    await loadReferralInfo(refCode);
-    renderQR(refCode);
-  } else {
-    $("greeting").innerText = "Hoş geldiniz! QR paylaşmak için sağdaki QR'ı oluşturun.";
-  }
-
-  // test load some products top 6
-  const { data: quick, error } = await supabase
-    .from("products")
-    .select("id, name, price, currency, imgurl, category")
-    .limit(6);
-
-  renderProducts(quick || []);
-
-  // handlers
-  $("btnVoiceSearch").onclick = () => {
-    speak("Hangi ürünü arıyorsunuz?");
-    startRecognition(userLang, async (text) => {
-      $("textQuery").value = text;
-      const results = await searchProductsByName(text);
-      renderProducts(results);
-    });
-  };
-
-  $("btnTextSearch").onclick = async () => {
-    const q = $("textQuery").value;
-    const results = await searchProductsByName(q);
-    renderProducts(results);
-  };
-
-  $("btnListen").onclick = () => {
-    speak("Test sesi: sistem çalışıyor.");
-  };
-
-  $("btnVoiceRegister").onclick = () => {
-    speak("İsim ve telefonunuzu söyleyin, lütfen: isim, 05xx...");
-    startRecognition(userLang, (text) => {
-      $("phoneInput").value = extractPhoneFromText(text) || "";
-      // naive name extraction
-      localUser.name = text.replace($("phoneInput").value || "", "").trim();
-      $("phoneInput").value = $("phoneInput").value || "";
-      speak("Kayıt bilgilerinizi aldım. Kaydet tuşuna basın.");
-    });
-  };
-
-  $("btnSavePhone").onclick = () => {
-    const ph = $("phoneInput").value.trim();
-    if (!ph) { alert("Telefon girin."); return; }
-    localUser.phone = ph;
-    localUser.id = localUser.id || crypto.randomUUID();
-    $("greeting").innerText = `Merhaba ${localUser.name || 'müşteri'} — numara: ${localUser.phone}`;
-    speak(`Hoş geldiniz. Kayıt tamamlandı.`);
-    // Optionally: post a referral_tracking record to your server (see server notes)
-  };
-
-  $("clearCart").onclick = () => { cart = []; renderCart(); $("cartOverlay").classList.add("hidden"); };
-
-  $("btnSendOrder").onclick = async () => {
-    if (!localUser.phone) { alert("Önce telefon bilgisi kaydedin (sesle veya manuel)."); return; }
-    if (cart.length === 0) { alert("Sepet boş."); return; }
-
-    // Send to server endpoint - you need to implement this server-side
-    const payload = {
-      ref: refCode,
-      phone: localUser.phone,
-      name: localUser.name || null,
-      items: cart.map(it => ({ product_id: it.product_id, quantity: it.quantity, unit_price: it.unit_price }))
-    };
-
-    // demo: show payload and explain next step
-    console.log("ORDER PAYLOAD (send to your server):", payload);
-    alert("Sipariş payload konsola yazıldı. Sunucu endpoint oluşturduktan sonra bu istekle sipariş verilecektir.");
-    speak("Sipariş sunucuya gönderildi (demo). Teşekkürler.");
-    // If you have an endpoint, uncomment the fetch below and set URL
-    /*
-    const resp = await fetch("https://yourserver.com/api/place_order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const rj = await resp.json();
-    console.log("server response", rj);
-    */
-  };
-});
-
-/* ------------------ helpers ------------------ */
-function extractPhoneFromText(text) {
-  if (!text) return null;
-  // simple digit extraction
-  const digits = text.replace(/\D/g, "");
-  if (digits.length >= 10) {
-    // return formatted as 05xx...
-    const match = digits.match(/(05\d{8,9}|\d{10,11})/);
-    if (match) return match[0];
-    return digits;
-  }
-  return null;
-}
+/* initial greeting */
+speak('Demoye hoşgeldiniz. Market veya Restaurant seçin, sonra sesle komut verin.');
 </script>
 </body>
 </html>
