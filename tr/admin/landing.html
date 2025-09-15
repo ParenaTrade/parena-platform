@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Voiza Simülasyon — Market & Restaurant (Demo)</title>
+<title>Voiza Simülasyon v2 — Market & Restaurant (Demo)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial; background: linear-gradient(180deg,#f8fafc,#eef2ff); }
@@ -14,7 +14,7 @@
   .btn-prim { background:#0ea5a4; color:white; }
   .btn-voice { background:#2563eb; color:white; }
   .stage { padding:18px; display:grid; grid-template-columns: 1fr 360px; gap:16px; }
-  .scene { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:10px; padding:12px; min-height:420px; position:relative; overflow:hidden; }
+  .scene { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:10px; padding:12px; min-height:520px; position:relative; overflow:hidden; }
   .panel { background:#fff; border-radius:10px; padding:12px; box-shadow:0 6px 18px rgba(2,6,23,0.06); }
   .shelf { background:linear-gradient(180deg,#fff,#f1f5f9); border-radius:10px; padding:8px; margin-bottom:12px; box-shadow:0 6px 18px rgba(2,6,23,0.05); display:flex; gap:8px; align-items:center; }
   .prod-thumb { width:62px; height:62px; border-radius:8px; object-fit:cover; }
@@ -26,7 +26,10 @@
   .overlay { position:fixed; left:50%; transform:translateX(-50%); top:18px; background:#fff; padding:10px 14px; border-radius:8px; box-shadow:0 8px 30px rgba(2,6,23,0.08); display:none; z-index:3002;}
   .speech-ind { font-size:13px; color:#334155; }
   .mode-badge { display:inline-block; padding:6px 10px; border-radius:999px; background:#f1f5f9; font-weight:600; }
+  .note-pill { display:inline-block; padding:4px 8px; background:#f8fafc; border-radius:999px; font-size:12px; margin-right:6px; border:1px solid #e6eef0; }
+  .muted { color:#64748b; font-size:13px; }
   .hidden { display:none; }
+  .input { padding:8px; border:1px solid #e6eef0; border-radius:8px; width:100%; }
 </style>
 </head>
 <body>
@@ -34,8 +37,8 @@
     <div class="card">
       <div class="hero">
         <div>
-          <h1 class="text-2xl font-bold">Voiza Simülasyon — Market & Restaurant (Demo)</h1>
-          <p class="text-sm text-slate-500">Sesi kullan, reyon aç, fiyat sor, miktar söyle sepete ekle — teyze dostu deneyim.</p>
+          <h1 class="text-2xl font-bold">Voiza Simülasyon v2 — Market & Restaurant (Demo)</h1>
+          <p class="text-sm text-slate-500">Gelişmiş sesli komut: reyon açma, fiyat sorgu, içerik çıkarma, ekstra/gram ekleme, içecek upsell.</p>
         </div>
         <div class="flex gap-3 items-center">
           <div id="greeting" class="text-sm text-slate-600">Merhaba Ayşe Teyze (demo)</div>
@@ -52,7 +55,7 @@
             <img src="https://images.unsplash.com/photo-1507476299244-0a3e9ff9899f?auto=format&fit=crop&w=1400&q=60" alt="" style="width:100%; height:220px; object-fit:cover; border-radius:8px; margin-bottom:12px;">
             <div style="padding:8px 6px;">
               <div class="text-lg font-semibold">Hoşgeldiniz! Market veya Restaurant seçin, sonra sesi kullanın.</div>
-              <div class="text-sm text-slate-500 mt-2">Örnek komutlar: "Manav reyonu", "Domates kaç para", "1 kilo ver", "Döner istiyorum", "Et olsun".</div>
+              <div class="text-sm text-slate-500 mt-2">Örnek komutlar: "Manav reyonu", "Domates kaç para", "1 kilo ver", "Döner istiyorum", "Et olsun", "turşu olmasın", "25 gr tavuk ekle".</div>
             </div>
           </div>
 
@@ -62,7 +65,7 @@
               <div><h3 class="text-lg font-semibold">Market — Reyonlar</h3><div class="text-xs text-slate-500">Sesle reyon aç, ürün sor, sepet eklensin.</div></div>
               <div class="mode-badge" id="currentMode">Mode: Market</div>
             </div>
-            <div id="marketShelves">
+            <div id="marketShelves" style="max-height:360px; overflow:auto;">
               <!-- dynamic shelves -->
             </div>
           </div>
@@ -70,11 +73,11 @@
           <!-- Restaurant view -->
           <div id="restaurantView" class="hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <div><h3 class="text-lg font-semibold">Restaurant — Menü</h3><div class="text-xs text-slate-500">Sesle sipariş ver, et/tavuk seç, porsiyon belirt.</div></div>
+              <div><h3 class="text-lg font-semibold">Restaurant — Menü</h3><div class="text-xs text-slate-500">Sesle sipariş ver, et/tavuk seç, porsiyon belirt. Not: "turşusuz", "ketçapsız" vb. komutlar işlenir.</div></div>
               <div class="mode-badge">Mode: Restaurant</div>
             </div>
 
-            <div id="menuList">
+            <div id="menuList" style="max-height:360px; overflow:auto;">
               <!-- dynamic menu -->
             </div>
           </div>
@@ -94,7 +97,7 @@
 
           <div class="mb-3">
             <div class="flex gap-2">
-              <input id="manualInput" class="w-full p-2 border rounded" placeholder="Komut yaz (ör: domates kaç para)" />
+              <input id="manualInput" class="input" placeholder="Komut yaz (ör: domates kaç para; turşusuz; 25 gr tavuk ekle)" />
               <button id="btnManual" class="btn btn-prim">Ara</button>
             </div>
           </div>
@@ -109,10 +112,11 @@
           </div>
 
           <div>
-            <h4 class="font-semibold">Kısa Komutlar</h4>
+            <h4 class="font-semibold">Kısa Komutlar & İpuçları</h4>
             <div class="text-xs text-slate-500 mt-2">
-              Market: "Manav reyonu", "Süt reyonu", "Salça fiyatı kaç" <br>
-              Restaurant: "Döner istiyorum", "Et olsun", "1 porsiyon"
+              Market: "Manav reyonu", "Süt reyonu", "Salça fiyatı kaç"<br>
+              Restaurant: "Döner istiyorum", "Et olsun", "25 gr tavuk ekle", "turşusuz", "ketçapsız"<br>
+              Genel: "Sepeti göster", "İçecek ister misin?"
             </div>
           </div>
         </div>
@@ -138,8 +142,10 @@ const PRODUCTS = {
 };
 
 const MENU = {
-  doner: { id:'doner', name:'Döner', basePrice:85, variants: ['Et','Tavuk'], img:'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=60' },
-  pizza: { id:'pizza', name:'Pizza', basePrice:150, variants: ['Klasik','Peynirli'], img:'https://images.unsplash.com/photo-1604908177522-6f4591a9a7e5?auto=format&fit=crop&w=400&q=60' }
+  doner: { id:'doner', name:'Döner', basePrice:85, variants: ['Et','Tavuk'], img:'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=60',
+          extras: [ { code:'25gr_tavuk', label:'25 gr Tavuk', price:50 }, { code:'extra_cheese', label:'Peynir +', price:20 } ] },
+  pizza: { id:'pizza', name:'Pizza', basePrice:150, variants: ['Klasik','Peynirli'], img:'https://images.unsplash.com/photo-1604908177522-6f4591a9a7e5?auto=format&fit=crop&w=400&q=60',
+           extras: [ { code:'extra_spice', label:'Baharat +', price:5 } ] }
 };
 
 /* ----------------- State ----------------- */
@@ -210,17 +216,23 @@ function renderMenu() {
   Object.values(MENU).forEach(m => {
     const div = document.createElement('div');
     div.className = 'shelf';
-    div.innerHTML = `<img src="${m.img}" class="prod-thumb" style="width:72px;height:72px"><div style="margin-left:10px"><div style="font-weight:700">${m.name}</div><div class="text-xs text-slate-500">Seçenek: ${m.variants.join(', ')}</div></div><div style="margin-left:auto" class="price">${m.basePrice}₺</div>`;
-    div.onclick = ()=> { speak(`${m.name} seçildi. Et mi tavuk mu istersiniz?`); lastMenuChoice = m; mode = 'restaurant'; };
+    div.style.display='flex'; div.style.alignItems='center';
+    div.innerHTML = `<img src="${m.img}" class="prod-thumb" style="width:72px;height:72px"><div style="margin-left:10px"><div style="font-weight:700">${m.name}</div><div class="text-xs text-slate-500">Seçenek: ${m.variants.join(', ')} — ${m.basePrice}₺</div></div><div style="margin-left:auto" class="price">${m.basePrice}₺</div>`;
+    div.onclick = ()=> { startMenuFlow(m); };
+    // extras listing small
+    const extrasHtml = m.extras.map(e=>`<div class="note-pill">${e.label} +${e.price}₺</div>`).join(' ');
+    const extrasDiv = document.createElement('div'); extrasDiv.style.marginTop='8px'; extrasDiv.innerHTML = extrasHtml;
+    div.appendChild(extrasDiv);
     list.appendChild(div);
   });
 }
 
 /* ----------------- Cart ----------------- */
-function addToCart(productId, qty) {
+function addToCart(productId, qty, opts={}) {
+  // opts: { variant, notes:[], extras:[] }
   if (PRODUCTS[productId]) {
     const p = PRODUCTS[productId];
-    cart.push({ id:p.id, name:p.name, qty, unit:p.unit, price:p.price });
+    cart.push({ id:p.id, name:p.name, qty, unit:p.unit, price:p.price, notes: opts.notes||[], extras: opts.extras||[] });
     updateCartUI();
     showFloating(p.img);
     speak(`${qty} ${p.unit} ${p.name} sepete eklendi efendim`);
@@ -228,12 +240,18 @@ function addToCart(productId, qty) {
     // menu
     const m = MENU[productId];
     if (m) {
-      const variant = selectedVariant || m.variants[0];
-      cart.push({ id:m.id, name:m.name + ' - ' + variant, qty: selectedQty || 1, unit:'porsiyon', price:m.basePrice });
+      const variant = opts.variant || m.variants[0];
+      let price = m.basePrice;
+      // extras price
+      const extrasArr = opts.extras || [];
+      extrasArr.forEach(ex => {
+        const exObj = m.extras.find(x=>x.code===ex);
+        if (exObj) price += exObj.price;
+      });
+      cart.push({ id:m.id, name: m.name + ' - ' + variant, qty, unit:'porsiyon', price, notes: opts.notes||[], extras: extrasArr });
       updateCartUI();
       showFloating(m.img);
-      speak(`${selectedQty||1} porsiyon ${m.name} sepete eklendi efendim`);
-      selectedQty = null; selectedVariant = null;
+      speak(`${qty} porsiyon ${m.name} (${variant}) sepete eklendi efendim`);
     }
   }
 }
@@ -243,9 +261,27 @@ function updateCartUI() {
   let total = 0;
   cart.forEach((it,idx)=>{
     total += it.qty * it.price;
-    const li = document.createElement('li');
-    li.style.display='flex'; li.style.justifyContent='space-between'; li.style.padding='6px 0';
-    li.innerHTML = `<div>${it.qty} x ${it.name}</div><div>${(it.qty*it.price).toFixed(2)}₺</div>`;
+    const li = document.createElement('li'); li.style.display='flex'; li.style.flexDirection='column'; li.style.padding='8px 0';
+    li.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center">
+                      <div><strong>${it.qty} x ${it.name}</strong><div class="muted">${it.unit}</div></div>
+                      <div style="text-align:right">${(it.qty*it.price).toFixed(2)}₺</div>
+                    </div>`;
+    if (it.extras && it.extras.length>0) {
+      const exs = it.extras.map(code => {
+        const m = MENU[it.id] || null;
+        if (m) { const e = m.extras.find(x=>x.code===code); return e ? `<span class="note-pill">${e.label}</span>` : ''; }
+        // product-level extras (rare)
+        return '';
+      }).join(' ');
+      li.innerHTML += `<div style="margin-top:6px">${exs}</div>`;
+    }
+    if (it.notes && it.notes.length>0) {
+      const notesHtml = it.notes.map(n=>`<span class="note-pill">${n}</span>`).join(' ');
+      li.innerHTML += `<div style="margin-top:6px">${notesHtml}</div>`;
+    }
+    // remove button
+    const rem = document.createElement('button'); rem.textContent='Sil'; rem.className='btn'; rem.style.marginTop='8px'; rem.onclick=()=>{ cart.splice(idx,1); updateCartUI(); };
+    li.appendChild(rem);
     ul.appendChild(li);
   });
   $('cartTotal').innerText = total.toFixed(2) + '₺';
@@ -254,15 +290,11 @@ function updateCartUI() {
 
 /* ----------------- Animations ----------------- */
 function animatePrice(prodId) {
-  // find shelf and pulse
   const prod = Object.values(PRODUCTS).find(p=>p.id===prodId);
   if (!prod) return;
-  // find shelf element matching aisle
-  const shelf = Array.from(document.querySelectorAll('.shelf')).find(s=>s.dataset.aisle===prod.aisle);
   const tag = $('priceTag');
   tag.innerText = `${prod.price}₺`;
   tag.classList.remove('hidden');
-  tag.style.left = ''; tag.style.right = '12px';
   tag.classList.add('pulse');
   setTimeout(()=> tag.classList.remove('pulse'),800);
   setTimeout(()=> tag.classList.add('hidden'),1800);
@@ -271,16 +303,13 @@ function animatePrice(prodId) {
 function showFloating(src) {
   const f = $('floatingImg'); f.src = src; f.style.display='block';
   f.style.transform='translateY(0)';
-  setTimeout(()=> { f.style.transform='translateY(-180px)'; setTimeout(()=> { f.style.display='none'; f.style.transform='translateY(0)'; },700); }, 300);
+  setTimeout(()=> { f.style.transform='translateY(-220px)'; setTimeout(()=> { f.style.display='none'; f.style.transform='translateY(0)'; },700); }, 300);
 }
 
 /* ----------------- Voice Recognition ----------------- */
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
-let lastMenuChoice = null;
-let selectedVariant = null;
-let selectedQty = null;
-
+let menuFlow = { item:null, awaitingVariant:false, awaitingQty:false, selectedVariant:null, pendingExtras:[], pendingNotes:[], pendingQty:1 };
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
   recognition.lang = 'tr-TR';
@@ -313,69 +342,123 @@ $('btnRestaurant').addEventListener('click', openRestaurant);
 /* checkout */
 $('checkout').addEventListener('click', ()=> {
   if (cart.length===0) { alert('Sepet boş'); return; }
-  alert('Sipariş demo: konsola bakın. (Sunucu endpoint ile kaydedilebilir.)');
-  console.log('ORDER PAYLOAD', { user: localUser, cart });
+  // demo: show payload
+  const payload = { user: localUser, cart };
+  console.log('ORDER PAYLOAD', payload);
+  alert('Sipariş demo: konsola yazıldı. Sunucu endpoint ile kaydedilebilir.');
   speak('Siparişiniz kayıt altına alındı. Teşekkürler.');
 });
 
 /* ----------------- Voice Command Handler ----------------- */
 function handleVoice(text) {
-  // quick helpers: quantity detection
-  const qtyMatch = text.match(/(\d+)\s*(kilo|kg|adet|porsiyon|porsiyon|tane)?/);
-  const quantity = qtyMatch ? parseInt(qtyMatch[1]) : null;
+  // direct control
+  if (text.includes('sepet') && text.includes('göster')) { updateCartUI(); speak('Sepetiniz gösteriliyor'); return; }
+  if (text.includes('çıkış') || text.includes('geri') ) { showWelcome(); speak('Ana ekrana dönüldü'); return; }
 
-  // Market mode commands
-  if (mode === 'market') {
+  // Market-specific commands
+  if (mode==='market') {
+    // aisle selection
     if (text.includes('manav') || text.includes('sebze')) { highlightAisle('manav'); speak('Manav reyonu açıldı efendim'); return; }
     if (text.includes('süt') || text.includes('peynir')) { highlightAisle('sut'); speak('Süt reyonu açıldı efendim'); return; }
-    if (text.includes('salça') || text.includes('salca')) { highlightAisle('kiler'); speak('Kiler reyonu açıldı efendim'); return; }
-    // price question
+    if (text.includes('kiler') || text.includes('salça') || text.includes('konserve')) { highlightAisle('kiler'); speak('Kiler reyonu açıldı efendim'); return; }
+
+    // price ask
     if (text.includes('kaç') || text.includes('fiyat')) {
       const found = findProductByName(text);
       if (found) { animatePrice(found.id); speak(`${found.name} şu anda ${found.price} lira efendim`); return; }
-      speak('Hangisinin fiyatını öğrenmek istiyorsunuz?');
-      return;
+      speak('Hangi ürünün fiyatını öğrenmek istiyorsunuz?'); return;
     }
-    // add to cart by name
+
+    // add by quantity or weight: "1 kilo domates", "2 domates" "domates 1 kilo"
+    const qtyMatch = text.match(/(\d+)\s*(kilo|kg|adet|tane)?/);
+    let qty = qtyMatch ? parseInt(qtyMatch[1]) : null;
     const found = findProductByName(text);
-    if (found) {
-      const q = quantity || 1;
-      addToCart(found.id, q); animatePrice(found.id);
+    if (found && qty) {
+      addToCart(found.id, qty);
+      animatePrice(found.id);
       return;
     }
+    if (found && !qty) { addToCart(found.id, 1); animatePrice(found.id); return; }
+
+    // fallback
     speak('Markette aradığınızı bulamadım, tekrar deneyin lütfen');
+    return;
   }
 
-  // Restaurant mode
-  if (mode === 'restaurant') {
-    if (text.includes('döner') || text.includes('doner')) {
-      lastMenuChoice = MENU.doner;
-      speak('Döner seçtiniz. Et mi tavuk mu olsun?');
+  // Restaurant-specific (more complex) flow
+  if (mode==='restaurant') {
+    // If in the middle of menuFlow, route accordingly
+    if (menuFlow.awaitingVariant) {
+      // parse variant
+      if (text.includes('et')) { menuFlow.selectedVariant='Et'; menuFlow.awaitingVariant=false; menuFlow.awaitingQty=true; speak('Kaç porsiyon olsun efendim?'); return; }
+      if (text.includes('tavuk')) { menuFlow.selectedVariant='Tavuk'; menuFlow.awaitingVariant=false; menuFlow.awaitingQty=true; speak('Kaç porsiyon olsun efendim?'); return; }
+      // also allow direct quantity like "1 porsiyon"
+    }
+    if (menuFlow.awaitingQty) {
+      const q = text.match(/(\d+)\s*(porsiyon|adet|tane)?/);
+      const qty = q ? parseInt(q[1]) : 1;
+      menuFlow.pendingQty = qty;
+      // look for extras or notes within the same utterance
+      const extras = parseExtrasFromText(text, menuFlow.item);
+      const notes = parseRemovalsFromText(text);
+      addToCart(menuFlow.item.id, qty, { variant: menuFlow.selectedVariant, extras, notes });
+      // reset
+      menuFlow = { item:null, awaitingVariant:false, awaitingQty:false, selectedVariant:null, pendingExtras:[], pendingNotes:[], pendingQty:1 };
+      // after adding, ask for drink upsell if no drink in cart
+      setTimeout(()=> maybeAskDrink(), 300);
       return;
     }
-    if ((text.includes('et') || text.includes('tavuk')) && lastMenuChoice) {
-      selectedVariant = text.includes('et') ? 'Et' : 'Tavuk';
-      speak(`${selectedVariant} seçtiniz. Kaç porsiyon olsun?`);
-      return;
+
+    // Start new menu if user said a menu item
+    const menuItem = findMenuByName(text);
+    if (menuItem) {
+      menuFlow.item = menuItem;
+      // ask variant (Et/Tavuk) if available
+      if (menuItem.variants && menuItem.variants.length>0) {
+        menuFlow.awaitingVariant = true;
+        speak(`${menuItem.name} seçtiniz. Et mi tavuk mu olsun efendim?`);
+        return;
+      } else {
+        menuFlow.awaitingQty = true;
+        speak('Kaç porsiyon olsun efendim?');
+        return;
+      }
     }
-    if (quantity && lastMenuChoice && selectedVariant) {
-      selectedQty = quantity;
-      // add to cart
-      addToCart(lastMenuChoice.id, selectedQty);
-      // reset menu flow
-      lastMenuChoice = null; selectedVariant = null; selectedQty = null;
-      return;
-    }
-    // price ask for menu
-    if (text.includes('fiyat') || text.includes('kaç')) {
+
+    // Price ask for menu
+    if (text.includes('kaç') || text.includes('fiyat')) {
       const f = Object.values(MENU).find(m=> text.includes(m.name.toLowerCase()) || text.includes('döner'));
       if (f) { speak(`${f.name} fiyatı ${f.basePrice} lira efendim`); return; }
     }
-    speak('Restoranda nasıl yardımcı olayım?');
+
+    // Removal commands applied to last added item: "turşusuz" etc.
+    const rems = parseRemovalsFromText(text);
+    if (rems.length>0 && cart.length>0) {
+      cart[cart.length-1].notes = Array.from(new Set((cart[cart.length-1].notes || []).concat(rems)));
+      updateCartUI();
+      speak(`${rems.join(', ')} notu eklendi efendim`);
+      return;
+    }
+
+    // Extras direct: "25 gr tavuk ekle" or "25 gram tavuk ekle"
+    const extrasDirect = parseExtrasFromText(text);
+    if (extrasDirect.length>0 && menuFlow.item) {
+      menuFlow.pendingExtras = menuFlow.pendingExtras.concat(extrasDirect);
+      speak(`${extrasDirect.map(e=>e).join(', ')} ekstrası eklendi. Kaç porsiyon olsun?`);
+      menuFlow.awaitingQty = true;
+      return;
+    }
+
+    // fallback
+    speak('Restoranda sizi tam olarak anlayamadım, tekrar eder misiniz?');
+    return;
   }
+
+  // if mode not set
+  speak('Lütfen önce Market veya Restaurant seçin.');
 }
 
-/* ----------------- Helpers ----------------- */
+/* ----------------- Parsers ----------------- */
 function findProductByName(text) {
   for (const k in PRODUCTS) {
     const p = PRODUCTS[k];
@@ -383,25 +466,128 @@ function findProductByName(text) {
   }
   return null;
 }
+function findMenuByName(text) {
+  for (const k in MENU) {
+    const m = MENU[k];
+    if (text.includes(m.name.toLowerCase()) || text.includes(k)) return m;
+  }
+  return null;
+}
+function parseRemovalsFromText(text) {
+  // match "turşusuz", "turşu olmasın", "ketçapsız", "ketçap olmasın", "soğansız", "soğan olmasın"
+  const removals = [];
+  if (text.match(/turşu(siz)?|turşu olmasın|turşu yok|turşu istemiyorum/)) removals.push('turşusuz');
+  if (text.match(/ketçap(sız)?|ketçap olmasın|ketçap yok|ketçap istemiyorum/)) removals.push('ketçapsız');
+  if (text.match(/soğan(sız)?|soğan olmasın|soğan yok|soğan istemiyorum/)) removals.push('soğansız');
+  if (text.match(/mayonez olmasın|mayonez istemiyorum/)) removals.push('mayonezsiz');
+  return removals;
+}
+function parseExtrasFromText(text, menuItem=null) {
+  const extras = [];
+  // look for "25 gr tavuk" or "25 gram tavuk" pattern
+  const g = text.match(/(\d+)\s*(gr|gram)\s*(tavuk|et)?/);
+  if (g) {
+    // map to known extra codes if exists in menuItem
+    const grams = parseInt(g[1]);
+    const meat = g[3] || 'tavuk';
+    // if menuItem has extras that match 25gr_tavuk, pick that
+    if (menuItem && menuItem.extras) {
+      const match = menuItem.extras.find(e => e.code.includes('25gr') && e.label.toLowerCase().includes(meat));
+      if (match) extras.push(match.code);
+    } else {
+      // fallback generic code
+      extras.push(`${grams}gr_${meat}`);
+    }
+  }
+  // detect "peynir" extra words
+  if (text.includes('peynir') && menuItem && menuItem.extras) {
+    const ex = menuItem.extras.find(e=> e.label.toLowerCase().includes('peynir'));
+    if (ex) extras.push(ex.code);
+  }
+  return extras;
+}
+
+/* ----------------- Helpers ----------------- */
 function highlightAisle(aisle) {
   const shelf = Array.from(document.querySelectorAll('.shelf')).find(s=>s.dataset.aisle===aisle);
   if (!shelf) { speak('O reyon bulunamadı'); return; }
   shelf.style.boxShadow = '0 18px 40px rgba(14,165,164,0.12)';
-  setTimeout(()=> shelf.style.boxShadow='', 2500);
+  setTimeout(()=> shelf.style.boxShadow = '', 2500);
 }
 
-/* TTS */
-function speak(text) {
-  try {
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'tr-TR';
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
-  } catch(e){ console.log(e); }
+function maybeAskDrink() {
+  // if cart has no drink-like item (we treat items with name including 'su'|'kola'|'ayran' as drinks)
+  const hasDrink = cart.some(it => /su|kola|ayran|icecek|içecek/i.test(it.name));
+  if (!hasDrink) {
+    // ask the user
+    speak('İçecek ister misiniz Ayşe Teyze?');
+    // set temporary recognition to capture yes/no
+    if (!recognition) return;
+    // we'll listen once and process yes/no
+    const tmp = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    tmp.lang = 'tr-TR';
+    tmp.interimResults = false;
+    tmp.maxAlternatives = 1;
+    tmp.onresult = (e) => {
+      const t = e.results[0][0].transcript.toLowerCase();
+      if (t.includes('evet') || t.includes('isterim') || t.includes('var')) {
+        // present drink options via TTS and manual fallback
+        speak('Hangi içecek istersiniz? Su, kola, ayran?');
+        // start a new recognition to capture which drink
+        const tmp2 = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        tmp2.lang = 'tr-TR';
+        tmp2.interimResults = false;
+        tmp2.maxAlternatives = 1;
+        tmp2.onresult = (ev2) => {
+          const drink = ev2.results[0][0].transcript.toLowerCase();
+          let drinkKey = null;
+          if (drink.includes('su')) drinkKey = { id:'su', name:'Su', price:5 };
+          else if (drink.includes('kola')) drinkKey = { id:'kola', name:'Kola', price:20 };
+          else if (drink.includes('ayran')) drinkKey = { id:'ayran', name:'Ayran', price:8 };
+          if (drinkKey) {
+            cart.push({ id:drinkKey.id, name:drinkKey.name, qty:1, unit:'adet', price:drinkKey.price, notes:[], extras:[] });
+            updateCartUI(); speak(`${drinkKey.name} sepete eklendi efendim`);
+          } else {
+            speak('İçecek seçilmedi, tamamdır efendim');
+          }
+        };
+        tmp2.onend = ()=> {};
+        tmp2.onerror = ()=> {};
+        try { tmp2.start(); } catch(e){ console.log('tmp2 err', e); }
+      } else {
+        speak('Tamam efendim, içecek eklemiyoruz.');
+      }
+    };
+    tmp.onerror = ()=>{};
+    try { tmp.start(); } catch(e){ console.log('tmp err', e); }
+  }
+}
+
+/* ----------------- Menu flow starter ----------------- */
+function startMenuFlow(menuItem) {
+  // set flow and ask variant if exists
+  menuFlow.item = menuItem;
+  menuFlow.pendingExtras = [];
+  menuFlow.pendingNotes = [];
+  menuFlow.pendingQty = 1;
+  if (menuItem.variants && menuItem.variants.length>0) {
+    menuFlow.awaitingVariant = true;
+    speak(`${menuItem.name} seçtiniz. Et mi tavuk mu olsun efendim?`);
+  } else {
+    menuFlow.awaitingQty = true;
+    speak('Kaç porsiyon olsun efendim?');
+  }
+}
+
+/* ----------------- Parsers test helpers ----------------- */
+function testParse(text) {
+  console.log('parseRemovals:', parseRemovalsFromText(text));
+  console.log('parseExtras:', parseExtrasFromText(text));
 }
 
 /* initial greeting */
-speak('Demoye hoşgeldiniz. Market veya Restaurant seçin, sonra sesle komut verin.');
+speak('Demo v2 ye hoşgeldiniz. Market veya Restaurant seçin, sonra sesle komut verin.');
+
 </script>
 </body>
 </html>
