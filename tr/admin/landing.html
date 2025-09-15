@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PaketKapinda - Sesli Market Demo</title>
+
+  <!-- Tailwind CDN (dev only) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+
+  <!-- QR lib -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .fade { transition: all .25s ease; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <div class="max-w-5xl mx-auto p-6">
+    <header class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-800">PaketKapinda — Sesli Market Demo</h1>
+        <p class="text-sm text-slate-500">QR ile davet, sesle sipariş, anında sepet görüntüsü.</p>
+      </div>
+      <div class="text-right">
+        <div id="greeting" class="text-sm text-slate-700">Yükleniyor...</div>
+        <div id="refInfo" class="text-xs text-slate-400"></div>
+      </div>
+    </header>
+
+    <!-- Main grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <!-- Left: Controls -->
+      <div class="md:col-span-1 bg-white p-4 rounded-lg shadow">
+        <h3 class="font-semibold mb-2">Hızlı Başlangıç</h3>
+
+        <div class="mb-3">
+          <label class="block text-xs text-slate-600 mb-1">Telefon (manuel veya sesle kayıt)</label>
+          <input id="phoneInput" type="text" placeholder="05xx..." class="w-full p-2 border rounded" />
+        </div>
+
+        <div class="flex gap-2 mb-3">
+          <button id="btnVoiceRegister" class="flex-1 bg-indigo-600 text-white p-2 rounded">🎙 Sesle Kayıt</button>
+          <button id="btnSavePhone" class="flex-1 bg-gray-200 p-2 rounded">💾 Kaydet</button>
+        </div>
+
+        <div class="mb-3">
+          <label class="block text-xs text-slate-600 mb-1">Test sesle ara</label>
+          <button id="btnListen" class="w-full bg-rose-500 text-white p-2 rounded">🎧 Ne var söyle</button>
+        </div>
+
+        <div class="mb-3">
+          <label class="block text-xs text-slate-600 mb-1">QR (paylaş)</label>
+          <div id="qrCanvas" class="p-2 bg-slate-50 rounded"></div>
+          <div class="text-xs text-slate-500 mt-2">QR davet linkini paylaş. Gelenler bu sayfaya yönlendirilecek.</div>
+        </div>
+
+        <div class="mt-4">
+          <button id="btnSendOrder" class="w-full bg-emerald-600 text-white p-2 rounded">🟢 Siparişi Sunucuya Gönder</button>
+          <div class="text-xs text-slate-500 mt-2">(Sunucu fonksiyonu yoksa önce backend kur)</div>
+        </div>
+      </div>
+
+      <!-- Middle: Product / Voice result -->
+      <div class="md:col-span-2 bg-white p-4 rounded-lg shadow">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">Sesli Arama & Ürün Kartı</h3>
+          <div>
+            <span id="langTag" class="text-xs text-slate-500"></span>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <div class="flex gap-2">
+            <input id="textQuery" class="flex-1 p-2 border rounded" placeholder="Ürün adı yaz veya sesle ara (ör: salça, zeytin)" />
+            <button id="btnTextSearch" class="bg-indigo-600 text-white px-4 rounded">Ara</button>
+            <button id="btnVoiceSearch" class="bg-sky-500 text-white px-3 rounded">🎤</button>
+          </div>
+        </div>
+
+        <div id="productArea" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+        <hr class="my-4">
+
+        <div id="cartOverlay" class="hidden p-3 bg-slate-50 rounded">
+          <h4 class="font-semibold">Sepetiniz</h4>
+          <ul id="cartList" class="mt-2"></ul>
+          <div class="mt-2 flex justify-between items-center">
+            <div class="text-sm font-medium">Toplam: <span id="cartTotal">0₺</span></div>
+            <button id="clearCart" class="bg-red-500 text-white px-3 py-1 rounded">Temizle</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer: Debug / notes -->
+    <div class="mt-6 p-4 bg-white rounded shadow">
+      <h4 class="font-semibold">Notlar & Gereken Backend</h4>
+      <ul class="list-disc pl-5 text-sm text-slate-600">
+        <li>Bu demo <strong>okuma</strong> amaçlı Supabase sorguları yapabilir (ürün listeleme). Yazma (orders/profiles) için backend function gereklidir.</li>
+        <li>Aşağıda örnek <strong>server endpoint</strong> ve <strong>SQL</strong> snippetleri ekledim; bunları sunucuna koyunca <em>“Siparişi Sunucuya Gönder”</em> butonu çalışır.</li>
+        <li>Production için Supabase anon key'ını direkt tarayıcıda kullanma; bir sunucu middleware / function ile güvenli hale getir.</li>
+      </ul>
+
+      <pre class="mt-3 text-xs bg-slate-100 p-2 rounded text-slate-700 overflow-auto">
+Server endpoint (örnek, Express.js):
+POST /api/place_order
+Body:
+{
+  "ref": "FATMA123",
+  "phone": "0532...",
+  "items": [
+    { "product_id": "uuid", "quantity": 2 }
+  ]
+}
+Sunucu: 
+- yeni profil oluştur (auth ile veya profiles kaydı),
+- referral_tracking ekle,
+- orders + order_details insert işlemlerini tek transaction olarak yap,
+- referral_bonus ekle.
+</pre>
+    </div>
+  </div>
+
+<script>
+/* ----------------------- CONFIG: Supabase bilgilerini kendi projenle doldur ----------------------- */
+cons const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+/* ---------------------------------------------------------------------------------------------------- */
+
+const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// State
+let refCode = null;
+let refOwner = null; // {owner_phone, owner_user_id}
+let localUser = { phone: null, name: null, id: null }; // client-side demo identity
+let cart = [];
+
+// Dom helpers
+const $ = id => document.getElementById(id);
+
+// Language detection
+const userLang = navigator.language || navigator.userLanguage || "tr-TR";
+$("langTag").innerText = userLang;
+
+/* ------------------ Parse referral from URL ------------------ */
+function parseReferral() {
+  const u = new URL(window.location.href);
+  // support both ?ref=CODE and /ref/CODE (path)
+  if (u.searchParams.has("ref")) {
+    return u.searchParams.get("ref");
+  }
+  const path = u.pathname.split("/").filter(Boolean);
+  const refIndex = path.indexOf("ref");
+  if (refIndex !== -1 && path.length > refIndex+1) return path[refIndex+1];
+  return null;
+}
+
+/* --------------- Load referral info from Supabase --------------- */
+async function loadReferralInfo(code) {
+  if (!code) { $("refInfo").innerText = ""; return; }
+  $("refInfo").innerText = "Davet kodu algılandı: " + code;
+  // Try to fetch from referral_links table
+  const { data, error } = await supabase
+    .from("referral_links")
+    .select("owner_user_id, owner_phone, created_at")
+    .eq("referral_code", code)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("Referral fetch error", error);
+    return;
+  }
+  if (data) {
+    refOwner = data;
+    speak(`Hoş geldiniz. Sizi ${data.owner_phone} numaralı teyzeniz davet etti.`);
+    $("greeting").innerText = `Sizi ${data.owner_phone} numaralı teyzeniz davet etti.`;
+  } else {
+    $("greeting").innerText = `Davet kodu: ${code}`;
+  }
+}
+
+/* ------------------ QR generation ------------------ */
+function renderQR(code) {
+  const url = new URL(window.location.href);
+  // make absolute link to /ref/CODE
+  const link = `${url.origin}/ref/${code}`;
+  const qrCanvas = $("qrCanvas");
+  qrCanvas.innerHTML = "";
+  QRCode.toCanvas(link, { width: 150 }, function (err, canvas) {
+    if (err) {
+      console.error(err);
+      qrCanvas.innerText = "QR oluşturulamadı";
+      return;
+    }
+    qrCanvas.appendChild(canvas);
+  });
+}
+
+/* ------------------ TTS helper ------------------ */
+function speak(text) {
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = userLang;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  } catch (e) { console.log("TTS hata", e); }
+}
+
+/* ------------------ Speech Recognition (web) ------------------ */
+function startRecognition(lang = userLang, onResult = ()=>{}) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert("Tarayıcınız konuşma tanımayı desteklemiyor.");
+    return null;
+  }
+  const rec = new SpeechRecognition();
+  rec.lang = lang;
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  rec.start();
+  rec.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    onResult(text);
+  };
+  rec.onerror = (e) => {
+    console.error("Speech error", e);
+    speak("Anlamadım, tekrar eder misiniz?");
+  };
+  return rec;
+}
+
+/* ------------------ Product search (Supabase) ------------------ */
+async function searchProductsByName(query) {
+  if (!query || query.trim().length < 1) return [];
+  // naive search: name ILIKE %query% OR description ILIKE
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, price, currency, imgurl, seller_id, category")
+    .ilike("name", `%${query}%`)
+    .limit(10);
+  if (error) {
+    console.error("product fetch err", error);
+    return [];
+  }
+  return data || [];
+}
+
+/* ------------------ Render products ------------------ */
+function renderProducts(list) {
+  const area = $("productArea");
+  area.innerHTML = "";
+  if (!list || list.length === 0) {
+    area.innerHTML = `<div class="text-slate-500">Ürün bulunamadı.</div>`;
+    return;
+  }
+  list.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "p-3 border rounded flex gap-3 items-center";
+    div.innerHTML = `
+      <img src="${p.imgurl || 'https://via.placeholder.com/120'}" class="w-24 h-24 object-cover rounded" alt="${escapeHtml(p.name)}" />
+      <div class="flex-1">
+        <div class="font-semibold">${escapeHtml(p.name)}</div>
+        <div class="text-slate-500 text-sm">${p.category || ''}</div>
+        <div class="mt-2 font-medium">${p.price || 0} ${p.currency || 'TRY'}</div>
+        <div class="mt-2 flex gap-2">
+          <button class="btnAdd bg-indigo-600 text-white px-3 py-1 rounded" data-id="${p.id}" data-price="${p.price}">Sepete Ekle</button>
+          <button class="btnDetail bg-gray-200 px-3 py-1 rounded" data-id="${p.id}">Detay</button>
+        </div>
+      </div>
+    `;
+    area.appendChild(div);
+  });
+
+  // attach add handlers
+  document.querySelectorAll(".btnAdd").forEach(b => {
+    b.onclick = () => {
+      const pid = b.dataset.id;
+      const price = parseFloat(b.dataset.price || 0);
+      addToCart(pid, 1, price);
+    };
+  });
+}
+
+/* ------------------ Cart functions (client-side) ------------------ */
+function addToCart(product_id, qty, unit_price) {
+  // find product info quickly (we might want to fetch product name)
+  cart.push({ product_id, quantity: qty, unit_price });
+  showCartOverlay();
+  renderCart();
+  speak("Siparişiniz eklendi efendim.");
+}
+
+function renderCart() {
+  const list = $("cartList");
+  list.innerHTML = "";
+  let total = 0;
+  cart.forEach((it, idx) => {
+    total += (it.quantity * it.unit_price);
+    const li = document.createElement("li");
+    li.className = "py-1 flex justify-between items-center";
+    li.innerHTML = `<div class="text-sm">${it.quantity} x ${it.product_id}</div>
+                    <div class="text-sm font-medium">${(it.quantity * it.unit_price).toFixed(2)}₺</div>`;
+    list.appendChild(li);
+  });
+  $("cartTotal").innerText = total.toFixed(2) + "₺";
+}
+
+function showCartOverlay() {
+  $("cartOverlay").classList.remove("hidden");
+}
+
+/* ------------------ Utility escape ------------------ */
+function escapeHtml(s) {
+  if (!s) return "";
+  return s.replace(/[&<>"']/g, function (m) {
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);
+  });
+}
+
+/* ------------------ Event bindings ------------------ */
+document.addEventListener("DOMContentLoaded", async () => {
+  // parse ref
+  refCode = parseReferral();
+  if (refCode) {
+    await loadReferralInfo(refCode);
+    renderQR(refCode);
+  } else {
+    $("greeting").innerText = "Hoş geldiniz! QR paylaşmak için sağdaki QR'ı oluşturun.";
+  }
+
+  // test load some products top 6
+  const { data: quick, error } = await supabase
+    .from("products")
+    .select("id, name, price, currency, imgurl, category")
+    .limit(6);
+
+  renderProducts(quick || []);
+
+  // handlers
+  $("btnVoiceSearch").onclick = () => {
+    speak("Hangi ürünü arıyorsunuz?");
+    startRecognition(userLang, async (text) => {
+      $("textQuery").value = text;
+      const results = await searchProductsByName(text);
+      renderProducts(results);
+    });
+  };
+
+  $("btnTextSearch").onclick = async () => {
+    const q = $("textQuery").value;
+    const results = await searchProductsByName(q);
+    renderProducts(results);
+  };
+
+  $("btnListen").onclick = () => {
+    speak("Test sesi: sistem çalışıyor.");
+  };
+
+  $("btnVoiceRegister").onclick = () => {
+    speak("İsim ve telefonunuzu söyleyin, lütfen: isim, 05xx...");
+    startRecognition(userLang, (text) => {
+      $("phoneInput").value = extractPhoneFromText(text) || "";
+      // naive name extraction
+      localUser.name = text.replace($("phoneInput").value || "", "").trim();
+      $("phoneInput").value = $("phoneInput").value || "";
+      speak("Kayıt bilgilerinizi aldım. Kaydet tuşuna basın.");
+    });
+  };
+
+  $("btnSavePhone").onclick = () => {
+    const ph = $("phoneInput").value.trim();
+    if (!ph) { alert("Telefon girin."); return; }
+    localUser.phone = ph;
+    localUser.id = localUser.id || crypto.randomUUID();
+    $("greeting").innerText = `Merhaba ${localUser.name || 'müşteri'} — numara: ${localUser.phone}`;
+    speak(`Hoş geldiniz. Kayıt tamamlandı.`);
+    // Optionally: post a referral_tracking record to your server (see server notes)
+  };
+
+  $("clearCart").onclick = () => { cart = []; renderCart(); $("cartOverlay").classList.add("hidden"); };
+
+  $("btnSendOrder").onclick = async () => {
+    if (!localUser.phone) { alert("Önce telefon bilgisi kaydedin (sesle veya manuel)."); return; }
+    if (cart.length === 0) { alert("Sepet boş."); return; }
+
+    // Send to server endpoint - you need to implement this server-side
+    const payload = {
+      ref: refCode,
+      phone: localUser.phone,
+      name: localUser.name || null,
+      items: cart.map(it => ({ product_id: it.product_id, quantity: it.quantity, unit_price: it.unit_price }))
+    };
+
+    // demo: show payload and explain next step
+    console.log("ORDER PAYLOAD (send to your server):", payload);
+    alert("Sipariş payload konsola yazıldı. Sunucu endpoint oluşturduktan sonra bu istekle sipariş verilecektir.");
+    speak("Sipariş sunucuya gönderildi (demo). Teşekkürler.");
+    // If you have an endpoint, uncomment the fetch below and set URL
+    /*
+    const resp = await fetch("https://yourserver.com/api/place_order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const rj = await resp.json();
+    console.log("server response", rj);
+    */
+  };
+});
+
+/* ------------------ helpers ------------------ */
+function extractPhoneFromText(text) {
+  if (!text) return null;
+  // simple digit extraction
+  const digits = text.replace(/\D/g, "");
+  if (digits.length >= 10) {
+    // return formatted as 05xx...
+    const match = digits.match(/(05\d{8,9}|\d{10,11})/);
+    if (match) return match[0];
+    return digits;
+  }
+  return null;
+}
+</script>
+</body>
+</html>
