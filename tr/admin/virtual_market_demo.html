@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sanal Market - Demo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: linear-gradient(180deg,#f8fafc,#eef2ff); font-family:Inter,system-ui,-apple-system; }
+  .stage { max-width:1000px; margin:24px auto; padding:20px; }
+  .card { background:#fff; border-radius:12px; box-shadow:0 8px 30px rgba(15,23,42,0.06); overflow:hidden; }
+  .market-outside { height:220px; background:url('https://images.unsplash.com/photo-1532634896-26909d0d8b79?auto=format&fit=crop&w=1200&q=60') center/cover; display:flex; align-items:end; padding:20px; color:#fff; }
+  .btn { display:inline-block; padding:10px 16px; border-radius:8px; background:#0ea5a4; color:white; cursor:pointer; }
+  .market-inside { display:none; padding:20px; }
+  .aisle { display:flex; gap:12px; margin-bottom:14px; }
+  .shelf { width:160px; height:140px; background:linear-gradient(180deg,#fff,#f1f5f9); border-radius:10px; padding:8px; box-shadow:0 6px 18px rgba(2,6,23,0.06); position:relative; }
+  .shelf h4 { font-size:14px; margin-bottom:6px; }
+  .prod { display:flex; gap:8px; align-items:center; padding:6px; border-radius:8px; background:#fff; cursor:pointer; }
+  .prod img { width:48px; height:48px; object-fit:cover; border-radius:8px; }
+  .price-tag { position:absolute; right:8px; bottom:8px; background:#111827; color:#fff; padding:6px 8px; border-radius:6px; transform-origin:center; transition: transform .25s ease; }
+  .price-tag.pulse { transform:scale(1.25); }
+  .cart { position:fixed; right:18px; bottom:18px; background:#0ea5a4; color:#fff; padding:12px 16px; border-radius:12px; box-shadow:0 12px 30px rgba(2,6,23,0.12); z-index:1000; }
+  .overlay-card { position:fixed; left:50%; transform:translateX(-50%); top:20px; background:#fff; border-radius:10px; padding:12px 16px; box-shadow:0 10px 30px rgba(2,6,23,0.08); z-index:1001; display:none; }
+  .floating-product { position:fixed; width:120px; right:120px; bottom:100px; transform:translateY(0); transition: transform .6s cubic-bezier(.2,.9,.25,1); z-index:1002; }
+  .floating-product img { width:100%; border-radius:8px; box-shadow:0 8px 30px rgba(2,6,23,0.12); }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="card">
+      <div class="market-outside">
+        <div>
+          <h2 class="text-2xl font-bold">Mahalle Sanal Marketi</h2>
+          <p class="opacity-90">Ekrana gel, gez, sesle söyle — aldığın an sepete gelsin!</p>
+          <div style="margin-top:10px;">
+            <button id="btnEnter" class="btn">Hadi markete gidelim 🛒</button>
+            <button id="btnVoice" class="btn" style="background:#2563eb;margin-left:8px;">🎤 Sesle komut</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="market-inside" id="marketInside">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 class="text-lg font-semibold">İçerisi — Reyonlar</h3>
+          <div>
+            <span id="statusMsg" class="text-sm text-slate-600">Ses durumu: hazır</span>
+          </div>
+        </div>
+
+        <!-- Aisles -->
+        <div class="aisle" id="produceAisle">
+          <div class="shelf" data-aisle="sebze">
+            <h4>Manav Reyonu</h4>
+            <div class="prod" data-product-id="tomato" data-name="Domates" data-price="25">
+              <img src="https://images.unsplash.com/photo-1572441710260-e8aa3ca5f0a6?auto=format&fit=crop&w=200&q=60" alt="">
+              <div>
+                <div class="pn">Domates</div>
+                <div class="muted text-xs">kg</div>
+              </div>
+            </div>
+            <div class="prod" data-product-id="onion" data-name="Soğan" data-price="8">
+              <img src="https://images.unsplash.com/photo-1580711200959-7b1a0b6be5d8?auto=format&fit=crop&w=200&q=60" alt="">
+              <div>
+                <div class="pn">Soğan</div>
+                <div class="muted text-xs">kg</div>
+              </div>
+            </div>
+            <div class="price-tag">Manav</div>
+          </div>
+
+          <div class="shelf" data-aisle="dairy">
+            <h4>Süt Ürünleri</h4>
+            <div class="prod" data-product-id="cheese" data-name="Beyaz Peynir" data-price="120">
+              <img src="https://images.unsplash.com/photo-1563431986-7b3d5b8a27b4?auto=format&fit=crop&w=200&q=60" alt="">
+              <div>
+                <div class="pn">Beyaz Peynir</div>
+                <div class="muted text-xs">kg</div>
+              </div>
+            </div>
+            <div class="price-tag">Süt</div>
+          </div>
+
+          <div class="shelf" data-aisle="canned">
+            <h4>Konserve & Kiler</h4>
+            <div class="prod" data-product-id="paste" data-name="Domates Salçası" data-price="95">
+              <img src="https://images.unsplash.com/photo-1542444459-db8a60b0b96f?auto=format&fit=crop&w=200&q=60" alt="">
+              <div>
+                <div class="pn">Salça</div>
+                <div class="muted text-xs">2kg</div>
+              </div>
+            </div>
+            <div class="price-tag">Kiler</div>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;">
+          <button id="btnClose" class="btn" style="background:#ef4444;">Çıkış</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cart" id="cartBtn">🛒 Sepet (<span id="cartCount">0</span>)</div>
+  <div class="overlay-card" id="notif"> </div>
+  <div class="floating-product" id="floatingProduct" style="display:none"><img src="" alt=""></div>
+
+<script>
+/* ---------- state ---------- */
+let inMarket = false;
+let cart = [];
+const products = {
+  tomato: { id:'tomato', name:'Domates', price:25, unit:'kg', img:'https://images.unsplash.com/photo-1572441710260-e8aa3ca5f0a6?auto=format&fit=crop&w=200&q=60' },
+  onion: { id:'onion', name:'Soğan', price:8, unit:'kg', img:'https://images.unsplash.com/photo-1580711200959-7b1a0b6be5d8?auto=format&fit=crop&w=200&q=60' },
+  cheese: { id:'cheese', name:'Beyaz Peynir', price:120, unit:'kg', img:'https://images.unsplash.com/photo-1563431986-7b3d5b8a27b4?auto=format&fit=crop&w=200&q=60' },
+  paste: { id:'paste', name:'Domates Salçası', price:95, unit:'2kg', img:'https://images.unsplash.com/photo-1542444459-db8a60b0b96f?auto=format&fit=crop&w=200&q=60' }
+};
+
+/* ---------- UI refs ---------- */
+const btnEnter = document.getElementById('btnEnter');
+const marketInside = document.getElementById('marketInside');
+const btnClose = document.getElementById('btnClose');
+const cartBtn = document.getElementById('cartBtn');
+const cartCount = document.getElementById('cartCount');
+const notif = document.getElementById('notif');
+const floating = document.getElementById('floatingProduct');
+const statusMsg = document.getElementById('statusMsg');
+
+/* ---------- Enter / Exit ---------- */
+btnEnter.addEventListener('click', ()=> {
+  document.querySelector('.market-outside').style.display = 'none';
+  marketInside.style.display = 'block';
+  inMarket = true;
+  speak("Market içindesiniz. Hangi ürünü arıyorsunuz?");
+});
+
+btnClose.addEventListener('click', ()=> {
+  document.querySelector('.market-outside').style.display = '';
+  marketInside.style.display = 'none';
+  inMarket = false;
+  speak("Marketten çıkıldı, iyi günler.");
+});
+
+/* ---------- Click to add ---------- */
+document.querySelectorAll('.prod').forEach(el=>{
+  el.addEventListener('click', ()=> {
+    const id = el.dataset.productId;
+    addToCart(id,1);
+    // animate price tag pulse
+    const shelf = el.closest('.shelf');
+    if (shelf) {
+      const tag = shelf.querySelector('.price-tag');
+      tag.classList.add('pulse');
+      setTimeout(()=> tag.classList.remove('pulse'), 600);
+    }
+    // floating product show
+    showFloatingProduct(products[id].img);
+  });
+});
+
+/* ---------- cart ---------- */
+function addToCart(productId, qty) {
+  const p = products[productId];
+  cart.push({ ...p, qty });
+  cartCount.innerText = cart.length;
+  showNotif(`${p.name} sepete eklendi (${qty} ${p.unit})`);
+}
+
+/* ---------- notifs ---------- */
+function showNotif(text) {
+  notif.style.display = 'block';
+  notif.innerText = text;
+  setTimeout(()=> notif.style.display='none', 2200);
+}
+
+/* ---------- floating anim ---------- */
+function showFloatingProduct(src) {
+  floating.style.display = 'block';
+  floating.querySelector('img').src = src;
+  floating.style.transform = 'translateY(-8px)';
+  setTimeout(()=> {
+    floating.style.transform = 'translateY(-180px)';
+    setTimeout(()=> { floating.style.display='none'; floating.style.transform='translateY(0)'; }, 700);
+  }, 300);
+}
+
+/* ---------- voice ---------- */
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.lang = 'tr-TR';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => { statusMsg.innerText = 'Ses dinleniyor...'; };
+  recognition.onerror = (e) => { statusMsg.innerText = 'Ses hatası: ' + e.error; speak("Anlayamadım tekrar eder misin?"); };
+  recognition.onend = () => { statusMsg.innerText = 'Ses durumu: hazır'; };
+  recognition.onresult = (ev) => {
+    const txt = ev.results[0][0].transcript;
+    statusMsg.innerText = 'Duydu: ' + txt;
+    handleVoiceCommand(txt.toLowerCase());
+  };
+}
+
+document.getElementById('btnVoice').addEventListener('click', ()=> {
+  if (!inMarket) { speak("Önce markete girin."); return; }
+  if (!recognition) { alert("Tarayıcı ses tanımayı desteklemiyor."); return; }
+  recognition.start();
+});
+
+/* ---------- TTS ---------- */
+function speak(text) {
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'tr-TR';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  } catch(e){ console.log(e); }
+}
+
+/* ---------- command handling ---------- */
+function handleVoiceCommand(text) {
+  // Examples: "1 kilo domates", "domates al", "domates fiyatı kaç", "sepete ekle domates 2"
+  // find product by name
+  // simple matching
+  if (text.includes('çık') || text.includes('çıkış')) { btnClose.click(); return; }
+  if (text.includes('kaç')) {
+    // price question
+    const found = findProductByName(text);
+    if (found) {
+      animatePriceTagFor(found.id);
+      speak(`${found.name} fiyatı ${found.price} Türk Lirası`); 
+    } else {
+      speak('Hangi ürünün fiyatını öğrenmek istiyorsun?');
+    }
+    return;
+  }
+  // quantity detection
+  const qMatch = text.match(/(\d+)\s*(kilo|kg|adet|tane)?/);
+  let qty = qMatch ? parseInt(qMatch[1]) : 1;
+  const found = findProductByName(text);
+  if (found) {
+    addToCart(found.id, qty);
+    speak(`${qty} ${found.unit} ${found.name} sepete eklendi efendim`);
+    animateShelfFor(found.id);
+    return;
+  }
+
+  // fallback: try to open aisle based on keywords
+  if (text.includes('manav') || text.includes('sebze') ) {
+    highlightAisle('sebze'); speak('Manav reyonuna yönlendiriyorum'); return;
+  }
+
+  speak('Ürünü bulamadım, tekrar söyler misiniz?');
+}
+
+/* ---------- helpers ---------- */
+function findProductByName(text) {
+  for (let k in products) {
+    const p = products[k];
+    if (text.includes(p.name.toLowerCase()) || text.includes(k)) return p;
+  }
+  return null;
+}
+
+function animateShelfFor(productId) {
+  const el = document.querySelector(`[data-product-id="${productId}"]`);
+  if (!el) return;
+  el.style.transform = 'scale(1.03)';
+  setTimeout(()=> el.style.transform = '', 400);
+  // also make price tag pulse
+  const shelf = el.closest('.shelf'); if (shelf) {
+    const tag = shelf.querySelector('.price-tag'); tag.classList.add('pulse'); setTimeout(()=> tag.classList.remove('pulse'),700);
+  }
+}
+
+function animatePriceTagFor(productId) {
+  const el = document.querySelector(`[data-product-id="${productId}"]`);
+  if (!el) return;
+  const shelf = el.closest('.shelf'); if (shelf) {
+    const tag = shelf.querySelector('.price-tag');
+    tag.classList.add('pulse');
+    setTimeout(()=> tag.classList.remove('pulse'), 900);
+  }
+}
+
+function highlightAisle(aisleKey) {
+  // show overlay / highlight shelf having data-aisle
+  const shelf = document.querySelector(`[data-aisle="${aisleKey}"]`);
+  if (!shelf) { speak("O reyon yok."); return; }
+  shelf.style.boxShadow = '0 14px 40px rgba(14,165,164,0.15)';
+  setTimeout(()=> shelf.style.boxShadow = '', 2000);
+}
+
+/* ---------- initial greeting ---------- */
+speak("Market demosuna hoşgeldiniz. Hadi markete gidelim butonuna basın ya da 'manav reyonu' deyin.");
+</script>
+</body>
+</html>
