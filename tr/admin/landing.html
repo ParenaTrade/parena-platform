@@ -2,61 +2,141 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>Ayşe Teyze Market Sipariş Sistemi</title>
+  <title>Sesli Sipariş Market</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f9f9f9; }
+    #store { text-align:center; margin-top:30px; position:relative; }
+    #reyon { max-width:400px; margin:0 auto; opacity:0; transform:scale(0.8); transition:all 0.5s; }
+    #priceTag { position:absolute; top:50px; left:50%; transform:translateX(-50%) scale(0); background:gold; padding:10px 20px; border-radius:8px; font-size:20px; transition:transform 0.5s; }
+    #cart { position:fixed; top:20px; right:20px; width:60px; height:60px; border-radius:50%; background:#4CAF50; color:#fff; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; }
+    #cartItems { position:fixed; top:90px; right:20px; width:250px; background:#fff; border:1px solid #ccc; border-radius:8px; padding:10px; display:none; }
+    .fly { position:absolute; width:80px; transition:all 1s ease-in-out; }
+    #micBtn { display:block; margin:20px auto; padding:15px 30px; background:#007BFF; color:#fff; border:none; border-radius:8px; font-size:18px; cursor:pointer; }
+ <style>
+  #micContainer {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+  #micBtn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #007BFF;
+    border: none;
+    color: #fff;
+    font-size: 
+
+  </style>
 </head>
 <body>
-  <h1>Ayşe Teyze Market Sipariş Sistemi</h1>
-  <button onclick="startListening()">🎙️ Konuşmaya Başla</button>
-  <div id="log"></div>
 
-  <script>
-    // ✅ Web Speech API tanımla
-    let recognition;
-    if ('webkitSpeechRecognition' in window) {
-      recognition = new webkitSpeechRecognition();
-      recognition.lang = "tr-TR"; // Türkçe
-      recognition.continuous = false;
-      recognition.interimResults = false;
-    } else {
-      alert("❌ Tarayıcınız ses tanımayı desteklemiyor.");
+<h1 style="text-align:center;">🎙️ Sesli Sipariş Market</h1>
+<button id="micBtn">🎤 Konuşmaya Başla</button>
+
+<div id="store">
+  <img id="reyon" src="" alt="Reyon">
+  <div id="priceTag"></div>
+</div>
+
+<div id="cart">🛒</div>
+<div id="cartItems"><h3>Sepet</h3><ul id="cartList"></ul></div>
+
+<script>
+  const dictionary = {
+    "sogan": "soğan",
+    "yogurt": "yoğurt",
+    "domates": "domates",
+    "zeytin": "zeytin",
+    "peynir": "peynir",
+    "elma": "elma",
+    "patlican": "patlıcan",
+    "fasulye": "kuru fasulye"
+  };
+
+  const categories = {
+    "domates": { reyon:"manav.png", price:"40 TL" },
+    "soğan": { reyon:"manav.png", price:"30 TL" },
+    "elma": { reyon:"manav.png", price:"25 TL" },
+    "zeytin": { reyon:"sarkuteri.png", price:"120 TL" },
+    "peynir": { reyon:"sarkuteri.png", price:"150 TL" },
+    "yoğurt": { reyon:"sut.png", price:"60 TL" }
+  };
+
+  const reyon = document.getElementById("reyon");
+  const priceTag = document.getElementById("priceTag");
+  const cart = document.getElementById("cart");
+  const cartItems = document.getElementById("cartItems");
+  const cartList = document.getElementById("cartList");
+
+  cart.onclick = () => cartItems.style.display = cartItems.style.display === "none" ? "block" : "none";
+
+  function normalizeText(text) {
+    return text.toLowerCase()
+      .replace(/ğ/g,"g").replace(/ü/g,"u").replace(/ş/g,"s")
+      .replace(/ı/g,"i").replace(/ö/g,"o").replace(/ç/g,"c");
+  }
+
+  function addToCart(item) {
+    const norm = normalizeText(item);
+    const original = dictionary[norm];
+    if (!original || !categories[original]) {
+      alert(`Ürün bulunamadı: ${item}`);
+      return;
     }
+    const data = categories[original];
 
-    // ✅ Türkçe harf normalizasyonu
-    function normalizeText(text) {
-      return text
-        .toLowerCase()
-        .replace(/ğ/g, "g")
-        .replace(/ü/g, "u")
-        .replace(/ş/g, "s")
-        .replace(/ı/g, "i")
-        .replace(/ö/g, "o")
-        .replace(/ç/g, "c");
-    }
+    // Reyon göster
+    reyon.src = data.reyon;
+    reyon.style.opacity = 1;
+    reyon.style.transform = "scale(1)";
 
-    // ✅ Dinlemeyi başlat
-    function startListening() {
-      if (!recognition) return;
-      recognition.start();
-    }
+    // Fiyat etiketi animasyon
+    priceTag.textContent = data.price;
+    priceTag.style.transform = "translateX(-50%) scale(1)";
+    setTimeout(() => priceTag.style.transform = "translateX(-50%) scale(0)", 2000);
 
-    // ✅ Ses algılandığında
-    if (recognition) {
-      recognition.onresult = async (event) => {
-        let originalText = event.results[0][0].transcript;   // Orijinal metin
-        let normalized = normalizeText(originalText);        // Normalize edilmiş metin
+    // Uçan ürün
+    const flyer = document.createElement("img");
+    flyer.src = data.reyon;
+    flyer.className = "fly";
+    flyer.style.left = "50%";
+    flyer.style.top = "200px";
+    document.body.appendChild(flyer);
 
-        // Log ekrana yaz
-        document.getElementById("log").innerHTML = `🎙️ Kullanıcı dedi ki: <b>${originalText}</b>`;
+    setTimeout(() => {
+      flyer.style.left = cart.getBoundingClientRect().left + "px";
+      flyer.style.top = cart.getBoundingClientRect().top + "px";
+      flyer.style.width = "20px";
+    }, 50);
+    setTimeout(() => flyer.remove(), 1000);
 
-        // Eğer fark varsa uyarı çıksın
-        if (originalText !== normalized) {
-          alert(`Orijinal: ${originalText}\nNormalize: ${normalized}`);
-        }
+    // Sepet listesi
+    const li = document.createElement("li");
+    li.textContent = original + " - " + data.price;
+    cartList.appendChild(li);
+  }
 
-        // Burada backend'e gönderebilirsin
-        // fetch("/api/ai", {...})
-      };
-    }
-  </script>
+  // 🎤 Ses Tanıma
+  let recognition;
+  if ("webkitSpeechRecognition" in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.lang = "tr-TR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      console.log("🎙️ Kullanıcı dedi ki:", text);
+      addToCart(text);
+    };
+  } else {
+    alert("Tarayıcınız ses tanımayı desteklemiyor.");
+  }
+
+  document.getElementById("micBtn").onclick = () => recognition.start();
+</script>
 </body>
 </html>
