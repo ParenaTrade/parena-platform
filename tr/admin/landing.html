@@ -22,43 +22,34 @@
         .replace(/ç/g, "c");
     }
 
-    let recognition;
-    if ("webkitSpeechRecognition" in window) {
-      recognition = new webkitSpeechRecognition();
-      recognition.lang = "tr-TR";
-    } else {
-      alert("❌ Tarayıcınız ses tanımayı desteklemiyor.");
-    }
+   recognition.onresult = async (event) => {
+  let originalText = event.results[0][0].transcript;   // orijinal metin
+  let normalized = normalizeText(originalText);        // normalize edilmiş metin
 
-    function startListening() {
-      if (!recognition) return;
-      recognition.start();
-    }
+  // ✅ Test amaçlı: fark varsa alert çıksın
+  if (originalText !== normalized) {
+    alert(`Orijinal: ${originalText}\nNormalize: ${normalized}`);
+  }
 
-    // Ses algılandığında
-    recognition.onresult = async (event) => {
-      let text = event.results[0][0].transcript;
-      text = normalizeText(text);
+  document.getElementById("log").innerHTML = `🎙️ Kullanıcı dedi ki: <b>${originalText}</b>`;
 
-      document.getElementById("log").innerHTML = `🎙️ Kullanıcı dedi ki: <b>${text}</b>`;
+  try {
+    const response = await fetch("/api/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: normalized, original: originalText }),
+    });
 
-      try {
-        // Backend'e gönder
-        const response = await fetch("/api/ai", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: text }),
-        });
+    if (!response.ok) throw new Error("API hatası: " + response.status);
 
-        if (!response.ok) throw new Error("API hatası: " + response.status);
+    const data = await response.json();
+    document.getElementById("log").innerHTML += `<br>🤖 Yanıt: ${data.reply}`;
+  } catch (err) {
+    document.getElementById("log").innerHTML += `<br>❌ Hata: ${err.message}`;
+  }
+};
 
-        const data = await response.json();
-
-        document.getElementById("log").innerHTML += `<br>🤖 Yanıt: ${data.reply}`;
-      } catch (err) {
-        document.getElementById("log").innerHTML += `<br>❌ Hata: ${err.message}`;
-      }
-    };
   </script>
 </body>
 </html>
+
