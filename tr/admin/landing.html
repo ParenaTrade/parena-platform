@@ -5,12 +5,23 @@
   <title>Ayşe Teyze Market Sipariş Sistemi</title>
 </head>
 <body>
-  <h2>Ayşe Teyze Market Sipariş Sistemi</h2>
+  <h1>Ayşe Teyze Market Sipariş Sistemi</h1>
   <button onclick="startListening()">🎙️ Konuşmaya Başla</button>
   <div id="log"></div>
 
   <script>
-    // Türkçe harf normalizasyonu
+    // ✅ Web Speech API tanımla
+    let recognition;
+    if ('webkitSpeechRecognition' in window) {
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = "tr-TR"; // Türkçe
+      recognition.continuous = false;
+      recognition.interimResults = false;
+    } else {
+      alert("❌ Tarayıcınız ses tanımayı desteklemiyor.");
+    }
+
+    // ✅ Türkçe harf normalizasyonu
     function normalizeText(text) {
       return text
         .toLowerCase()
@@ -22,34 +33,30 @@
         .replace(/ç/g, "c");
     }
 
-   recognition.onresult = async (event) => {
-  let originalText = event.results[0][0].transcript;   // orijinal metin
-  let normalized = normalizeText(originalText);        // normalize edilmiş metin
+    // ✅ Dinlemeyi başlat
+    function startListening() {
+      if (!recognition) return;
+      recognition.start();
+    }
 
-  // ✅ Test amaçlı: fark varsa alert çıksın
-  if (originalText !== normalized) {
-    alert(`Orijinal: ${originalText}\nNormalize: ${normalized}`);
-  }
+    // ✅ Ses algılandığında
+    if (recognition) {
+      recognition.onresult = async (event) => {
+        let originalText = event.results[0][0].transcript;   // Orijinal metin
+        let normalized = normalizeText(originalText);        // Normalize edilmiş metin
 
-  document.getElementById("log").innerHTML = `🎙️ Kullanıcı dedi ki: <b>${originalText}</b>`;
+        // Log ekrana yaz
+        document.getElementById("log").innerHTML = `🎙️ Kullanıcı dedi ki: <b>${originalText}</b>`;
 
-  try {
-    const response = await fetch("/api/ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: normalized, original: originalText }),
-    });
+        // Eğer fark varsa uyarı çıksın
+        if (originalText !== normalized) {
+          alert(`Orijinal: ${originalText}\nNormalize: ${normalized}`);
+        }
 
-    if (!response.ok) throw new Error("API hatası: " + response.status);
-
-    const data = await response.json();
-    document.getElementById("log").innerHTML += `<br>🤖 Yanıt: ${data.reply}`;
-  } catch (err) {
-    document.getElementById("log").innerHTML += `<br>❌ Hata: ${err.message}`;
-  }
-};
-
+        // Burada backend'e gönderebilirsin
+        // fetch("/api/ai", {...})
+      };
+    }
   </script>
 </body>
 </html>
-
