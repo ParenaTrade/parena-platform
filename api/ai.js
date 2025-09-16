@@ -2,7 +2,7 @@
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY, // ✅ Vercel env'den alacak
 });
 
 export default async function handler(req, res) {
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Body parse et
+    // 🔑 Body parse et
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { query } = body;
 
@@ -19,10 +19,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "query alanı gerekli" });
     }
 
+    // ✅ OpenAI çağrısı
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "Sen bir market sipariş asistanısın. Kullanıcı ne isterse sepete ekle." },
+        { role: "system", content: "Sen bir market sipariş asistanısın. Kullanıcıdan ürün ve miktar al." },
         { role: "user", content: query },
       ],
     });
