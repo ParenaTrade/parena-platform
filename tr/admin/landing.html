@@ -1,4 +1,68 @@
-async function aiFallback(text) {
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Sesli Market Asistanı (AI Destekli)</title>
+</head>
+<body>
+  <h2>🛒 Sepetiniz</h2>
+  <ul id="cart"></ul>
+
+  <button id="startBtn">🎙️ Konuşmaya Başla</button>
+
+  <script>
+    const cart = [];
+    const cartEl = document.getElementById("cart");
+
+    // 🟢 Sepet UI güncelle
+    function updateCartUI() {
+      cartEl.innerHTML = cart.map(item => `<li>${item.name} - ${item.qty} ${item.unit}</li>`).join("");
+    }
+
+    // 🟢 Sesli Yanıt
+    function speak(message) {
+      const utterance = new SpeechSynthesisUtterance(message);
+      utterance.lang = "tr-TR";
+      speechSynthesis.speak(utterance);
+    }
+
+    // 🟢 Kural Tabanlı Komutlar
+    function ruleBasedCommand(text) {
+      text = text.toLowerCase();
+      const addRegex = /(\d+)\s*(kilo|kg|adet)?\s*(\w+)\s*(ekle|istiyorum|ver)?/;
+      const removeRegex = /(çıkar|sil)\s*(\d+)?\s*(kilo|kg|adet)?\s*(\w+)/;
+
+      if (addRegex.test(text)) {
+        const match = text.match(addRegex);
+        const qty = parseInt(match[1]) || 1;
+        const unit = match[2] || "adet";
+        const product = match[3];
+
+        cart.push({ name: product, qty, unit });
+        updateCartUI();
+        speak(`${qty} ${unit} ${product} sepete eklendi Ayşe Teyze ✔️`);
+        return true;
+      }
+
+      if (removeRegex.test(text)) {
+        const match = text.match(removeRegex);
+        const product = match[4];
+        const index = cart.findIndex(i => i.name === product);
+        if (index !== -1) {
+          cart.splice(index, 1);
+          updateCartUI();
+          speak(`${product} sepetten çıkarıldı Ayşe Teyze ❌`);
+        } else {
+          speak(`${product} zaten sepetinizde yok Ayşe Teyze`);
+        }
+        return true;
+      }
+
+      return false;
+    }
+
+    // 🟢 AI fallback → OpenAI API
+   async function aiFallback(text) {
   try {
     const response = await fetch("/api/ai", {
       method: "POST",
@@ -35,3 +99,24 @@ async function aiFallback(text) {
     speak("Sistem hatası oldu Ayşe Teyze.");
   }
 }
+
+        
+    // 🟢 Ses Tanıma
+    document.getElementById("startBtn").addEventListener("click", () => {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = "tr-TR";
+      recognition.start();
+
+      recognition.onresult = async (event) => {
+        const text = event.results[0][0].transcript;
+        console.log("🎙️ Kullanıcı dedi ki:", text);
+
+        const handled = ruleBasedCommand(text);
+        if (!handled) {
+          await aiFallback(text);
+        }
+      };
+    });
+  </script>
+</body>
+</html>
