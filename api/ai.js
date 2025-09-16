@@ -1,8 +1,8 @@
-// api/ai.js
+// /api/ai.js
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // ✅ Vercel env içine ekle
+  apiKey: process.env.OPENAI_API_KEY, // ✅ Vercel env'den al
 });
 
 export default async function handler(req, res) {
@@ -11,42 +11,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message } = req.body;
-
-    if (!message) {
-      return res.status(400).json({ error: "Mesaj boş olamaz" });
+    const { query } = req.body;  // ✅ Burayı düzelttik
+    if (!query) {
+      return res.status(400).json({ error: "query alanı gerekli" });
     }
 
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini", // hızlı ve ucuz
       messages: [
-        {
-          role: "system",
-          content: `
-          Sen bir market sipariş asistanısın.
-          Kullanıcının konuşmasını analiz et ve şu formatta JSON dön:
-          {
-            "product": "ürün adı",
-            "quantity": "miktar",
-            "unit": "kg/adet",
-            "action": "add/remove/info"
-          }
-          Sadece JSON döndür, başka açıklama yazma.
-          `
-        },
-        { role: "user", content: message }
+        { role: "system", content: "Sen bir market sipariş asistanısın. Kullanıcı ne isterse sepete ekle." },
+        { role: "user", content: query },
       ],
-      temperature: 0.2,
     });
 
-    let aiResponse = completion.choices[0].message.content.trim();
+    const answer = completion.choices[0].message.content;
 
-    // JSON parse et
-    let parsed = JSON.parse(aiResponse);
-
-    return res.status(200).json(parsed);
-  } catch (err) {
-    console.error("🔥 API Hatası:", err);
-    return res.status(500).json({ error: "Sunucu hatası" });
+    // ✅ Hep temiz JSON dönüyor
+    return res.status(200).json({
+      ok: true,
+      query,
+      answer,
+    });
+  } catch (error) {
+    console.error("API Hatası:", error);
+    return res.status(500).json({
+      ok: false,
+      error: error.message || "Bilinmeyen sunucu hatası",
+    });
   }
 }
