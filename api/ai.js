@@ -1,39 +1,29 @@
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY, // Vercel'den alıyor
+});
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Sadece POST istekleri destekleniyor." });
+    return res.status(405).json({ error: "Only POST requests are allowed" });
   }
 
   try {
-    const { text } = req.body;
+    const { message } = req.body;
 
-    // OpenAI API çağrısı
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "Sen bir market sipariş asistanısın. Kullanıcının söylediği siparişi ürün adı, miktar ve birim olarak çıkar."
-          },
-          { role: "user", content: text }
-        ]
-      })
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Sen bir market sipariş asistanısın. Kullanıcı ürünleri sorarsa fiyata ve miktara göre net cevap ver." },
+        { role: "user", content: message }
+      ],
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || "OpenAI API hatası");
-    }
-
-    res.status(200).json(data);
+    const reply = completion.choices[0].message.content;
+    res.status(200).json({ reply });
   } catch (error) {
-    console.error("Backend Hatası:", error);
+    console.error("AI API Hatası:", error.message);
     res.status(500).json({ error: error.message });
   }
 }
