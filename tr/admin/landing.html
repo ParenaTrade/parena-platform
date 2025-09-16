@@ -1,128 +1,37 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <title>Sesli Market Asistanı (AI Destekli)</title>
-</head>
-<body>
-  <h2>🛒 Sepetiniz</h2>
-  <ul id="cart"></ul>
-
-  <button id="startBtn">🎙️ Konuşmaya Başla</button>
-
-  <script>
-    const cart = [];
-    const cartEl = document.getElementById("cart");
-
-    // 🟢 Sepet UI güncelle
-    function updateCartUI() {
-      cartEl.innerHTML = cart.map(item => `<li>${item.name} - ${item.qty} ${item.unit}</li>`).join("");
-    }
-
-    // 🟢 Sesli Yanıt
-    function speak(message) {
-      const utterance = new SpeechSynthesisUtterance(message);
-      utterance.lang = "tr-TR";
-      speechSynthesis.speak(utterance);
-    }
-
-    // 🟢 Kural Tabanlı Komutlar
-    function ruleBasedCommand(text) {
-      text = text.toLowerCase();
-      const addRegex = /(\d+)\s*(kilo|kg|adet)?\s*(\w+)\s*(ekle|istiyorum|ver)?/;
-      const removeRegex = /(çıkar|sil)\s*(\d+)?\s*(kilo|kg|adet)?\s*(\w+)/;
-
-      if (addRegex.test(text)) {
-        const match = text.match(addRegex);
-        const qty = parseInt(match[1]) || 1;
-        const unit = match[2] || "adet";
-        const product = match[3];
-
-        cart.push({ name: product, qty, unit });
-        updateCartUI();
-        speak(`${qty} ${unit} ${product} sepete eklendi Ayşe Teyze ✔️`);
-        return true;
-      }
-
-      if (removeRegex.test(text)) {
-        const match = text.match(removeRegex);
-        const product = match[4];
-        const index = cart.findIndex(i => i.name === product);
-        if (index !== -1) {
-          cart.splice(index, 1);
-          updateCartUI();
-          speak(`${product} sepetten çıkarıldı Ayşe Teyze ❌`);
-        } else {
-          speak(`${product} zaten sepetinizde yok Ayşe Teyze`);
-        }
-        return true;
-      }
-
-      return false;
-    }
-
-    // 🟢 AI fallback → OpenAI API
-    async function aiFallback(text) {
-      try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer SENIN_OPENAI_API_KEYIN"
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              { role: "system", content: "Sen bir market sipariş asistanısın. Kullanıcının söylediği siparişi ürün adı, miktar ve birim olarak çıkar." },
-              { role: "user", content: text }
-            ]
-          })
-        });
-
-        const data = await response.json();
-        const result = data.choices[0].message.content;
-
-        // 🔎 Basit parse: Örn "2 kilo domates"
-        const match = result.match(/(\d+)\s*(kilo|kg|adet)?\s*(\w+)/i);
-        if (match) {
-          const qty = parseInt(match[1]) || 1;
-          const unit = match[2] || "adet";
-          const product = match[3];
-
-          cart.push({ name: product, qty, unit });
-          updateCartUI();
-          speak(`${qty} ${unit} ${product} sepete eklendi ✔️`);
-        } else {
-          speak("Tam anlayamadım Ayşe Teyze, lütfen tekrar eder misiniz?");
-        }
-
-      } catch (err) {
-        console.error("AI Hatası:", err);
-        speak("Sistem hatası oldu Ayşe Teyze, tekrar deneyelim.");
-      }
-    }
-} catch (err) {
-  console.error("AI Hatası:", err);
-  alert("AI Hatası: " + JSON.stringify(err)); // Hata detayını gör
-  speak("Sistem hatası oldu Ayşe Teyze, tekrar deneyelim.");
-}
-
-    // 🟢 Ses Tanıma
-    document.getElementById("startBtn").addEventListener("click", () => {
-      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = "tr-TR";
-      recognition.start();
-
-      recognition.onresult = async (event) => {
-        const text = event.results[0][0].transcript;
-        console.log("🎙️ Kullanıcı dedi ki:", text);
-
-        const handled = ruleBasedCommand(text);
-        if (!handled) {
-          await aiFallback(text);
-        }
-      };
+async function aiFallback(text) {
+  try {
+    const response = await fetch("/api/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
     });
-  </script>
-</body>
-</html>
+
+    const data = await response.json();
+
+    if (data.error) {
+      console.error("API Hatası:", data.error);
+      speak("Sistem hatası oldu Ayşe Teyze.");
+      return;
+    }
+
+    const result = data.choices[0].message.content;
+    console.log("AI Yanıtı:", result);
+
+    // Basit ürün parse
+    const match = result.match(/(\d+)\s*(kilo|kg|adet)?\s*(\w+)/i);
+    if (match) {
+      const qty = parseInt(match[1]) || 1;
+      const unit = match[2] || "adet";
+      const product = match[3];
+
+      cart.push({ name: product, qty, unit });
+      updateCartUI();
+      speak(`${qty} ${unit} ${product} sepete eklendi ✔️`);
+    } else {
+      speak("Tam anlayamadım Ayşe Teyze, tekrar deneyelim.");
+    }
+  } catch (err) {
+    console.error("Frontend Hatası:", err);
+    speak("Sistem hatası oldu Ayşe Teyze.");
+  }
+}
