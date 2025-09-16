@@ -2,50 +2,40 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>Ayşe Teyze Market</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    #log { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
-    button { padding: 10px 20px; margin-top: 10px; }
-  </style>
+  <title>Ayşe Teyze Market Sipariş Sistemi</title>
 </head>
 <body>
-  <h1>🎙️ Ayşe Teyze Market Sipariş Sistemi</h1>
-  <button onclick="startListening()">Konuşmaya Başla</button>
-  <div id="log">Henüz konuşma yok...</div>
+  <h2>Ayşe Teyze Market Sipariş Sistemi</h2>
+  <button onclick="startListening()">🎙️ Konuşmaya Başla</button>
+  <div id="log"></div>
 
   <script>
-    // ✅ Normalize Türkçe karakterler
+    // Türkçe harf normalizasyonu
     function normalizeText(text) {
       return text
-        .replace(/ı/g, "i")
+        .toLowerCase()
         .replace(/ğ/g, "g")
-        .replace(/ş/g, "s")
-        .replace(/ö/g, "o")
         .replace(/ü/g, "u")
+        .replace(/ş/g, "s")
+        .replace(/ı/g, "i")
+        .replace(/ö/g, "o")
         .replace(/ç/g, "c");
     }
 
-    // ✅ SpeechRecognition tanımı
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition;
-
-    if (SpeechRecognition) {
-      recognition = new SpeechRecognition();
+    if ("webkitSpeechRecognition" in window) {
+      recognition = new webkitSpeechRecognition();
       recognition.lang = "tr-TR";
-      recognition.continuous = false;
-      recognition.interimResults = false;
     } else {
       alert("❌ Tarayıcınız ses tanımayı desteklemiyor.");
     }
 
-    // ✅ Konuşmayı başlat
     function startListening() {
       if (!recognition) return;
       recognition.start();
     }
 
-    // ✅ Konuşma sonucu
+    // Ses algılandığında
     recognition.onresult = async (event) => {
       let text = event.results[0][0].transcript;
       text = normalizeText(text);
@@ -53,26 +43,21 @@
       document.getElementById("log").innerHTML = `🎙️ Kullanıcı dedi ki: <b>${text}</b>`;
 
       try {
-        // ✅ Backend API'ye JSON gönder
+        // Backend'e gönder
         const response = await fetch("/api/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: text })
+          body: JSON.stringify({ query: text }),
         });
 
         if (!response.ok) throw new Error("API hatası: " + response.status);
 
         const data = await response.json();
 
-        // ✅ JSON temiz ekrana bas
-        document.getElementById("log").innerHTML += `<br>🤖 Yanıt: <pre>${JSON.stringify(data, null, 2)}</pre>`;
+        document.getElementById("log").innerHTML += `<br>🤖 Yanıt: ${data.reply}`;
       } catch (err) {
         document.getElementById("log").innerHTML += `<br>❌ Hata: ${err.message}`;
       }
-    };
-
-    recognition.onerror = (event) => {
-      document.getElementById("log").innerHTML = "⚠️ Hata: " + event.error;
     };
   </script>
 </body>
