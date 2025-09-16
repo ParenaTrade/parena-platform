@@ -2,49 +2,78 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>Sesli Market Asistanı (AI Destekli)</title>
+  <title>Ayşe Teyze Market</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #log { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+    button { padding: 10px 20px; margin-top: 10px; }
+  </style>
 </head>
 <body>
-  <h2>🛒 Sepetiniz</h2>
-  <ul id="cart"></ul>
-
-  <button id="startBtn">🎙️ Konuşmaya Başla</button>
+  <h1>🎙️ Ayşe Teyze Market Sipariş Sistemi</h1>
+  <button onclick="startListening()">Konuşmaya Başla</button>
+  <div id="log">Henüz konuşma yok...</div>
 
   <script>
-// --- Türkçe harfleri normalize et ---
-function normalizeTurkish(text) {
-  const map = {
-    "ç": "c",
-    "ğ": "g",
-    "ı": "i",
-    "ö": "o",
-    "ş": "s",
-    "ü": "u",
-  };
-  let normalized = text.toLowerCase();
-  normalized = normalized.replace(/[çğışöü]/g, char => map[char] || char);
-  return normalized;
-}
+    // ✅ Normalize Türkçe karakterler
+    function normalizeText(text) {
+      return text
+        .replace(/ı/g, "i")
+        .replace(/ğ/g, "g")
+        .replace(/ş/g, "s")
+        .replace(/ö/g, "o")
+        .replace(/ü/g, "u")
+        .replace(/ç/g, "c");
+    }
 
-// --- Sesli komut geldiğinde çalışacak ---
-recognition.onresult = async (event) => {
-  let transcript = event.results[event.resultIndex][0].transcript.trim();
+    // ✅ SpeechRecognition tanımı
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
 
-  console.log("🎙️ Kullanıcı dedi ki:", transcript);
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = "tr-TR";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+    } else {
+      alert("❌ Tarayıcınız ses tanımayı desteklemiyor.");
+    }
 
-  // Normalizasyon burada olacak
-  const normalizedTranscript = normalizeTurkish(transcript);
-  console.log("✅ Normalize Edildi:", normalizedTranscript);
+    // ✅ Konuşmayı başlat
+    function startListening() {
+      if (!recognition) return;
+      recognition.start();
+    }
 
-  try {
-    await processCommand(normalizedTranscript);
-  } catch (err) {
-    console.error("Komut işlenemedi:", err);
-    speak("Sistem hatası oldu Ayşe teyze, tekrar deneyiniz.");
-  }
-};
-</script>
+    // ✅ Konuşma sonucu
+    recognition.onresult = async (event) => {
+      let text = event.results[0][0].transcript;
+      text = normalizeText(text);
 
+      document.getElementById("log").innerHTML = `🎙️ Kullanıcı dedi ki: <b>${text}</b>`;
+
+      try {
+        // ✅ Backend API'ye JSON gönder
+        const response = await fetch("/api/ai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: text })
+        });
+
+        if (!response.ok) throw new Error("API hatası: " + response.status);
+
+        const data = await response.json();
+
+        // ✅ JSON temiz ekrana bas
+        document.getElementById("log").innerHTML += `<br>🤖 Yanıt: <pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        document.getElementById("log").innerHTML += `<br>❌ Hata: ${err.message}`;
+      }
+    };
+
+    recognition.onerror = (event) => {
+      document.getElementById("log").innerHTML = "⚠️ Hata: " + event.error;
+    };
+  </script>
 </body>
-
 </html>
