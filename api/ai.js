@@ -2,7 +2,7 @@
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // ✅ Vercel env'den alacak
+  apiKey: process.env.OPENAI_API_KEY, // Vercel env'den al
 });
 
 export default async function handler(req, res) {
@@ -11,35 +11,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 🔑 Body parse et
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const { query } = body;
+    // Gelen body'yi parse et
+    const { query } = await req.json ? await req.json() : req.body;
 
     if (!query) {
-      return res.status(400).json({ error: "query alanı gerekli" });
+      return res.status(400).json({ error: "Sorgu boş olamaz" });
     }
 
-    // ✅ OpenAI çağrısı
+    // OpenAI çağrısı
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // hızlı ve uygun maliyetli
       messages: [
-        { role: "system", content: "Sen bir market sipariş asistanısın. Kullanıcıdan ürün ve miktar al." },
-        { role: "user", content: query },
+        { role: "system", content: "Sen bir market sipariş asistanısın." },
+        { role: "user", content: query }
       ],
     });
 
     const answer = completion.choices[0].message.content;
 
-    return res.status(200).json({
-      ok: true,
-      query,
-      answer,
-    });
+    return res.status(200).json({ reply: answer });
+
   } catch (error) {
     console.error("API Hatası:", error);
-    return res.status(500).json({
-      ok: false,
-      error: error.message || "Bilinmeyen sunucu hatası",
-    });
+    return res.status(500).json({ error: error.message });
   }
 }
