@@ -11,112 +11,40 @@
   <button id="startBtn">🎙️ Konuşmaya Başla</button>
 
   <script>
-    const cart = [];
-    const cartEl = document.getElementById("cart");
-
-    // 🟢 Sepet UI güncelle
-    function updateCartUI() {
-      cartEl.innerHTML = cart.map(item => `<li>${item.name} - ${item.qty} ${item.unit}</li>`).join("");
-    }
-
-    // 🟢 Sesli Yanıt
-    function speak(message) {
-      const utterance = new SpeechSynthesisUtterance(message);
-      utterance.lang = "tr-TR";
-      speechSynthesis.speak(utterance);
-    }
-
-    // 🟢 Kural Tabanlı Komutlar
-    function ruleBasedCommand(text) {
-      text = text.toLowerCase();
-      const addRegex = /(\d+)\s*(kilo|kg|adet)?\s*(\w+)\s*(ekle|istiyorum|ver)?/;
-      const removeRegex = /(çıkar|sil)\s*(\d+)?\s*(kilo|kg|adet)?\s*(\w+)/;
-
-      if (addRegex.test(text)) {
-        const match = text.match(addRegex);
-        const qty = parseInt(match[1]) || 1;
-        const unit = match[2] || "adet";
-        const product = match[3];
-
-        cart.push({ name: product, qty, unit });
-        updateCartUI();
-        speak(`${qty} ${unit} ${product} sepete eklendi Ayşe Teyze ✔️`);
-        return true;
-      }
-
-      if (removeRegex.test(text)) {
-        const match = text.match(removeRegex);
-        const product = match[4];
-        const index = cart.findIndex(i => i.name === product);
-        if (index !== -1) {
-          cart.splice(index, 1);
-          updateCartUI();
-          speak(`${product} sepetten çıkarıldı Ayşe Teyze ❌`);
-        } else {
-          speak(`${product} zaten sepetinizde yok Ayşe Teyze`);
-        }
-        return true;
-      }
-
-      return false;
-    }
-
-    // 🟢 AI fallback → OpenAI API
-   async function aiFallback(text) {
-  try {
-    const response = await fetch("/api/ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    });
-
-    const data = await response.json();
-
-    if (data.error) {
-      console.error("API Hatası:", data.error);
-      speak("Sistem hatası oldu Ayşe Teyze.");
-      return;
-    }
-
-    const result = data.choices[0].message.content;
-    console.log("AI Yanıtı:", result);
-
-    // Basit ürün parse
-    const match = result.match(/(\d+)\s*(kilo|kg|adet)?\s*(\w+)/i);
-    if (match) {
-      const qty = parseInt(match[1]) || 1;
-      const unit = match[2] || "adet";
-      const product = match[3];
-
-      cart.push({ name: product, qty, unit });
-      updateCartUI();
-      speak(`${qty} ${unit} ${product} sepete eklendi ✔️`);
-    } else {
-      speak("Tam anlayamadım Ayşe Teyze, tekrar deneyelim.");
-    }
-  } catch (err) {
-    console.error("Frontend Hatası:", err);
-    speak("Sistem hatası oldu Ayşe Teyze.");
-  }
+// --- Türkçe harfleri normalize et ---
+function normalizeTurkish(text) {
+  const map = {
+    "ç": "c",
+    "ğ": "g",
+    "ı": "i",
+    "ö": "o",
+    "ş": "s",
+    "ü": "u",
+  };
+  let normalized = text.toLowerCase();
+  normalized = normalized.replace(/[çğışöü]/g, char => map[char] || char);
+  return normalized;
 }
 
-        
-    // 🟢 Ses Tanıma
-    document.getElementById("startBtn").addEventListener("click", () => {
-      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = "tr-TR";
-      recognition.start();
+// --- Sesli komut geldiğinde çalışacak ---
+recognition.onresult = async (event) => {
+  let transcript = event.results[event.resultIndex][0].transcript.trim();
 
-      recognition.onresult = async (event) => {
-        const text = event.results[0][0].transcript;
-        console.log("🎙️ Kullanıcı dedi ki:", text);
+  console.log("🎙️ Kullanıcı dedi ki:", transcript);
 
-        const handled = ruleBasedCommand(text);
-        if (!handled) {
-          await aiFallback(text);
-        }
-      };
-    });
-  </script>
+  // Normalizasyon burada olacak
+  const normalizedTranscript = normalizeTurkish(transcript);
+  console.log("✅ Normalize Edildi:", normalizedTranscript);
+
+  try {
+    await processCommand(normalizedTranscript);
+  } catch (err) {
+    console.error("Komut işlenemedi:", err);
+    speak("Sistem hatası oldu Ayşe teyze, tekrar deneyiniz.");
+  }
+};
+</script>
+
 </body>
+
 </html>
