@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <title>Aylık Referral Bonus Raporu</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; background: #f7f7f7; }
+    select, button { padding: 6px 10px; margin-right: 10px; }
+    table { border-collapse: collapse; margin-top: 1rem; background: white; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #eee; }
+  </style>
+</head>
+<body>
+  <h1>Aylık Referral Bonus Raporu</h1>
+
+  <label>Yıl: 
+    <select id="yearSelect"></select>
+  </label>
+  <label>Ay: 
+    <select id="monthSelect">
+      <option value="">-- Hepsi --</option>
+      <option value="1">Ocak</option>
+      <option value="2">Şubat</option>
+      <option value="3">Mart</option>
+      <option value="4">Nisan</option>
+      <option value="5">Mayıs</option>
+      <option value="6">Haziran</option>
+      <option value="7">Temmuz</option>
+      <option value="8">Ağustos</option>
+      <option value="9">Eylül</option>
+      <option value="10">Ekim</option>
+      <option value="11">Kasım</option>
+      <option value="12">Aralık</option>
+    </select>
+  </label>
+  <button onclick="fetchReport()">Getir</button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Ay</th>
+        <th>Link ID</th>
+        <th>Referrer</th>
+        <th>Üye Sayısı</th>
+        <th>Toplam Ciro (₺)</th>
+        <th>Ciro Bonus (₺)</th>
+      </tr>
+    </thead>
+    <tbody id="reportBody">
+      <tr><td colspan="6">Henüz veri yok</td></tr>
+    </tbody>
+  </table>
+
+<script>
+  // ---- SUPABASE BAĞLANTISI ----
+  const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
+  const SUPABASE_KEY = "YOUR_PUBLIC_ANON_KEY";
+  const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // Yıl seçeneklerini doldur
+  const yearSelect = document.getElementById("yearSelect");
+  const now = new Date().getFullYear();
+  for (let y = now; y >= now - 5; y--) {
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.textContent = y;
+    yearSelect.appendChild(opt);
+  }
+  yearSelect.value = now;
+
+  async function fetchReport() {
+    const year = yearSelect.value;
+    const month = document.getElementById("monthSelect").value;
+
+    let { data, error } = await supabase
+      .from("referral_bonus_monthly")
+      .select("*")
+      .order("ay", { ascending: false })
+      .limit(1000);
+
+    if (error) {
+      console.error(error);
+      alert("Hata: " + error.message);
+      return;
+    }
+
+    // Filtrele
+    data = data.filter(r => {
+      const d = new Date(r.ay);
+      if (year && d.getFullYear() != year) return false;
+      if (month && (d.getMonth() + 1) != month) return false;
+      return true;
+    });
+
+    // Tabloya bas
+    const tbody = document.getElementById("reportBody");
+    tbody.innerHTML = "";
+    if (data.length === 0) {
+      tbody.innerHTML = "<tr><td colspan='6'>Kayıt yok</td></tr>";
+      return;
+    }
+
+    data.forEach(r => {
+      const d = new Date(r.ay);
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}</td>
+        <td>${r.link_id}</td>
+        <td>${r.referrer_id}</td>
+        <td>${r.uye_sayisi || 0}</td>
+        <td>${Number(r.toplam_ciro||0).toLocaleString("tr-TR",{minimumFractionDigits:2})}</td>
+        <td>${Number(r.ciro_bonus||0).toLocaleString("tr-TR",{minimumFractionDigits:2})}</td>
+      `;
+      tbody.appendChild(row);
+    });
+  }
+</script>
+</body>
+</html>
