@@ -3,22 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reyon + Ürünler</title>
+  <title>Sesli Sepet</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .active-reyon {
-      transform: scale(1.2) translateY(-20px);
-      z-index: 10;
-    }
-    .inactive-left {
-      transform: translateX(-80px) scale(0.9);
-      opacity: 0.6;
-    }
-    .inactive-right {
-      transform: translateX(80px) scale(0.9);
-      opacity: 0.6;
-    }
-    .transition-anim { transition: all 0.6s ease; }
     .shake { animation: shake 0.5s; }
     @keyframes shake {
       0% { transform: rotate(0deg); }
@@ -27,131 +14,139 @@
       75% { transform: rotate(-10deg); }
       100% { transform: rotate(0deg); }
     }
+    .fly {
+      position: absolute;
+      z-index: 1000;
+      transition: all 0.8s ease-in-out;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body class="bg-gray-100">
 
-  <h1 class="text-2xl font-bold text-center py-6">Market Reyonları</h1>
-
-  <!-- Reyonlar -->
-  <div id="reyonlar" class="flex justify-center gap-6 px-6 mb-6"></div>
+  <h1 class="text-2xl font-bold text-center py-6">Manav Reyonu</h1>
 
   <!-- Ürünler -->
-  <div id="urunler" class="grid grid-cols-2 md:grid-cols-3 gap-6 px-6 hidden"></div>
+  <div id="urunler" class="grid grid-cols-2 md:grid-cols-3 gap-6 px-6">
+    <div class="bg-white rounded-xl shadow p-4 flex flex-col items-center">
+      <img src="https://cdn-icons-png.flaticon.com/512/766/766741.png" alt="Domates" class="w-16 h-16 mb-2">
+      <h4 class="font-semibold">Domates</h4>
+      <p class="text-sm text-gray-600">40 ₺</p>
+      <button onclick="addToCart('Domates','https://cdn-icons-png.flaticon.com/512/766/766741.png')" 
+        class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Sepete Ekle</button>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 flex flex-col items-center">
+      <img src="https://cdn-icons-png.flaticon.com/512/135/135620.png" alt="Soğan" class="w-16 h-16 mb-2">
+      <h4 class="font-semibold">Soğan</h4>
+      <p class="text-sm text-gray-600">20 ₺</p>
+      <button onclick="addToCart('Soğan','https://cdn-icons-png.flaticon.com/512/135/135620.png')" 
+        class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Sepete Ekle</button>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 flex flex-col items-center">
+      <img src="https://cdn-icons-png.flaticon.com/512/706/706164.png" alt="Patlıcan" class="w-16 h-16 mb-2">
+      <h4 class="font-semibold">Patlıcan</h4>
+      <p class="text-sm text-gray-600">35 ₺</p>
+      <button onclick="addToCart('Patlıcan','https://cdn-icons-png.flaticon.com/512/706/706164.png')" 
+        class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Sepete Ekle</button>
+    </div>
+  </div>
 
   <!-- Sepet -->
   <div id="cart" class="fixed bottom-6 right-6 bg-green-500 text-white p-4 rounded-full shadow-lg cursor-pointer">
     🛒 <span id="cart-count">0</span>
   </div>
 
-  <script>
-    const reyonData = [
-      { 
-        name: "Manav", img: "reyon_images/manav.png", 
-        products: [
-          { name: "Domates", price: 40, img: "reyon_images/domates.png" },
-          { name: "Soğan", price: 20, img: "reyon_images/sogan.png" },
-          { name: "Patlıcan", price: 35, img: "reyon_images/patlican.png" }
-        ]
-      },
-      { name: "İçecek", img: "reyon_images/icecek.png", products: [
-          { name: "Kola", price: 25, img: "reyon_images/kola.png" },
-          { name: "Ayran", price: 10, img: "reyon_images/ayran.png" }
-        ]
-      },
-      { name: "Temel Gıda", img: "reyon_images/temel-gida.png", products: [] }
-    ];
+  <!-- Sepet listesi -->
+  <div id="cart-list" class="hidden fixed bottom-20 right-6 bg-white shadow-xl rounded-xl p-4 w-64">
+    <h3 class="font-bold mb-2">Sepetim</h3>
+    <ul id="cart-items" class="space-y-1 text-sm"></ul>
+  </div>
 
-    const reyonlar = document.getElementById("reyonlar");
-    const urunler = document.getElementById("urunler");
+  <script>
+    let count = 0;
+    let cartItems = [];
+
     const cart = document.getElementById("cart");
     const cartCount = document.getElementById("cart-count");
-    let count = 0;
+    const cartList = document.getElementById("cart-list");
+    const cartItemsEl = document.getElementById("cart-items");
 
-    // Reyonları çiz
-    reyonData.forEach((reyon, i) => {
-      const card = document.createElement("div");
-      card.className =
-        "bg-white rounded-2xl shadow-lg transition-anim cursor-pointer flex flex-col items-center p-4 w-40 h-40";
-      card.innerHTML = `
-        <img src="${reyon.img}" alt="${reyon.name}" class="w-20 h-20 object-contain mb-2">
-        <h3 class="font-semibold">${reyon.name}</h3>
-      `;
-      card.dataset.index = i;
-      card.dataset.name = reyon.name;
-      reyonlar.appendChild(card);
+    // Ürün listesi (isim → görsel eşleşmesi için)
+    const productMap = {
+      "domates": "https://cdn-icons-png.flaticon.com/512/766/766741.png",
+      "soğan": "https://cdn-icons-png.flaticon.com/512/135/135620.png",
+      "patlıcan": "https://cdn-icons-png.flaticon.com/512/706/706164.png"
+    };
 
-      // Tıklanınca fokus
-      card.addEventListener("click", () => focusReyon(reyon.name));
+    // Sepeti aç/kapat
+    cart.addEventListener("click", () => {
+      cartList.classList.toggle("hidden");
     });
 
-    function focusReyon(name) {
-      const cards = document.querySelectorAll("#reyonlar div");
-      let activeIndex = -1;
-
-      cards.forEach((card, i) => {
-        card.classList.remove("active-reyon","inactive-left","inactive-right");
-        if (card.dataset.name === name) activeIndex = i;
-      });
-
-      cards.forEach((card, i) => {
-        if (i === activeIndex) {
-          card.classList.add("active-reyon");
-        } else if (i < activeIndex) {
-          card.classList.add("inactive-left");
-        } else {
-          card.classList.add("inactive-right");
-        }
-      });
-
-      // Ürünleri aç
-      showProducts(name);
-    }
-
-    function showProducts(reyonName) {
-      urunler.innerHTML = "";
-      const reyon = reyonData.find(r => r.name === reyonName);
-      if (!reyon) return;
-
-      if (reyon.products.length === 0) {
-        urunler.innerHTML = `<div class="col-span-3 text-center text-gray-500">Ürün bulunamadı</div>`;
-      } else {
-        reyon.products.forEach(p => {
-          const card = document.createElement("div");
-          card.className = "bg-white rounded-xl shadow p-4 flex flex-col items-center";
-          card.innerHTML = `
-            <img src="${p.img}" alt="${p.name}" class="w-16 h-16 object-contain mb-2">
-            <h4 class="font-semibold">${p.name}</h4>
-            <p class="text-sm text-gray-600">${p.price} ₺</p>
-            <button class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Sepete Ekle</button>
-          `;
-          card.querySelector("button").addEventListener("click", () => addToCart(p));
-          urunler.appendChild(card);
-        });
-      }
-      urunler.classList.remove("hidden");
-    }
-
-    function addToCart(product) {
+    function addToCart(name, imgUrl) {
       count++;
       cartCount.textContent = count;
       cart.classList.add("shake");
       setTimeout(() => cart.classList.remove("shake"), 500);
-      console.log("Sepete eklendi:", product.name);
+
+      cartItems.push(name);
+      renderCart();
+
+      flyToCart(imgUrl);
     }
 
-    // Sesle komut (Web Speech API basit)
+    function renderCart() {
+      cartItemsEl.innerHTML = "";
+      cartItems.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = `• ${item}`;
+        cartItemsEl.appendChild(li);
+      });
+    }
+
+    function flyToCart(imgUrl) {
+      const img = document.createElement("img");
+      img.src = imgUrl;
+      img.className = "fly w-12 h-12 rounded-full";
+      document.body.appendChild(img);
+
+      img.style.top = "200px";
+      img.style.left = "200px";
+
+      setTimeout(() => {
+        const cartRect = cart.getBoundingClientRect();
+        img.style.top = cartRect.top + "px";
+        img.style.left = cartRect.left + "px";
+        img.style.width = "20px";
+        img.style.height = "20px";
+        img.style.opacity = "0";
+      }, 50);
+
+      setTimeout(() => img.remove(), 900);
+    }
+
+    // 🔊 Ses tanıma
     window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = "tr-TR";
     recognition.continuous = true;
 
     recognition.onresult = (e) => {
-      const transcript = e.results[e.results.length - 1][0].transcript.trim();
+      const transcript = e.results[e.results.length - 1][0].transcript.toLowerCase().trim();
       console.log("Ses:", transcript);
-      if (transcript.toLowerCase().includes("domates")) focusReyon("Manav");
-      if (transcript.toLowerCase().includes("kola")) focusReyon("İçecek");
-      if (transcript.toLowerCase().includes("soğan")) addToCart({name:"Soğan"});
+
+      // Miktarı yakala (örn: "2 kilo domates")
+      const qtyMatch = transcript.match(/(\d+)\s*(kilo|adet)?/);
+      const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+
+      // Ürün adı yakala
+      for (let product in productMap) {
+        if (transcript.includes(product)) {
+          for (let i = 0; i < qty; i++) {
+            addToCart(product.charAt(0).toUpperCase() + product.slice(1), productMap[product]);
+          }
+        }
+      }
     };
 
     recognition.start();
