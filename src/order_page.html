@@ -1,638 +1,321 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Sipariş Sayfası — Onur Market</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hızlı Sipariş Sistemi</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <style>
-  .fly { position:absolute; z-index:9999; transition: all 0.85s ease-in-out; pointer-events:none; }
-  .shake { animation: shake 0.5s; }
-  @keyframes shake { 0%{transform:rotate(0)}25%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}75%{transform:rotate(-8deg)}100%{transform:rotate(0)}}
-  .card { transition: transform .25s ease, box-shadow .25s ease; }
-  .card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 10px 25px rgba(0,0,0,0.12); }
+  .reyon { perspective: 800px; cursor: pointer; }
+  .reyon-inner { transition: transform 0.5s; transform-style: preserve-3d; }
+  .reyon:hover .reyon-inner { transform: rotateY(15deg) scale(1.05); }
+  .urun-card { transition: transform 0.3s; }
+  .urun-card:hover { transform: rotateY(10deg) scale(1.05); }
+  .fade-in { animation: fadeIn 0.5s forwards; }
+  @keyframes fadeIn { from {opacity:0;} to{opacity:1;} }
+  /* Modal */
+  .modal-bg { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; justify-content:center; align-items:center; }
+  .modal-content { background:white; padding:20px; border-radius:10px; max-width:400px; width:90%; max-height:80%; overflow:auto; }
 </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
+<body class="bg-gray-100 font-sans">
 
-<div class="max-w-7xl mx-auto p-6">
-  <header class="flex items-center justify-between mb-6">
+<header class="text-center py-8 bg-green-600 text-white">
+  <h1 class="text-3xl font-bold">Hızlı Sipariş Sistemi</h1>
+  <p class="mt-2">Sadece konuş, siparişin hazırlansın!</p>
+</header>
+
+<!-- Lokasyon ve Satıcı -->
+<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">Lokasyon ve Satıcı</h2>
+  <button id="locBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Konumumu Kullan</button>
+  <select id="saticiSelect" class="w-full p-2 border rounded mt-2 hidden">
+    <option value="">Satıcı seçin</option>
+  </select>
+  <p id="noSatici" class="mt-2 text-red-600 hidden">Bölgede satıcı bulunamadı.</p>
+</section>
+
+<!-- Reyonlar -->
+<section id="reyonSection" class="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 my-6 px-4 hidden"></section>
+
+<!-- Ürün Listesi ve Sepet -->
+<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">Sepet ve Ürün Seçimi</h2>
+  <ul id="sepet" class="mb-4"></ul>
+  <div id="urunPanel" class="hidden">
+    <h3 class="font-semibold mb-2" id="urunReyon"></h3>
+    <div id="urunlerContainer" class="grid grid-cols-2 gap-2"></div>
+  </div>
+
+  <!-- Sepet Finansal Özet -->
+  <div id="sepetOzet" class="mt-4 p-2 border-t border-gray-300">
+    <p>Toplam Tutar: ₺<span id="toplamTutar">0</span></p>
+    <p>İndirim: ₺<span id="indirim">0</span></p>
+    <p>KDV (18%): ₺<span id="kdv">0</span></p>
+    <p class="font-bold">Genel Toplam: ₺<span id="genelToplam">0</span></p>
+    <button id="detayBtn" class="mt-2 bg-gray-700 text-white px-4 py-2 rounded">Sipariş Detaylarını Gör</button>
+  </div>
+</section>
+
+<!-- Profil & Bonus -->
+<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow">
+  <h2 class="text-xl font-semibold mb-2">Profil & Bonus</h2>
+  <div class="flex items-center gap-4 mb-2">
+    <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="Profil" class="w-12 h-12 rounded-full">
     <div>
-      <h1 class="text-2xl font-bold">Sipariş Sayfası</h1>
-      <p class="text-sm text-gray-500">Profilim → Bilgilerim / Bonuslarım / Siparişlerim / Ödemelerim</p>
+      <p id="userName" class="font-semibold">Ayşe Teyze</p>
+      <p id="userEmail" class="text-gray-600 text-sm">ayse@example.com</p>
     </div>
-    <div id="userBox" class="text-right">
-      <div id="userName" class="font-semibold">Giriş yapılmadı</div>
-      <div id="userMeta" class="text-sm text-gray-500"></div>
-    </div>
-  </header>
+  </div>
+  <div class="mb-2">
+    <p>Kazanılan Bonus: <span id="kazananBonus">0</span> puan</p>
+    <p>Harcanan Bonus: <span id="harcananBonus">0</span> puan</p>
+    <p>Kalan Bonus: <span id="kalanBonus">0</span> puan</p>
+  </div>
+</section>
 
-  <main class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+<!-- Ödeme Butonları -->
+<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow text-center">
+  <h2 class="text-xl font-semibold mb-2">Ödeme Seçenekleri</h2>
+  <div class="flex flex-col sm:flex-row gap-2 mt-4">
+    <button id="payNakit" class="bg-gray-600 text-white px-4 py-2 rounded flex-1">Kapıda Nakit</button>
+    <button id="payKart" class="bg-blue-600 text-white px-4 py-2 rounded flex-1">Kapıda Kredi Kartı</button>
+    <button id="payBonus" class="bg-green-600 text-white px-4 py-2 rounded flex-1">Bonusla Ödeme</button>
+  </div>
+</section>
 
-    <!-- LEFT: Seller & Filters -->
-    <aside class="col-span-1 bg-white rounded shadow p-4">
-      <h2 class="font-semibold mb-2">Satıcı & Filtreler</h2>
+<!-- Sesli Sipariş -->
+<section class="max-w-xl mx-auto my-6 text-center">
+  <button id="startVoice" class="bg-blue-600 text-white px-6 py-3 rounded text-lg">Sesli Sipariş Başlat</button>
+</section>
 
-      <div class="mb-3">
-        <label class="block text-sm text-gray-600 mb-1">Satıcınız (lokasyona göre)</label>
-        <select id="sellerSelect" class="w-full border rounded px-3 py-2">
-          <option value="">-- Satıcı seçin --</option>
-        </select>
-      </div>
+<!-- WhatsApp Referans -->
+<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow text-center">
+  <h2 class="text-xl font-semibold mb-2">Arkadaşına Gönder</h2>
+  <button id="shareBtn" class="bg-green-600 text-white px-6 py-3 rounded text-lg">
+    Referans Linki WhatsApp’a Gönder
+  </button>
+</section>
 
-      <div class="mb-3">
-        <label class="block text-sm text-gray-600 mb-1">Reyon</label>
-        <select id="reyonSelect" class="w-full border rounded px-3 py-2">
-          <option value="">-- Reyon seçin --</option>
-        </select>
-      </div>
-
-      <div class="mb-3">
-        <label class="block text-sm text-gray-600 mb-1">Kategori</label>
-        <select id="categorySelect" class="w-full border rounded px-3 py-2">
-          <option value="">-- Kategori seçin --</option>
-        </select>
-      </div>
-
-      <div class="mb-3">
-        <label class="block text-sm text-gray-600 mb-1">Ürün</label>
-        <select id="productSelect" class="w-full border rounded px-3 py-2">
-          <option value="">-- Ürün seçin --</option>
-        </select>
-      </div>
-
-      <div class="flex gap-2">
-        <button id="btnLoadProducts" class="bg-green-600 text-white px-3 py-2 rounded">Ürünleri Yükle</button>
-        <button id="btnShareRef" class="bg-blue-600 text-white px-3 py-2 rounded flex-1">Referans Linki Gönder</button>
-      </div>
-
-      <hr class="my-3" />
-
-      <div>
-        <h3 class="text-sm font-semibold mb-1">Profilim</h3>
-        <div id="profileInfo" class="text-sm text-gray-700">
-          <!-- doldurulacak -->
-          <div>Adı Soyadı: <span id="p_name">-</span></div>
-          <div>Telefon: <span id="p_phone">-</span></div>
-          <div>Rol: <span id="p_role">-</span></div>
-          <div>Adres / Şehir: <span id="p_address">-</span> / <span id="p_city">-</span></div>
-          <div class="mt-2">Bonus Kalan: <strong id="p_bonus">0 ₺</strong></div>
-        </div>
-      </div>
-    </aside>
-
-    <!-- MIDDLE: Products -->
-    <section class="col-span-2 bg-white rounded shadow p-4">
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <input id="voiceBtn" type="button" class="px-3 py-2 bg-yellow-500 rounded text-white" value="Sesle Sipariş Başlat (Dinle)">
-          <span id="voiceStatus" class="ml-3 text-sm text-gray-500"></span>
-        </div>
-        <div class="text-sm text-gray-600">Reyon → Kategori → Ürün seçerek veya sesle ürün ekleyin</div>
-      </div>
-
-      <div id="productsGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <!-- ürün kartları buraya -->
-      </div>
-    </section>
-
-    <!-- RIGHT: Cart -->
-    <aside class="col-span-1 bg-white rounded shadow p-4">
-      <h2 class="font-semibold mb-2">Sepet</h2>
-      <div id="cartList" class="space-y-2 max-h-[420px] overflow-y-auto mb-3">
-        <div class="text-sm text-gray-500">Sepete ürün ekleyin</div>
-      </div>
-
-      <div class="border-t pt-3">
-        <div class="flex justify-between">
-          <div>Ara Toplam</div><div id="subtotal">0 ₺</div>
-        </div>
-        <div class="flex justify-between">
-          <div>İndirim</div><div id="discount">0 ₺</div>
-        </div>
-        <div class="flex justify-between">
-          <div>KDV (<span id="vatRate">18</span>%)</div><div id="vatAmount">0 ₺</div>
-        </div>
-        <div class="flex justify-between font-bold mt-2">
-          <div>Genel Toplam</div><div id="totalAmount">0 ₺</div>
-        </div>
-
-        <div class="mt-3 space-y-2">
-          <button id="payCash" class="w-full bg-green-600 text-white py-2 rounded">Kapıda Nakit</button>
-          <button id="payCard" class="w-full bg-blue-600 text-white py-2 rounded">Kapıda Kredi Kartı</button>
-          <button id="payBonus" class="w-full bg-purple-600 text-white py-2 rounded">Bonus ile Ödeme</button>
-        </div>
-      </div>
-    </aside>
-
-  </main>
+<!-- Modal -->
+<div id="modal" class="modal-bg flex">
+  <div class="modal-content">
+    <h3 class="text-lg font-semibold mb-2">Sipariş Detayları</h3>
+    <ul id="modalSepet" class="mb-2"></ul>
+    <p>Toplam: ₺<span id="modalToplam">0</span></p>
+    <p>İndirim: ₺<span id="modalIndirim">0</span></p>
+    <p>KDV: ₺<span id="modalKdv">0</span></p>
+    <p class="font-bold">Genel Toplam: ₺<span id="modalGenelToplam">0</span></p>
+    <button id="closeModal" class="mt-2 bg-red-600 text-white px-4 py-2 rounded">Kapat</button>
+  </div>
 </div>
 
-<!-- Supabase JS -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
 <script>
-/* =================== CONFIG =================== */
+// Supabase client
 const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
-const { createClient } = supabase;
-const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-/* =============================================== */
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ====== Uygulama state ====== */
-let currentUser = null;
-let currentProfile = null;
-let sellers = [];      // seller profiles list
-let reyonlar = [];     // current seller reyon list
-let categories = [];   // categories for selected reyon
-let products = [];     // products list for selected seller / category
-let productPrices = {}; // map product_id -> price (from product_prices)
-let cart = [];         // { product_id, name, img, price, qty }
+// DOM Elements
+const sepet = document.getElementById('sepet');
+const urunPanel = document.getElementById('urunPanel');
+const urunReyon = document.getElementById('urunReyon');
+const urunlerContainer = document.getElementById('urunlerContainer');
+const saticiSelect = document.getElementById('saticiSelect');
+const noSatici = document.getElementById('noSatici');
+const reyonSection = document.getElementById('reyonSection');
+const toplamTutarEl = document.getElementById('toplamTutar');
+const indirimEl = document.getElementById('indirim');
+const kdvEl = document.getElementById('kdv');
+const genelToplamEl = document.getElementById('genelToplam');
+const kazanilanBonusEl = document.getElementById('kazananBonus');
+const harcananBonusEl = document.getElementById('harcananBonus');
+const kalanBonusEl = document.getElementById('kalanBonus');
 
-/* VAT ve discount config */
-const VAT_RATE = 18; // yüzde
+let mevcutBonus = 120;
+let harcananBonus = 0;
+let urunlerData = [];
+let saticilarData = [];
 
-/* DOM */
-const userNameEl = document.getElementById("userName");
-const userMetaEl = document.getElementById("userMeta");
-const p_name = document.getElementById("p_name");
-const p_phone = document.getElementById("p_phone");
-const p_role = document.getElementById("p_role");
-const p_address = document.getElementById("p_address");
-const p_city = document.getElementById("p_city");
-const p_bonus = document.getElementById("p_bonus");
-const sellerSelect = document.getElementById("sellerSelect");
-const reyonSelect = document.getElementById("reyonSelect");
-const categorySelect = document.getElementById("categorySelect");
-const productSelect = document.getElementById("productSelect");
-const productsGrid = document.getElementById("productsGrid");
-const cartList = document.getElementById("cartList");
-const subtotalEl = document.getElementById("subtotal");
-const discountEl = document.getElementById("discount");
-const vatAmountEl = document.getElementById("vatAmount");
-const totalAmountEl = document.getElementById("totalAmount");
-const btnLoadProducts = document.getElementById("btnLoadProducts");
-const btnShareRef = document.getElementById("btnShareRef");
-const voiceBtn = document.getElementById("voiceBtn");
-const voiceStatus = document.getElementById("voiceStatus");
-
-/* ====== Initialize ====== */
-(async function init(){
-  await loadProfile();
-  await loadSellersByLocation();
-  setupEventHandlers();
-  await loadReferralSummary(); // show user's bonus summary
-})();
-
-/* ====== Helpers ====== */
-function money(n){ return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; }
-
-// Profil yükle
-async function loadProfile() {
-  const { data: { session } } = await client.auth.getSession();
-  if (!session) {
-    document.getElementById("profile-info").innerText = "Oturum yok!";
-    return;
-  }
-  const userId = session.user.id;
-  const { data, error } = await client.from("profiles").select("full_name, role, phone, address, city").eq("id", userId).single();
-  if (error) {
-    document.getElementById("profile-info").innerText = "Hata: " + error.message;
-  } else {
-    document.getElementById("profile-info").innerText =
-      `Ad: ${data.full_name} | Rol: ${data.role} | Tel: ${data.phone} | Adres: ${data.address} / ${data.city}`;
-  }
- }
-
-/* ====== Seller loading by location ====== */
-async function loadSellersByLocation(){
-  if (!currentProfile?.location) {
-    sellerSelect.innerHTML = '<option value="">-- Lokasyon yok --</option>';
-    return;
-  }
-  // query profiles where role = 'market' and location matches
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, full_name, phone, city, location')
-    .eq('role', 'market')
-    .eq('location', currentProfile.location)
-    .limit(100);
-
-  if (error) { console.error(error); return; }
-  sellers = data || [];
-  sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
-  sellers.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = `${s.full_name || s.phone || s.id}`;
-    sellerSelect.appendChild(opt);
-  });
-}
-
-/* ====== Load reyon / categories / products for a seller ====== */
-async function loadSellerData(sellerId){
-  // REYON: common schema is 'reyon' table with fields id,name,image_url,seller_id|owner_id
-  let { data: reyonData, error: er1 } = await supabase
-    .from('reyon')
-    .select('id, name, image_url')
-    .or(`seller_id.eq.${sellerId},owner_id.eq.${sellerId}`)
-    .limit(200);
-
-  if (er1) {
-    // fallback: try without seller filter
-    const resp = await supabase.from('reyon').select('id,name,image_url').limit(200);
-    reyonData = resp.data || [];
-  }
-  reyonlar = reyonData || [];
-  reyonSelect.innerHTML = '<option value="">-- Reyon seçin --</option>';
-  reyonlar.forEach(r => { const o = document.createElement('option'); o.value = r.id; o.textContent = r.name; reyonSelect.appendChild(o); });
-
-  // categories: categories table with reyon_id
-  const { data: catData } = await supabase
-    .from('categories')
-    .select('id, name, reyon_id')
-    .in('reyon_id', reyonlar.map(r=>r.id))
-    .limit(100);
-  categories = catData || [];
-  categorySelect.innerHTML = '<option value="">-- Kategori seçin --</option>';
-  categories.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; categorySelect.appendChild(o); });
-
-  // products: try product_prices join to get prices for seller branch if product_prices uses sube_id
-  await loadProductsForSeller(sellerId);
-}
-
-async function loadProductsForSeller(sellerId){
-  // First try to get product_prices rows for this seller/sube
-  const { data: pp, error: ppErr } = await supabase
-    .from('product_prices')
-    .select('product_id, price, sube_id')
-    .eq('sube_id', sellerId)
-    .limit(1000);
-
-  productPrices = {};
-  (pp || []).forEach(r => productPrices[r.product_id] = r.price);
-
-  // Now fetch product records for this seller: either products.seller_id or urun table
-  let prods = [];
-  let { data: p1, error: e1 } = await supabase
-    .from('products')
-    .select('id, name, imgurl, category_id, seller_id, barcode, brand')
-    .eq('seller_id', sellerId)
-    .limit(1000);
-
-  if (!e1 && p1 && p1.length) {
-    prods = p1;
-  } else {
-    // fallback to urun table (if exists)
-    const { data: p2, error: e2 } = await supabase
-      .from('urun')
-      .select('id, name, imgurl, category_id, barcode, brand')
-      .limit(1000);
-    if (!e2) prods = p2 || [];
-  }
-
-  products = (prods || []).map(p => ({
-    id: p.id, name: p.name, img: p.imgurl || '', category_id: p.category_id, price: productPrices[p.id] ?? p.price ?? 0, barcode: p.barcode
-  }));
-  renderProductsGrid(products);
-  // populate productSelect for quick selection
-  productSelect.innerHTML = '<option value="">-- Ürün seçin --</option>';
-  products.forEach(pr => {
-    const o = document.createElement('option'); o.value = pr.id; o.textContent = pr.name; productSelect.appendChild(o);
-  });
-}
-
-/* ====== Render products cards ====== */
-function renderProductsGrid(list){
-  productsGrid.innerHTML = '';
-  if (!list || list.length === 0) {
-    productsGrid.innerHTML = '<div class="text-gray-500">Ürün yok</div>';
-    return;
-  }
-  list.forEach(p => {
-    const card = document.createElement('div');
-    card.className = 'card bg-white rounded-lg p-3 flex flex-col items-center';
-    card.innerHTML = `
-      <img src="${p.img || 'https://via.placeholder.com/120x80?text=Ürün'}" class="w-28 h-20 object-contain mb-2" alt="${p.name}">
-      <div class="font-semibold text-sm text-center">${p.name}</div>
-      <div class="text-sm text-gray-600 mt-1">${money(p.price)}</div>
-      <button class="mt-3 px-3 py-1 bg-green-600 text-white rounded">Sepete Ekle</button>
-    `;
-    const btn = card.querySelector('button');
-    btn.addEventListener('click', ()=> addToCartByProduct(p, 1, true));
-    productsGrid.appendChild(card);
-  });
-}
-
-/* ====== Cart functions ====== */
-function addToCartByProduct(prod, qty=1, animate=false){
-  // find existing
-  let item = cart.find(c=>c.product_id===prod.id);
-  if (item) {
-    item.qty += qty;
-  } else {
-    cart.push({ product_id: prod.id, name: prod.name, img: prod.img, price: prod.price, qty: qty });
-  }
-  renderCart();
-  if (animate) flyToCart(prod.img || 'https://via.placeholder.com/100');
-}
-
-function renderCart(){
-  cartList.innerHTML = '';
-  if (cart.length===0) { cartList.innerHTML = '<div class="text-sm text-gray-500">Sepet boş</div>'; updateTotals(); return; }
-  cart.forEach((it, idx) => {
-    const row = document.createElement('div');
-    row.className = 'flex items-center gap-2';
-    row.innerHTML = `
-      <img src="${it.img || 'https://via.placeholder.com/48'}" class="w-12 h-12 object-cover rounded" />
-      <div class="flex-1 text-sm">
-        <div class="font-semibold">${it.name}</div>
-        <div class="text-xs text-gray-500">Birim: ${money(it.price)} • x${it.qty}</div>
-      </div>
-      <div class="text-sm font-semibold">${money(it.price * it.qty)}</div>
-      <div class="ml-2">
-        <button data-idx="${idx}" class="text-xs px-2 py-1 bg-gray-100 rounded">-</button>
-        <button data-idx-inc="${idx}" class="text-xs px-2 py-1 bg-gray-100 rounded">+</button>
-        <button data-idx-rm="${idx}" class="text-xs px-2 py-1 bg-red-100 rounded">✕</button>
-      </div>
-    `;
-    cartList.appendChild(row);
-  });
-  // attach events
-  cartList.querySelectorAll('[data-idx]').forEach(btn => btn.addEventListener('click', e=>{
-    const i = Number(e.currentTarget.dataset.idx);
-    if (cart[i].qty > 1) cart[i].qty--;
-    else cart.splice(i,1);
-    renderCart();
-  }));
-  cartList.querySelectorAll('[data-idx-inc]').forEach(btn => btn.addEventListener('click', e=>{
-    const i = Number(e.currentTarget.dataset.idxInc);
-    cart[i].qty++;
-    renderCart();
-  }));
-  cartList.querySelectorAll('[data-idx-rm]').forEach(btn => btn.addEventListener('click', e=>{
-    const i = Number(e.currentTarget.dataset.idxRm);
-    cart.splice(i,1); renderCart();
-  }));
-  updateTotals();
-}
-
-function updateTotals(){
-  const sub = cart.reduce((s,it)=> s + (it.price * it.qty), 0);
-  const discount = 0;
-  const vat = (sub - discount) * VAT_RATE / 100;
-  const total = sub - discount + vat;
-  subtotalEl.textContent = money(sub);
-  discountEl.textContent = money(discount);
-  vatAmountEl.textContent = money(vat);
-  totalAmountEl.textContent = money(total);
-}
-
-/* ====== fly animation to cart ====== */
-function flyToCart(imgUrl){
-  const img = document.createElement('img');
-  img.src = imgUrl;
-  img.className = 'fly w-12 h-12 rounded-full';
-  document.body.appendChild(img);
-  // start position: center of productsGrid
-  const startRect = productsGrid.getBoundingClientRect();
-  img.style.top = (startRect.top + 50) + 'px';
-  img.style.left = (startRect.left + 50) + 'px';
-  setTimeout(()=>{
-    const cartRect = document.querySelector('aside.col-span-1 .fixed') || document.querySelector('#cartList').getBoundingClientRect();
-    // approximate target coords (right sidebar)
-    const targetX = window.innerWidth - 120;
-    const targetY = window.innerHeight - 80;
-    img.style.top = targetY + 'px';
-    img.style.left = targetX + 'px';
-    img.style.width = '20px';
-    img.style.height = '20px';
-    img.style.opacity = '0';
-  }, 50);
-  setTimeout(()=> img.remove(), 1000);
-}
-
-/* ====== Voice recognition and parsing ====== */
-let recognition = null;
-function setupVoice(){
-  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-    voiceStatus.textContent = 'Tarayıcınız ses tanımayı desteklemiyor';
-    return;
-  }
-  window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognition();
-  recognition.lang = 'tr-TR';
-  recognition.continuous = true;
-  recognition.interimResults = false;
-
-  recognition.onstart = ()=> voiceStatus.textContent = 'Dinliyorum...';
-  recognition.onend = ()=> voiceStatus.textContent = 'Durdu';
-  recognition.onerror = (e)=> console.error('voice err',e);
-
-  recognition.onresult = (ev) => {
-    const transcript = ev.results[ev.results.length-1][0].transcript.toLowerCase().trim();
-    voiceStatus.textContent = `"${transcript}"`;
-    parseVoiceCommand(transcript);
-  };
-}
-
-function parseVoiceCommand(text){
-  // capture quantity like "2 kilo", "iki kilo" handling numbers in digits is enough for demo
-  const qtyMatch = text.match(/(\d+)\s*(kilo|adet)?/);
-  const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
-  // find product by name substring
-  const matched = products.find(p=> text.includes(p.name.toLowerCase()));
-  if (matched) {
-    addToCartByProduct(matched, qty, true);
-    return;
-  }
-  // fallback try productSelect value
-  const selProdId = productSelect.value;
-  if (selProdId) {
-    const prod = products.find(p=>p.id===selProdId);
-    if (prod) addToCartByProduct(prod, qty, true);
-  }
-}
-
-/* ====== Referral share / ensure link ====== */
-async function ensureReferralLinkForUser(){
-  if (!currentProfile?.id) { alert('Kayıtlı kullanıcı değil.'); return; }
-  // check existing
-  let { data: existing } = await supabase
-    .from('referral_links')
-    .select('id, referral_code')
-    .eq('owner_user_id', currentProfile.id)
-    .maybeSingle();
-
-  if (existing) return existing;
-  // create referral code: e.g. FIRST6 of uuid + random
-  const code = (currentProfile.full_name ? currentProfile.full_name.split(' ')[0] : 'REF') + Math.floor(Math.random()*9000+1000);
-  const { data, error } = await supabase
-    .from('referral_links')
-    .insert({ owner_user_id: currentProfile.id, owner_phone: currentProfile.phone || '', referral_code: code })
-    .select('id, referral_code')
-    .single();
-  if (error) { console.error(error); alert('Referans link oluşturulamadı'); return null; }
-  return data;
-}
-
-/* ====== Event handlers ====== */
-function setupEventHandlers(){
-  sellerSelect.addEventListener('change', async () => {
-    const sid = sellerSelect.value;
-    if (!sid) return;
-    await loadSellerData(sid);
-  });
-  reyonSelect.addEventListener('change', ()=>{
-    const rid = reyonSelect.value;
-    // filter categories that belong to this reyon
-    const filtered = categories.filter(c => (c.reyon_id == rid) || !c.reyon_id);
-    categorySelect.innerHTML = '<option value="">-- Kategori seçin --</option>';
-    filtered.forEach(c=> { const o=document.createElement('option'); o.value=c.id; o.text=c.name; categorySelect.appendChild(o);});
-  });
-  categorySelect.addEventListener('change', ()=>{
-    const cid = categorySelect.value;
-    const filtered = products.filter(p=> String(p.category_id) === String(cid) || !cid);
-    renderProductsGrid(filtered);
-  });
-  productSelect.addEventListener('change', ()=>{
-    const pid = productSelect.value;
-    const prod = products.find(p=>p.id===pid);
-    if (prod) {
-      // scroll to product in grid or brief highlight
-      addToCartByProduct(prod,1,true);
-    }
-  });
-  btnLoadProducts.addEventListener('click', async ()=> {
-    const sid = sellerSelect.value;
-    if (!sid) return alert('Önce satıcı seçin');
-    await loadProductsForSeller(sid);
-  });
-
-  // share referral
-  btnShareRef.addEventListener('click', async ()=>{
-    if (!currentProfile?.id) return alert('Üyeliğiniz yok. Üye olun veya giriş yapın.');
-    const link = await ensureReferralLinkForUser();
-    if (!link) return;
-    const shareUrl = `${location.origin}${location.pathname}?ref=${encodeURIComponent(link.referral_code)}`;
-    // copy to clipboard
-    await navigator.clipboard.writeText(shareUrl);
-    alert('Referans linki kopyalandı: ' + shareUrl);
-  });
-
-  // payments
-  document.getElementById('payCash').addEventListener('click', ()=> finalizeOrder('nakit'));
-  document.getElementById('payCard').addEventListener('click', ()=> finalizeOrder('kart'));
-  document.getElementById('payBonus').addEventListener('click', ()=> finalizeOrder('bonus'));
-  voiceBtn.addEventListener('click', ()=> {
-    if (!recognition) setupVoice();
-    if (recognition && recognition.running) { recognition.stop(); recognition.running = false; voiceBtn.value='Sesle Sipariş Başlat (Dinle)'; }
-    else { recognition.start(); recognition.running = true; voiceBtn.value='Dinle (Dur)'; }
-  });
-}
-
-/* ====== Referral summary for profile ====== */
-async function loadReferralSummary(){
-  if (!currentProfile?.id) return;
-  const { data, error } = await supabase
-    .from('referral_bonus_summary')
-    .select('*')
-    .eq('user_id', currentProfile.id)
-    .maybeSingle();
-  if (error) { console.error(error); return; }
-  const kalan = data?.kalan_bonus ?? 0;
-  p_bonus.textContent = money(kalan);
-}
-
-/* ====== Finalize order (create records via RPC or REST) ====== */
-async function finalizeOrder(method){
-  if (!currentProfile?.id) return alert('Lütfen giriş yapın ve profilinizi tamamlayın.');
-  if (!cart.length) return alert('Sepet boş.');
-
-  // prepare items: fetch latest unit prices from DB for safety
-  // map items to product_id, qty, unit_price
-  const items = cart.map(it => ({ product_id: it.product_id, quantity: it.qty, unit_price: it.price }));
-
-  // check bonus balance if paying by bonus
-  let bonusToUse = 0;
-  if (method === 'bonus') {
-    // get remaining bonus
-    const { data } = await supabase.from('referral_bonus_summary').select('kalan_bonus').eq('user_id', currentProfile.id).maybeSingle();
-    const kalan = data?.kalan_bonus ?? 0;
-    if (kalan <= 0) return alert('Yeterli bonus yok.');
-    // use up to total
-    const subtotal = cart.reduce((s,it)=> s + it.price*it.qty, 0);
-    bonusToUse = Math.min(kalan, subtotal);
-  } else {
-    // optional: allow partial bonus + cash/card; for simplicity we won't auto-apply partial here
-    bonusToUse = 0;
-  }
-
-  // call RPC function create_order_with_bonus
-  try {
-    const { data, error } = await supabase.rpc('create_order_with_bonus', {
-      p_user_id: currentProfile.id,
-      p_items: items,
-      p_bonus_used: bonusToUse,
-      p_payment_type: (bonusToUse>0 ? 'bonus+' + method : method)
+// Lokasyon ve satıcı çekme
+document.getElementById('locBtn').addEventListener('click', async () => {
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const { data: saticilar, error } = await supabase.from('saticilar').select('*');
+      if(error){ console.error(error); return; }
+      saticilarData = saticilar.filter(s => Math.abs(lat - s.lat)+Math.abs(lon - s.lon)<2);
+      if(saticilarData.length>0){
+        saticiSelect.innerHTML = '<option value="">Satıcı seçin</option>';
+        saticilarData.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.name;
+          saticiSelect.appendChild(opt);
+        });
+        saticiSelect.classList.remove('hidden');
+        noSatici.classList.add('hidden');
+      } else {
+        saticiSelect.classList.add('hidden');
+        noSatici.classList.remove('hidden');
+        reyonSection.classList.add('hidden');
+      }
     });
-    if (error) { console.error(error); alert('Sipariş oluşturulamadı: ' + error.message); return; }
-    const orderId = data;
-    alert('Sipariş kaydedildi. Sipariş ID: ' + orderId);
-    // clear cart
-    cart = []; renderCart(); loadReferralSummary(); // refresh bonus
-    // optionally: open adisyon print window
-    openReceiptPrint(orderId);
-  } catch (err) {
-    console.error(err); alert('Hata: ' + (err.message || err));
-  }
-}
+  } else { alert('Konum alınamadı!'); }
+});
 
-/* ====== Receipt print (simple) ====== */
-async function openReceiptPrint(orderId){
-  // fetch order + details + profile
-  const q = await supabase.rpc('get_order_receipt', { p_order_id: orderId }).catch(()=>null);
-  // fallback query if RPC not exists
-  let orderData = q?.data;
-  if (!orderData) {
-    const { data: order } = await supabase
-      .from('orders').select('*').eq('id', orderId).maybeSingle();
-    const { data: details } = await supabase
-      .from('order_details').select('product_id, quantity, unit_price, total_price').eq('order_id', orderId);
-    const { data: profile } = await supabase.from('profiles').select('full_name, phone, address, city').eq('id', order.user_id).maybeSingle();
-    orderData = { order, details, profile };
-  }
-  // build simple HTML
-  let html = `<div style="font-family: Arial; padding:10px; width:320px;">
-    <h3>Onur Market</h3>
-    <div>Sipariş No: ${orderId}</div>
-    <div>Tarih: ${new Date().toLocaleString()}</div>
-    <div>Müşteri: ${orderData.profile?.full_name || ''}</div>
-    <div>Tel: ${orderData.profile?.phone || ''}</div>
-    <hr/>`;
-  (orderData.details || []).forEach(d=>{
-    html += `<div style="display:flex; justify-content:space-between;"><div>${d.product_id}</div><div>${d.quantity} x ${money(d.unit_price)}</div></div>`;
+// Satıcı seçildiğinde ürün ve reyonları çek
+saticiSelect.addEventListener('change', async () => {
+  const saticiId = saticiSelect.value;
+  if(!saticiId) return;
+  const { data: urunler, error } = await supabase.from('urunler').select('*').eq('satici_id', saticiId);
+  if(error){ console.error(error); return; }
+  urunlerData = urunler;
+  const reyonlar = [...new Set(urunler.map(u=>u.reyon))];
+  reyonSection.innerHTML = '';
+  reyonlar.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'reyon bg-white rounded shadow p-4';
+    div.dataset.reyon = r;
+    div.innerHTML = `<div class="reyon-inner text-center"><h3 class="mt-2 font-semibold">${r}</h3></div>`;
+    div.addEventListener('click', ()=>{
+      urunPanel.classList.remove('hidden');
+      urunReyon.textContent = r.toUpperCase();
+      urunlerContainer.innerHTML = '';
+      urunlerData.filter(u=>u.reyon===r).forEach(u=>{
+        const card = document.createElement('div');
+        card.className = 'urun-card bg-white p-2 rounded shadow flex flex-col items-center';
+        card.innerHTML = `<img src="${u.image_url}" class="w-20 h-20 mb-1" alt="${u.name}">
+                          <p class="text-sm font-semibold">${u.name}</p>
+                          <p>₺${u.fiyat}</p>
+                          <button class="mt-1 bg-green-600 text-white px-2 py-1 rounded addToCart">Sepete Ekle</button>`;
+        card.querySelector('.addToCart').addEventListener('click', ()=>{
+          const li = document.createElement('li');
+          li.textContent = `${u.name} - 1 adet - ₺${u.fiyat.toFixed(2)}`;
+          li.classList.add('fade-in');
+          sepet.appendChild(li);
+          guncelleOzet();
+        });
+        urunlerContainer.appendChild(card);
+      });
+    });
+    reyonSection.appendChild(div);
   });
-  html += `<hr/><div>Toplam: ${money(orderData.order.total_amount)}</div>`;
-  html += `</div>`;
-  const w = window.open('', '_blank', 'width=400,height=600');
-  w.document.write(html);
-  w.document.close();
-  w.print();
+  reyonSection.classList.remove('hidden');
+});
+
+// Sepet ve özet fonksiyonları
+function guncelleOzet(){
+  let toplam=0;
+  document.querySelectorAll('#sepet li').forEach(li=>{
+    const match = li.textContent.match(/₺(\d+(\.\d+)?)/);
+    if(match) toplam += parseFloat(match[1]);
+  });
+  const indirim = toplam*0.05;
+  const kdv = (toplam-indirim)*0.18;
+  const genel = toplam-indirim+kdv;
+  toplamTutarEl.textContent = toplam.toFixed(2);
+  indirimEl.textContent = indirim.toFixed(2);
+  kdvEl.textContent = kdv.toFixed(2);
+  genelToplamEl.textContent = genel.toFixed(2);
+  const kazanilan = Math.floor(genel*0.05);
+  kazanilanBonusEl.textContent = kazanilan;
+  harcananBonusEl.textContent = harcananBonus;
+  kalanBonusEl.textContent = (mevcutBonus - harcananBonus + kazanilan).toFixed(0);
 }
 
-/* ====== Optional: create RPC 'get_order_receipt' on backend for nicer data shape ====== */
-/* If not present you can rely on fallback above */
+// Modal işlemleri
+const modal = document.getElementById('modal');
+const modalSepet = document.getElementById('modalSepet');
+document.getElementById('detayBtn').addEventListener('click', ()=>{
+  modalSepet.innerHTML = '';
+  document.querySelectorAll('#sepet li').forEach(li=>{
+    const liClone = li.cloneNode(true);
+    modalSepet.appendChild(liClone);
+  });
+  document.getElementById('modalToplam').textContent = toplamTutarEl.textContent;
+  document.getElementById('modalIndirim').textContent = indirimEl.textContent;
+  document.getElementById('modalKdv').textContent = kdvEl.textContent;
+  document.getElementById('modalGenelToplam').textContent = genelToplamEl.textContent;
+  modal.style.display='flex';
+});
+document.getElementById('closeModal').addEventListener('click', ()=>{ modal.style.display='none'; });
 
-/* ========== End of file ========== */
+// Sesli sipariş (dinamik)
+const startVoice = document.getElementById('startVoice');
+const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+recognition.lang = 'tr-TR';
+recognition.interimResults = false;
+startVoice.addEventListener('click', ()=>recognition.start());
+recognition.addEventListener('result',(e)=>{
+  const text = e.results[0][0].transcript.toLowerCase();
+  const reyonlar = [...new Set(urunlerData.map(u=>u.reyon.toLowerCase()))];
+  const match = reyonlar.find(r => text.includes(r));
+  if(match){
+    urunPanel.classList.remove('hidden');
+    urunReyon.textContent = match.toUpperCase();
+    urunlerContainer.innerHTML = '';
+    urunlerData.filter(u=>u.reyon.toLowerCase()===match).forEach(u=>{
+      const card = document.createElement('div');
+      card.className = 'urun-card bg-white p-2 rounded shadow flex flex-col items-center';
+      card.innerHTML = `<img src="${u.image_url}" class="w-20 h-20 mb-1" alt="${u.name}">
+                        <p class="text-sm font-semibold">${u.name}</p>
+                        <p>₺${u.fiyat}</p>
+                        <button class="mt-1 bg-green-600 text-white px-2 py-1 rounded addToCart">Sepete Ekle</button>`;
+      card.querySelector('.addToCart').addEventListener('click', ()=>{
+        const li = document.createElement('li');
+        li.textContent = `${u.name} - 1 adet - ₺${u.fiyat.toFixed(2)}`;
+        li.classList.add('fade-in');
+        sepet.appendChild(li);
+        guncelleOzet();
+      });
+      urunlerContainer.appendChild(card);
+    });
+  }
+});
 
+// Ödeme ve sipariş gönderme
+async function siparisVer(siparis){
+  const { data, error } = await supabase.from('orders').insert([siparis]).select();
+  if(error){ console.error(error); return null; }
+  return data[0];
+}
+async function siparisGonder(odemeYontemi){
+  const urunlerSepet = [];
+  document.querySelectorAll('#sepet li').forEach(li=>{
+    const match = li.textContent.match(/(.*) - (\d+) adet - ₺(\d+(\.\d+)?)/);
+    if(match) urunlerSepet.push({ad: match[1], adet: parseInt(match[2]), fiyat: parseFloat(match[3])});
+  });
+  if(urunlerSepet.length===0){ alert("Sepet boş!"); return; }
+  const toplamTutar = parseFloat(genelToplamEl.textContent);
+  const siparis = {
+    user: document.getElementById('userName').textContent,
+    urunler: urunlerSepet,
+    toplam: toplamTutar,
+    odeme: odemeYontemi,
+    bonusKullan: harcananBonus
+  };
+  const result = await siparisVer(siparis);
+  if(result?.id){
+    alert(`Siparişiniz alındı! ID: ${result.id}`);
+    mevcutBonus = mevcutBonus - harcananBonus + Math.floor(toplamTutar*0.05);
+    harcananBonus = 0;
+    guncelleOzet();
+    sepet.innerHTML = '';
+  } else { alert("Sipariş gönderilemedi!"); }
+}
+document.getElementById('payNakit').addEventListener('click', ()=>siparisGonder('Kapıda Nakit'));
+document.getElementById('payKart').addEventListener('click', ()=>siparisGonder('Kapıda Kredi Kartı'));
+document.getElementById('payBonus').addEventListener('click', ()=>siparisGonder('Bonus ile Ödeme'));
+
+// WhatsApp paylaşımı
+document.getElementById('shareBtn').addEventListener('click', ()=>{
+  const referansLink = encodeURIComponent(window.location.href);
+  const mesaj = encodeURIComponent('Merhaba! Bu linkten sipariş verebilirsin: ');
+  window.open(`https://api.whatsapp.com/send?text=${mesaj}${referansLink}`,'_blank');
+});
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
