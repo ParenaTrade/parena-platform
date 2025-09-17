@@ -187,16 +187,22 @@ const voiceStatus = document.getElementById("voiceStatus");
 /* ====== Helpers ====== */
 function money(n){ return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; }
 
-async function loadSessionAndProfile(){
-  // get current session user
-  const { data: sessionData } = await supabase.auth.getSession();
-  const session = sessionData?.session;
-  if (!session?.user) {
-    userNameEl.textContent = "Giriş yapılmadı";
-    userMetaEl.textContent = "Lütfen giriş yapın.";
-    // page could force login or show public flow. We'll continue but profile-dependent features disabled.
+// Profil yükle
+async function loadProfile() {
+  const { data: { session } } = await client.auth.getSession();
+  if (!session) {
+    document.getElementById("profile-info").innerText = "Oturum yok!";
     return;
   }
+  const userId = session.user.id;
+  const { data, error } = await client.from("profiles").select("full_name, role, phone, address, city").eq("id", userId).single();
+  if (error) {
+    document.getElementById("profile-info").innerText = "Hata: " + error.message;
+  } else {
+    document.getElementById("profile-info").innerText =
+      `Ad: ${data.full_name} | Rol: ${data.role} | Tel: ${data.phone} | Adres: ${data.address} / ${data.city}`;
+  }
+}
   currentUser = session.user;
   // fetch profile
   const { data: profile, error } = await supabase
@@ -641,3 +647,4 @@ async function openReceiptPrint(orderId){
 </script>
 </body>
 </html>
+
