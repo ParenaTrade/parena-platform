@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reyon + Ürünler</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .active-reyon {
+      transform: scale(1.2) translateY(-20px);
+      z-index: 10;
+    }
+    .inactive-left {
+      transform: translateX(-80px) scale(0.9);
+      opacity: 0.6;
+    }
+    .inactive-right {
+      transform: translateX(80px) scale(0.9);
+      opacity: 0.6;
+    }
+    .transition-anim { transition: all 0.6s ease; }
+    .shake { animation: shake 0.5s; }
+    @keyframes shake {
+      0% { transform: rotate(0deg); }
+      25% { transform: rotate(-10deg); }
+      50% { transform: rotate(10deg); }
+      75% { transform: rotate(-10deg); }
+      100% { transform: rotate(0deg); }
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+
+  <h1 class="text-2xl font-bold text-center py-6">Market Reyonları</h1>
+
+  <!-- Reyonlar -->
+  <div id="reyonlar" class="flex justify-center gap-6 px-6 mb-6"></div>
+
+  <!-- Ürünler -->
+  <div id="urunler" class="grid grid-cols-2 md:grid-cols-3 gap-6 px-6 hidden"></div>
+
+  <!-- Sepet -->
+  <div id="cart" class="fixed bottom-6 right-6 bg-green-500 text-white p-4 rounded-full shadow-lg cursor-pointer">
+    🛒 <span id="cart-count">0</span>
+  </div>
+
+  <script>
+    const reyonData = [
+      { 
+        name: "Manav", img: "reyon_images/manav.png", 
+        products: [
+          { name: "Domates", price: 40, img: "reyon_images/domates.png" },
+          { name: "Soğan", price: 20, img: "reyon_images/sogan.png" },
+          { name: "Patlıcan", price: 35, img: "reyon_images/patlican.png" }
+        ]
+      },
+      { name: "İçecek", img: "reyon_images/icecek.png", products: [
+          { name: "Kola", price: 25, img: "reyon_images/kola.png" },
+          { name: "Ayran", price: 10, img: "reyon_images/ayran.png" }
+        ]
+      },
+      { name: "Temel Gıda", img: "reyon_images/temel-gida.png", products: [] }
+    ];
+
+    const reyonlar = document.getElementById("reyonlar");
+    const urunler = document.getElementById("urunler");
+    const cart = document.getElementById("cart");
+    const cartCount = document.getElementById("cart-count");
+    let count = 0;
+
+    // Reyonları çiz
+    reyonData.forEach((reyon, i) => {
+      const card = document.createElement("div");
+      card.className =
+        "bg-white rounded-2xl shadow-lg transition-anim cursor-pointer flex flex-col items-center p-4 w-40 h-40";
+      card.innerHTML = `
+        <img src="${reyon.img}" alt="${reyon.name}" class="w-20 h-20 object-contain mb-2">
+        <h3 class="font-semibold">${reyon.name}</h3>
+      `;
+      card.dataset.index = i;
+      card.dataset.name = reyon.name;
+      reyonlar.appendChild(card);
+
+      // Tıklanınca fokus
+      card.addEventListener("click", () => focusReyon(reyon.name));
+    });
+
+    function focusReyon(name) {
+      const cards = document.querySelectorAll("#reyonlar div");
+      let activeIndex = -1;
+
+      cards.forEach((card, i) => {
+        card.classList.remove("active-reyon","inactive-left","inactive-right");
+        if (card.dataset.name === name) activeIndex = i;
+      });
+
+      cards.forEach((card, i) => {
+        if (i === activeIndex) {
+          card.classList.add("active-reyon");
+        } else if (i < activeIndex) {
+          card.classList.add("inactive-left");
+        } else {
+          card.classList.add("inactive-right");
+        }
+      });
+
+      // Ürünleri aç
+      showProducts(name);
+    }
+
+    function showProducts(reyonName) {
+      urunler.innerHTML = "";
+      const reyon = reyonData.find(r => r.name === reyonName);
+      if (!reyon) return;
+
+      if (reyon.products.length === 0) {
+        urunler.innerHTML = `<div class="col-span-3 text-center text-gray-500">Ürün bulunamadı</div>`;
+      } else {
+        reyon.products.forEach(p => {
+          const card = document.createElement("div");
+          card.className = "bg-white rounded-xl shadow p-4 flex flex-col items-center";
+          card.innerHTML = `
+            <img src="${p.img}" alt="${p.name}" class="w-16 h-16 object-contain mb-2">
+            <h4 class="font-semibold">${p.name}</h4>
+            <p class="text-sm text-gray-600">${p.price} ₺</p>
+            <button class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Sepete Ekle</button>
+          `;
+          card.querySelector("button").addEventListener("click", () => addToCart(p));
+          urunler.appendChild(card);
+        });
+      }
+      urunler.classList.remove("hidden");
+    }
+
+    function addToCart(product) {
+      count++;
+      cartCount.textContent = count;
+      cart.classList.add("shake");
+      setTimeout(() => cart.classList.remove("shake"), 500);
+      console.log("Sepete eklendi:", product.name);
+    }
+
+    // Sesle komut (Web Speech API basit)
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "tr-TR";
+    recognition.continuous = true;
+
+    recognition.onresult = (e) => {
+      const transcript = e.results[e.results.length - 1][0].transcript.trim();
+      console.log("Ses:", transcript);
+      if (transcript.toLowerCase().includes("domates")) focusReyon("Manav");
+      if (transcript.toLowerCase().includes("kola")) focusReyon("İçecek");
+      if (transcript.toLowerCase().includes("soğan")) addToCart({name:"Soğan"});
+    };
+
+    recognition.start();
+  </script>
+</body>
+</html>
