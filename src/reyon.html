@@ -1,155 +1,93 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sesli Sepet</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .shake { animation: shake 0.5s; }
-    @keyframes shake {
-      0% { transform: rotate(0deg); }
-      25% { transform: rotate(-10deg); }
-      50% { transform: rotate(10deg); }
-      75% { transform: rotate(-10deg); }
-      100% { transform: rotate(0deg); }
+<script>
+  let count = 0;
+  let cartItems = [];
+
+  const cart = document.getElementById("cart");
+  const cartCount = document.getElementById("cart-count");
+  const cartList = document.getElementById("cart-list");
+  const cartItemsEl = document.getElementById("cart-items");
+
+  // Ürün listesi (isim → görsel eşleşmesi için)
+  const productMap = {
+    "domates": { img: "https://cdn-icons-png.flaticon.com/512/766/766741.png", price: 40 },
+    "soğan": { img: "https://cdn-icons-png.flaticon.com/512/135/135620.png", price: 20 },
+    "patlıcan": { img: "https://cdn-icons-png.flaticon.com/512/706/706164.png", price: 35 }
+  };
+
+  // Sepeti aç/kapat
+  cart.addEventListener("click", () => {
+    cartList.classList.toggle("hidden");
+  });
+
+  function addToCart(name, imgUrl, qty = 1) {
+    count += qty;
+    cartCount.textContent = count;
+    cart.classList.add("shake");
+    setTimeout(() => cart.classList.remove("shake"), 500);
+
+    // Sepette var mı kontrol et
+    let item = cartItems.find(i => i.name === name);
+    if (item) {
+      item.qty += qty;
+    } else {
+      cartItems.push({ name, qty });
     }
-    .fly {
-      position: absolute;
-      z-index: 1000;
-      transition: all 0.8s ease-in-out;
-      pointer-events: none;
-    }
-  </style>
-</head>
-<body class="bg-gray-100">
+    renderCart();
 
-  <h1 class="text-2xl font-bold text-center py-6">Manav Reyonu</h1>
+    flyToCart(imgUrl);
+  }
 
-  <!-- Ürünler -->
-  <div id="urunler" class="grid grid-cols-2 md:grid-cols-3 gap-6 px-6">
-    <div class="bg-white rounded-xl shadow p-4 flex flex-col items-center">
-      <img src="https://cdn-icons-png.flaticon.com/512/766/766741.png" alt="Domates" class="w-16 h-16 mb-2">
-      <h4 class="font-semibold">Domates</h4>
-      <p class="text-sm text-gray-600">40 ₺</p>
-      <button onclick="addToCart('Domates','https://cdn-icons-png.flaticon.com/512/766/766741.png')" 
-        class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Sepete Ekle</button>
-    </div>
-    <div class="bg-white rounded-xl shadow p-4 flex flex-col items-center">
-      <img src="https://cdn-icons-png.flaticon.com/512/135/135620.png" alt="Soğan" class="w-16 h-16 mb-2">
-      <h4 class="font-semibold">Soğan</h4>
-      <p class="text-sm text-gray-600">20 ₺</p>
-      <button onclick="addToCart('Soğan','https://cdn-icons-png.flaticon.com/512/135/135620.png')" 
-        class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Sepete Ekle</button>
-    </div>
-    <div class="bg-white rounded-xl shadow p-4 flex flex-col items-center">
-      <img src="https://cdn-icons-png.flaticon.com/512/706/706164.png" alt="Patlıcan" class="w-16 h-16 mb-2">
-      <h4 class="font-semibold">Patlıcan</h4>
-      <p class="text-sm text-gray-600">35 ₺</p>
-      <button onclick="addToCart('Patlıcan','https://cdn-icons-png.flaticon.com/512/706/706164.png')" 
-        class="mt-2 px-3 py-1 bg-green-500 text-white rounded">Sepete Ekle</button>
-    </div>
-  </div>
-
-  <!-- Sepet -->
-  <div id="cart" class="fixed bottom-6 right-6 bg-green-500 text-white p-4 rounded-full shadow-lg cursor-pointer">
-    🛒 <span id="cart-count">0</span>
-  </div>
-
-  <!-- Sepet listesi -->
-  <div id="cart-list" class="hidden fixed bottom-20 right-6 bg-white shadow-xl rounded-xl p-4 w-64">
-    <h3 class="font-bold mb-2">Sepetim</h3>
-    <ul id="cart-items" class="space-y-1 text-sm"></ul>
-  </div>
-
-  <script>
-    let count = 0;
-    let cartItems = [];
-
-    const cart = document.getElementById("cart");
-    const cartCount = document.getElementById("cart-count");
-    const cartList = document.getElementById("cart-list");
-    const cartItemsEl = document.getElementById("cart-items");
-
-    // Ürün listesi (isim → görsel eşleşmesi için)
-    const productMap = {
-      "domates": "https://cdn-icons-png.flaticon.com/512/766/766741.png",
-      "soğan": "https://cdn-icons-png.flaticon.com/512/135/135620.png",
-      "patlıcan": "https://cdn-icons-png.flaticon.com/512/706/706164.png"
-    };
-
-    // Sepeti aç/kapat
-    cart.addEventListener("click", () => {
-      cartList.classList.toggle("hidden");
+  function renderCart() {
+    cartItemsEl.innerHTML = "";
+    cartItems.forEach(item => {
+      const li = document.createElement("li");
+      li.textContent = `• ${item.name} x${item.qty}`;
+      cartItemsEl.appendChild(li);
     });
+  }
 
-    function addToCart(name, imgUrl) {
-      count++;
-      cartCount.textContent = count;
-      cart.classList.add("shake");
-      setTimeout(() => cart.classList.remove("shake"), 500);
+  function flyToCart(imgUrl) {
+    const img = document.createElement("img");
+    img.src = imgUrl;
+    img.className = "fly w-12 h-12 rounded-full";
+    document.body.appendChild(img);
 
-      cartItems.push(name);
-      renderCart();
+    img.style.top = "200px";
+    img.style.left = "200px";
 
-      flyToCart(imgUrl);
-    }
+    setTimeout(() => {
+      const cartRect = cart.getBoundingClientRect();
+      img.style.top = cartRect.top + "px";
+      img.style.left = cartRect.left + "px";
+      img.style.width = "20px";
+      img.style.height = "20px";
+      img.style.opacity = "0";
+    }, 50);
 
-    function renderCart() {
-      cartItemsEl.innerHTML = "";
-      cartItems.forEach(item => {
-        const li = document.createElement("li");
-        li.textContent = `• ${item}`;
-        cartItemsEl.appendChild(li);
-      });
-    }
+    setTimeout(() => img.remove(), 900);
+  }
 
-    function flyToCart(imgUrl) {
-      const img = document.createElement("img");
-      img.src = imgUrl;
-      img.className = "fly w-12 h-12 rounded-full";
-      document.body.appendChild(img);
+  // 🔊 Ses tanıma
+  window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.lang = "tr-TR";
+  recognition.continuous = true;
 
-      img.style.top = "200px";
-      img.style.left = "200px";
+  recognition.onresult = (e) => {
+    const transcript = e.results[e.results.length - 1][0].transcript.toLowerCase().trim();
+    console.log("Ses:", transcript);
 
-      setTimeout(() => {
-        const cartRect = cart.getBoundingClientRect();
-        img.style.top = cartRect.top + "px";
-        img.style.left = cartRect.left + "px";
-        img.style.width = "20px";
-        img.style.height = "20px";
-        img.style.opacity = "0";
-      }, 50);
+    // Miktarı yakala (örn: "3 kilo soğan")
+    const qtyMatch = transcript.match(/(\d+)\s*(kilo|adet)?/);
+    const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
 
-      setTimeout(() => img.remove(), 900);
-    }
-
-    // 🔊 Ses tanıma
-    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = "tr-TR";
-    recognition.continuous = true;
-
-    recognition.onresult = (e) => {
-      const transcript = e.results[e.results.length - 1][0].transcript.toLowerCase().trim();
-      console.log("Ses:", transcript);
-
-      // Miktarı yakala (örn: "2 kilo domates")
-      const qtyMatch = transcript.match(/(\d+)\s*(kilo|adet)?/);
-      const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
-
-      // Ürün adı yakala
-      for (let product in productMap) {
-        if (transcript.includes(product)) {
-          for (let i = 0; i < qty; i++) {
-            addToCart(product.charAt(0).toUpperCase() + product.slice(1), productMap[product]);
-          }
-        }
+    // Ürün adı yakala
+    for (let product in productMap) {
+      if (transcript.includes(product)) {
+        addToCart(product.charAt(0).toUpperCase() + product.slice(1), productMap[product].img, qty);
       }
-    };
+    }
+  };
 
-    recognition.start();
-  </script>
-</body>
-</html>
+  recognition.start();
+</script>
