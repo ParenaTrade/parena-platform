@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Sipariş Sayfası — Onur Market</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.0/dist/umd/supabase.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesli Sipariş Sistemi - Onur Market</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -16,321 +15,528 @@
             --light: #f9fafb;
         }
         
-        body {
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
             background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            color: #333;
             min-height: 100vh;
+            padding: 20px;
         }
         
-        .header-gradient {
-            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
-        }
-        
-        .card {
-            transition: all 0.3s ease;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
             background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
         }
         
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        header {
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo i {
+            margin-right: 10px;
+        }
+        
+        .user-info {
+            text-align: right;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #f1f5f9;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+        }
+        
+        .status-item i {
+            margin-right: 8px;
+            color: var(--primary);
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title i {
+            margin-right: 10px;
+            color: var(--primary);
+        }
+        
+        .filters select, .filters input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .profile-info div {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .profile-info span {
+            font-weight: 500;
+        }
+        
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 5px;
         }
         
         .product-card {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
         }
         
         .product-image {
-            height: 140px;
-            object-fit: contain;
-            padding: 10px;
-            background: #f9fafb;
-            border-radius: 8px;
+            height: 120px;
+            width: 100%;
+            object-fit: cover;
+            background: #f3f4f6;
         }
         
-        .fly {
-            position: fixed;
-            z-index: 9999;
-            transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            pointer-events: none;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        .product-info {
+            padding: 10px;
+        }
+        
+        .product-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        
+        .product-price {
+            color: var(--primary);
+            font-weight: bold;
+        }
+        
+        .product-discount {
+            color: #ef4444;
+            font-size: 12px;
+            text-decoration: line-through;
+            margin-left: 5px;
+        }
+        
+        .cart-items {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
         }
         
         .cart-item {
-            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
         }
         
-        .cart-item:hover {
-            background-color: #f9fafb;
+        .cart-item-info {
+            flex: 1;
         }
         
-        .btn-primary {
-            background-color: var(--primary);
-            transition: all 0.3s ease;
+        .cart-item-name {
+            font-weight: 500;
         }
         
-        .btn-primary:hover {
-            background-color: #1d4ed8;
-            transform: translateY(-2px);
+        .cart-item-quantity {
+            color: #6b7280;
+            font-size: 14px;
         }
         
-        .btn-secondary {
-            background-color: var(--secondary);
-            transition: all 0.3s ease;
+        .cart-item-price {
+            font-weight: bold;
+            color: var(--primary);
         }
         
-        .btn-secondary:hover {
-            background-color: #059669;
-            transform: translateY(-2px);
+        .cart-totals {
+            border-top: 2px solid #e5e7eb;
+            padding-top: 15px;
         }
         
-        .btn-accent {
-            background-color: var(--accent);
-            transition: all 0.3s ease;
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
         }
         
-        .btn-accent:hover {
-            background-color: #d97706;
-            transform: translateY(-2px);
+        .grand-total {
+            font-weight: bold;
+            font-size: 18px;
+            color: var(--dark);
+            border-top: 1px solid #d1d5db;
+            padding-top: 10px;
         }
         
-        .pulse {
+        .payment-options {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .payment-btn {
+            padding: 12px;
+            border-radius: 6px;
+            border: none;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        
+        .payment-btn i {
+            margin-right: 8px;
+        }
+        
+        .cash-btn {
+            background: var(--secondary);
+        }
+        
+        .cash-btn:hover {
+            background: #0d9669;
+        }
+        
+        .card-btn {
+            background: var(--primary);
+        }
+        
+        .card-btn:hover {
+            background: #1d4ed8;
+        }
+        
+        .bonus-btn {
+            background: #8b5cf6;
+        }
+        
+        .bonus-btn:hover {
+            background: #7c3aed;
+        }
+        
+        .voice-assistant {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+            z-index: 100;
             animation: pulse 2s infinite;
         }
         
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
         
-        .voice-listening {
-            animation: voicePulse 1.5s infinite;
+        .listening .voice-assistant {
+            animation: listening 1.5s infinite;
         }
         
-        @keyframes voicePulse {
+        @keyframes listening {
             0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
             70% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
             100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
         }
         
-        .loading {
-            position: relative;
+        .voice-status {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+            display: none;
+        }
+        
+        .assistant-message {
+            font-weight: 500;
+            color: var(--dark);
+        }
+        
+        .user-message {
+            text-align: right;
+            color: var(--primary);
+            margin-top: 5px;
+        }
+        
+        .selected {
+            border: 2px solid var(--secondary) !important;
+            background: #f0fdf4 !important;
+        }
+        
+        .order-status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f9ff;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .status-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .status-title i {
+            margin-right: 8px;
+            color: var(--primary);
+        }
+        
+        .status-progress {
+            height: 6px;
+            background: #dbeafe;
+            border-radius: 3px;
             overflow: hidden;
+            margin: 10px 0;
         }
         
-        .loading::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
+        .status-progress-bar {
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
-            animation: loading 1.5s infinite;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.5s;
         }
         
-        @keyframes loading {
-            100% { left: 100%; }
+        .status-steps {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #6b7280;
         }
         
-        .shake {
-            animation: shake 0.5s;
-        }
-        
-        @keyframes shake {
-            0% { transform: translateX(0); }
-            20% { transform: translateX(-10px); }
-            40% { transform: translateX(10px); }
-            60% { transform: translateX(-10px); }
-            80% { transform: translateX(10px); }
-            100% { transform: translateX(0); }
-        }
-        
-        /* Scrollbar stilleri */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: #c5c5c5;
-            border-radius: 10px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8;
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
-<body class="min-h-screen py-6">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <!-- Header -->
-        <header class="header-gradient text-white rounded-xl shadow-lg mb-8 p-6">
-            <div class="flex flex-col md:flex-row items-center justify-between">
-                <div class="mb-4 md:mb-0 text-center md:text-left">
-                    <h1 class="text-3xl font-bold mb-2">Sesli Sipariş Sistemi</h1>
-                    <p class="opacity-90">Hızlı ve kolay alışveriş için sesinizi kullanın</p>
-                </div>
-                <div id="userBox" class="bg-white text-gray-800 rounded-lg p-4 shadow-md text-center md:text-right">
-                    <div id="userName" class="font-semibold text-lg"><i class="fas fa-user-circle mr-2"></i>Giriş yapılmadı</div>
-                    <div id="userMeta" class="text-sm text-gray-500 mt-1">Lütfen giriş yapın</div>
-                </div>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-store"></i>
+                <span>Onur Market Sesli Sipariş</span>
+            </div>
+            <div class="user-info">
+                <div id="userName">Misafir</div>
+                <div id="userLocation">Konum bilinmiyor</div>
             </div>
         </header>
-
-        <main class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <!-- LEFT: Seller & Filters -->
-            <aside class="col-span-1 card p-5">
-                <h2 class="font-semibold text-lg mb-4 text-gray-700 flex items-center">
-                    <i class="fas fa-store mr-2 text-blue-500"></i> Satıcı & Filtreler
-                </h2>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-600 mb-1"><i class="fas fa-map-marker-alt mr-1"></i> Satıcınız</label>
-                    <select id="sellerSelect" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">-- Satıcı seçin --</option>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <span id="currentStatus">Sesli tanıma başlatılıyor...</span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-gift"></i>
+                <span>Bonus: <strong id="p_bonus">0 ₺</strong></span>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <!-- Sol Bölüm - Filtreler ve Profil -->
+            <div class="section">
+                <div class="section-title">
+                    <i class="fas fa-filter"></i>
+                    <span>Filtreler</span>
+                </div>
+                <div class="filters">
+                    <select id="sellerSelect">
+                        <option value="">Satıcı Seçin</option>
+                    </select>
+                    <select id="reyonSelect">
+                        <option value="">Reyon Seçin</option>
+                    </select>
+                    <select id="categorySelect">
+                        <option value="">Kategori Seçin</option>
+                    </select>
+                    <select id="productSelect">
+                        <option value="">Ürün Seçin</option>
                     </select>
                 </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-600 mb-1"><i class="fas fa-boxes mr-1"></i> Reyon</label>
-                    <select id="reyonSelect" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">-- Reyon seçin --</option>
-                    </select>
+                
+                <div class="section-title">
+                    <i class="fas fa-user"></i>
+                    <span>Profil Bilgilerim</span>
                 </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-600 mb-1"><i class="fas fa-tags mr-1"></i> Kategori</label>
-                    <select id="categorySelect" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">-- Kategori seçin --</option>
-                    </select>
+                <div class="profile-info">
+                    <div>Adı Soyadı: <span id="p_name">-</span></div>
+                    <div>Telefon: <span id="p_phone">-</span></div>
+                    <div>Şehir: <span id="p_city">-</span></div>
+                    <div>Adres: <span id="p_address">-</span></div>
+                    <div>Bonus: <strong id="p_bonus_amount">0 ₺</strong></div>
                 </div>
-
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-600 mb-1"><i class="fas fa-shopping-basket mr-1"></i> Ürün</label>
-                    <select id="productSelect" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">-- Ürün seçin --</option>
-                    </select>
+            </div>
+            
+            <!-- Orta Bölüm - Ürünler -->
+            <div class="section">
+                <div class="section-title">
+                    <i class="fas fa-shopping-basket"></i>
+                    <span>Ürünler</span>
                 </div>
-
-                <div class="flex flex-col gap-3">
-                    <button id="btnLoadProducts" class="btn-secondary py-3 rounded-lg font-medium flex items-center justify-center">
-                        <i class="fas fa-sync-alt mr-2"></i> Ürünleri Yükle
-                    </button>
-                    <button id="btnShareRef" class="btn-primary py-3 rounded-lg font-medium flex items-center justify-center">
-                        <i class="fas fa-share-alt mr-2"></i> Referans Linki Gönder
-                    </button>
-                </div>
-
-                <hr class="my-5 border-gray-200" />
-
-                <div>
-                    <h3 class="text-md font-semibold mb-3 text-gray-700 flex items-center">
-                        <i class="fas fa-user-circle mr-2 text-blue-500"></i> Profil Bilgilerim
-                    </h3>
-                    <div id="profileInfo" class="text-sm text-gray-700 space-y-2">
-                        <div class="flex justify-between"><span class="font-medium">Adı Soyadı:</span> <span id="p_name">-</span></div>
-                        <div class="flex justify-between"><span class="font-medium">Telefon:</span> <span id="p_phone">-</span></div>
-                        <div class="flex justify-between"><span class="font-medium">Rol:</span> <span id="p_role">-</span></div>
-                        <div class="flex justify-between"><span class="font-medium">Şehir:</span> <span id="p_city">-</span></div>
-                        <div class="flex justify-between"><span class="font-medium">Adres:</span> <span id="p_address">-</span></div>
-                        <div class="flex justify-between"><span class="font-medium">Lokasyon:</span> <span id="p_location">-</span></div>
-
-                        <div class="mt-3 pt-2 border-t border-gray-200 flex justify-between">
-                            <span class="font-medium">Bonus Kalan:</span> 
-                            <strong id="p_bonus" class="text-green-600">0 ₺</strong>
-                        </div>
-                    </div>
-                </div>
-            </aside>
-
-            <!-- MIDDLE: Products -->
-            <section class="col-span-2 card p-5">
-                <div class="flex flex-col sm:flex-row items-center justify-between mb-6">
-                    <div class="mb-3 sm:mb-0">
-                        <button id="voiceBtn" class="btn-accent py-3 px-6 rounded-lg font-semibold flex items-center voice-listening">
-                            <i class="fas fa-microphone mr-2"></i> Sesli Sipariş Başlat
-                        </button>
-                        <div id="voiceStatus" class="ml-1 text-sm text-gray-500 mt-2"></div>
-                    </div>
-                    <div class="text-sm text-gray-600 text-center sm:text-right">
-                        Reyon → Kategori → Ürün seçerek veya sesle ürün ekleyin
-                    </div>
-                </div>
-
-                <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    <div class="flex flex-col items-center justify-center p-8 text-gray-400">
-                        <i class="fas fa-box-open text-4xl mb-3"></i>
+                <div class="products-grid" id="productsGrid">
+                    <div class="text-center" style="grid-column: 1 / -1; padding: 30px; color: #6b7280;">
+                        <i class="fas fa-box-open" style="font-size: 48px; margin-bottom: 15px;"></i>
                         <p>Satıcı seçerek ürünleri görüntüleyin</p>
                     </div>
                 </div>
-            </section>
-
-            <!-- RIGHT: Cart -->
-            <aside class="col-span-1 card p-5">
-                <h2 class="font-semibold text-lg mb-4 text-gray-700 flex items-center">
-                    <i class="fas fa-shopping-cart mr-2 text-blue-500"></i> Sepetim
-                    <span id="cartCount" class="ml-2 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
-                </h2>
-                
-                <div id="cartList" class="space-y-3 max-h-[320px] overflow-y-auto mb-4 py-1">
-                    <div class="text-center text-gray-500 py-8">
-                        <i class="fas fa-shopping-basket text-2xl mb-2"></i>
+            </div>
+            
+            <!-- Sağ Bölüm - Sepet -->
+            <div class="section">
+                <div class="section-title">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Sepetim</span>
+                </div>
+                <div class="cart-items" id="cartList">
+                    <div class="text-center" style="padding: 20px; color: #6b7280;">
+                        <i class="fas fa-shopping-cart" style="font-size: 36px; margin-bottom: 10px;"></i>
                         <p>Sepetinizde ürün bulunmuyor</p>
                     </div>
                 </div>
-
-                <div class="border-t border-gray-200 pt-4 space-y-3">
-                    <div class="flex justify-between text-sm">
-                        <div>Ara Toplam</div>
-                        <div id="subtotal">0.00 ₺</div>
+                
+                <div class="cart-totals">
+                    <div class="total-row">
+                        <span>Ara Toplam:</span>
+                        <span id="subtotal">0.00 ₺</span>
                     </div>
-                    <div class="flex justify-between text-sm">
-                        <div>İndirim</div>
-                        <div id="discount">0.00 ₺</div>
+                    <div class="total-row">
+                        <span>İndirim:</span>
+                        <span id="discount">0.00 ₺</span>
                     </div>
-                    <div class="flex justify-between text-sm">
-                        <div>KDV (<span id="vatRate">18</span>%)</div>
-                        <div id="vatAmount">0.00 ₺</div>
+                    <div class="total-row">
+                        <span>KDV (%18):</span>
+                        <span id="vatAmount">0.00 ₺</span>
                     </div>
-                    <div class="flex justify-between font-bold text-lg pt-2 border-t border-gray-200">
-                        <div>Genel Toplam</div>
-                        <div id="totalAmount">0.00 ₺</div>
-                    </div>
-
-                    <div class="mt-4 space-y-3">
-                        <button id="payCash" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium transition-all">
-                            <i class="fas fa-money-bill-wave mr-2"></i> Kapıda Nakit
-                        </button>
-                        <button id="payCard" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-all">
-                            <i class="fas fa-credit-card mr-2"></i> Kapıda Kart
-                        </button>
-                        <button id="payBonus" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium transition-all">
-                            <i class="fas fa-gift mr-2"></i> Bonus ile Ödeme
-                        </button>
+                    <div class="total-row grand-total">
+                        <span>Genel Toplam:</span>
+                        <span id="totalAmount">0.00 ₺</span>
                     </div>
                 </div>
-            </aside>
-        </main>
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50">
-        <div class="flex items-center">
-            <i id="toastIcon" class="fas fa-info-circle mr-2"></i>
-            <span id="toastMessage"></span>
+                
+                <div class="payment-options">
+                    <button class="payment-btn cash-btn" id="payCash">
+                        <i class="fas fa-money-bill-wave"></i>
+                        Kapıda Nakit
+                    </button>
+                    <button class="payment-btn card-btn" id="payCard">
+                        <i class="fas fa-credit-card"></i>
+                        Kapıda Kart
+                    </button>
+                    <button class="payment-btn bonus-btn" id="payBonus">
+                        <i class="fas fa-gift"></i>
+                        Bonus ile Ödeme
+                    </button>
+                </div>
+                
+                <div class="order-status">
+                    <div class="status-title">
+                        <i class="fas fa-truck"></i>
+                        <span>Sipariş Durumu</span>
+                    </div>
+                    <div class="status-progress">
+                        <div class="status-progress-bar" id="statusProgress"></div>
+                    </div>
+                    <div class="status-steps">
+                        <span>Sipariş Alındı</span>
+                        <span>Hazırlanıyor</span>
+                        <span>Yolda</span>
+                        <span>Teslim Edildi</span>
+                    </div>
+                    <div id="statusText" style="margin-top: 10px; font-size: 14px;">
+                        Henüz sipariş verilmedi
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
+    
+    <div class="voice-assistant" id="voiceAssistant">
+        <i class="fas fa-microphone"></i>
+    </div>
+    
+    <div class="voice-status" id="voiceStatus">
+        <div class="assistant-message" id="assistantMessage">Merhaba, size nasıl yardımcı olabilirim?</div>
+        <div class="user-message" id="userMessage"></div>
     </div>
 
     <script>
@@ -341,667 +547,515 @@
         // Initialize Supabase client
         const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        // State variables
+        // Global state
         let currentUser = null;
         let currentProfile = null;
         let sellers = [];
         let reyonlar = [];
         let categories = [];
         let products = [];
-        let productPrices = {};
         let cart = [];
-        const VAT_RATE = 18;
-
+        let recognition;
+        let isListening = false;
+        let voiceCode = null;
+        let conversationStep = 0;
+        let currentPaymentMethod = null;
+        let orderStatusInterval = null;
+        
         // DOM Elements
-        const userNameEl = document.getElementById("userName");
-        const userMetaEl = document.getElementById("userMeta");
-        const p_name = document.getElementById("p_name");
-        const p_phone = document.getElementById("p_phone");
-        const p_role = document.getElementById("p_role");
-        const p_address = document.getElementById("p_address");
-        const p_city = document.getElementById("p_city");
-        const p_bonus = document.getElementById("p_bonus");
-        const sellerSelect = document.getElementById("sellerSelect");
-        const reyonSelect = document.getElementById("reyonSelect");
-        const categorySelect = document.getElementById("categorySelect");
-        const productSelect = document.getElementById("productSelect");
-        const productsGrid = document.getElementById("productsGrid");
-        const cartList = document.getElementById("cartList");
-        const subtotalEl = document.getElementById("subtotal");
-        const discountEl = document.getElementById("discount");
-        const vatAmountEl = document.getElementById("vatAmount");
-        const totalAmountEl = document.getElementById("totalAmount");
-        const btnLoadProducts = document.getElementById("btnLoadProducts");
-        const btnShareRef = document.getElementById("btnShareRef");
-        const voiceBtn = document.getElementById("voiceBtn");
-        const voiceStatus = document.getElementById("voiceStatus");
-        const cartCount = document.getElementById("cartCount");
-        const toast = document.getElementById("toast");
-        const toastIcon = document.getElementById("toastIcon");
-        const toastMessage = document.getElementById("toastMessage");
-
-        // Utility functions
-        function money(amount) {
-            return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(amount);
-        }
-
-        function showToast(message, type = 'info') {
-            const icons = {
-                success: 'fa-check-circle',
-                error: 'fa-exclamation-circle',
-                warning: 'fa-exclamation-triangle',
-                info: 'fa-info-circle'
-            };
-            
-            const colors = {
-                success: 'bg-green-600',
-                error: 'bg-red-600',
-                warning: 'bg-yellow-600',
-                info: 'bg-gray-800'
-            };
-            
-            toastIcon.className = `fas ${icons[type]} mr-2`;
-            toast.className = toast.className.replace(/bg-\w+-\d+/, colors[type]);
-            toastMessage.textContent = message;
-            
-            toast.classList.remove('opacity-0', 'translate-y-20');
-            toast.classList.add('opacity-100', 'translate-y-0');
-            
-            setTimeout(() => {
-                toast.classList.remove('opacity-100', 'translate-y-0');
-                toast.classList.add('opacity-0', 'translate-y-20');
-            }, 3000);
-        }
-
-        // Initialize application
-        document.addEventListener('DOMContentLoaded', async function() {
-            await initApp();
+        const voiceAssistant = document.getElementById('voiceAssistant');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const assistantMessage = document.getElementById('assistantMessage');
+        const userMessage = document.getElementById('userMessage');
+        const currentStatus = document.getElementById('currentStatus');
+        const statusProgress = document.getElementById('statusProgress');
+        const statusText = document.getElementById('statusText');
+        
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initVoiceRecognition();
+            loadInitialData();
             setupEventListeners();
+            
+            // Sayfa yüklendiğinde sesli asistanı başlat
+            setTimeout(() => {
+                speakToUser("Merhaba! Hoş geldiniz. Size nasıl yardımcı olabilirim?");
+            }, 1000);
         });
-
-        async function initApp() {
-            await loadSessionAndProfile();
-            await loadSellersByLocation();
-            await loadReferralSummary();
-        }
-
-        async function loadSessionAndProfile() {
-            try {
-                const { data: { session }, error } = await supabase.auth.getSession();
+        
+        // Initialize voice recognition
+        function initVoiceRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.lang = 'tr-TR';
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
                 
-                if (error) {
-                    console.error('Session error:', error);
-                    return;
-                }
+                recognition.onstart = function() {
+                    isListening = true;
+                    document.body.classList.add('listening');
+                    voiceStatus.style.display = 'block';
+                    assistantMessage.textContent = "Dinliyorum...";
+                    userMessage.textContent = "";
+                };
                 
-                if (!session?.user) {
-                    userNameEl.textContent = "Giriş yapılmadı";
-                    userMetaEl.textContent = "Lütfen giriş yapın";
-                    return;
-                }
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript.toLowerCase();
+                    userMessage.textContent = transcript;
+                    processVoiceCommand(transcript);
+                };
                 
-                currentUser = session.user;
+                recognition.onerror = function(event) {
+                    console.error('Speech recognition error', event.error);
+                    assistantMessage.textContent = "Üzgünüm, anlayamadım. Tekrar söyler misiniz?";
+                    isListening = false;
+                    document.body.classList.remove('listening');
+                };
                 
-                const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, role, phone, address, city, location')
-                    .eq('id', currentUser.id)
-                    .single();
-                    
-                if (profileError) {
-                    console.error('Profile error:', profileError);
-                    showToast('Profil bilgileri yüklenirken hata oluştu', 'error');
-                    return;
-                }
+                recognition.onend = function() {
+                    isListening = false;
+                    document.body.classList.remove('listening');
+                };
                 
-                currentProfile = profile;
-                userNameEl.textContent = profile.full_name || currentUser.email;
-                userMetaEl.textContent = profile.city ? `${profile.city} • ${profile.location || ''}` : '';
-                
-                p_name.textContent = profile.full_name || '-';
-                p_phone.textContent = profile.phone || '-';
-                p_role.textContent = profile.role || '-';
-                p_address.textContent = profile.address || '-';
-                p_city.textContent = profile.city || '-';
-                
-            } catch (err) {
-                console.error('Error in loadSessionAndProfile:', err);
-                showToast('Bir hata oluştu: ' + err.message, 'error');
-            }
-        }
-
-        async function loadSellersByLocation() {
-            if (!currentProfile?.location) {
-                sellerSelect.innerHTML = '<option value="">-- Lokasyonunuz belirlenemedi --</option>';
-                return;
-            }
-            
-            try {
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, phone, city, location')
-                    .eq('role', 'market')
-                    .eq('location', currentProfile.location)
-                    .limit(100);
-                    
-                if (error) {
-                    console.error('Sellers error:', error);
-                    showToast('Satıcılar yüklenirken hata oluştu', 'error');
-                    return;
-                }
-                
-                sellers = data || [];
-                sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
-                
-                sellers.forEach(seller => {
-                    const option = document.createElement('option');
-                    option.value = seller.id;
-                    option.textContent = seller.full_name || seller.phone || seller.id;
-                    sellerSelect.appendChild(option);
-                });
-                
-            } catch (err) {
-                console.error('Error in loadSellersByLocation:', err);
-                showToast('Satıcılar yüklenirken hata oluştu', 'error');
-            }
-        }
-
-        async function loadSellerData(sellerId) {
-            if (!sellerId) return;
-            
-            try {
-                // Load reyonlar
-                const { data: reyonData, error: reyonError } = await supabase
-                    .from('reyon')
-                    .select('id, name, image_url')
-                    .eq('seller_id', sellerId);
-                    
-                if (reyonError) {
-                    console.error('Reyon error:', reyonError);
-                    showToast('Reyonlar yüklenirken hata oluştu', 'error');
-                    return;
-                }
-                
-                reyonlar = reyonData || [];
-                reyonSelect.innerHTML = '<option value="">-- Reyon seçin --</option>';
-                
-                reyonlar.forEach(reyon => {
-                    const option = document.createElement('option');
-                    option.value = reyon.id;
-                    option.textContent = reyon.name;
-                    reyonSelect.appendChild(option);
-                });
-                
-                // Load categories
-                const { data: catData, error: catError } = await supabase
-                    .from('categories')
-                    .select('id, name, reyon_id')
-                    .in('reyon_id', reyonlar.map(r => r.id))
-                    .limit(100);
-                    
-                if (catError) {
-                    console.error('Categories error:', catError);
-                    showToast('Kategoriler yüklenirken hata oluştu', 'error');
-                    return;
-                }
-                
-                categories = catData || [];
-                categorySelect.innerHTML = '<option value="">-- Kategori seçin --</option>';
-                
-                categories.forEach(category => {
-                    const option = document.createElement('option');
-                    option.value = category.id;
-                    option.textContent = category.name;
-                    categorySelect.appendChild(option);
-                });
-                
-                // Load products
-                await loadProductsForSeller(sellerId);
-                
-            } catch (err) {
-                console.error('Error in loadSellerData:', err);
-                showToast('Satıcı verileri yüklenirken hata oluştu', 'error');
-            }
-        }
-
-        async function loadProductsForSeller(sellerId) {
-            try {
-                // Load product prices
-                const { data: priceData, error: priceError } = await supabase
-                    .from('product_prices')
-                    .select('product_id, price')
-                    .eq('sube_id', sellerId);
-                    
-                if (priceError) {
-                    console.error('Price error:', priceError);
-                    showToast('Fiyat bilgileri yüklenirken hata oluştu', 'error');
-                    return;
-                }
-                
-                productPrices = {};
-                (priceData || []).forEach(item => {
-                    productPrices[item.product_id] = item.price;
-                });
-                
-                // Load products
-                const { data: productData, error: productError } = await supabase
-                    .from('products')
-                    .select('id, name, imgurl, category_id')
-                    .eq('seller_id', sellerId);
-                    
-                if (productError) {
-                    console.error('Product error:', productError);
-                    showToast('Ürünler yüklenirken hata oluştu', 'error');
-                    return;
-                }
-                
-                products = (productData || []).map(product => ({
-                    id: product.id,
-                    name: product.name,
-                    img: product.imgurl || 'https://via.placeholder.com/150x150?text=Ürün',
-                    category_id: product.category_id,
-                    price: productPrices[product.id] || 0
-                }));
-                
-                renderProductsGrid(products);
-                
-                // Update product select
-                productSelect.innerHTML = '<option value="">-- Ürün seçin --</option>';
-                products.forEach(product => {
-                    const option = document.createElement('option');
-                    option.value = product.id;
-                    option.textContent = product.name;
-                    productSelect.appendChild(option);
-                });
-                
-            } catch (err) {
-                console.error('Error in loadProductsForSeller:', err);
-                showToast('Ürünler yüklenirken hata oluştu', 'error');
-            }
-        }
-
-        function renderProductsGrid(productsList) {
-            productsGrid.innerHTML = '';
-            
-            if (!productsList || !productsList.length) {
-                productsGrid.innerHTML = `
-                    <div class="col-span-full text-center py-10 text-gray-500">
-                        <i class="fas fa-box-open text-4xl mb-3"></i>
-                        <p>Bu satıcıya ait ürün bulunamadı</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            productsList.forEach(product => {
-                const card = document.createElement('div');
-                card.className = 'card product-card p-4';
-                card.innerHTML = `
-                    <div class="flex justify-center mb-3">
-                        <img src="${product.img}" alt="${product.name}" class="product-image">
-                    </div>
-                    <h3 class="font-semibold text-sm text-center mb-2 h-10 overflow-hidden">${product.name}</h3>
-                    <div class="text-center text-green-600 font-bold mb-3">${money(product.price)}</div>
-                    <button class="mt-auto btn-primary py-2 rounded-lg text-sm add-to-cart-btn" data-product-id="${product.id}">
-                        <i class="fas fa-cart-plus mr-1"></i> Sepete Ekle
-                    </button>
-                `;
-                
-                productsGrid.appendChild(card);
-            });
-            
-            // Add event listeners to Add to Cart buttons
-            document.querySelectorAll('.add-to-cart-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const productId = this.getAttribute('data-product-id');
-                    const product = products.find(p => p.id == productId);
-                    if (product) {
-                        addToCartByProduct(product, 1, true);
+                voiceAssistant.addEventListener('click', function() {
+                    if (isListening) {
+                        recognition.stop();
+                    } else {
+                        recognition.start();
                     }
                 });
+            } else {
+                voiceAssistant.style.display = 'none';
+                console.warn('Speech Recognition API is not supported in this browser');
+            }
+        }
+        
+        // Load initial data
+        async function loadInitialData() {
+            // Önce ses tanıma ile kullanıcıyı tanımlamaya çalış
+            await identifyUserByVoice();
+        }
+        
+        // Process voice commands
+        function processVoiceCommand(transcript) {
+            switch(conversationStep) {
+                case 0: // İlk karşılama
+                    if (transcript.includes('merhaba')) {
+                        speakToUser("Merhaba efendim! Hoş geldiniz. Sesi tanıyorum, profiliniz yükleniyor.");
+                        // Ses kodu ile kullanıcıyı bulmaya çalış
+                        findUserByVoiceCode();
+                    } else {
+                        speakToUser("Önce 'Merhaba' diyerek başlayalım mı?");
+                    }
+                    break;
+                case 1: // Telefon numarası isteme
+                    const phoneMatch = transcript.match(/\d+/g);
+                    if (phoneMatch) {
+                        const phone = phoneMatch.join('');
+                        document.getElementById('p_phone').textContent = phone;
+                        checkUserByPhone(phone);
+                    } else {
+                        speakToUser("Telefon numaranızı anlayamadım. Lütfen numaranızı söyler misiniz?");
+                    }
+                    break;
+                case 2: // Yeni kullanıcı kaydı - İsim
+                    document.getElementById('p_name').textContent = transcript;
+                    speakToUser("Teşekkürler. Hangi şehirden alışveriş yapmak istiyorsunuz?");
+                    conversationStep = 3;
+                    break;
+                case 3: // Yeni kullanıcı kaydı - Şehir
+                    document.getElementById('p_city').textContent = transcript;
+                    speakToUser("Tamam. Son olarak, adresinizi öğrenebilir miyim?");
+                    conversationStep = 4;
+                    break;
+                case 4: // Yeni kullanıcı kaydı - Adres
+                    document.getElementById('p_address').textContent = transcript;
+                    speakToUser("Teşekkürler. Konumunuz belirleniyor ve profiliniz oluşturuluyor.");
+                    // Konum bilgisini al ve profili kaydet
+                    getLocationFromAddress(transcript);
+                    conversationStep = 5;
+                    break;
+                case 5: // Profil oluşturuldu, satıcılar yükleniyor
+                    // Satıcıları yükle
+                    loadSellersByLocation();
+                    break;
+                default:
+                    // Normal sipariş süreci
+                    processOrderCommand(transcript);
+                    break;
+            }
+        }
+        
+        // Speak to user
+        function speakToUser(message) {
+            assistantMessage.textContent = message;
+            
+            // Tarayıcı ses sentezleme API'si
+            if ('speechSynthesis' in window) {
+                const speech = new SpeechSynthesisUtterance(message);
+                speech.lang = 'tr-TR';
+                speech.volume = 1;
+                speech.rate = 1;
+                speech.pitch = 1;
+                
+                window.speechSynthesis.speak(speech);
+            }
+        }
+        
+        // Find user by voice code
+        async function findUserByVoiceCode() {
+            // Bu örnek için rastgele bir ses kodu oluşturuluyor
+            // Gerçek uygulamada bu kodu veritabanından almalısınız
+            voiceCode = Math.random().toString(36).substring(2, 10);
+            
+            // Ses kodunu kullanarak kullanıcıyı bulmaya çalış
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('voice_code', voiceCode)
+                .maybeSingle();
+                
+            if (data) {
+                // Kullanıcı bulundu
+                currentProfile = data;
+                updateProfileUI();
+                speakToUser(`Hoş geldiniz ${data.full_name}! Size yardımcı olmaktan mutluluk duyarım.`);
+                conversationStep = 6; // Normal sipariş sürecine geç
+                loadSellersByLocation();
+            } else {
+                // Kullanıcı bulunamadı, telefon numarası iste
+                speakToUser("Ses kodu bulunamadı. Lütfen telefon numaranızı söyler misiniz?");
+                conversationStep = 1;
+            }
+        }
+        
+        // Check user by phone
+        async function checkUserByPhone(phone) {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('phone', phone)
+                .maybeSingle();
+                
+            if (data) {
+                // Kullanıcı bulundu
+                currentProfile = data;
+                updateProfileUI();
+                speakToUser(`Hoş geldiniz ${data.full_name}! Ses tanıma kodunuz: ${voiceCode}. Bir sonraki girişinizde bu kodu kullanabilirsiniz.`);
+                conversationStep = 6; // Normal sipariş sürecine geç
+                loadSellersByLocation();
+            } else {
+                // Kullanıcı bulunamadı, yeni kayıt
+                speakToUser("Kayıtlı kullanıcı profiliniz bulunamadı. Lütfen adınızı ve soyadınızı söyler misiniz?");
+                conversationStep = 2;
+            }
+        }
+        
+        // Get location from address
+        async function getLocationFromAddress(address) {
+            // Bu örnek için sabit bir konum döndürüyoruz
+            // Gerçek uygulamada Google Maps API kullanmalısınız
+            const location = "https://www.google.com/maps/place/Kadıköy";
+            
+            // Profili oluştur
+            createUserProfile(location);
+        }
+        
+        // Create user profile
+        async function createUserProfile(location) {
+            const full_name = document.getElementById('p_name').textContent;
+            const phone = document.getElementById('p_phone').textContent;
+            const city = document.getElementById('p_city').textContent;
+            const address = document.getElementById('p_address').textContent;
+            
+            // Rastgele bir voice code oluştur
+            voiceCode = Math.random().toString(36).substring(2, 10);
+            
+            const { data, error } = await supabase
+                .from('profiles')
+                .insert([
+                    {
+                        full_name: full_name,
+                        role: 'customer',
+                        phone: phone,
+                        address: address,
+                        city: city,
+                        location: location,
+                        voice_code: voiceCode,
+                        status: 'Active',
+                        confirm: true
+                    }
+                ])
+                .select()
+                .single();
+                
+            if (error) {
+                console.error('Error creating profile:', error);
+                speakToUser("Profil oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+            } else {
+                currentProfile = data;
+                speakToUser(`Profiliniz başarıyla oluşturuldu. Ses tanıma kodunuz: ${voiceCode}. Bir sonraki girişinizde bu kodu kullanabilirsiniz.`);
+                conversationStep = 6; // Normal sipariş sürecine geç
+                loadSellersByLocation();
+            }
+        }
+        
+        // Load sellers by location
+        async function loadSellersByLocation() {
+            if (!currentProfile) return;
+            
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('role', 'market')
+                .eq('city', currentProfile.city)
+                .limit(10);
+                
+            if (error) {
+                console.error('Error loading sellers:', error);
+            } else {
+                sellers = data;
+                updateSellerSelect();
+                speakToUser("Bulunduğunuz bölgedeki satıcılar yüklendi. Sesli olarak bir satıcı seçebilir veya listeden seçim yapabilirsiniz.");
+            }
+        }
+        
+        // Update seller select
+        function updateSellerSelect() {
+            const sellerSelect = document.getElementById('sellerSelect');
+            sellerSelect.innerHTML = '<option value="">Satıcı Seçin</option>';
+            
+            sellers.forEach(seller => {
+                const option = document.createElement('option');
+                option.value = seller.id;
+                option.textContent = seller.full_name;
+                sellerSelect.appendChild(option);
             });
         }
-
-        function addToCartByProduct(product, quantity = 1, animate = false) {
-            const existingItem = cart.find(item => item.product_id === product.id);
+        
+        // Update profile UI
+        function updateProfileUI() {
+            if (!currentProfile) return;
+            
+            document.getElementById('p_name').textContent = currentProfile.full_name || '-';
+            document.getElementById('p_phone').textContent = currentProfile.phone || '-';
+            document.getElementById('p_city').textContent = currentProfile.city || '-';
+            document.getElementById('p_address').textContent = currentProfile.address || '-';
+            document.getElementById('userName').textContent = currentProfile.full_name || 'Misafir';
+            document.getElementById('userLocation').textContent = currentProfile.city || 'Konum bilinmiyor';
+            
+            // Bonus bilgisini yükle
+            loadBonusInfo();
+        }
+        
+        // Load bonus info
+        async function loadBonusInfo() {
+            if (!currentProfile) return;
+            
+            // Örnek bonus bilgisi
+            document.getElementById('p_bonus').textContent = "125.50 ₺";
+            document.getElementById('p_bonus_amount').textContent = "125.50 ₺";
+        }
+        
+        // Process order command
+        function processOrderCommand(transcript) {
+            // Basit bir ürün tanıma örneği
+            const products = [
+                { name: "domates", id: 1, price: 12.5 },
+                { name: "ekmek", id: 2, price: 5 },
+                { name: "süt", id: 3, price: 15 },
+                { name: "yumurta", id: 4, price: 25 },
+                { name: "peynir", id: 5, price: 85 }
+            ];
+            
+            let productFound = null;
+            let quantity = 1;
+            
+            // Miktarı kontrol et (1 kilo, 2 adet vb.)
+            const quantityMatch = transcript.match(/(\d+)\s*(kilo|kg|adet|paket|tane)/);
+            if (quantityMatch) {
+                quantity = parseInt(quantityMatch[1]);
+            }
+            
+            // Ürünü bul
+            for (const product of products) {
+                if (transcript.includes(product.name)) {
+                    productFound = product;
+                    break;
+                }
+            }
+            
+            if (productFound) {
+                // Ürünü sepete ekle
+                addToCart(productFound, quantity);
+                speakToUser(`${quantity} ${productFound.name} sepete eklendi. Başka bir şey ister misiniz?`);
+                
+                // 10 saniye içinde yanıt gelmezse devam edelim mi diye sor
+                setTimeout(() => {
+                    if (!isListening) {
+                        speakToUser("Alışverişe devam etmek istiyor musunuz?");
+                    }
+                }, 10000);
+            } else if (transcript.includes('hayır') || transcript.includes('istemiyorum')) {
+                speakToUser("Peki. Siparişinizi tamamlayalım mı?");
+            } else if (transcript.includes('evet') || transcript.includes('tamamla')) {
+                completeOrder();
+            } else {
+                speakToUser("Üzgünüm, anlayamadım. Lütfen tekrar söyler misiniz?");
+            }
+        }
+        
+        // Add to cart
+        function addToCart(product, quantity) {
+            // Sepete ürünü ekle
+            const existingItem = cart.find(item => item.id === product.id);
             
             if (existingItem) {
-                existingItem.qty += quantity;
+                existingItem.quantity += quantity;
             } else {
                 cart.push({
-                    product_id: product.id,
+                    id: product.id,
                     name: product.name,
-                    img: product.img,
                     price: product.price,
-                    qty: quantity
+                    quantity: quantity
                 });
             }
             
-            renderCart();
-            updateCartCount();
-            
-            if (animate) {
-                flyToCart(product.img);
-            }
-            
-            showToast(`${product.name} sepete eklendi`, 'success');
+            updateCartUI();
         }
-
-        function renderCart() {
+        
+        // Update cart UI
+        function updateCartUI() {
+            const cartList = document.getElementById('cartList');
+            const subtotalEl = document.getElementById('subtotal');
+            const discountEl = document.getElementById('discount');
+            const vatAmountEl = document.getElementById('vatAmount');
+            const totalAmountEl = document.getElementById('totalAmount');
+            
+            // Sepeti temizle
             cartList.innerHTML = '';
             
-            if (!cart.length) {
+            if (cart.length === 0) {
                 cartList.innerHTML = `
-                    <div class="text-center text-gray-500 py-8">
-                        <i class="fas fa-shopping-basket text-2xl mb-2"></i>
+                    <div class="text-center" style="padding: 20px; color: #6b7280;">
+                        <i class="fas fa-shopping-cart" style="font-size: 36px; margin-bottom: 10px;"></i>
                         <p>Sepetinizde ürün bulunmuyor</p>
                     </div>
                 `;
-                updateTotals();
-                return;
-            }
-            
-            cart.forEach((item, index) => {
-                const cartItem = document.createElement('div');
-                cartItem.className = 'cart-item bg-gray-50 p-3 rounded-lg';
-                cartItem.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <img src="${item.img}" class="w-12 h-12 object-cover rounded" alt="${item.name}">
-                        <div class="flex-1">
-                            <div class="font-medium text-sm">${item.name}</div>
-                            <div class="text-xs text-gray-500">${money(item.price)} × ${item.qty}</div>
-                        </div>
-                        <div class="font-semibold">${money(item.price * item.qty)}</div>
-                        <button class="remove-from-cart text-red-500 ml-2" data-index="${index}">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                `;
-                cartList.appendChild(cartItem);
-            });
-            
-            // Add event listeners to remove buttons
-            document.querySelectorAll('.remove-from-cart').forEach(button => {
-                button.addEventListener('click', function() {
-                    const index = parseInt(this.getAttribute('data-index'));
-                    removeFromCart(index);
-                });
-            });
-            
-            updateTotals();
-        }
-
-        function updateCartCount() {
-            const totalItems = cart.reduce((total, item) => total + item.qty, 0);
-            cartCount.textContent = totalItems;
-            
-            if (totalItems > 0) {
-                cartCount.classList.remove('hidden');
             } else {
-                cartCount.classList.add('hidden');
+                // Sepet öğelerini ekle
+                cart.forEach(item => {
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'cart-item';
+                    itemElement.innerHTML = `
+                        <div class="cart-item-info">
+                            <div class="cart-item-name">${item.name}</div>
+                            <div class="cart-item-quantity">${item.quantity} adet</div>
+                        </div>
+                        <div class="cart-item-price">${(item.price * item.quantity).toFixed(2)} ₺</div>
+                    `;
+                    cartList.appendChild(itemElement);
+                });
             }
+            
+            // Toplamları hesapla
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const discount = 0; // İndirim yok
+            const vatAmount = subtotal * 0.18; // %18 KDV
+            const totalAmount = subtotal + vatAmount - discount;
+            
+            // Toplamları güncelle
+            subtotalEl.textContent = subtotal.toFixed(2) + ' ₺';
+            discountEl.textContent = discount.toFixed(2) + ' ₺';
+            vatAmountEl.textContent = vatAmount.toFixed(2) + ' ₺';
+            totalAmountEl.textContent = totalAmount.toFixed(2) + ' ₺';
         }
-
-        function removeFromCart(index) {
-            if (index >= 0 && index < cart.length) {
-                const removedItem = cart[index];
-                cart.splice(index, 1);
-                renderCart();
-                updateCartCount();
-                showToast(`${removedItem.name} sepetten çıkarıldı`, 'info');
+        
+        // Complete order
+        function completeOrder() {
+            if (cart.length === 0) {
+                speakToUser("Sepetinizde ürün bulunmamaktadır. Lütfen önce ürün ekleyin.");
+                return;
             }
+            
+            speakToUser(`Sipariş toplamınız ${document.getElementById('totalAmount').textContent}. Nasıl ödemek istersiniz? Kapıda nakit, kapıda kart veya bonus ile ödeme seçenekleriniz bulunmaktadır.`);
         }
-
-        function updateTotals() {
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const discount = 0; // Could be implemented later
-            const vatAmount = ((subtotal - discount) * VAT_RATE) / 100;
-            const total = subtotal - discount + vatAmount;
-            
-            subtotalEl.textContent = money(subtotal);
-            discountEl.textContent = money(discount);
-            vatAmountEl.textContent = money(vatAmount);
-            totalAmountEl.textContent = money(total);
-        }
-
-        function flyToCart(imgUrl) {
-            const flyElement = document.createElement('img');
-            flyElement.src = imgUrl;
-            flyElement.className = 'fly w-12 h-12';
-            
-            // Get button position
-            const rect = event.target.getBoundingClientRect();
-            flyElement.style.left = `${rect.left}px`;
-            flyElement.style.top = `${rect.top}px`;
-            
-            document.body.appendChild(flyElement);
-            
-            // Get cart position
-            const cartRect = document.getElementById('cartCount').getBoundingClientRect();
-            
-            // Animate to cart
-            setTimeout(() => {
-                flyElement.style.left = `${cartRect.left}px`;
-                flyElement.style.top = `${cartRect.top}px`;
-                flyElement.style.width = '20px';
-                flyElement.style.height = '20px';
-                flyElement.style.opacity = '0';
-            }, 50);
-            
-            // Remove element after animation
-            setTimeout(() => {
-                if (document.body.contains(flyElement)) {
-                    document.body.removeChild(flyElement);
-                }
-            }, 850);
-        }
-
-        async function loadReferralSummary() {
-            if (!currentProfile?.id) return;
-            
-            try {
-                const { data, error } = await supabase
-                    .from('referral_bonus_summary')
-                    .select('kalan_bonus')
-                    .eq('user_id', currentProfile.id)
-                    .maybeSingle();
-                    
-                if (error) {
-                    console.error('Referral error:', error);
-                    return;
-                }
-                
-                const bonus = data?.kalan_bonus || 0;
-                p_bonus.textContent = money(bonus);
-                
-            } catch (err) {
-                console.error('Error in loadReferralSummary:', err);
-            }
-        }
-
+        
+        // Setup event listeners
         function setupEventListeners() {
-            // Seller selection change
-            sellerSelect.addEventListener('change', function() {
-                if (this.value) {
-                    loadSellerData(this.value);
-                } else {
-                    productsGrid.innerHTML = '<div class="text-center text-gray-500 py-10">Lütfen bir satıcı seçin</div>';
-                }
+            // Ödeme butonları
+            document.getElementById('payCash').addEventListener('click', () => {
+                selectPaymentMethod('cash');
             });
             
-            // Load products button
-            btnLoadProducts.addEventListener('click', function() {
-                if (sellerSelect.value) {
-                    loadSellerData(sellerSelect.value);
-                } else {
-                    showToast('Lütfen önce bir satıcı seçin', 'warning');
-                }
+            document.getElementById('payCard').addEventListener('click', () => {
+                selectPaymentMethod('card');
             });
             
-            // Share referral button
-            btnShareRef.addEventListener('click', function() {
-                if (!currentProfile) {
-                    showToast('Önce giriş yapmalısınız', 'warning');
-                    return;
-                }
-                
-                // Simple implementation - could be expanded
-                const referralLink = `${window.location.origin}?ref=${currentProfile.id}`;
-                navigator.clipboard.writeText(referralLink).then(() => {
-                    showToast('Referans linki panoya kopyalandı', 'success');
-                }).catch(err => {
-                    showToast('Link kopyalanırken hata oluştu', 'error');
-                    console.error('Copy error:', err);
-                });
+            document.getElementById('payBonus').addEventListener('click', () => {
+                selectPaymentMethod('bonus');
             });
-            
-            // Payment buttons
-            document.getElementById('payCash').addEventListener('click', () => finalizeOrder('nakit'));
-            document.getElementById('payCard').addEventListener('click', () => finalizeOrder('kart'));
-            document.getElementById('payBonus').addEventListener('click', () => finalizeOrder('bonus'));
-            
-            // Voice order button
-            voiceBtn.addEventListener('click', startVoiceRecognition);
         }
-
-        function startVoiceRecognition() {
-            if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-                showToast('Tarayıcınız ses tanıma özelliğini desteklemiyor', 'error');
-                return;
+        
+        // Select payment method
+        function selectPaymentMethod(method) {
+            currentPaymentMethod = method;
+            
+            // Tüm butonlardan seçili classını kaldır
+            document.getElementById('payCash').classList.remove('selected');
+            document.getElementById('payCard').classList.remove('selected');
+            document.getElementById('payBonus').classList.remove('selected');
+            
+            // Seçilen butona selected classını ekle
+            document.getElementById(`pay${method.charAt(0).toUpperCase() + method.slice(1)}`).classList.add('selected');
+            
+            if (method === 'bonus') {
+                const bonusAmount = parseFloat(document.getElementById('p_bonus_amount').textContent);
+                const totalAmount = parseFloat(document.getElementById('totalAmount').textContent);
+                
+                if (bonusAmount < totalAmount) {
+                    speakToUser(`Bonus bakiyeniz ${bonusAmount} TL, sipariş tutarınız ${totalAmount} TL. Bonus bakiyeniz yetersiz. Kalan tutarı nasıl ödemek istersiniz?`);
+                } else {
+                    speakToUser("Ödemeniz bonus bakiyenizden karşılanacaktır. Siparişinizi onaylıyor musunuz?");
+                }
+            } else {
+                speakToUser(`Ödemeniz ${method === 'cash' ? 'kapıda nakit' : 'kapıda kart'} olarak ayarlandı. Siparişinizi onaylıyor musunuz?`);
             }
-            
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'tr-TR';
-            recognition.continuous = false;
-            
-            voiceBtn.classList.add('voice-listening');
-            voiceStatus.textContent = 'Dinleniyor...';
-            voiceStatus.className = 'ml-1 text-sm text-green-600 font-medium mt-2';
-            
-            recognition.start();
-            
-            recognition.onresult = function(event) {
-                const transcript = event.results[0][0].transcript.toLowerCase();
-                voiceStatus.textContent = `Söylenen: "${transcript}"`;
-                
-                // Try to find product matches
-                const foundProducts = products.filter(product => 
-                    transcript.includes(product.name.toLowerCase())
-                );
-                
-                if (foundProducts.length > 0) {
-                    // Try to extract quantity
-                    const quantityMatch = transcript.match(/\d+/);
-                    const quantity = quantityMatch ? parseInt(quantityMatch[0]) : 1;
-                    
-                    foundProducts.forEach(product => {
-                        addToCartByProduct(product, quantity, true);
-                    });
-                    
-                    voiceStatus.textContent += ` → ${foundProducts.length} ürün eklendi`;
-                } else {
-                    voiceStatus.className = 'ml-1 text-sm text-red-600 mt-2';
-                    voiceStatus.textContent = 'Ürün bulunamadı: ' + transcript;
-                }
-            };
-            
-            recognition.onerror = function(event) {
-                console.error('Speech recognition error', event.error);
-                voiceBtn.classList.remove('voice-listening');
-                voiceStatus.className = 'ml-1 text-sm text-red-600 mt-2';
-                
-                if (event.error === 'no-speech') {
-                    voiceStatus.textContent = 'Ses algılanamadı';
-                } else {
-                    voiceStatus.textContent = 'Hata: ' + event.error;
-                }
-            };
-            
-            recognition.onend = function() {
-                voiceBtn.classList.remove('voice-listening');
-                setTimeout(() => {
-                    voiceStatus.textContent = '';
-                }, 5000);
-            };
         }
-
-        async function finalizeOrder(paymentMethod) {
-            if (!currentProfile?.id) {
-                showToast('Sipariş için lütfen giriş yapın', 'warning');
-                return;
-            }
+        
+        // Simulate order status updates
+        function simulateOrderStatus() {
+            let progress = 0;
+            statusText.textContent = "Siparişiniz alındı";
             
-            if (!cart.length) {
-                showToast('Sepetinizde ürün bulunmuyor', 'warning');
-                return;
-            }
+            if (orderStatusInterval) clearInterval(orderStatusInterval);
             
-            // Check if seller is selected
-            if (!sellerSelect.value) {
-                showToast('Lütfen bir satıcı seçin', 'warning');
-                return;
-            }
-            
-            const items = cart.map(item => ({
-                product_id: item.product_id,
-                quantity: item.qty,
-                unit_price: item.price
-            }));
-            
-            let bonusToUse = 0;
-            
-            if (paymentMethod === 'bonus') {
-                const { data } = await supabase
-                    .from('referral_bonus_summary')
-                    .select('kalan_bonus')
-                    .eq('user_id', currentProfile.id)
-                    .maybeSingle();
-                    
-                const availableBonus = data?.kalan_bonus || 0;
+            orderStatusInterval = setInterval(() => {
+                progress += 10;
+                statusProgress.style.width = `${progress}%`;
                 
-                if (availableBonus <= 0) {
-                    showToast('Yeterli bonusunuz bulunmuyor', 'warning');
-                    return;
+                if (progress >= 100) {
+                    clearInterval(orderStatusInterval);
+                    statusText.textContent = "Siparişiniz teslim edildi";
+                    speakToUser("Siparişiniz teslim edildi. Bizi tercih ettiğiniz için teşekkür ederiz!");
+                } else if (progress >= 75) {
+                    statusText.textContent = "Kurye adresinizde";
+                } else if (progress >= 50) {
+                    statusText.textContent = "Kurye yolda";
+                } else if (progress >= 25) {
+                    statusText.textContent = "Kurye atandı";
                 }
-                
-                const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-                bonusToUse = Math.min(availableBonus, subtotal);
-            }
-            
-            try {
-                showToast('Siparişiniz işleniyor...', 'info');
-                
-                const { data: orderId, error } = await supabase.rpc('create_order_with_bonus', {
-                    p_user_id: currentProfile.id,
-                    p_items: items,
-                    p_bonus_used: bonusToUse,
-                    p_payment_type: paymentMethod
-                });
-                
-                if (error) {
-                    console.error('Order error:', error);
-                    showToast('Sipariş oluşturulamadı: ' + error.message, 'error');
-                    return;
-                }
-                
-                showToast(`Siparişiniz alındı! Sipariş No: ${orderId}`, 'success');
-                
-                // Clear cart and update UI
-                cart = [];
-                renderCart();
-                updateCartCount();
-                await loadReferralSummary();
-                
-                // Print receipt (simulated)
-                setTimeout(() => {
-                    alert(`Siparişiniz başarıyla oluşturuldu!\nSipariş No: ${orderId}\nÖdeme Yöntemi: ${paymentMethod}\nToplam Tutar: ${totalAmountEl.textContent}`);
-                }, 500);
-                
-            } catch (err) {
-                console.error('Error in finalizeOrder:', err);
-                showToast('Sipariş sırasında bir hata oluştu: ' + err.message, 'error');
-            }
+            }, 2000);
+        }
+        
+        // Initialize voice recognition on page load
+        function identifyUserByVoice() {
+            // Sayfa yüklendiğinde sesli tanıma başlat
+            setTimeout(() => {
+                speakToUser("Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen 'Merhaba' diyerek başlayın.");
+            }, 1500);
         }
     </script>
 </body>
