@@ -128,114 +128,515 @@
 
   </main>
 </div>
-  <!-- JS -->
-  <script>
-  /******** SUPABASE INIT ********/
-  const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
-  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  /******** GLOBALS ********/
-  let cart = [];
-  let currentProfile = null;
-  const productsGrid = document.getElementById("productsGrid");
-  const cartList = document.getElementById("cartList");
-  const modalCartList = document.getElementById("modalCartList");
-  const p_bonus = document.getElementById("p_bonus");
+<script>
+        // Supabase configuration
+        const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+        
+        // Initialize Supabase client
+        const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  /******** HELPERS ********/
-  const money = (n) =>
-    Number(n).toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
+/* ====== Uygulama state ====== */
+let currentUser = null;
+let currentProfile = null;
+let sellers = [];      // seller profiles list
+let reyonlar = [];     // current seller reyon list
+let categories = [];   // categories for selected reyon
+let products = [];     // products list for selected seller / category
+let productPrices = {}; // map product_id -> price (from product_prices)
+let cart = [];         // { product_id, name, img, price, qty }
 
-  /******** CART ********/
-  function renderCart() {
-    cartList.innerHTML = "";
-    if (!cart.length) {
-      cartList.innerHTML = `<div class="text-gray-400 text-sm">Sepet boş</div>`;
-      updateTotals();
-      return;
-    }
-    cart.forEach((it) => {
-      const row = document.createElement("div");
-      row.className = "flex justify-between items-center text-sm";
-      row.innerHTML = `
-        <div>${it.name} <span class="text-gray-400">x${it.qty}</span></div>
-        <div class="font-semibold">${money(it.price * it.qty)}</div>
-      `;
-      cartList.appendChild(row);
-    });
-    updateTotals();
+/* VAT ve discount config */
+const VAT_RATE = 18; // yüzde
+
+/* DOM */
+const userNameEl = document.getElementById("userName");
+const userMetaEl = document.getElementById("userMeta");
+const p_name = document.getElementById("p_name");
+const p_phone = document.getElementById("p_phone");
+const p_role = document.getElementById("p_role");
+const p_address = document.getElementById("p_address");
+const p_city = document.getElementById("p_city");
+const p_bonus = document.getElementById("p_bonus");
+const sellerSelect = document.getElementById("sellerSelect");
+const reyonSelect = document.getElementById("reyonSelect");
+const categorySelect = document.getElementById("categorySelect");
+const productSelect = document.getElementById("productSelect");
+const productsGrid = document.getElementById("productsGrid");
+const cartList = document.getElementById("cartList");
+const subtotalEl = document.getElementById("subtotal");
+const discountEl = document.getElementById("discount");
+const vatAmountEl = document.getElementById("vatAmount");
+const totalAmountEl = document.getElementById("totalAmount");
+const btnLoadProducts = document.getElementById("btnLoadProducts");
+const btnShareRef = document.getElementById("btnShareRef");
+const voiceBtn = document.getElementById("voiceBtn");
+const voiceStatus = document.getElementById("voiceStatus");
+
+/* ====== Initialize ====== */
+(async function init(){
+  await loadSessionAndProfile();
+  await loadSellersByLocation();
+  setupEventHandlers();
+  await loadReferralSummary(); // show user's bonus summary
+})();
+
+/* ====== Helpers ====== */
+function money(n){ return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; }
+
+async function loadSessionAndProfile(){
+  // get current session user
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData?.session;
+  if (!session?.user) {
+    userNameEl.textContent = "Giriş yapılmadı";
+    userMetaEl.textContent = "Lütfen giriş yapın.";
+    // page could force login or show public flow. We'll continue but profile-dependent features disabled.
+    return;
   }
-  function updateTotals() {
-    const total = cart.reduce((s, it) => s + it.price * it.qty, 0);
-    document.getElementById("cartTotal").textContent = money(total);
+  currentUser = session.user;
+  // fetch profile
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, role, phone, address, city, location')
+    .eq('id', currentUser.id)
+    .maybeSingle();
+
+  if (error) { console.error(error); return; }
+  currentProfile = profile;
+  userNameEl.textContent = profile?.full_name || currentUser.email || "Kullanıcı";
+  userMetaEl.textContent = profile?.city ? `${profile.city} • ${profile.location || ''}` : '';
+  p_name.textContent = profile?.full_name || '-';
+  p_phone.textContent = profile?.phone || '-';
+  p_role.textContent = profile?.role || '-';
+  p_address.textContent = profile?.address || '-';
+  p_city.textContent = profile?.city || '-';
+}
+
+/* ====== Seller loading by location ====== */
+async function loadSellersByLocation(){
+  if (!currentProfile?.location) {
+    sellerSelect.innerHTML = '<option value="">-- Lokasyon yok --</option>';
+    return;
   }
-  function clearCart() {
-    cart = [];
+  // query profiles where role = 'market' and location matches
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, phone, city, location')
+    .eq('role', 'market')
+    .eq('location', currentProfile.location)
+    .limit(100);
+
+  if (error) { console.error(error); return; }
+  sellers = data || [];
+  sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
+  sellers.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `${s.full_name || s.phone || s.id}`;
+    sellerSelect.appendChild(opt);
+  });
+}
+
+/* ====== Load reyon / categories / products for a seller ====== */
+async function loadSellerData(sellerId){
+  // REYON: common schema is 'reyon' table with fields id,name,image_url,seller_id|owner_id
+  let { data: reyonData, error: er1 } = await supabase
+    .from('reyon')
+    .select('id, name, image_url')
+    .or(`seller_id.eq.${sellerId},owner_id.eq.${sellerId}`)
+    .limit(200);
+
+  if (er1) {
+    // fallback: try without seller filter
+    const resp = await supabase.from('reyon').select('id,name,image_url').limit(200);
+    reyonData = resp.data || [];
+  }
+  reyonlar = reyonData || [];
+  reyonSelect.innerHTML = '<option value="">-- Reyon seçin --</option>';
+  reyonlar.forEach(r => { const o = document.createElement('option'); o.value = r.id; o.textContent = r.name; reyonSelect.appendChild(o); });
+
+  // categories: categories table with reyon_id
+  const { data: catData } = await supabase
+    .from('categories')
+    .select('id, name, reyon_id')
+    .in('reyon_id', reyonlar.map(r=>r.id))
+    .limit(100);
+  categories = catData || [];
+  categorySelect.innerHTML = '<option value="">-- Kategori seçin --</option>';
+  categories.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; categorySelect.appendChild(o); });
+
+  // products: try product_prices join to get prices for seller branch if product_prices uses sube_id
+  await loadProductsForSeller(sellerId);
+}
+
+async function loadProductsForSeller(sellerId){
+  // First try to get product_prices rows for this seller/sube
+  const { data: pp, error: ppErr } = await supabase
+    .from('product_prices')
+    .select('product_id, price, sube_id')
+    .eq('sube_id', sellerId)
+    .limit(1000);
+
+  productPrices = {};
+  (pp || []).forEach(r => productPrices[r.product_id] = r.price);
+
+  // Now fetch product records for this seller: either products.seller_id or urun table
+  let prods = [];
+  let { data: p1, error: e1 } = await supabase
+    .from('products')
+    .select('id, name, imgurl, category_id, seller_id, barcode, brand')
+    .eq('seller_id', sellerId)
+    .limit(1000);
+
+  if (!e1 && p1 && p1.length) {
+    prods = p1;
+  } else {
+    // fallback to urun table (if exists)
+    const { data: p2, error: e2 } = await supabase
+      .from('urun')
+      .select('id, name, imgurl, category_id, barcode, brand')
+      .limit(1000);
+    if (!e2) prods = p2 || [];
+  }
+
+  products = (prods || []).map(p => ({
+    id: p.id, name: p.name, img: p.imgurl || '', category_id: p.category_id, price: productPrices[p.id] ?? p.price ?? 0, barcode: p.barcode
+  }));
+  renderProductsGrid(products);
+  // populate productSelect for quick selection
+  productSelect.innerHTML = '<option value="">-- Ürün seçin --</option>';
+  products.forEach(pr => {
+    const o = document.createElement('option'); o.value = pr.id; o.textContent = pr.name; productSelect.appendChild(o);
+  });
+}
+
+/* ====== Render products cards ====== */
+function renderProductsGrid(list){
+  productsGrid.innerHTML = '';
+  if (!list || list.length === 0) {
+    productsGrid.innerHTML = '<div class="text-gray-500">Ürün yok</div>';
+    return;
+  }
+  list.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'card bg-white rounded-lg p-3 flex flex-col items-center';
+    card.innerHTML = `
+      <img src="${p.img || 'https://via.placeholder.com/120x80?text=Ürün'}" class="w-28 h-20 object-contain mb-2" alt="${p.name}">
+      <div class="font-semibold text-sm text-center">${p.name}</div>
+      <div class="text-sm text-gray-600 mt-1">${money(p.price)}</div>
+      <button class="mt-3 px-3 py-1 bg-green-600 text-white rounded">Sepete Ekle</button>
+    `;
+    const btn = card.querySelector('button');
+    btn.addEventListener('click', ()=> addToCartByProduct(p, 1, true));
+    productsGrid.appendChild(card);
+  });
+}
+
+/* ====== Cart functions ====== */
+function addToCartByProduct(prod, qty=1, animate=false){
+  // find existing
+  let item = cart.find(c=>c.product_id===prod.id);
+  if (item) {
+    item.qty += qty;
+  } else {
+    cart.push({ product_id: prod.id, name: prod.name, img: prod.img, price: prod.price, qty: qty });
+  }
+  renderCart();
+  if (animate) flyToCart(prod.img || 'https://via.placeholder.com/100');
+}
+
+function renderCart(){
+  cartList.innerHTML = '';
+  if (cart.length===0) { cartList.innerHTML = '<div class="text-sm text-gray-500">Sepet boş</div>'; updateTotals(); return; }
+  cart.forEach((it, idx) => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.innerHTML = `
+      <img src="${it.img || 'https://via.placeholder.com/48'}" class="w-12 h-12 object-cover rounded" />
+      <div class="flex-1 text-sm">
+        <div class="font-semibold">${it.name}</div>
+        <div class="text-xs text-gray-500">Birim: ${money(it.price)} • x${it.qty}</div>
+      </div>
+      <div class="text-sm font-semibold">${money(it.price * it.qty)}</div>
+      <div class="ml-2">
+        <button data-idx="${idx}" class="text-xs px-2 py-1 bg-gray-100 rounded">-</button>
+        <button data-idx-inc="${idx}" class="text-xs px-2 py-1 bg-gray-100 rounded">+</button>
+        <button data-idx-rm="${idx}" class="text-xs px-2 py-1 bg-red-100 rounded">✕</button>
+      </div>
+    `;
+    cartList.appendChild(row);
+  });
+  // attach events
+  cartList.querySelectorAll('[data-idx]').forEach(btn => btn.addEventListener('click', e=>{
+    const i = Number(e.currentTarget.dataset.idx);
+    if (cart[i].qty > 1) cart[i].qty--;
+    else cart.splice(i,1);
     renderCart();
+  }));
+  cartList.querySelectorAll('[data-idx-inc]').forEach(btn => btn.addEventListener('click', e=>{
+    const i = Number(e.currentTarget.dataset.idxInc);
+    cart[i].qty++;
+    renderCart();
+  }));
+  cartList.querySelectorAll('[data-idx-rm]').forEach(btn => btn.addEventListener('click', e=>{
+    const i = Number(e.currentTarget.dataset.idxRm);
+    cart.splice(i,1); renderCart();
+  }));
+  updateTotals();
+}
+
+function updateTotals(){
+  const sub = cart.reduce((s,it)=> s + (it.price * it.qty), 0);
+  const discount = 0;
+  const vat = (sub - discount) * VAT_RATE / 100;
+  const total = sub - discount + vat;
+  subtotalEl.textContent = money(sub);
+  discountEl.textContent = money(discount);
+  vatAmountEl.textContent = money(vat);
+  totalAmountEl.textContent = money(total);
+}
+
+/* ====== fly animation to cart ====== */
+function flyToCart(imgUrl){
+  const img = document.createElement('img');
+  img.src = imgUrl;
+  img.className = 'fly w-12 h-12 rounded-full';
+  document.body.appendChild(img);
+  // start position: center of productsGrid
+  const startRect = productsGrid.getBoundingClientRect();
+  img.style.top = (startRect.top + 50) + 'px';
+  img.style.left = (startRect.left + 50) + 'px';
+  setTimeout(()=>{
+    const cartRect = document.querySelector('aside.col-span-1 .fixed') || document.querySelector('#cartList').getBoundingClientRect();
+    // approximate target coords (right sidebar)
+    const targetX = window.innerWidth - 120;
+    const targetY = window.innerHeight - 80;
+    img.style.top = targetY + 'px';
+    img.style.left = targetX + 'px';
+    img.style.width = '20px';
+    img.style.height = '20px';
+    img.style.opacity = '0';
+  }, 50);
+  setTimeout(()=> img.remove(), 1000);
+}
+
+/* ====== Voice recognition and parsing ====== */
+let recognition = null;
+function setupVoice(){
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    voiceStatus.textContent = 'Tarayıcınız ses tanımayı desteklemiyor';
+    return;
   }
+  window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.lang = 'tr-TR';
+  recognition.continuous = true;
+  recognition.interimResults = false;
 
-  /******** BONUS REFRESH ********/
-  async function refreshUserBonus() {
-    if (!currentProfile?.id) return;
-    const { data, error } = await supabase
-      .from("referral_bonus_summary")
-      .select("kalan_bonus")
-      .eq("user_id", currentProfile.id)
-      .maybeSingle();
-    if (error) return console.error(error);
-    p_bonus.textContent = money(data?.kalan_bonus ?? 0);
+  recognition.onstart = ()=> voiceStatus.textContent = 'Dinliyorum...';
+  recognition.onend = ()=> voiceStatus.textContent = 'Durdu';
+  recognition.onerror = (e)=> console.error('voice err',e);
+
+  recognition.onresult = (ev) => {
+    const transcript = ev.results[ev.results.length-1][0].transcript.toLowerCase().trim();
+    voiceStatus.textContent = `"${transcript}"`;
+    parseVoiceCommand(transcript);
+  };
+}
+
+function parseVoiceCommand(text){
+  // capture quantity like "2 kilo", "iki kilo" handling numbers in digits is enough for demo
+  const qtyMatch = text.match(/(\d+)\s*(kilo|adet)?/);
+  const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+  // find product by name substring
+  const matched = products.find(p=> text.includes(p.name.toLowerCase()));
+  if (matched) {
+    addToCartByProduct(matched, qty, true);
+    return;
   }
+  // fallback try productSelect value
+  const selProdId = productSelect.value;
+  if (selProdId) {
+    const prod = products.find(p=>p.id===selProdId);
+    if (prod) addToCartByProduct(prod, qty, true);
+  }
+}
 
-  /******** ORDER ********/
-  async function finalizeOrder(method) {
-    if (!currentProfile?.id) return alert("Lütfen giriş yapın.");
-    if (!cart.length) return alert("Sepet boş.");
+/* ====== Referral share / ensure link ====== */
+async function ensureReferralLinkForUser(){
+  if (!currentProfile?.id) { alert('Kayıtlı kullanıcı değil.'); return; }
+  // check existing
+  let { data: existing } = await supabase
+    .from('referral_links')
+    .select('id, referral_code')
+    .eq('owner_user_id', currentProfile.id)
+    .maybeSingle();
 
-    const items = cart.map((it) => ({
-      product_id: it.product_id,
-      quantity: it.qty,
-      unit_price: it.price,
-    }));
+  if (existing) return existing;
+  // create referral code: e.g. FIRST6 of uuid + random
+  const code = (currentProfile.full_name ? currentProfile.full_name.split(' ')[0] : 'REF') + Math.floor(Math.random()*9000+1000);
+  const { data, error } = await supabase
+    .from('referral_links')
+    .insert({ owner_user_id: currentProfile.id, owner_phone: currentProfile.phone || '', referral_code: code })
+    .select('id, referral_code')
+    .single();
+  if (error) { console.error(error); alert('Referans link oluşturulamadı'); return null; }
+  return data;
+}
 
-    let bonusToUse = 0;
-    if (method === "bonus") {
-      const { data } = await supabase
-        .from("referral_bonus_summary")
-        .select("kalan_bonus")
-        .eq("user_id", currentProfile.id)
-        .maybeSingle();
-      const kalan = data?.kalan_bonus ?? 0;
-      if (kalan <= 0) return alert("Yeterli bonus yok.");
-      const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
-      bonusToUse = Math.min(kalan, subtotal);
+/* ====== Event handlers ====== */
+function setupEventHandlers(){
+  sellerSelect.addEventListener('change', async () => {
+    const sid = sellerSelect.value;
+    if (!sid) return;
+    await loadSellerData(sid);
+  });
+  reyonSelect.addEventListener('change', ()=>{
+    const rid = reyonSelect.value;
+    // filter categories that belong to this reyon
+    const filtered = categories.filter(c => (c.reyon_id == rid) || !c.reyon_id);
+    categorySelect.innerHTML = '<option value="">-- Kategori seçin --</option>';
+    filtered.forEach(c=> { const o=document.createElement('option'); o.value=c.id; o.text=c.name; categorySelect.appendChild(o);});
+  });
+  categorySelect.addEventListener('change', ()=>{
+    const cid = categorySelect.value;
+    const filtered = products.filter(p=> String(p.category_id) === String(cid) || !cid);
+    renderProductsGrid(filtered);
+  });
+  productSelect.addEventListener('change', ()=>{
+    const pid = productSelect.value;
+    const prod = products.find(p=>p.id===pid);
+    if (prod) {
+      // scroll to product in grid or brief highlight
+      addToCartByProduct(prod,1,true);
     }
+  });
+  btnLoadProducts.addEventListener('click', async ()=> {
+    const sid = sellerSelect.value;
+    if (!sid) return alert('Önce satıcı seçin');
+    await loadProductsForSeller(sid);
+  });
 
-    const { data, error } = await supabase.rpc("create_order_with_bonus", {
+  // share referral
+  btnShareRef.addEventListener('click', async ()=>{
+    if (!currentProfile?.id) return alert('Üyeliğiniz yok. Üye olun veya giriş yapın.');
+    const link = await ensureReferralLinkForUser();
+    if (!link) return;
+    const shareUrl = `${location.origin}${location.pathname}?ref=${encodeURIComponent(link.referral_code)}`;
+    // copy to clipboard
+    await navigator.clipboard.writeText(shareUrl);
+    alert('Referans linki kopyalandı: ' + shareUrl);
+  });
+
+  // payments
+  document.getElementById('payCash').addEventListener('click', ()=> finalizeOrder('nakit'));
+  document.getElementById('payCard').addEventListener('click', ()=> finalizeOrder('kart'));
+  document.getElementById('payBonus').addEventListener('click', ()=> finalizeOrder('bonus'));
+  voiceBtn.addEventListener('click', ()=> {
+    if (!recognition) setupVoice();
+    if (recognition && recognition.running) { recognition.stop(); recognition.running = false; voiceBtn.value='Sesle Sipariş Başlat (Dinle)'; }
+    else { recognition.start(); recognition.running = true; voiceBtn.value='Dinle (Dur)'; }
+  });
+}
+
+/* ====== Referral summary for profile ====== */
+async function loadReferralSummary(){
+  if (!currentProfile?.id) return;
+  const { data, error } = await supabase
+    .from('referral_bonus_summary')
+    .select('*')
+    .eq('user_id', currentProfile.id)
+    .maybeSingle();
+  if (error) { console.error(error); return; }
+  const kalan = data?.kalan_bonus ?? 0;
+  p_bonus.textContent = money(kalan);
+}
+
+/* ====== Finalize order (create records via RPC or REST) ====== */
+async function finalizeOrder(method){
+  if (!currentProfile?.id) return alert('Lütfen giriş yapın ve profilinizi tamamlayın.');
+  if (!cart.length) return alert('Sepet boş.');
+
+  // prepare items: fetch latest unit prices from DB for safety
+  // map items to product_id, qty, unit_price
+  const items = cart.map(it => ({ product_id: it.product_id, quantity: it.qty, unit_price: it.price }));
+
+  // check bonus balance if paying by bonus
+  let bonusToUse = 0;
+  if (method === 'bonus') {
+    // get remaining bonus
+    const { data } = await supabase.from('referral_bonus_summary').select('kalan_bonus').eq('user_id', currentProfile.id).maybeSingle();
+    const kalan = data?.kalan_bonus ?? 0;
+    if (kalan <= 0) return alert('Yeterli bonus yok.');
+    // use up to total
+    const subtotal = cart.reduce((s,it)=> s + it.price*it.qty, 0);
+    bonusToUse = Math.min(kalan, subtotal);
+  } else {
+    // optional: allow partial bonus + cash/card; for simplicity we won't auto-apply partial here
+    bonusToUse = 0;
+  }
+
+  // call RPC function create_order_with_bonus
+  try {
+    const { data, error } = await supabase.rpc('create_order_with_bonus', {
       p_user_id: currentProfile.id,
       p_items: items,
       p_bonus_used: bonusToUse,
-      p_payment_type: bonusToUse > 0 ? "bonus+" + method : method,
+      p_payment_type: (bonusToUse>0 ? 'bonus+' + method : method)
     });
-
-    if (error) return alert("Sipariş kaydedilemedi: " + error.message);
-
-    alert("Sipariş oluşturuldu. ID: " + data);
-    clearCart();
-    refreshUserBonus();
+    if (error) { console.error(error); alert('Sipariş oluşturulamadı: ' + error.message); return; }
+    const orderId = data;
+    alert('Sipariş kaydedildi. Sipariş ID: ' + orderId);
+    // clear cart
+    cart = []; renderCart(); loadReferralSummary(); // refresh bonus
+    // optionally: open adisyon print window
+    openReceiptPrint(orderId);
+  } catch (err) {
+    console.error(err); alert('Hata: ' + (err.message || err));
   }
+}
 
-  /******** EVENT LISTENERS ********/
-  document.getElementById("payCash").addEventListener("click", () => finalizeOrder("nakit"));
-  document.getElementById("payCard").addEventListener("click", () => finalizeOrder("kart"));
-  document.getElementById("payBonus").addEventListener("click", () => finalizeOrder("bonus"));
+/* ====== Receipt print (simple) ====== */
+async function openReceiptPrint(orderId){
+  // fetch order + details + profile
+  const q = await supabase.rpc('get_order_receipt', { p_order_id: orderId }).catch(()=>null);
+  // fallback query if RPC not exists
+  let orderData = q?.data;
+  if (!orderData) {
+    const { data: order } = await supabase
+      .from('orders').select('*').eq('id', orderId).maybeSingle();
+    const { data: details } = await supabase
+      .from('order_details').select('product_id, quantity, unit_price, total_price').eq('order_id', orderId);
+    const { data: profile } = await supabase.from('profiles').select('full_name, phone, address, city').eq('id', order.user_id).maybeSingle();
+    orderData = { order, details, profile };
+  }
+  // build simple HTML
+  let html = `<div style="font-family: Arial; padding:10px; width:320px;">
+    <h3>Onur Market</h3>
+    <div>Sipariş No: ${orderId}</div>
+    <div>Tarih: ${new Date().toLocaleString()}</div>
+    <div>Müşteri: ${orderData.profile?.full_name || ''}</div>
+    <div>Tel: ${orderData.profile?.phone || ''}</div>
+    <hr/>`;
+  (orderData.details || []).forEach(d=>{
+    html += `<div style="display:flex; justify-content:space-between;"><div>${d.product_id}</div><div>${d.quantity} x ${money(d.unit_price)}</div></div>`;
+  });
+  html += `<hr/><div>Toplam: ${money(orderData.order.total_amount)}</div>`;
+  html += `</div>`;
+  const w = window.open('', '_blank', 'width=400,height=600');
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
 
-  /******** INIT ********/
-  renderCart();
-  updateTotals();
-  refreshUserBonus();
-  </script>
+/* ====== Optional: create RPC 'get_order_receipt' on backend for nicer data shape ====== */
+/* If not present you can rely on fallback above */
+
+/* ========== End of file ========== */
+
+</script>
 </body>
 </html>
-
-
