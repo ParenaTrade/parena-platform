@@ -44,11 +44,390 @@ body{font-family:Arial,sans-serif;margin:0;padding:0;}
 <button id="payCard">Kart Öde</button>
 <button id="payBonus">Bonus ile Öde</button>
 
+
+
 <script>
-/* ====== SUPABASE INIT ====== */
-const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
-const SUPABASE_KEY = 'YOUR_ANON_KEY';
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+/* ================== CONFIG ================== */
+const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
+const SUPABASE_KEY = "YOUR_PUBLIC_ANON_KEY";
+if (SUPABASE_URL.includes("YOUR_PROJECT") || SUPABASE_KEY.includes("YOUR_PUBLIC")) {
+  alert("Supabase credentials missing. Update SUPABASE_URL and SUPABASE_KEY.");
+  throw new Error("Supabase credentials missing");
+}
+const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ======== STATE ======== */
+let currentUser = null;
+let currentProfile = null;
+let sellers = [];      // Role=market kullanıcılar (şubeler)
+let reyonlar = [];     // Seçilen şubenin reyonları
+let categories = [];   // Reyon bazlı kategoriler
+let products = [];     // Şube ürünleri
+let productPrices = {}; // product_id -> price
+let cart = [];         // { product_id, name, img, price, qty }
+
+const VAT_RATE = 18; // KDV %
+
+/* ======== DOM ELEMENTS ======== */
+const userNameEl = document.getElementById("userName");
+const userMetaEl = document.getElementById("userMeta");
+const p_name = document.getElementById("p_name");
+const p_phone = document.getElementById("p_phone");
+const p_role = document.getElementById("p_role");
+const p_address = document.getElementById("p_address");
+const p_city = document.getElementById("p_city");
+const p_bonus = document.getElementById("p_bonus");
+const sellerSelect = document.getElementById("sellerSelect");
+const reyonSelect = document.getElementById("reyonSelect");
+const categorySelect = document.getElementById("categorySelect");
+const productSelect = document.getElementById("productSelect");
+const productsGrid = document.getElementById("productsGrid");
+const cartList = document.getElementById("cartList");
+const modalCartList = document.getElementById("modalCartList"); // modal sepet için
+const subtotalEl = document.getElementById("subtotal");
+const discountEl = document.getElementById("discount");
+const vatAmountEl = document.getElementById("vatAmount");
+const totalAmountEl = document.getElementById("totalAmount");
+const btnLoadProducts = document.getElementById("btnLoadProducts");
+const btnShareRef = document.getElementById("btnShareRef");
+const voiceBtn = document.getElementById("voiceBtn");
+const voiceStatus = document.getElementById("voiceStatus");
+
+/* ======== HELPER ======== */
+function money(n){ return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; }
+
+/* ======== INIT ======== */
+(async function init(){
+  await loadSessionAndProfile();
+  await loadSellersByLocation();
+  setupEventHandlers();
+  await loadReferralSummary();
+})();
+
+/* ======== LOAD SESSION & PROFILE ======== */
+async function loadSessionAndProfile(){
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData?.session;
+  if(!session?.user){
+    userNameEl.textContent = "Giriş yapılmadı";
+    userMetaEl.textContent = "Lütfen giriş yapın.";
+    return;
+  }
+  currentUser = session.user;
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, full_name, role, phone, address, city, location')
+    .eq('id', currentUser.id)
+    .maybeSingle();
+  currentProfile = profile;
+  userNameEl.textContent = profile?.full_name || currentUser.email || "Kullanıcı";
+  userMetaEl.textContent = profile?.city ? `${profile.city} • ${profile.location || ''}` : '';
+  p_name.textContent = profile?.full_name || '-';
+  p_phone.textContent = profile?.phone || '-';
+  p_role.textContent = profile?.role || '-';
+  p_address.textContent = profile?.address || '-';
+  p_city.textContent = profile?.city || '-';
+}
+
+/* ======== LOAD SELLERS BY LOCATION ======== */
+async function loadSellersByLocation(){
+  if(!currentProfile?.location){
+    sellerSelect.innerHTML = '<option value="">-- Lokasyon yok --</option>';
+    return;
+  }
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, phone, city, location')
+    .eq('role','market')
+    .eq('location', currentProfile.location)
+    .limit(100);
+  if(error){ console.error(error); return; }
+  sellers = data || [];
+  sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
+  sellers.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.full_name || s.phone || s.id;
+    sellerSelect.appendChild(opt);
+  });
+}
+
+/* ======== LOAD REYON / CATEGORIES / PRODUCTS FOR SELLER ======== */
+async function loadSellerData(sellerId){
+  // Reyonlar
+  const { data: reyonData, error: reyonErr } = await supabase
+    .from('reyon')
+    .select('id, name, image_url')
+    .eq('seller_id', sellerId);
+  reyonlar = reyonData || [];
+  reyonSelect.innerHTML = '<option value="">-- Reyon seçin --</option>';
+  reyonlar.forEach(r => {
+    const o = document.createElement('option');
+    o.value = r.id;
+    o.textContent = r.name;
+    reyonSelect.appendChild(o);
+  });
+
+  // Kategoriler
+  const { data: catData } = await supabase
+    .from('categories')
+    .select('id, name, reyon_id')
+    .in('reyon_id', reyonlar.map(r=>r.id))
+    .limit(100);
+  categories = catData || [];
+  categorySelect.innerHTML = '<option value="">-- Kategori seçin --</option>';
+  categories.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = c.name;
+    categorySelect.appendChild(o);
+  });
+
+  // Ürünler
+  await loadProductsForSeller(sellerId);
+}
+
+async function loadProductsForSeller(sellerId){
+  const { data: pp } = await supabase
+    .from('product_prices')
+    .select('product_id, price')
+    .eq('sube_id', sellerId);
+  productPrices = {};
+  (pp||[]).forEach(r=>productPrices[r.product_id]=r.price);
+
+  const { data: prods } = await supabase
+    .from('products')
+    .select('id, name, imgurl, category_id')
+    .eq('seller_id', sellerId);
+  products = (prods||[]).map(p=>({
+    id:p.id, name:p.name, img:p.imgurl||'', category_id:p.category_id, price: productPrices[p.id]||0
+  }));
+
+  renderProductsGrid(products);
+
+  productSelect.innerHTML = '<option value="">-- Ürün seçin --</option>';
+  products.forEach(pr => {
+    const o = document.createElement('option');
+    o.value = pr.id; o.textContent = pr.name;
+    productSelect.appendChild(o);
+  });
+}
+
+/* ======== RENDER PRODUCTS ======== */
+function renderProductsGrid(list){
+  productsGrid.innerHTML = '';
+  if(!list || !list.length){ productsGrid.innerHTML = '<div class="text-gray-500">Ürün yok</div>'; return; }
+  list.forEach(p=>{
+    const card = document.createElement('div');
+    card.className = 'card bg-white rounded-lg p-3 flex flex-col items-center';
+    card.innerHTML=`
+      <img src="${p.img||'https://via.placeholder.com/120x80?text=Ürün'}" class="w-28 h-20 object-contain mb-2" alt="${p.name}">
+      <div class="font-semibold text-sm text-center">${p.name}</div>
+      <div class="text-sm text-gray-600 mt-1">${money(p.price)}</div>
+      <button class="mt-3 px-3 py-1 bg-green-600 text-white rounded">Sepete Ekle</button>
+    `;
+    card.querySelector('button').addEventListener('click', ()=>addToCartByProduct(p,1,true));
+    productsGrid.appendChild(card);
+  });
+}
+
+/* ======== CART ======== */
+function addToCartByProduct(prod, qty=1, animate=false){
+  let item = cart.find(c=>c.product_id===prod.id);
+  if(item) item.qty+=qty;
+  else cart.push({ product_id:prod.id, name:prod.name, img:prod.img, price:prod.price, qty:qty });
+  renderCart();
+  renderCartModal();
+  if(animate) flyToCart(prod.img||'https://via.placeholder.com/100');
+}
+
+function renderCart(){
+  cartList.innerHTML='';
+  if(modalCartList) modalCartList.innerHTML='';
+  if(!cart.length){ 
+    cartList.innerHTML='<div class="text-sm text-gray-500">Sepet boş</div>'; 
+    updateTotals(); 
+    return; 
+  }
+  cart.forEach((it,idx)=>{
+    const row=document.createElement('div');
+    row.className='flex items-center gap-2';
+    row.innerHTML=`<img src="${it.img||'https://via.placeholder.com/48'}" class="w-12 h-12 object-cover rounded" />
+      <div class="flex-1 text-sm">
+        <div class="font-semibold">${it.name}</div>
+        <div class="text-xs text-gray-500">Birim: ${money(it.price)} • x${it.qty}</div>
+      </div>
+      <div class="text-sm font-semibold">${money(it.price*it.qty)}</div>`;
+    cartList.appendChild(row);
+    if(modalCartList){
+      const modalRow=row.cloneNode(true);
+      modalCartList.appendChild(modalRow);
+    }
+  });
+  updateTotals();
+}
+
+function updateTotals(){
+  const subtotal = cart.reduce((s,it)=>s+it.price*it.qty,0);
+  const discount = 0; // şimdilik
+  const vatAmount = ((subtotal-discount)*VAT_RATE)/100;
+  const total = subtotal - discount + vatAmount;
+  subtotalEl.textContent = money(subtotal);
+  discountEl.textContent = money(discount);
+  vatAmountEl.textContent = money(vatAmount);
+  totalAmountEl.textContent = money(total);
+}
+
+/* ======== CLEAR CART ======== */
+function clearCart(){
+  cart=[];
+  renderCart();
+  renderCartModal();
+  updateTotals();
+}
+
+/* ======== RENDER MODAL CART ======== */
+function renderCartModal(){
+  if(!modalCartList) return;
+  modalCartList.innerHTML='';
+  if(!cart.length){
+    modalCartList.innerHTML='<div class="text-sm text-gray-500">Sepet boş</div>';
+    return;
+  }
+  cart.forEach(it=>{
+    const row=document.createElement('div');
+    row.className='flex justify-between items-center mb-1';
+    row.innerHTML=`
+      <div class="flex-1">${it.name}</div>
+      <div>${it.qty} x ${money(it.price)}</div>
+      <div>${money(it.price*it.qty)}</div>
+    `;
+    modalCartList.appendChild(row);
+  });
+}
+
+/* ======== REFERRAL & BONUS ======== */
+async function loadReferralSummary(){
+  if(!currentProfile?.id) return;
+  const { data } = await supabase
+    .from('referral_bonus_summary')
+    .select('kalan_bonus')
+    .eq('user_id', currentProfile.id)
+    .maybeSingle();
+  const kalan = data?.kalan_bonus||0;
+  p_bonus.textContent = money(kalan);
+}
+
+/* ======== FINALIZE ORDER ======== */
+async function finalizeOrder(method){
+  if(!currentProfile?.id) return alert('Lütfen giriş yapın.');
+  if(!cart.length) return alert('Sepet boş.');
+
+  const items = cart.map(it=>({ product_id: it.product_id, quantity: it.qty, unit_price: it.price }));
+  let bonusToUse = 0;
+  if(method==='bonus'){
+    const { data } = await supabase.from('referral_bonus_summary').select('kalan_bonus').eq('user_id', currentProfile.id).maybeSingle();
+    const kalan = data?.kalan_bonus||0;
+    if(kalan<=0) return alert('Yeterli bonus yok.');
+    const subtotal = cart.reduce((s,it)=>s+it.price*it.qty,0);
+    bonusToUse = Math.min(kalan,subtotal);
+  }
+
+  try{
+    const { data: orderId, error } = await supabase.rpc('create_order_with_bonus',{
+      p_user_id: currentProfile.id,
+      p_items: items,
+      p_bonus_used: bonusToUse,
+      p_payment_type: bonusToUse>0 ? 'bonus+'+method : method
+    });
+    if(error){ console.error(error); alert('Sipariş kaydedilemedi: '+error.message); return; }
+    alert('Sipariş kaydedildi. ID: '+orderId);
+    clearCart();
+    loadReferralSummary();
+    openReceiptPrint(orderId);
+  }catch(err){
+    console.error(err); alert('Sipariş sırasında hata oluştu: '+(err.message||err));
+  }
+}
+
+/* ======== PRINT RECEIPT ======== */
+async function openReceiptPrint(orderId){
+  let orderData;
+  try{
+    const q = await supabase.rpc('get_order_receipt', { p_order_id: orderId });
+    orderData = q?.data;
+  }catch(e){ console.warn('RPC çalışmadı, fallback'); }
+  if(!orderData){
+    const { data: order } = await supabase.from('orders').select('*').eq('id',orderId).maybeSingle();
+    const { data: details } = await supabase.from('order_details').select('*').eq('order_id',orderId);
+    const { data: profile } = await supabase.from('profiles').select('full_name, phone, address, city').eq('id',order.user_id).maybeSingle();
+    orderData = { order, details, profile };
+  }
+  let html=`<div style="font-family: Arial; padding:10px; width:320px;">
+    <h3>Onur Market</h3>
+    <div>Sipariş No: ${orderId}</div>
+    <div>Tarih: ${new Date().toLocaleString()}</div>
+    <div>Müşteri: ${orderData.profile?.full_name||''}</div>
+    <div>Tel: ${orderData.profile?.phone||''}</div>
+    <hr/>`;
+  (orderData.details||[]).forEach(d=>{
+    html+=`<div style="display:flex; justify-content:space-between;">
+      <div>${d.product_id}</div>
+      <div>${d.quantity} x ${money(d.unit_price)}</div>
+    </div>`;
+  });
+  html+=`<hr/><div>Toplam: ${money(orderData.order.total_amount)}</div></div>`;
+  const w=window.open('','_blank','width=400,height=600');
+  w.document.write(html); w.document.close(); w.print();
+}
+
+/* ======== EVENT HANDLERS ======== */
+function setupEventHandlers(){
+  sellerSelect.addEventListener('change', e=>{
+    if(e.target.value) loadSellerData(e.target.value);
+    else productsGrid.innerHTML='';
+  });
+  btnLoadProducts?.addEventListener('click', ()=>{ if(sellerSelect.value) loadSellerData(sellerSelect.value); });
+  document.getElementById('payCash')?.addEventListener('click', ()=>finalizeOrder('nakit'));
+  document.getElementById('payCard')?.addEventListener('click', ()=>finalizeOrder('kart'));
+  document.getElementById('payBonus')?.addEventListener('click', ()=>finalizeOrder('bonus'));
+}
+
+/* ======== SIMPLE 2.5D FLY TO CART ANIMATION ======== */
+function flyToCart(imgUrl){
+  const img = document.createElement('img');
+  img.src = imgUrl;
+  img.style.position='fixed';
+  img.style.width='60px';
+  img.style.height='60px';
+  img.style.borderRadius='6px';
+  img.style.top='50%'; img.style.left='50%';
+  img.style.transition='all 0.7s ease-in-out';
+  document.body.appendChild(img);
+  setTimeout(()=>{ img.style.top='80px'; img.style.left='90%'; img.style.opacity='0'; },50);
+  setTimeout(()=>document.body.removeChild(img),800);
+}
+
+/* ======== VOICE ORDER (EXAMPLE) ======== */
+voiceBtn?.addEventListener('click', ()=>{
+  if(!('webkitSpeechRecognition' in window)) return alert('Tarayıcı desteklemiyor.');
+  const recognition = new webkitSpeechRecognition();
+  recognition.lang = 'tr-TR';
+  recognition.start();
+  voiceStatus.textContent = 'Dinleniyor...';
+  recognition.onresult = (e)=>{
+    const spoken = e.results[0][0].transcript.toLowerCase();
+    const prod = products.find(p=>spoken.includes(p.name.toLowerCase()));
+    if(prod){
+      const qtyMatch = spoken.match(/(\d+)/);
+      const qty = qtyMatch ? parseInt(qtyMatch[1]):1;
+      addToCartByProduct(prod,qty,true);
+      voiceStatus.textContent = `Sepete eklendi: ${prod.name} x${qty}`;
+    }else voiceStatus.textContent = 'Ürün bulunamadı.';
+  };
+  recognition.onend = ()=>{ voiceStatus.textContent = 'Dinleme durdu'; };
+
+
 
 /* ====== GLOBALS ====== */
 let cart = [];
@@ -62,7 +441,7 @@ const sellerSelect = document.getElementById('sellerSelect');
 /* ====== MONEY FORMAT ====== */
 function money(amount){ return Number(amount).toLocaleString('tr-TR', { style:'currency', currency:'TRY' }); }
 
-/* ====== CART RENDER ====== */
+/* ====== RENDER CART ====== */
 function renderCart(){
     cartList.innerHTML='';
     modalCartList.innerHTML='';
@@ -120,7 +499,7 @@ function clearCart(){
     updateTotals();
 }
 
-/* ====== REFERRAL / BONUS ====== */
+/* ====== REFERRAL / BONUS UPDATE ====== */
 async function refreshUserBonus(){
     if(!currentProfile?.id) return;
     const { data, error } = await supabase
@@ -168,9 +547,15 @@ async function finalizeOrder(method){
         const orderId = data;
         alert('Sipariş kaydedildi. Sipariş ID: ' + orderId);
 
+        // Sepeti temizle ve bonusları güncelle
         clearCart();
         await refreshUserBonus();
+        await updateReferralAndBonus(orderId);
+
+        // Fatura/Adisyon yazdır
         openReceiptPrint(orderId);
+
+        // UI güncellemeleri
         postOrderUIUpdates();
 
     } catch(err){
@@ -218,7 +603,7 @@ async function openReceiptPrint(orderId){
     w.print();
 }
 
-/* ====== SESLİ ÜYELİK ====== */
+/* ====== SESLİ ÜYELİK KAYDI ====== */
 const voiceRegisterBtn = document.getElementById('voiceRegisterBtn');
 let voiceRegRecognition = null;
 function setupVoiceRegistration(){
@@ -249,7 +634,7 @@ voiceRegisterBtn?.addEventListener('click', ()=> {
     voiceRegRecognition.start();
 });
 
-/* ====== LOKASYON BAZLI SATICI ====== */
+/* ====== LOKASYON BAZLI SATICI KONTROL ====== */
 async function checkSellersForLocation(city){
     const { data: sellersData } = await supabase.from('profiles')
         .select('id, full_name').eq('role','market').eq('location', city);
@@ -301,6 +686,7 @@ renderCartModal();
 updateTotals();
 add3DEffectToProducts();
 refreshUserBonus();
+});
 </script>
 
 </body>
