@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesli Sipariş Sistemi - Onur Market</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --dark: #1f2937;
+            --light: #f9fafb;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo i {
+            margin-right: 10px;
+        }
+        
+        .user-info {
+            text-align: right;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #f1f5f9;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+        }
+        
+        .status-item i {
+            margin-right: 8px;
+            color: var(--primary);
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title i {
+            margin-right: 10px;
+            color: var(--primary);
+        }
+        
+        .filters select, .filters input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .profile-info div {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .profile-info span {
+            font-weight: 500;
+        }
+        
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+        
+        .product-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .product-image {
+            height: 120px;
+            width: 100%;
+            object-fit: cover;
+            background: #f3f4f6;
+        }
+        
+        .product-info {
+            padding: 10px;
+        }
+        
+        .product-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        
+        .product-price {
+            color: var(--primary);
+            font-weight: bold;
+        }
+        
+        .product-discount {
+            color: #ef4444;
+            font-size: 12px;
+            text-decoration: line-through;
+            margin-left: 5px;
+        }
+        
+        .cart-items {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .cart-item-info {
+            flex: 1;
+        }
+        
+        .cart-item-name {
+            font-weight: 500;
+        }
+        
+        .cart-item-quantity {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .cart-item-price {
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .cart-totals {
+            border-top: 2px solid #e5e7eb;
+            padding-top: 15px;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .grand-total {
+            font-weight: bold;
+            font-size: 18px;
+            color: var(--dark);
+            border-top: 1px solid #d1d5db;
+            padding-top: 10px;
+        }
+        
+        .payment-options {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .payment-btn {
+            padding: 12px;
+            border-radius: 6px;
+            border: none;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        
+        .payment-btn i {
+            margin-right: 8px;
+        }
+        
+        .cash-btn {
+            background: var(--secondary);
+        }
+        
+        .cash-btn:hover {
+            background: #0d9669;
+        }
+        
+        .card-btn {
+            background: var(--primary);
+        }
+        
+        .card-btn:hover {
+            background: #1d4ed8;
+        }
+        
+        .bonus-btn {
+            background: #8b5cf6;
+        }
+        
+        .bonus-btn:hover {
+            background: #7c3aed;
+        }
+        
+        .voice-assistant {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+            z-index: 100;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .listening .voice-assistant {
+            animation: listening 1.5s infinite;
+        }
+        
+        @keyframes listening {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+            70% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        
+        .voice-status {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+            display: none;
+        }
+        
+        .assistant-message {
+            font-weight: 500;
+            color: var(--dark);
+        }
+        
+        .user-message {
+            text-align: right;
+            color: var(--primary);
+            margin-top: 5px;
+        }
+        
+        .selected {
+            border: 2px solid var(--secondary) !important;
+            background: #f0fdf4 !important;
+        }
+        
+        .order-status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f9ff;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .status-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .status-title i {
+            margin-right: 8px;
+            color: var(--primary);
+        }
+        
+        .status-progress {
+            height: 6px;
+            background: #dbeafe;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .status-progress-bar {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.5s;
+        }
+        
+        .status-steps {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-store"></i>
+                <span>Onur Market Sesli Sipariş</span>
+            </div>
+            <div class="user-info">
+                <div id="userName">Misafir</div>
+                <div id="userLocation">Konum bilinmiyor</div>
+            </div>
+        </header>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <span id="currentStatus">Sesli tanıma başlatılıyor...</span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-gift"></i>
+                <span>Bonus: <strong id="p_bonus">0 ₺</strong></span>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <!-- Sol Bölüm - Filtreler ve Profil -->
+            <div class="section">
+                <div class="section-title">
+                    <i class="fas fa-filter"></i>
+                    <span>Filtreler</span>
+                </div>
+                <div class="filters">
+                    <select id="sellerSelect">
+                        <option value="">Satıcı Seçin</option>
+                    </select>
+                    <select id="reyonSelect">
+                        <option value="">Reyon Seçin</option>
+                    </select>
+                    <select id="categorySelect">
+                        <option value="">Kategori Seçin</option>
+                    </select>
+                    <select id="productSelect">
+                        <option value="">Ürün Seçin</option>
+                    </select>
+                </div>
+                
+                <div class="section-title">
+                    <i class="fas fa-user"></i>
+                    <span>Profil Bilgilerim</span>
+                </div>
+                <div class="profile-info">
+                    <div>Adı Soyadı: <span id="p_name">-</span></div>
+                    <div>Telefon: <span id="p_phone">-</span></div>
+                    <div>Şehir: <span id="p_city">-</span></div>
+                    <div>Adres: <span id="p_address">-</span></div>
+                    <div>Bonus: <strong id="p_bonus_amount">0 ₺</strong></div>
+                </div>
+            </div>
+            
+            <!-- Orta Bölüm - Ürünler -->
+            <div class="section">
+                <div class="section-title">
+                    <i class="fas fa-shopping-basket"></i>
+                    <span>Ürünler</span>
+                </div>
+                <div class="products-grid" id="productsGrid">
+                    <div class="text-center" style="grid-column: 1 / -1; padding: 30px; color: #6b7280;">
+                        <i class="fas fa-box-open" style="font-size: 48px; margin-bottom: 15px;"></i>
+                        <p>Satıcı seçerek ürünleri görüntüleyin</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sağ Bölüm - Sepet -->
+            <div class="section">
+                <div class="section-title">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Sepetim</span>
+                </div>
+                <div class="cart-items" id="cartList">
+                    <div class="text-center" style="padding: 20px; color: #6b7280;">
+                        <i class="fas fa-shopping-cart" style="font-size: 36px; margin-bottom: 10px;"></i>
+                        <p>Sepetinizde ürün bulunmuyor</p>
+                    </div>
+                </div>
+                
+                <div class="cart-totals">
+                    <div class="total-row">
+                        <span>Ara Toplam:</span>
+                        <span id="subtotal">0.00 ₺</span>
+                    </div>
+                    <div class="total-row">
+                        <span>İndirim:</span>
+                        <span id="discount">0.00 ₺</span>
+                    </div>
+                    <div class="total-row">
+                        <span>KDV (%18):</span>
+                        <span id="vatAmount">0.00 ₺</span>
+                    </div>
+                    <div class="total-row grand-total">
+                        <span>Genel Toplam:</span>
+                        <span id="totalAmount">0.00 ₺</span>
+                    </div>
+                </div>
+                
+                <div class="payment-options">
+                    <button class="payment-btn cash-btn" id="payCash">
+                        <i class="fas fa-money-bill-wave"></i>
+                        Kapıda Nakit
+                    </button>
+                    <button class="payment-btn card-btn" id="payCard">
+                        <i class="fas fa-credit-card"></i>
+                        Kapıda Kart
+                    </button>
+                    <button class="payment-btn bonus-btn" id="payBonus">
+                        <i class="fas fa-gift"></i>
+                        Bonus ile Ödeme
+                    </button>
+                </div>
+                
+                <div class="order-status">
+                    <div class="status-title">
+                        <i class="fas fa-truck"></i>
+                        <span>Sipariş Durumu</span>
+                    </div>
+                    <div class="status-progress">
+                        <div class="status-progress-bar" id="statusProgress"></div>
+                    </div>
+                    <div class="status-steps">
+                        <span>Sipariş Alındı</span>
+                        <span>Hazırlanıyor</span>
+                        <span>Yolda</span>
+                        <span>Teslim Edildi</span>
+                    </div>
+                    <div id="statusText" style="margin-top: 10px; font-size: 14px;">
+                        Henüz sipariş verilmedi
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="voice-assistant" id="voiceAssistant">
+        <i class="fas fa-microphone"></i>
+    </div>      
+    
+    <div class="voice-status" id="voiceStatus">
+        <div class="status-header">
+            <div class="status-title">
+                <i class="fas fa-microphone"></i>
+                <span>Sesli Asistan</span>
+            </div>
+            <button class="status-close" id="closeVoiceStatus">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="status-content">
+            <div class="assistant-message" id="assistantMessage">Mikrofon erişimi için lütfen üstteki turuncu butona tıklayın.</div>
+            <div class="user-message" id="userMessage"></div>
+        </div>
+        <div class="voice-indicator" id="voiceIndicator">
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase configuration
+        const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+        
+        // Initialize Supabase client
+        const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        // Global state
+        let currentUser = null;
+        let currentProfile = null;
+        let sellers = [];
+        let reyonlar = [];
+        let categories = [];
+        let products = [];
+        let cart = [];
+        let recognition;
+        let isListening = false;
+        let voiceCode = null;
+        let conversationStep = 0;
+        let currentPaymentMethod = null;
+        let orderStatusInterval = null;
+        
+        // DOM Elements
+	const microphoneToggle = document.getElementById('microphoneToggle');
+        const voiceAssistant = document.getElementById('voiceAssistant');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const assistantMessage = document.getElementById('assistantMessage');
+        const userMessage = document.getElementById('userMessage');	
+        const currentStatus = document.getElementById('currentStatus');
+	const voiceIndicator = document.getElementById('voiceIndicator');
+        const statusProgress = document.getElementById('statusProgress');
+        const statusText = document.getElementById('statusText');
+	const closeVoiceStatus = document.getElementById('closeVoiceStatus');
+        
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initVoiceRecognition();
+            loadInitialData();
+            setupEventListeners();
+
+	 // Mikrofon durumunu kontrol et
+            checkMicrophonePermission();
+
+	 // Ses durumu kutusunu göster
+            showVoiceStatus();
+        });
+            
+            // Sayfa yüklendiğinde sesli asistanı başlat
+            setTimeout(() => {
+                speakToUser("Merhaba! Hoş geldiniz. Size nasıl yardımcı olabilirim?");
+            }, 1000);
+        });
+        
+        // Initialize voice recognition
+        	 {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.lang = 'tr-TR';
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+                
+                recognition.onstart = function() {
+                    isListening = true;
+                    document.body.classList.add('listening');
+                    voiceStatus.style.display = 'block';
+                    assistantMessage.textContent = "Dinliyorum...";
+                    userMessage.textContent = "";
+                };
+                
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript.toLowerCase();
+                    userMessage.textContent = transcript;
+                    processVoiceCommand(transcript);
+                };
+                
+                recognition.onerror = function(event) {
+                    console.error('Speech recognition error', event.error);
+                    assistantMessage.textContent = "Üzgünüm, anlayamadım. Tekrar söyler misiniz?";
+                    isListening = false;
+                    document.body.classList.remove('listening');
+                };
+                
+                recognition.onend = function() {
+                    isListening = false;
+                    document.body.classList.remove('listening');
+                };
+                
+                voiceAssistant.addEventListener('click', function() {
+                    if (isListening) {
+                        recognition.stop();
+                    } else {
+                        recognition.start();
+                    }
+                });
+            } else {
+                voiceAssistant.style.display = 'none';
+                console.warn('Speech Recognition API is not supported in this browser');
+            }
+        }
+        
+        // Load initial data
+        async function loadInitialData() {
+            // Önce ses tanıma ile kullanıcıyı tanımlamaya çalış
+            await identifyUserByVoice();
+        }
+        
+        // Process voice commands
+        function processVoiceCommand(transcript) {
+            switch(conversationStep) {
+                case 0: // İlk karşılama
+                    if (transcript.includes('merhaba')) {
+                        speakToUser("Merhaba efendim! Hoş geldiniz. Sesi tanıyorum, profiliniz yükleniyor.");
+                        // Ses kodu ile kullanıcıyı bulmaya çalış
+                        findUserByVoiceCode();
+                    } else {
+                        speakToUser("Önce 'Merhaba' diyerek başlayalım mı?");
+                    }
+                    break;
+                case 1: // Telefon numarası isteme
+                    const phoneMatch = transcript.match(/\d+/g);
+                    if (phoneMatch) {
+                        const phone = phoneMatch.join('');
+                        document.getElementById('p_phone').textContent = phone;
+                        checkUserByPhone(phone);
+                    } else {
+                        speakToUser("Telefon numaranızı anlayamadım. Lütfen numaranızı söyler misiniz?");
+                    }
+                    break;
+                case 2: // Yeni kullanıcı kaydı - İsim
+                    document.getElementById('p_name').textContent = transcript;
+                    speakToUser("Teşekkürler. Hangi şehirden alışveriş yapmak istiyorsunuz?");
+                    conversationStep = 3;
+                    break;
+                case 3: // Yeni kullanıcı kaydı - Şehir
+                    document.getElementById('p_city').textContent = transcript;
+                    speakToUser("Tamam. Son olarak, adresinizi öğrenebilir miyim?");
+                    conversationStep = 4;
+                    break;
+                case 4: // Yeni kullanıcı kaydı - Adres
+                    document.getElementById('p_address').textContent = transcript;
+                    speakToUser("Teşekkürler. Konumunuz belirleniyor ve profiliniz oluşturuluyor.");
+                    // Konum bilgisini al ve profili kaydet
+                    getLocationFromAddress(transcript);
+                    conversationStep = 5;
+                    break;
+                case 5: // Profil oluşturuldu, satıcılar yükleniyor
+                    // Satıcıları yükle
+                    loadSellersByLocation();
+                    break;
+                default:
+                    // Normal sipariş süreci
+                    processOrderCommand(transcript);
+                    break;
+            }
+        }
+        
+        // Speak to user
+        function speakToUser(message) {
+            assistantMessage.textContent = message;
+            
+            // Tarayıcı ses sentezleme API'si
+            if ('speechSynthesis' in window) {
+                const speech = new SpeechSynthesisUtterance(message);
+                speech.lang = 'tr-TR';
+                speech.volume = 1;
+                speech.rate = 1;
+                speech.pitch = 1;
+                
+                window.speechSynthesis.speak(speech);
+            }
+        }
+        
+        // Find user by voice code
+        async function findUserByVoiceCode() {
+            // Bu örnek için rastgele bir ses kodu oluşturuluyor
+            // Gerçek uygulamada bu kodu veritabanından almalısınız
+            voiceCode = Math.random().toString(36).substring(2, 10);
+            
+            // Ses kodunu kullanarak kullanıcıyı bulmaya çalış
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('voice_code', voiceCode)
+                .maybeSingle();
+                
+            if (data) {
+                // Kullanıcı bulundu
+                currentProfile = data;
+                updateProfileUI();
+                speakToUser(`Hoş geldiniz ${data.full_name}! Size yardımcı olmaktan mutluluk duyarım.`);
+                conversationStep = 6; // Normal sipariş sürecine geç
+                loadSellersByLocation();
+            } else {
+                // Kullanıcı bulunamadı, telefon numarası iste
+                speakToUser("Ses kodu bulunamadı. Lütfen telefon numaranızı söyler misiniz?");
+                conversationStep = 1;
+            }
+        }
+        
+        // Check user by phone
+        async function checkUserByPhone(phone) {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('phone', phone)
+                .maybeSingle();
+                
+            if (data) {
+                // Kullanıcı bulundu
+                currentProfile = data;
+                updateProfileUI();
+                speakToUser(`Hoş geldiniz ${data.full_name}! Ses tanıma kodunuz: ${voiceCode}. Bir sonraki girişinizde bu kodu kullanabilirsiniz.`);
+                conversationStep = 6; // Normal sipariş sürecine geç
+                loadSellersByLocation();
+            } else {
+                // Kullanıcı bulunamadı, yeni kayıt
+                speakToUser("Kayıtlı kullanıcı profiliniz bulunamadı. Lütfen adınızı ve soyadınızı söyler misiniz?");
+                conversationStep = 2;
+            }
+        }
+        
+        // Get location from address
+        async function getLocationFromAddress(address) {
+            // Bu örnek için sabit bir konum döndürüyoruz
+            // Gerçek uygulamada Google Maps API kullanmalısınız
+            const location = "https://www.google.com/maps/place/Kadıköy";
+            
+            // Profili oluştur
+            createUserProfile(location);
+        }
+        
+        // Create user profile
+        async function createUserProfile(location) {
+            const full_name = document.getElementById('p_name').textContent;
+            const phone = document.getElementById('p_phone').textContent;
+            const city = document.getElementById('p_city').textContent;
+            const address = document.getElementById('p_address').textContent;
+            
+            // Rastgele bir voice code oluştur
+            voiceCode = Math.random().toString(36).substring(2, 10);
+            
+            const { data, error } = await supabase
+                .from('profiles')
+                .insert([
+                    {
+                        full_name: full_name,
+                        role: 'customer',
+                        phone: phone,
+                        address: address,
+                        city: city,
+                        location: location,
+                        voice_code: voiceCode,
+                        status: 'Active',
+                        confirm: true
+                    }
+                ])
+                .select()
+                .single();
+                
+            if (error) {
+                console.error('Error creating profile:', error);
+                speakToUser("Profil oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+            } else {
+                currentProfile = data;
+                speakToUser(`Profiliniz başarıyla oluşturuldu. Ses tanıma kodunuz: ${voiceCode}. Bir sonraki girişinizde bu kodu kullanabilirsiniz.`);
+                conversationStep = 6; // Normal sipariş sürecine geç
+                loadSellersByLocation();
+            }
+        }
+        
+        // Load sellers by location
+        async function loadSellersByLocation() {
+            if (!currentProfile) return;
+            
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('role', 'market')
+                .eq('city', currentProfile.city)
+                .limit(10);
+                
+            if (error) {
+                console.error('Error loading sellers:', error);
+            } else {
+                sellers = data;
+                updateSellerSelect();
+                speakToUser("Bulunduğunuz bölgedeki satıcılar yüklendi. Sesli olarak bir satıcı seçebilir veya listeden seçim yapabilirsiniz.");
+            }
+        }
+        
+        // Update seller select
+        function updateSellerSelect() {
+            const sellerSelect = document.getElementById('sellerSelect');
+            sellerSelect.innerHTML = '<option value="">Satıcı Seçin</option>';
+            
+            sellers.forEach(seller => {
+                const option = document.createElement('option');
+                option.value = seller.id;
+                option.textContent = seller.full_name;
+                sellerSelect.appendChild(option);
+            });
+        }
+        
+        // Update profile UI
+        function updateProfileUI() {
+            if (!currentProfile) return;
+            
+            document.getElementById('p_name').textContent = currentProfile.full_name || '-';
+            document.getElementById('p_phone').textContent = currentProfile.phone || '-';
+            document.getElementById('p_city').textContent = currentProfile.city || '-';
+            document.getElementById('p_address').textContent = currentProfile.address || '-';
+            document.getElementById('userName').textContent = currentProfile.full_name || 'Misafir';
+            document.getElementById('userLocation').textContent = currentProfile.city || 'Konum bilinmiyor';
+            
+            // Bonus bilgisini yükle
+            loadBonusInfo();
+        }
+        
+        // Load bonus info
+        async function loadBonusInfo() {
+            if (!currentProfile) return;
+            
+            // Örnek bonus bilgisi
+            document.getElementById('p_bonus').textContent = "125.50 ₺";
+            document.getElementById('p_bonus_amount').textContent = "125.50 ₺";
+        }
+        
+        // Process order command
+        function processOrderCommand(transcript) {
+            // Basit bir ürün tanıma örneği
+            const products = [
+                { name: "domates", id: 1, price: 12.5 },
+                { name: "ekmek", id: 2, price: 5 },
+                { name: "süt", id: 3, price: 15 },
+                { name: "yumurta", id: 4, price: 25 },
+                { name: "peynir", id: 5, price: 85 }
+            ];
+            
+            let productFound = null;
+            let quantity = 1;
+            
+            // Miktarı kontrol et (1 kilo, 2 adet vb.)
+            const quantityMatch = transcript.match(/(\d+)\s*(kilo|kg|adet|paket|tane)/);
+            if (quantityMatch) {
+                quantity = parseInt(quantityMatch[1]);
+            }
+            
+            // Ürünü bul
+            for (const product of products) {
+                if (transcript.includes(product.name)) {
+                    productFound = product;
+                    break;
+                }
+            }
+            
+            if (productFound) {
+                // Ürünü sepete ekle
+                addToCart(productFound, quantity);
+                speakToUser(`${quantity} ${productFound.name} sepete eklendi. Başka bir şey ister misiniz?`);
+                
+                // 10 saniye içinde yanıt gelmezse devam edelim mi diye sor
+                setTimeout(() => {
+                    if (!isListening) {
+                        speakToUser("Alışverişe devam etmek istiyor musunuz?");
+                    }
+                }, 10000);
+            } else if (transcript.includes('hayır') || transcript.includes('istemiyorum')) {
+                speakToUser("Peki. Siparişinizi tamamlayalım mı?");
+            } else if (transcript.includes('evet') || transcript.includes('tamamla')) {
+                completeOrder();
+            } else {
+                speakToUser("Üzgünüm, anlayamadım. Lütfen tekrar söyler misiniz?");
+            }
+        }
+        
+        // Add to cart
+        function addToCart(product, quantity) {
+            // Sepete ürünü ekle
+            const existingItem = cart.find(item => item.id === product.id);
+            
+            if (existingItem) {
+                existingItem.quantity += quantity;
+            } else {
+                cart.push({
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    quantity: quantity
+                });
+            }
+            
+            updateCartUI();
+        }
+        
+        // Update cart UI
+        function updateCartUI() {
+            const cartList = document.getElementById('cartList');
+            const subtotalEl = document.getElementById('subtotal');
+            const discountEl = document.getElementById('discount');
+            const vatAmountEl = document.getElementById('vatAmount');
+            const totalAmountEl = document.getElementById('totalAmount');
+            
+            // Sepeti temizle
+            cartList.innerHTML = '';
+            
+            if (cart.length === 0) {
+                cartList.innerHTML = `
+                    <div class="text-center" style="padding: 20px; color: #6b7280;">
+                        <i class="fas fa-shopping-cart" style="font-size: 36px; margin-bottom: 10px;"></i>
+                        <p>Sepetinizde ürün bulunmuyor</p>
+                    </div>
+                `;
+            } else {
+                // Sepet öğelerini ekle
+                cart.forEach(item => {
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'cart-item';
+                    itemElement.innerHTML = `
+                        <div class="cart-item-info">
+                            <div class="cart-item-name">${item.name}</div>
+                            <div class="cart-item-quantity">${item.quantity} adet</div>
+                        </div>
+                        <div class="cart-item-price">${(item.price * item.quantity).toFixed(2)} ₺</div>
+                    `;
+                    cartList.appendChild(itemElement);
+                });
+            }
+            
+            // Toplamları hesapla
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const discount = 0; // İndirim yok
+            const vatAmount = subtotal * 0.18; // %18 KDV
+            const totalAmount = subtotal + vatAmount - discount;
+            
+            // Toplamları güncelle
+            subtotalEl.textContent = subtotal.toFixed(2) + ' ₺';
+            discountEl.textContent = discount.toFixed(2) + ' ₺';
+            vatAmountEl.textContent = vatAmount.toFixed(2) + ' ₺';
+            totalAmountEl.textContent = totalAmount.toFixed(2) + ' ₺';
+        }
+        
+        // Complete order
+        function completeOrder() {
+            if (cart.length === 0) {
+                speakToUser("Sepetinizde ürün bulunmamaktadır. Lütfen önce ürün ekleyin.");
+                return;
+            }
+            
+            speakToUser(`Sipariş toplamınız ${document.getElementById('totalAmount').textContent}. Nasıl ödemek istersiniz? Kapıda nakit, kapıda kart veya bonus ile ödeme seçenekleriniz bulunmaktadır.`);
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Ödeme butonları
+            document.getElementById('payCash').addEventListener('click', () => {
+                selectPaymentMethod('cash');
+            });
+
+	// Mikrofon açma/kapama butonu
+            microphoneToggle.addEventListener('click', toggleMicrophone);
+	
+	// Ses durumu kapatma butonu
+            closeVoiceStatus.addEventListener('click', hideVoiceStatus);
+        }
+            
+            document.getElementById('payCard').addEventListener('click', () => {
+                selectPaymentMethod('card');
+            });
+            
+            document.getElementById('payBonus').addEventListener('click', () => {
+                selectPaymentMethod('bonus');
+            });
+        }
+
+
+
+        // Mikrofon iznini kontrol et
+        async function checkMicrophonePermission() {
+            try {
+                // Mikrofon erişim durumunu kontrol et
+                const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+                
+                if (permissionStatus.state === 'granted') {
+                    // İzin zaten verilmiş
+                    enableMicrophone();
+                } else {
+                    // İzin verilmemiş veya sorulmamış
+                    disableMicrophone();
+                }
+                
+                // İzin durumu değiştiğinde
+                permissionStatus.onchange = function() {
+                    if (permissionStatus.state === 'granted') {
+                        enableMicrophone();
+                    } else {
+                        disableMicrophone();
+                    }
+                };
+            } catch (error) {
+                console.error('Mikrofon izni kontrol hatası:', error);
+                // Fallback: Doğrudan mikrofon erişimini dene
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    enableMicrophone();
+                    stream.getTracks().forEach(track => track.stop());
+                } catch (err) {
+                    disableMicrophone();
+                }
+            }
+        }
+        
+        // Mikrofonu aç/kapa
+        function toggleMicrophone() {
+            if (isMicrophoneEnabled) {
+                disableMicrophone();
+            } else {
+                enableMicrophone();
+            }
+        }
+        
+        // Mikrofonu etkinleştir
+        async function enableMicrophone() {
+            try {
+                // Mikrofon erişim isteği gönder
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Mikrofon etkin
+                isMicrophoneEnabled = true;
+                microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (Açık)</span>';
+                microphoneToggle.classList.add('listening');
+                currentStatus.textContent = "Mikrofon erişimi sağlandı";
+                
+                // Ses tanıma başlat
+                initializeSpeechRecognition();
+                
+                // Kullanıcıya bildir
+                assistantMessage.textContent = "Mikrofon erişimi sağlandı. Lütfen 'Merhaba' diyerek sistemi başlatın.";
+                speakToUser("Mikrofon erişimi sağlandı. Lütfen merhaba diyerek sistemi başlatın.");
+                
+                // Mikrofon stream'ini serbest bırak (sadece izin için kullandık)
+                stream.getTracks().forEach(track => track.stop());
+                
+            } catch (error) {
+                console.error("Mikrofon erişim hatası:", error);
+                currentStatus.textContent = "Mikrofon erişimi reddedildi";
+                
+                let errorMessage = "Mikrofon erişimi sağlanamadı. ";
+                if (error.name === "NotAllowedError") {
+                    errorMessage += "Lütfen tarayıcı ayarlarınızdan mikrofon erişimine izin verin.";
+                } else if (error.name === "NotFoundError") {
+                    errorMessage += "Mikrofon cihazı bulunamadı.";
+                } else if (error.name === "NotReadableError") {
+                    errorMessage += "Mikrofon başka bir uygulama tarafından kullanılıyor.";
+                } else {
+                    errorMessage += "Beklenmeyen bir hata oluştu.";
+                }
+                
+                assistantMessage.textContent = errorMessage;
+                disableMicrophone();
+            }
+        }
+        
+        // Mikrofonu devre dışı bırak
+        function disableMicrophone() {
+            isMicrophoneEnabled = false;
+            microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon (Kapalı)</span>';
+            microphoneToggle.classList.remove('listening');
+            currentStatus.textContent = "Mikrofon erişimi kapalı";
+            
+            // Ses tanımayı durdur
+            if (recognition) {
+                recognition.stop();
+            }
+            
+            // Ses göstergesini sıfırla
+            voiceIndicator.classList.remove('listening');
+            
+            // Kullanıcıya bildir
+            assistantMessage.textContent = "Mikrofon erişimi kapalı. Sesli sipariş için lütfen mikrofon erişimine izin verin.";
+        }
+        
+        // Ses tanıma sistemini başlat
+        function initializeSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                assistantMessage.textContent = "Tarayıcınız ses tanıma özelliğini desteklemiyor";
+                return;
+            }
+            
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.lang = 'tr-TR';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            
+            recognition.onstart = function() {
+                isListening = true;
+                voiceIndicator.classList.add('listening');
+                currentStatus.textContent = "Ses dinleniyor...";
+                assistantMessage.textContent = "Dinliyorum...";
+            };
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[event.results.length - 1][0].transcript;
+                userMessage.textContent = transcript;
+                
+                // Basit sesli komut işleme
+                processVoiceCommand(transcript.toLowerCase());
+            };
+            
+         recognition.onerror = function(event) {
+                console.error('Ses tanıma hatası:', event.error);
+                
+                if (event.error === 'not-allowed') {
+                    assistantMessage.textContent = "Mikrofon erişimine izin verilmedi. Lütfen tarayıcı ayarlarınızdan izin verin.";
+                    disableMicrophone();
+                } else {
+                    assistantMessage.textContent = "Ses tanıma hatası: " + event.error;
+                }
+                
+                isListening = false;
+                voiceIndicator.classList.remove('listening');
+                currentStatus.textContent = "Ses dinleme hatası";
+            };
+            
+            recognition.onend = function() {
+                isListening = false;
+                voiceIndicator.classList.remove('listening');
+                
+                // Mikrofon hala açıksa yeniden başlat
+                if (isMicrophoneEnabled) {
+                    setTimeout(() => {
+                        if (!isListening) {
+                            recognition.start();
+                        }
+                    }, 500);
+                }
+            };
+            
+            // Ses tanımayı başlat
+            recognition.start();
+        }
+
+
+
+
+ // Sesli komutları işle
+        function processVoiceCommand(transcript) {
+            if (transcript.includes('merhaba')) {
+                assistantMessage.textContent = "Merhaba! Size nasıl yardımcı olabilirim?";
+                speakToUser("Merhaba! Hoş geldiniz. Size nasıl yardımcı olabilirim?");
+            } else if (transcript.includes('nasılsın')) {
+                assistantMessage.textContent = "Teşekkür ederim, iyiyim. Size nasıl yardımcı olabilirim?";
+                speakToUser("Teşekkür ederim, iyiyim. Bugün için sipariş vermek ister misiniz?");
+            } else if (transcript.includes('teşekkür')) {
+                assistantMessage.textContent = "Rica ederim! Size başka nasıl yardımcı olabilirim?";
+                speakToUser("Rica ederim! Başka bir isteğiniz var mı?");
+            } else {
+                assistantMessage.textContent = "Üzgünüm, anlayamadım. Lütfen tekrar söyler misiniz?";
+                speakToUser("Üzgünüm, anlayamadım. Lütfen tekrar söyler misiniz?");
+            }
+        }
+
+        // Select payment method
+        function selectPaymentMethod(method) {
+            currentPaymentMethod = method;
+            
+            // Tüm butonlardan seçili classını kaldır
+            document.getElementById('payCash').classList.remove('selected');
+            document.getElementById('payCard').classList.remove('selected');
+            document.getElementById('payBonus').classList.remove('selected');
+            
+            // Seçilen butona selected classını ekle
+            document.getElementById(`pay${method.charAt(0).toUpperCase() + method.slice(1)}`).classList.add('selected');
+            
+            if (method === 'bonus') {
+                const bonusAmount = parseFloat(document.getElementById('p_bonus_amount').textContent);
+                const totalAmount = parseFloat(document.getElementById('totalAmount').textContent);
+                
+                if (bonusAmount < totalAmount) {
+                    speakToUser(`Bonus bakiyeniz ${bonusAmount} TL, sipariş tutarınız ${totalAmount} TL. Bonus bakiyeniz yetersiz. Kalan tutarı nasıl ödemek istersiniz?`);
+                } else {
+                    speakToUser("Ödemeniz bonus bakiyenizden karşılanacaktır. Siparişinizi onaylıyor musunuz?");
+                }
+            } else {
+                speakToUser(`Ödemeniz ${method === 'cash' ? 'kapıda nakit' : 'kapıda kart'} olarak ayarlandı. Siparişinizi onaylıyor musunuz?`);
+            }
+        }
+
+	// Kullanıcıya sesli yanıt ver
+        function speakToUser(message) {
+            if ('speechSynthesis' in window) {
+                const speech = new SpeechSynthesisUtterance(message);
+                speech.lang = 'tr-TR';
+                speech.volume = 1;
+                speech.rate = 1;
+                speech.pitch = 1;
+                
+                window.speechSynthesis.speak(speech);
+            }
+        }
+        
+        // Ses durumu kutusunu göster
+        function showVoiceStatus() {
+            voiceStatus.style.display = 'block';
+        }
+        
+        // Ses durumu kutusunu gizle
+        function hideVoiceStatus() {
+            voiceStatus.style.display = 'none';
+        }
+        
+        // Simulate order status updates
+        function simulateOrderStatus() {
+            let progress = 0;
+            statusText.textContent = "Siparişiniz alındı";
+            
+            if (orderStatusInterval) clearInterval(orderStatusInterval);
+            
+            orderStatusInterval = setInterval(() => {
+                progress += 10;
+                statusProgress.style.width = `${progress}%`;
+                
+                if (progress >= 100) {
+                    clearInterval(orderStatusInterval);
+                    statusText.textContent = "Siparişiniz teslim edildi";
+                    speakToUser("Siparişiniz teslim edildi. Bizi tercih ettiğiniz için teşekkür ederiz!");
+                } else if (progress >= 75) {
+                    statusText.textContent = "Kurye adresinizde";
+                } else if (progress >= 50) {
+                    statusText.textContent = "Kurye yolda";
+                } else if (progress >= 25) {
+                    statusText.textContent = "Kurye atandı";
+                }
+            }, 2000);
+        }
+
+// Kullanıcıya sesli yanıt ver
+        function speakToUser(message) {
+            if ('speechSynthesis' in window) {
+                const speech = new SpeechSynthesisUtterance(message);
+                speech.lang = 'tr-TR';
+                speech.volume = 1;
+                speech.rate = 1;
+                speech.pitch = 1;
+                
+                window.speechSynthesis.speak(speech);
+            }
+        }
+        
+        // Ses durumu kutusunu göster
+        function showVoiceStatus() {
+            voiceStatus.style.display = 'block';
+        }
+        
+        // Ses durumu kutusunu gizle
+        function hideVoiceStatus() {
+            voiceStatus.style.display = 'none';
+        }
+        
+        // Initialize voice recognition on page load
+        function identifyUserByVoice() {
+            // Sayfa yüklendiğinde sesli tanıma başlat
+            setTimeout(() => {
+                speakToUser("Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen 'Merhaba' diyerek başlayın.");
+            }, 1500);
+        }
+    </script>
+</body>
+</html>
