@@ -3,270 +3,304 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hızlı Sipariş Sistemi</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<title>Onur Market - Sipariş Sistemi</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
 <style>
-  .reyon { perspective: 800px; cursor: pointer; }
-  .reyon-inner { transition: transform 0.5s; transform-style: preserve-3d; }
-  .reyon:hover .reyon-inner { transform: rotateY(15deg) scale(1.05); }
-  .fade-in { animation: fadeIn 0.5s forwards; }
-  @keyframes fadeIn { from {opacity:0;} to{opacity:1;} }
+body{font-family:Arial,sans-serif;margin:0;padding:0;}
+#productsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;padding:10px;}
+.card{padding:10px;background:#f9f9f9;border-radius:8px;text-align:center;cursor:pointer;transition:transform 0.2s;}
+#cartModal,#cartList,#modalCartList{padding:10px;}
 </style>
 </head>
-<body class="bg-gray-100 font-sans">
+<body>
 
-<header class="text-center py-8 bg-green-600 text-white">
-  <h1 class="text-3xl font-bold">Hızlı Sipariş Sistemi</h1>
-  <p class="mt-2">Sadece konuş, siparişin hazırlansın!</p>
-</header>
+<h2>Onur Market</h2>
 
-<!-- Lokasyon ve Satıcı -->
-<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow">
-  <h2 class="text-xl font-semibold mb-2">Lokasyon ve Satıcı</h2>
-  <button id="locBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Konumumu Kullan</button>
-  <select id="saticiSelect" class="w-full p-2 border rounded mt-2 hidden">
-    <option value="">Satıcı seçin</option>
-  </select>
-  <p id="noSatici" class="mt-2 text-red-600 hidden">Bölgede satıcı bulunamadı.</p>
-</section>
+<!-- Kullanıcı Bilgileri / Bonus -->
+<div>
+    Hoşgeldiniz: <span id="currentUser">Giriş Yapılmadı</span> | 
+    Bonus: <span id="p_bonus">0 ₺</span>
+</div>
 
-<!-- Reyonlar -->
-<section id="reyonSection" class="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 my-6 px-4 hidden"></section>
+<!-- Sesli Üyelik -->
+<button id="voiceRegisterBtn">Sesli Üyelik Kaydı</button>
 
-<!-- Ürün Listesi ve Sepet -->
-<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow">
-  <h2 class="text-xl font-semibold mb-2">Sepet ve Ürün Seçimi</h2>
-  <ul id="sepet" class="mb-4"></ul>
-  <div id="urunPanel" class="hidden">
-    <h3 class="font-semibold mb-2" id="urunReyon"></h3>
-    <div class="flex gap-2 mb-2">
-      <input type="text" id="urunAd" placeholder="Ürün Adı" class="flex-1 p-2 border rounded">
-      <input type="number" id="urunAdet" placeholder="Adet" class="w-20 p-2 border rounded" min="1" value="1">
-      <input type="number" id="urunFiyat" placeholder="Fiyat (₺)" class="w-24 p-2 border rounded">
-      <button id="urunEkle" class="bg-green-600 text-white px-4 py-2 rounded">Sepete Ekle</button>
-    </div>
-  </div>
+<!-- Satıcı Seçim -->
+<select id="sellerSelect">
+    <option value="">-- Satıcı Seçin --</option>
+</select>
 
-  <!-- Sepet Finansal Özet -->
-  <div id="sepetOzet" class="mt-4 p-2 border-t border-gray-300">
-    <p>Toplam Tutar: ₺<span id="toplamTutar">0</span></p>
-    <p>İndirim: ₺<span id="indirim">0</span></p>
-    <p>KDV (18%): ₺<span id="kdv">0</span></p>
-    <p class="font-bold">Genel Toplam: ₺<span id="genelToplam">0</span></p>
-  </div>
-</section>
+<!-- Ürün Listesi -->
+<div id="productsGrid"></div>
 
-<!-- Profil & Bonus -->
-<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow">
-  <h2 class="text-xl font-semibold mb-2">Profil & Bonus</h2>
-  <div class="flex items-center gap-4 mb-2">
-    <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="Profil" class="w-12 h-12 rounded-full">
-    <div>
-      <p id="userName" class="font-semibold">Ayşe Teyze</p>
-      <p id="userEmail" class="text-gray-600 text-sm">ayse@example.com</p>
-    </div>
-  </div>
-  <div class="mb-2">
-    <p>Kazanılan Bonus: <span id="kazananBonus">0</span> puan</p>
-    <p>Harcanan Bonus: <span id="harcananBonus">0</span> puan</p>
-    <p>Kalan Bonus: <span id="kalanBonus">0</span> puan</p>
-  </div>
-</section>
+<!-- Sepet -->
+<h3>Sepet</h3>
+<div id="cartList"></div>
+<div id="modalCartList"></div>
+<div>Toplam: <span id="cartTotal">0 ₺</span></div>
 
 <!-- Ödeme Butonları -->
-<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow text-center">
-  <h2 class="text-xl font-semibold mb-2">Ödeme Seçenekleri</h2>
-  <div class="flex flex-col sm:flex-row gap-2 mt-4">
-    <button id="payNakit" class="bg-gray-600 text-white px-4 py-2 rounded flex-1">Kapıda Nakit</button>
-    <button id="payKart" class="bg-blue-600 text-white px-4 py-2 rounded flex-1">Kapıda Kredi Kartı</button>
-    <button id="payBonus" class="bg-green-600 text-white px-4 py-2 rounded flex-1">Bonusla Ödeme</button>
-  </div>
-</section>
-
-<!-- Sesli Sipariş -->
-<section class="max-w-xl mx-auto my-6 text-center">
-  <button id="startVoice" class="bg-blue-600 text-white px-6 py-3 rounded text-lg">Sesli Sipariş Başlat</button>
-</section>
-
-<!-- WhatsApp Referans -->
-<section class="max-w-xl mx-auto my-6 p-4 bg-white rounded shadow text-center">
-  <h2 class="text-xl font-semibold mb-2">Arkadaşına Gönder</h2>
-  <button id="shareBtn" class="bg-green-600 text-white px-6 py-3 rounded text-lg">
-    Referans Linki WhatsApp’a Gönder
-  </button>
-</section>
+<button id="payCash">Nakit Öde</button>
+<button id="payCard">Kart Öde</button>
+<button id="payBonus">Bonus ile Öde</button>
 
 <script>
-// Supabase client
-const SUPABASE_URL = 'https://xyzcompany.supabase.co';
-const SUPABASE_KEY = 'public-anon-key';
+/* ====== SUPABASE INIT ====== */
+const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
+const SUPABASE_KEY = 'YOUR_ANON_KEY';
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// DOM Elements
-const sepet = document.getElementById('sepet');
-const urunPanel = document.getElementById('urunPanel');
-const urunReyon = document.getElementById('urunReyon');
-const urunAd = document.getElementById('urunAd');
-const urunAdet = document.getElementById('urunAdet');
-const urunFiyat = document.getElementById('urunFiyat');
-const urunEkle = document.getElementById('urunEkle');
-const saticiSelect = document.getElementById('saticiSelect');
-const noSatici = document.getElementById('noSatici');
-const reyonSection = document.getElementById('reyonSection');
-const toplamTutarEl = document.getElementById('toplamTutar');
-const indirimEl = document.getElementById('indirim');
-const kdvEl = document.getElementById('kdv');
-const genelToplamEl = document.getElementById('genelToplam');
-const kazanilanBonusEl = document.getElementById('kazananBonus');
-const harcananBonusEl = document.getElementById('harcananBonus');
-const kalanBonusEl = document.getElementById('kalanBonus');
+/* ====== GLOBALS ====== */
+let cart = [];
+let currentProfile = null;
+const cartList = document.getElementById('cartList');
+const modalCartList = document.getElementById('modalCartList');
+const p_bonus = document.getElementById('p_bonus');
+const productsGrid = document.getElementById('productsGrid');
+const sellerSelect = document.getElementById('sellerSelect');
 
-let mevcutBonus = 120;
-let harcananBonus = 0;
-let urunlerData = [];
-let saticilarData = [];
+/* ====== MONEY FORMAT ====== */
+function money(amount){ return Number(amount).toLocaleString('tr-TR', { style:'currency', currency:'TRY' }); }
 
-// Lokasyon ve satıcıları Supabase’den çek
-document.getElementById('locBtn').addEventListener('click', async () => {
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(async pos => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      const { data: saticilar, error } = await supabase.from('saticilar').select('*');
-      if(error){ console.error(error); return; }
-      saticilarData = saticilar.filter(s => Math.abs(lat - s.lat) + Math.abs(lon - s.lon) < 2);
-      if(saticilarData.length>0){
-        saticiSelect.innerHTML = '<option value="">Satıcı seçin</option>';
-        saticilarData.forEach(s => {
-          const opt = document.createElement('option');
-          opt.value = s.id;
-          opt.textContent = s.name;
-          saticiSelect.appendChild(opt);
+/* ====== CART RENDER ====== */
+function renderCart(){
+    cartList.innerHTML='';
+    modalCartList.innerHTML='';
+    if(!cart.length){ 
+        cartList.innerHTML='<div class="text-sm text-gray-500">Sepet boş</div>'; 
+        updateTotals(); 
+        return; 
+    }
+    cart.forEach((it,idx)=>{
+        const row=document.createElement('div');
+        row.className='flex items-center gap-2';
+        row.innerHTML=`<img src="${it.img||'https://via.placeholder.com/48'}" class="w-12 h-12 object-cover rounded" />
+        <div class="flex-1 text-sm">
+            <div class="font-semibold">${it.name}</div>
+            <div class="text-xs text-gray-500">Birim: ${money(it.price)} • x${it.qty}</div>
+        </div>
+        <div class="text-sm font-semibold">${money(it.price*it.qty)}</div>`;
+        cartList.appendChild(row);
+        const modalRow=row.cloneNode(true); modalCartList.appendChild(modalRow);
+    });
+    updateTotals();
+}
+
+/* ====== UPDATE TOTALS ====== */
+function updateTotals(){
+    const total = cart.reduce((s,it)=> s + it.price*it.qty,0);
+    document.getElementById('cartTotal').textContent = money(total);
+}
+
+/* ====== MODAL CART ====== */
+function renderCartModal(){
+    if(!modalCartList) return;
+    modalCartList.innerHTML = '';
+    if(!cart.length){ 
+        modalCartList.innerHTML = '<div class="text-sm text-gray-500">Sepet boş</div>'; 
+        return; 
+    }
+    cart.forEach(it => {
+        const row = document.createElement('div');
+        row.className = 'flex justify-between items-center mb-1';
+        row.innerHTML = `
+            <div class="flex-1">${it.name}</div>
+            <div>${it.qty} x ${money(it.price)}</div>
+            <div>${money(it.price*it.qty)}</div>
+        `;
+        modalCartList.appendChild(row);
+    });
+}
+
+/* ====== CLEAR CART ====== */
+function clearCart(){
+    cart = [];
+    renderCart();
+    renderCartModal();
+    updateTotals();
+}
+
+/* ====== REFERRAL / BONUS ====== */
+async function refreshUserBonus(){
+    if(!currentProfile?.id) return;
+    const { data, error } = await supabase
+        .from('referral_bonus_summary')
+        .select('kalan_bonus')
+        .eq('user_id', currentProfile.id)
+        .maybeSingle();
+    if(error){ console.error(error); return; }
+    const kalan = data?.kalan_bonus ?? 0;
+    p_bonus.textContent = money(kalan);
+}
+
+/* ====== FINALIZE ORDER ====== */
+async function finalizeOrder(method){
+    if (!currentProfile?.id) return alert('Lütfen giriş yapın ve profilinizi tamamlayın.');
+    if (!cart.length) return alert('Sepet boş.');
+
+    const items = cart.map(it => ({
+        product_id: it.product_id,
+        quantity: it.qty,
+        unit_price: it.price
+    }));
+
+    let bonusToUse = 0;
+    if(method === 'bonus'){
+        const { data } = await supabase.from('referral_bonus_summary')
+            .select('kalan_bonus')
+            .eq('user_id', currentProfile.id)
+            .maybeSingle();
+        const kalan = data?.kalan_bonus ?? 0;
+        if(kalan <= 0) return alert('Yeterli bonus yok.');
+        const subtotal = cart.reduce((s,it)=> s + it.price*it.qty, 0);
+        bonusToUse = Math.min(kalan, subtotal);
+    }
+
+    try{
+        const { data, error } = await supabase.rpc('create_order_with_bonus', {
+            p_user_id: currentProfile.id,
+            p_items: items,
+            p_bonus_used: bonusToUse,
+            p_payment_type: (bonusToUse>0 ? 'bonus+' + method : method)
         });
-        saticiSelect.classList.remove('hidden');
-        noSatici.classList.add('hidden');
-      } else {
-        saticiSelect.classList.add('hidden');
-        noSatici.classList.remove('hidden');
-        reyonSection.classList.add('hidden');
-      }
+        if(error){ console.error(error); return alert('Sipariş oluşturulamadı: ' + error.message); }
+
+        const orderId = data;
+        alert('Sipariş kaydedildi. Sipariş ID: ' + orderId);
+
+        clearCart();
+        await refreshUserBonus();
+        openReceiptPrint(orderId);
+        postOrderUIUpdates();
+
+    } catch(err){
+        console.error(err); 
+        alert('Sipariş sırasında hata oluştu: ' + (err.message || err));
+    }
+}
+
+/* ====== PRINT RECEIPT ====== */
+async function openReceiptPrint(orderId){
+    let orderData;
+    try{
+        const q = await supabase.rpc('get_order_receipt', { p_order_id: orderId });
+        orderData = q?.data;
+    } catch(e){ console.warn('RPC çalışmadı, fallback kullanılıyor'); }
+
+    if(!orderData){
+        const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
+        const { data: details } = await supabase.from('order_details').select('*').eq('order_id', orderId);
+        const { data: profile } = await supabase.from('profiles')
+            .select('full_name, phone, address, city').eq('id', order.user_id).maybeSingle();
+        orderData = { order, details, profile };
+    }
+
+    let html = `<div style="font-family: Arial; padding:10px; width:320px;">
+        <h3>Onur Market</h3>
+        <div>Sipariş No: ${orderId}</div>
+        <div>Tarih: ${new Date().toLocaleString()}</div>
+        <div>Müşteri: ${orderData.profile?.full_name || ''}</div>
+        <div>Tel: ${orderData.profile?.phone || ''}</div>
+        <hr/>`;
+
+    (orderData.details || []).forEach(d => {
+        html += `<div style="display:flex; justify-content:space-between;">
+                    <div>${d.product_id}</div>
+                    <div>${d.quantity} x ${money(d.unit_price)}</div>
+                 </div>`;
     });
-  } else { alert('Konum alınamadı!'); }
+
+    html += `<hr/><div>Toplam: ${money(orderData.order.total_amount)}</div></div>`;
+
+    const w = window.open('', '_blank', 'width=400,height=600');
+    w.document.write(html);
+    w.document.close();
+    w.print();
+}
+
+/* ====== SESLİ ÜYELİK ====== */
+const voiceRegisterBtn = document.getElementById('voiceRegisterBtn');
+let voiceRegRecognition = null;
+function setupVoiceRegistration(){
+    if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    voiceRegRecognition = new SpeechRecognition();
+    voiceRegRecognition.lang = 'tr-TR';
+    voiceRegRecognition.interimResults = false;
+
+    voiceRegRecognition.onresult = async (ev) => {
+        const transcript = ev.results[ev.results.length-1][0].transcript.toLowerCase().trim();
+        const nameMatch = transcript.match(/adım\s+(\w+)/);
+        const phoneMatch = transcript.match(/telefon\s+(\d{10,11})/);
+        const cityMatch = transcript.match(/konum\s+(\w+)/);
+        if(!nameMatch || !phoneMatch || !cityMatch) return alert('Ad, telefon ve konum söyleyin.');
+        const full_name = nameMatch[1], phone = phoneMatch[1], city = cityMatch[1];
+
+        const { data, error } = await supabase.auth.signUp({ email: phone+'@dummy.com', password: Math.random().toString(36).slice(-8) });
+        if(error) return alert('Kayıt başarısız: '+error.message);
+        const userId = data.user.id;
+        await supabase.from('profiles').insert({ id:userId, full_name, phone, city, role:'customer', location: city });
+        alert('Sesli kayıt tamamlandı. Hoşgeldiniz, '+full_name);
+        await loadSessionAndProfile();
+    };
+}
+voiceRegisterBtn?.addEventListener('click', ()=> {
+    if(!voiceRegRecognition) setupVoiceRegistration();
+    voiceRegRecognition.start();
 });
 
-// Satıcı seçildiğinde ürün ve reyonları Supabase’den çek
-saticiSelect.addEventListener('change', async () => {
-  const saticiId = saticiSelect.value;
-  if(!saticiId) return;
-  const { data: urunler, error } = await supabase.from('urunler').select('*').eq('satici_id', saticiId);
-  if(error){ console.error(error); return; }
-  urunlerData = urunler;
-  const reyonlar = [...new Set(urunler.map(u=>u.reyon))];
-  reyonSection.innerHTML = '';
-  reyonlar.forEach(r => {
-    const div = document.createElement('div');
-    div.className = 'reyon bg-white rounded shadow p-4';
-    div.dataset.reyon = r;
-    div.innerHTML = `<div class="reyon-inner text-center"><h3 class="mt-2 font-semibold">${r}</h3></div>`;
-    div.addEventListener('click', ()=>{
-      urunPanel.classList.remove('hidden');
-      urunReyon.textContent = r.toUpperCase();
+/* ====== LOKASYON BAZLI SATICI ====== */
+async function checkSellersForLocation(city){
+    const { data: sellersData } = await supabase.from('profiles')
+        .select('id, full_name').eq('role','market').eq('location', city);
+    if(!sellersData.length) return alert('Bu lokasyon için aktif satıcı bulunamadı.');
+    sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
+    sellersData.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.full_name;
+        sellerSelect.appendChild(opt);
     });
-    reyonSection.appendChild(div);
-  });
-  reyonSection.classList.remove('hidden');
-});
-
-// Sepete ekleme
-urunEkle.addEventListener('click', () => {
-  if(urunAd.value && urunFiyat.value && urunAdet.value){
-    const li = document.createElement('li');
-    li.textContent = `${urunAd.value} - ${urunAdet.value} adet - ₺${(urunFiyat.value*urunAdet.value).toFixed(2)}`;
-    li.classList.add('fade-in');
-    sepet.appendChild(li);
-    urunAd.value = '';
-    urunAdet.value = 1;
-    urunFiyat.value = '';
-    guncelleOzet();
-  }
-});
-
-// Özet ve bonus hesaplama
-function guncelleOzet(){
-  let toplam=0;
-  document.querySelectorAll('#sepet li').forEach(li=>{
-    const match = li.textContent.match(/₺(\d+(\.\d+)?)/);
-    if(match) toplam += parseFloat(match[1]);
-  });
-  const indirim = toplam*0.05;
-  const kdv = (toplam-indirim)*0.18;
-  const genel = toplam-indirim+kdv;
-  toplamTutarEl.textContent = toplam.toFixed(2);
-  indirimEl.textContent = indirim.toFixed(2);
-  kdvEl.textContent = kdv.toFixed(2);
-  genelToplamEl.textContent = genel.toFixed(2);
-  const kazanilan = Math.floor(genel*0.05);
-  kazanilanBonusEl.textContent = kazanilan;
-  harcananBonusEl.textContent = harcananBonus;
-  kalanBonusEl.textContent = (mevcutBonus - harcananBonus + kazanilan).toFixed(0);
 }
 
-// Sipariş gönderme Supabase
-async function siparisVer(siparis){
-  const { data, error } = await supabase.from('orders').insert([siparis]).select();
-  if(error){ console.error(error); return null; }
-  return data[0];
+/* ====== 2.5D ÜRÜN GÖRSELLERİ ====== */
+function add3DEffectToProducts(){
+    productsGrid.querySelectorAll('.card').forEach(card => {
+        card.style.transformStyle = 'preserve-3d';
+        card.addEventListener('mouseenter', ()=>{ card.style.transform='rotateX(10deg) rotateY(10deg)'; });
+        card.addEventListener('mouseleave', ()=>{ card.style.transform='rotateX(0deg) rotateY(0deg)'; });
+    });
 }
 
-async function siparisGonder(odemeYontemi){
-  const urunlerSepet = [];
-  document.querySelectorAll('#sepet li').forEach(li=>{
-    const match = li.textContent.match(/(.*) - (\d+) adet - ₺(\d+(\.\d+)?)/);
-    if(match) urunlerSepet.push({ad: match[1], adet: parseInt(match[2]), fiyat: parseFloat(match[3])});
-  });
-  if(urunlerSepet.length===0){ alert("Sepet boş!"); return; }
-  const toplamTutar = parseFloat(genelToplamEl.textContent);
-  const siparis = {
-    user: document.getElementById('userName').textContent,
-    urunler: urunlerSepet,
-    toplam: toplamTutar,
-    odeme: odemeYontemi,
-    bonusKullan: harcananBonus
-  };
-  const result = await siparisVer(siparis);
-  if(result?.id){
-    alert(`Siparişiniz alındı! ID: ${result.id}`);
-    mevcutBonus = mevcutBonus - harcananBonus + Math.floor(toplamTutar*0.05);
-    harcananBonus = 0;
-    guncelleOzet();
-    sepet.innerHTML = '';
-  } else { alert("Sipariş gönderilemedi!"); }
+/* ====== REFERRAL & BONUS LOG ====== */
+async function updateReferralAndBonus(orderId){
+    await refreshUserBonus();
+    const { data: ref } = await supabase.from('referral_links')
+        .select('*').eq('owner_user_id', currentProfile.id).maybeSingle();
+    if(ref) await supabase.from('referral_usage').insert({
+        referral_id: ref.id,
+        user_id: currentProfile.id,
+        order_id: orderId,
+        used_at: new Date()
+    });
 }
 
-document.getElementById('payNakit').addEventListener('click', ()=>siparisGonder('Kapıda Nakit'));
-document.getElementById('payKart').addEventListener('click', ()=>siparisGonder('Kapıda Kredi Kartı'));
-document.getElementById('payBonus').addEventListener('click', ()=>siparisGonder('Bonus ile Ödeme'));
+/* ====== POST ORDER UI ====== */
+function postOrderUIUpdates(){
+    renderCartModal();
+    add3DEffectToProducts();
+}
 
-// Sesli sipariş
-const startVoice = document.getElementById('startVoice');
-const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-recognition.lang = 'tr-TR';
-recognition.interimResults = false;
-startVoice.addEventListener('click', ()=>recognition.start());
-recognition.addEventListener('result',(e)=>{
-  const text = e.results[0][0].transcript.toLowerCase();
-  if(text.includes('manav')){ urunPanel.classList.remove('hidden'); urunReyon.textContent='MANAV'; }
-  else if(text.includes('et')){ urunPanel.classList.remove('hidden'); urunReyon.textContent='ET & ŞARKÜTERİ'; }
-  else if(text.includes('süt')){ urunPanel.classList.remove('hidden'); urunReyon.textContent='SÜT & KAHVALTILIK'; }
-});
+/* ====== EVENT LISTENERS ====== */
+document.getElementById('payCash')?.addEventListener('click', ()=>finalizeOrder('nakit'));
+document.getElementById('payCard')?.addEventListener('click', ()=>finalizeOrder('kart'));
+document.getElementById('payBonus')?.addEventListener('click', ()=>finalizeOrder('bonus'));
 
-// WhatsApp paylaşımı
-document.getElementById('shareBtn').addEventListener('click', ()=>{
-  const referansLink = encodeURIComponent(window.location.href);
-  const mesaj = encodeURIComponent('Merhaba! Bu linkten sipariş verebilirsin: ');
-  window.open(`https://api.whatsapp.com/send?text=${mesaj}${referansLink}`,'_blank');
-});
+/* ====== INIT ====== */
+renderCartModal();
+updateTotals();
+add3DEffectToProducts();
+refreshUserBonus();
 </script>
 
 </body>
