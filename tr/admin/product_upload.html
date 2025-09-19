@@ -292,14 +292,6 @@
             font-size: 14px;
         }
         
-        .demo-credentials {
-            background: #e7f5ff;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-            font-size: 14px;
-        }
-        
         .connection-status {
             display: flex;
             align-items: center;
@@ -320,6 +312,15 @@
         
         .status-disconnected {
             background-color: #f72585;
+        }
+        
+        .sheet-url-info {
+            background: #e7f5ff;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 14px;
+            display: none;
         }
     </style>
 </head>
@@ -352,7 +353,7 @@
         </div>
         
         <div class="filters">
-            <select id="sellerSelect" onchange="filterData()">
+            <select id="sellerSelect" onchange="updateSheetUrlInfo(); filterData();">
                 <option value="">Satıcı Seç (Tümü)</option>
             </select>
             
@@ -375,6 +376,10 @@
             <select id="productSelect" onchange="filterData()">
                 <option value="">Ürün Seç (Tümü)</option>
             </select>
+        </div>
+        
+        <div class="sheet-url-info" id="sheetUrlInfo">
+            Seçilen satıcının Sheets URL'si: <span id="sheetUrlText"></span>
         </div>
         
         <div class="filter-info" id="filterInfo">
@@ -453,12 +458,6 @@
                 </tbody>
             </table>
         </div>
-
-        <div class="demo-credentials">
-            <h3>Demo için Test Verileri</h3>
-            <p>Supabase bağlantısı kurulduktan sonra, demo verilerle test yapabilirsiniz. Aşağıdaki butona tıklayarak demo verileri yükleyebilirsiniz.</p>
-            <button onclick="loadDemoData()" class="btn-primary">Demo Verileri Yükle</button>
-        </div>
     </div>
 
     <script>
@@ -474,7 +473,7 @@
         
         // Sayfa yüklendiğinde
         document.addEventListener('DOMContentLoaded', function() {
-            // Demo amaçlı varsayılan değerler
+            // Varsayılan değerler
             document.getElementById('supabaseUrl').value = "https://xliutvspwodhoaxvysks.supabase.co";
             document.getElementById('supabaseKey').value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
         });
@@ -614,60 +613,8 @@
             } catch (error) {
                 showNotification('Ürün verileri yüklenirken hata oluştu: ' + error.message, 'error');
                 console.error(error);
-                
-                // Hata durumunda demo verileri yükle
-                loadDemoData();
             }
         }
-
-
-// Demo verileri yükle
-        function loadDemoData() {
-            showLoading(true);
-            // 100 saniye bekleme (simülasyon için)
-            setTimeout(() => {
-                // Demo satıcılar
-                sellers = [
-                    { id: '1', full_name: 'Ahmet Market', role: 'seller', seller_type: 'market', sheets_url: 'https://docs.google.com/spreadsheets/d/1-ziqj4f0fMBiYH5niGdA9maSygDubkyTsVCryDR0CC' },
-                    { id: '2', full_name: 'Mehmet Restoran', role: 'seller', seller_type: 'restaurant', sheets_url: 'https://docs.google.com/spreadsheets/d/2-ziqj4f0fMBiYH5niGdA9maSygDubkyTsVCryDR0CC' },
-                    { id: '3', full_name: 'Ayşe Bakkal', role: 'seller', seller_type: 'market', sheets_url: 'https://docs.google.com/spreadsheets/d/3-ziqj4f0fMBiYH5niGdA9maSygDubkyTsVCryDR0CC' }
-                ];
-                
-                // Demo kategoriler
-                categories = [
-                    { id: '1', name: 'Süt Ürünleri' },
-                    { id: '2', name: 'Kahvaltılık' },
-                    { id: '3', name: 'Fırın' },
-                    { id: '4', name: 'İçecek' }
-                ];
-                
-                // Demo reyonlar
-                reyons = [
-                    { id: '1', name: 'Süt Ürünleri' },
-                    { id: '2', name: 'Kahvaltılık' },
-                    { id: '3', name: 'Fırın' },
-                    { id: '4', name: 'İçecek' }
-                ];
-                
-                // Demo ürün listesi
-                productsList = [
-                    { id: '1', name: 'Süt' },
-                    { id: '2', name: 'Peynir' },
-                    { id: '3', name: 'Yumurta' },
-                    { id: '4', name: 'Ekmek' },
-                    { id: '5', name: 'Su' }
-                ];
-                
-                // Demo ürünler
-                allProducts = [
-                    { seller_id: '1', seller_name: 'Ahmet Market', seller_role: 'seller', seller_type: 'market', barcode: '1234567890123', name: 'Süt', brand: 'Sütaş', category: 'Süt Ürünleri', price: 25.50, discount_price: 23.00 },
-                    { seller_id: '2', seller_name: 'Mehmet Restoran', seller_role: 'seller', seller_type: 'restaurant', barcode: '1234567890124', name: 'Peynir', brand: 'Pınar', category: 'Süt Ürünleri', price: 180.75, discount_price: 170.00 },
-                    { seller_id: '1', seller_name: 'Ahmet Market', seller_role: 'seller', seller_type: 'market', barcode: '1234567890125', name: 'Yumurta', brand: 'Köy Yumurtası', category: 'Kahvaltılık', price: 45.00, discount_price: 42.00 },
-                    { seller_id: '3', seller_name: 'Ayşe Bakkal', seller_role: 'seller', seller_type: 'market', barcode: '1234567890126', name: 'Ekmek', brand: 'Günlük Ekmek', category: 'Fırın', price: 7.50, discount_price: 7.00 },
-                    { seller_id: '2', seller_name: 'Mehmet Restoran', seller_role: 'seller', seller_type: 'restaurant', barcode: '1234567890127', name: 'Su', brand: 'Erikli', category: 'İçecek', price: 5.00, discount_price: 4.50 }
-                ];
-        
-
         
         // Satıcıları yükle
         async function loadSellers() {
@@ -753,7 +700,7 @@
         async function loadReyons() {
             try {
                 const { data, error } = await supabaseClient
-                    .from('reyon')
+                    .from('reyonlar')
                     .select('id, name')
                     .order('name');
                 
@@ -801,55 +748,22 @@
             }
         }
         
-                
-                // Selectbox'ları doldur
-                const sellerSelect = document.getElementById('sellerSelect');
-                sellerSelect.innerHTML = '<option value="">Satıcı Seç (Tümü)</option>';
-                sellers.forEach(seller => {
-                    const option = document.createElement('option');
-                    option.value = seller.id;
-                    option.textContent = seller.full_name;
-                    sellerSelect.appendChild(option);
-                });
-                
-                loadRolesAndTypes();
-                
-                const categorySelect = document.getElementById('categorySelect');
-                categorySelect.innerHTML = '<option value="">Kategori Seç (Tümü)</option>';
-                categories.forEach(category => {
-                    const option = document.createElement('option');
-                    option.value = category.name;
-                    option.textContent = category.name;
-                    categorySelect.appendChild(option);
-                });
-                
-                const reyonSelect = document.getElementById('reyonSelect');
-                reyonSelect.innerHTML = '<option value="">Reyon Seç (Tümü)</option>';
-                reyons.forEach(reyon => {
-                    const option = document.createElement('option');
-                    option.value = reyon.name;
-                    option.textContent = reyon.name;
-                    reyonSelect.appendChild(option);
-                });
-                
-                const productSelect = document.getElementById('productSelect');
-                productSelect.innerHTML = '<option value="">Ürün Seç (Tümü)</option>';
-                productsList.forEach(product => {
-                    const option = document.createElement('option');
-                    option.value = product.name;
-                    option.textContent = product.name;
-                    productSelect.appendChild(option);
-                });
-                
-                filteredProducts = [...allProducts];
-                renderProductsTable();
-                
-                showNotification('Demo veriler başarıyla yüklendi', 'success');
-                showLoading(false);
-                
-                // Buton durumlarını güncelle
-                updateButtonStates();
-            }, 1000);
+        // Sheets URL bilgisini güncelle
+        function updateSheetUrlInfo() {
+            const sellerId = document.getElementById('sellerSelect').value;
+            const sheetUrlInfo = document.getElementById('sheetUrlInfo');
+            const sheetUrlText = document.getElementById('sheetUrlText');
+            
+            if (sellerId) {
+                const selectedSeller = sellers.find(s => s.id === sellerId);
+                if (selectedSeller && selectedSeller.sheets_url) {
+                    sheetUrlText.textContent = selectedSeller.sheets_url;
+                    sheetUrlInfo.style.display = 'block';
+                    return;
+                }
+            }
+            
+            sheetUrlInfo.style.display = 'none';
         }
         
         // Verileri filtrele
@@ -913,7 +827,15 @@
             showLoading(true);
             
             try {
-                // Burada Google Sheets API entegrasyonu yapılacak
+                // Sheets URL'den sheet ID'yi çıkar
+                const sheetIdMatch = selectedSeller.sheets_url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                if (!sheetIdMatch || !sheetIdMatch[1]) {
+                    throw new Error('Geçersiz sheets URL formatı');
+                }
+                
+                const sheetId = sheetIdMatch[1];
+                
+                // Burada Google Sheets API'sini kullanarak veri çekme işlemi yapılacak
                 // Şimdilik simüle ediyoruz
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 
@@ -988,8 +910,19 @@
                         results.matched++;
                         results.matchedProducts.push(product);
                         
-                        // Burada Supabase'de güncelleme yapılacak
-                        // Şimdilik sadece sonuçları güncelle
+                        // Supabase'de güncelleme yap
+                        const { error } = await supabaseClient
+                            .from('product_prices')
+                            .update({
+                                price: product.price,
+                                discount_price: product.price * 0.9, // %10 indirim
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('product_id', existingProduct.product_id)
+                            .eq('sube_id', sellerId);
+                        
+                        if (error) throw error;
+                        
                         results.updated++;
                     } else {
                         // Yeni ürün, ekleme yap
@@ -999,14 +932,43 @@
                             reason: 'Yeni ürün'
                         });
                         
-                        // Burada Supabase'ye yeni ürün eklenecek
-                        // Şimdilik sadece sonuçları güncelle
+                        // Önce products tablosuna yeni ürün ekle
+                        const { data: newProduct, error: productError } = await supabaseClient
+                            .from('products')
+                            .insert({
+                                barcode: product.barcode,
+                                name: product.name,
+                                brand: product.brand,
+                                category: product.category,
+                                imgurl: product.imgurl
+                            })
+                            .select()
+                            .single();
+                        
+                        if (productError) throw productError;
+                        
+                        // Sonra product_prices tablosuna fiyat bilgisi ekle
+                        const { error: priceError } = await supabaseClient
+                            .from('product_prices')
+                            .insert({
+                                product_id: newProduct.id,
+                                sube_id: sellerId,
+                                price: product.price,
+                                discount_price: product.price * 0.9, // %10 indirim
+                                created: new Date().toISOString()
+                            });
+                        
+                        if (priceError) throw priceError;
+                        
                         results.inserted++;
                     }
                 }
                 
                 // Sonuçları göster
                 showResults(results);
+                
+                // Verileri yeniden yükle
+                await loadAllProductsData();
                 
                 showNotification('Ürünler başarıyla işlendi ve veritabanına kaydedildi', 'success');
             } catch (error) {
@@ -1096,6 +1058,9 @@
             
             // Filtre bilgisini sıfırla
             document.getElementById('filterInfo').textContent = 'Filtreleme yapmak için yukarıdaki seçenekleri kullanın. Tümü seçeneği tüm verileri gösterir.';
+            
+            // Sheets URL bilgisini gizle
+            document.getElementById('sheetUrlInfo').style.display = 'none';
             
             showNotification('Filtreler temizlendi, tüm veriler gösteriliyor', 'success');
         }
