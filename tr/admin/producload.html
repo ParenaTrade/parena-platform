@@ -619,27 +619,28 @@
                 if (profilesError) throw profilesError;
                 
                 // Verileri birleştir
-                allProducts = pricesData.map(price => {
-                    const product = productsData.find(p => p.id === price.product_id);
-                    const profile = profilesData.find(s => s.id === price.sube_id);
-                    
-                    return {
-                        seller_id: price.sube_id,
-                        seller_name: profile ? profile.full_name : 'Bilinmeyen',
-                        seller_role: profile ? profile.role : '',
-                        seller_type: profile ? profile.seller_type : '',
-                        seller_sheets_url: profile ? profile.sheets_url : '',
-                        product_id: price.product_id,
-                        barcode: product ? product.barcode : '',
-                        name: product ? product.name : '',
-                        brand: product ? product.brand : '',
-                        price: price.price,
-                        reyon_id: item.products.reyon.id,
-                        category_id: item.products.category.id,
-                        discount_price: price.discount_price,
-                        created: price.created
-                    };
-                });
+              // Veriyi işle - düzeltilmiş versiyon
+allProducts = data.map(item => ({
+  seller_id: item.profiles.id,
+  seller_name: item.profiles.full_name,
+  seller_role: item.profiles.role,
+  seller_type: item.profiles.seller_type,
+  seller_sheets_url: item.profiles.sheets_url,
+  product_id: item.products.id,
+  barcode: item.products.barcode,
+  name: item.products.name,
+  brand: item.products.brand,
+  // Reyona ait bilgiler
+  reyon_id: item.products.reyon.id,
+  reyon_name: item.products.reyon.name,
+  // Kategoriye ait bilgiler
+  category_id: item.products.category.id,
+  category_name: item.products.category.name,
+  imgurl: item.products.imgurl,
+  price: item.price,
+  discount_price: item.discount_price,
+  created: item.created
+}));
                 
                 filteredProducts = [...allProducts];
                 renderProductsTable();
@@ -809,14 +810,16 @@
             const categoryId = document.getElementById('categorySelect').value;
             const productName = document.getElementById('productSelect').value;
             
-            filteredProducts = allProducts.filter(product => {
-                return (!sellerId || product.seller_id === sellerId) &&
-                       (!role || product.seller_role === role) &&
-                       (!sellerType || product.seller_type === sellerType) &&
-                       (!reyonId || product.reyon_id === reyonId) &&
-                       (!categoryId || product.category_id === categoryId) &&
-                       (!productName || product.name.includes(productName));
-            });
+          filteredProducts = allProducts.filter(product => {
+  return (!sellerId || product.seller_id === sellerId) &&
+         (!role || product.seller_role === role) &&
+         (!sellerType || product.seller_type === sellerType) &&
+         // Reyona göre filtreleme (reyon_id veya reyon_name kullanılabilir)
+         (!reyonId || product.reyon_id === reyonId) &&
+         // Kategoriye göre filtreleme (category_id veya category_name kullanılabilir)
+         (!categoryId || product.category_id === categoryId) &&
+         (!productName || product.name.includes(productName));
+});
             
             renderProductsTable();
             
