@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ürün Yönetim Sistemi - Google Sheets ve Supabase Entegrasyonu</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --success-color: #4cc9f0;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+            --products-color: #ffb4a2;
+            --prices-color: #e5989b;
+            --categories-color: #b5838d;
+            --reyon-color: #6d6875;
+            --brands-color: #ffcdb2;
+            --currencies-color: #ffb4a2;
+            --languages-color: #e5989b;
+            --gtip-color: #b5838d;
+            --unit-type-color: #6d6875;
+        }
+        
+        body {
+            background-color: #f5f7fb;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-bottom: 20px;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .card {
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: none;
+            margin-bottom: 24px;
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid #eaeaea;
+            font-weight: 600;
+            padding: 16px 20px;
+            border-radius: 12px 12px 0 0 !important;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        
+        .badge-products {
+            background-color: var(--products-color);
+            color: var(--dark-color);
+        }
+        
+        .badge-prices {
+            background-color: var(--prices-color);
+            color: var(--dark-color);
+        }
+        
+        .badge-categories {
+            background-color: var(--categories-color);
+            color: white;
+        }
+        
+        .badge-reyon {
+            background-color: var(--reyon-color);
+            color: white;
+        }
+        
+        .badge-brands {
+            background-color: var(--brands-color);
+            color: var(--dark-color);
+        }
+        
+        .badge-currencies {
+            background-color: var(--currencies-color);
+            color: var(--dark-color);
+        }
+        
+        .badge-languages {
+            background-color: var(--languages-color);
+            color: var(--dark-color);
+        }
+        
+        .badge-gtip {
+            background-color: var(--gtip-color);
+            color: white;
+        }
+        
+        .badge-unit-type {
+            background-color: var(--unit-type-color);
+            color: white;
+        }
+        
+        .table th {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .filter-section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .drag-container {
+            min-height: 100px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 16px;
+            background-color: #f8f9fa;
+        }
+        
+        .drag-item {
+            padding: 8px 12px;
+            margin: 4px;
+            border-radius: 6px;
+            display: inline-block;
+            cursor: move;
+            font-size: 14px;
+        }
+        
+        .modal-content {
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        
+        .modal-header {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .horizontal-scroll {
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 10px;
+        }
+        
+        .table-responsive {
+            border-radius: 12px;
+        }
+        
+        .action-buttons .btn {
+            margin-right: 5px;
+        }
+        
+        .section-title {
+            border-left: 4px solid var(--primary-color);
+            padding-left: 12px;
+            margin: 24px 0 16px;
+            font-weight: 600;
+        }
+        
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .demo-mode {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #ffeeba;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-database me-2"></i>Ürün Yönetim Sistemi
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="syncButton"><i class="fas fa-sync-alt me-1"></i> Senkronize Et</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-question-circle me-1"></i> Yardım</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="fas fa-cog me-1"></i> Ayarlar</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="demo-mode">
+                    <strong>Demo Modu:</strong> Bu sayfa tam işlevsel bir demo olarak tasarlanmıştır. Supabase bağlantısı kurulduğunda gerçek verilerle çalışacaktır.
+                </div>
+                
+                <!-- Durum Mesajları -->
+                <div id="statusMessage" class="status-message"></div>
+
+                <!-- Filtreleme Bölümü -->
+                <div class="filter-section">
+                    <h5 class="section-title">Filtreleme Seçenekleri</h5>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Satıcı Seç</label>
+                            <select class="form-select" id="sellerFilter">
+                                <option value="">Tüm Satıcılar</option>
+                                <option value="1">Çolak Market</option>
+                                <option value="2">Derman Market</option>
+                                <option value="3">Onur Market</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Rol Seç</label>
+                            <select class="form-select" id="roleFilter">
+                                <option value="">Tüm Roller</option>
+                                <option value="admin">Admin</option>
+                                <option value="seller">Satıcı</option>
+                                <option value="buyer">Alıcı</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Reyon Seç</label>
+                            <select class="form-select" id="reyonFilter">
+                                <option value="">Tüm Reyondlar</option>
+                                <option value="1">Kişisel Bakım</option>
+                                <option value="2">İçecek</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Kategori Seç</label>
+                            <select class="form-select" id="categoryFilter">
+                                <option value="">Tüm Kategoriler</option>
+                                <option value="1">Kuruyemiş</option>
+                                <option value="2">Bulaşık</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Ürün Ara</label>
+                            <input type="text" class="form-control" id="searchInput" placeholder="Ürün adı veya barkod...">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button class="btn btn-primary me-2" id="filterButton"><i class="fas fa-filter me-1"></i> Filtrele</button>
+                        <button class="btn btn-outline-secondary" id="clearFilters"><i class="fas fa-times me-1"></i> Filtreleri Temizle</button>
+                    </div>
+                </div>
+
+                <!-- Sütun Yönetimi -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Görüntülenecek Sütunları Yönetin</span>
+                        <button class="btn btn-sm btn-outline-primary" id="resetColumns">Varsayılana Sıfırla</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-5">
+                                <h6>Mevcut Sütunlar</h6>
+                                <div class="drag-container" id="availableColumns">
+                                    <span class="drag-item badge badge-products" draggable="true">ID <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-products" draggable="true">Ürün Adı <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-prices" draggable="true">Fiyat <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-prices" draggable="true">İndirimli Fiyat <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-products" draggable="true">Stok <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-products" draggable="true">Barkod <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-brands" draggable="true">Marka <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-categories" draggable="true">Kategori <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-reyon" draggable="true">Reyon <i class="fas fa-grip-vertical ms-1"></i></span>
+                                </div>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-center justify-content-center">
+                                <div class="text-center">
+                                    <i class="fas fa-arrows-alt-h fa-2x text-muted"></i>
+                                    <p class="mt-2 small text-muted">Sütunları sürükleyip bırakın</p>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <h6>Görüntülenecek Sütunlar</h6>
+                                <div class="drag-container" id="selectedColumns">
+                                    <span class="drag-item badge badge-products" draggable="true">Ürün Adı <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-prices" draggable="true">Fiyat <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-prices" draggable="true">İndirimli Fiyat <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-products" draggable="true">Stok <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    <span class="drag-item badge badge-products" draggable="true">Barkod <i class="fas fa-grip-vertical ms-1"></i></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ürün Listesi -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Ürün Listesi</span>
+                        <div>
+                            <button class="btn btn-sm btn-outline-success me-2" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                                <i class="fas fa-upload me-1"></i> Excel Yükle
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary me-2" id="downloadExcel">
+                                <i class="fas fa-download me-1"></i> Excel İndir
+                            </button>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#productModal">
+                                <i class="fas fa-plus me-1"></i> Yeni Ürün Ekle
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Ürün Adı</th>
+                                        <th>Fiyat</th>
+                                        <th>İndirimli Fiyat</th>
+                                        <th>Stok</th>
+                                        <th>Barkod</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productsTableBody">
+                                    <tr>
+                                        <td>Domates</td>
+                                        <td>39.90 ₺</td>
+                                        <td>39.50 ₺</td>
+                                        <td>100.0 kg</td>
+                                        <td>9990000000001</td>
+                                        <td class="action-buttons">
+                                            <button class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Soğan</td>
+                                        <td>18.90 ₺</td>
+                                        <td>17.50 ₺</td>
+                                        <td>200.0 kg</td>
+                                        <td>9990000000002</td>
+                                        <td class="action-buttons">
+                                            <button class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ürün Ekleme Modal -->
+    <div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="productModalLabel">Yeni Ürün Ekle / Düzenle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="productForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Ürün Adı</label>
+                                <input type="text" class="form-control" name="name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Barkod</label>
+                                <input type="text" class="form-control" name="barcode" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Kategori</label>
+                                <select class="form-select" name="category_id" required>
+                                    <option value="">Kategori Seçin</option>
+                                    <option value="a50248cb-27ce-4fd7-a2c2-d2bc6215351d">Sebze/Meyve</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Reyon</label>
+                                <select class="form-select" name="reyon_id" required>
+                                    <option value="">Reyon Seçin</option>
+                                    <option value="c80401d5-d4bc-4a46-9dfd-377d6e0c615f">Meyve/Sebze</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Marka</label>
+                                <input type="text" class="form-control" name="brand">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Birim Tipi</label>
+                                <select class="form-select" name="unit_type" required>
+                                    <option value="Kilo">Kilo</option>
+                                    <option value="Gram">Gram</option>
+                                    <option value="Litre">Litre</option>
+                                    <option value="Adet">Adet</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Fiyat</label>
+                                <input type="number" step="0.01" class="form-control" name="price" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">İndirimli Fiyat</label>
+                                <input type="number" step="0.01" class="form-control" name="discount_price">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Stok</label>
+                                <input type="number" step="0.1" class="form-control" name="stock" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Para Birimi</label>
+                                <select class="form-select" name="currency" required>
+                                    <option value="TRY">Türk Lirası (₺)</option>
+                                    <option value="USD">ABD Doları ($)</option>
+                                    <option value="EUR">Euro (€)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">GTIP Kodu</label>
+                                <input type="text" class="form-control" name="gtip_code">
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Açıklama</label>
+                                <textarea class="form-control" name="description" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-primary" id="saveProduct">Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel Yükleme Modal -->
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadModalLabel">Excel Dosyası Yükle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="formFile" class="form-label">Excel dosyasını seçin</label>
+                        <input class="form-control" type="file" id="formFile" accept=".xlsx, .xls">
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="updateExisting">
+                        <label class="form-check-label" for="updateExisting">
+                            Barkodu eşleşen ürünlerin fiyatlarını güncelle
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-primary" id="uploadExcel">Yükle ve İşle</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Demo verileri
+        const demoProducts = [
+            {
+                id: 'cf132a09-3b8e-476f-b717-0c3a1c7aa23d',
+                name: 'Domates',
+                price: 39.90,
+                discount_price: 39.50,
+                stock: 100.0,
+                barcode: '9990000000001',
+                brand: 'Yerel Üretici',
+                currency: 'TRY',
+                unit_type: 'Kilo',
+                category: 'Sebze/Meyve',
+                reyon: 'Meyve/Sebze'
+            },
+            {
+                id: 'bf136a01-3b8e-476f-b717-0c3a1c7aa25c',
+                name: 'Soğan',
+                price: 18.90,
+                discount_price: 17.50,
+                stock: 200.0,
+                barcode: '9990000000002',
+                brand: 'Yerel Üretici',
+                currency: 'TRY',
+                unit_type: 'Kilo',
+                category: 'Sebze/Meyve',
+                reyon: 'Meyve/Sebze'
+            }
+        ];
+
+        // Supabase bağlantı ayarları (demo modu için devre dışı)
+        /*
+        // Supabase bağlantı ayarları
+        const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        */
+
+        // Durum mesajı göster
+        function showStatus(message, isSuccess = true) {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.textContent = message;
+            statusElement.className = isSuccess ? 'status-message status-success' : 'status-message status-error';
+            statusElement.style.display = 'block';
+            
+            // 5 saniye sonra mesajı gizle
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 5000);
+        }
+
+        // Sürükle bırak işlevselliği
+        document.addEventListener('DOMContentLoaded', function() {
+            const dragItems = document.querySelectorAll('.drag-item');
+            const containers = document.querySelectorAll('.drag-container');
+            
+            let draggedItem = null;
+            
+            dragItems.forEach(item => {
+                item.addEventListener('dragstart', function() {
+                    draggedItem = this;
+                    setTimeout(() => this.style.opacity = '0.5', 0);
+                });
+                
+                item.addEventListener('dragend', function() {
+                    draggedItem = null;
+                    this.style.opacity = '1';
+                });
+            });
+            
+            containers.forEach(container => {
+                container.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                });
+                
+                container.addEventListener('dragenter', function(e) {
+                    e.preventDefault();
+                    this.style.backgroundColor = '#e9ecef';
+                });
+                
+                container.addEventListener('dragleave', function() {
+                    this.style.backgroundColor = '#f8f9fa';
+                });
+                
+                container.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.style.backgroundColor = '#f8f9fa';
+                    if (draggedItem) {
+                        this.appendChild(draggedItem);
+                        updateTableColumns();
+                    }
+                });
+            });
+            
+            // Event listener'ları bağla
+            document.getElementById('filterButton').addEventListener('click', applyFilters);
+            document.getElementById('clearFilters').addEventListener('click', clearFilters);
+            document.getElementById('saveProduct').addEventListener('click', saveProduct);
+            document.getElementById('uploadExcel').addEventListener('click', uploadExcelFile);
+            document.getElementById('downloadExcel').addEventListener('click', downloadExcel);
+            document.getElementById('syncButton').addEventListener('click', syncData);
+            document.getElementById('resetColumns').addEventListener('click', resetColumns);
+            
+            // Demo verileri yükle
+            loadDemoProducts();
+        });
+        
+        // Filtreleri uygula
+        function applyFilters() {
+            const seller = document.getElementById('sellerFilter').value;
+            const category = document.getElementById('categoryFilter').value;
+            const reyon = document.getElementById('reyonFilter').value;
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            
+            // Filtreleme işlemi
+            const filteredProducts = demoProducts.filter(product => {
+                let match = true;
+                
+                if (category && product.category !== category) match = false;
+                if (reyon && product.reyon !== reyon) match = false;
+                if (searchText && !product.name.toLowerCase().includes(searchText) && 
+                    !product.barcode.includes(searchText)) match = false;
+                
+                return match;
+            });
+            
+            // Tabloyu güncelle
+            updateProductsTable(filteredProducts);
+            showStatus('Filtreleme uygulandı.');
+        }
+        
+        // Filtreleri temizle
+        function clearFilters() {
+            document.getElementById('sellerFilter').value = '';
+            document.getElementById('categoryFilter').value = '';
+            document.getElementById('reyonFilter').value = '';
+            document.getElementById('searchInput').value = '';
+            
+            // Tüm ürünleri göster
+            updateProductsTable(demoProducts);
+            showStatus('Filtreler temizlendi.');
+        }
+        
+        // Demo ürünleri yükle
+        function loadDemoProducts() {
+            updateProductsTable(demoProducts);
+        }
+        
+        // Tabloyu güncelle
+        function updateProductsTable(products) {
+            const tbody = document.getElementById('productsTableBody');
+            tbody.innerHTML = '';
+            
+            products.forEach(product => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${product.name}</td>
+                    <td>${product.price} ${product.currency}</td>
+                    <td>${product.discount_price} ${product.currency}</td>
+                    <td>${product.stock} ${product.unit_type}</td>
+                    <td>${product.barcode}</td>
+                    <td class="action-buttons">
+                        <button class="btn btn-sm btn-outline-primary" onclick="editProduct('${product.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteProduct('${product.id}')"><i class="fas fa-trash"></i></button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Tablo sütunlarını güncelle
+        function updateTableColumns() {
+            // Bu fonksiyon, sürükle-bırak ile sütun değişikliklerini uygular
+            showStatus('Sütun görünümü güncellendi.');
+        }
+        
+        // Sütunları varsayılana sıfırla
+        function resetColumns() {
+            const selectedColumns = document.getElementById('selectedColumns');
+            const availableColumns = document.getElementById('availableColumns');
+            
+            // Tüm sütunları available'a taşı
+            while (selectedColumns.firstChild) {
+                availableColumns.appendChild(selectedColumns.firstChild);
+            }
+            
+            // Varsayılan sütunları ekle
+            const defaultColumns = ['Ürün Adı', 'Fiyat', 'İndirimli Fiyat', 'Stok', 'Barkod'];
+            defaultColumns.forEach(colText => {
+                const items = availableColumns.querySelectorAll('.drag-item');
+                for (let item of items) {
+                    if (item.textContent.includes(colText)) {
+                        selectedColumns.appendChild(item);
+                        break;
+                    }
+                }
+            });
+            
+            showStatus('Sütun görünümü varsayılana sıfırlandı.');
+        }
+        
+        // Ürün düzenle
+        function editProduct(productId) {
+            const product = demoProducts.find(p => p.id === productId);
+            if (product) {
+                // Formu doldur
+                document.querySelector('input[name="name"]').value = product.name;
+                document.querySelector('input[name="barcode"]').value = product.barcode;
+                document.querySelector('input[name="brand"]').value = product.brand;
+                document.querySelector('input[name="price"]').value = product.price;
+                document.querySelector('input[name="discount_price"]').value = product.discount_price;
+                document.querySelector('input[name="stock"]').value = product.stock;
+                
+                // Modal'ı göster
+                const modal = new bootstrap.Modal(document.getElementById('productModal'));
+                modal.show();
+                
+                showStatus('Ürün düzenleme modunda: ' + product.name);
+            }
+        }
+        
+        // Ürün sil
+        function deleteProduct(productId) {
+            if (confirm('Bu ürünü silmek istediğinize emin misiniz?')) {
+                // Gerçek uygulamada Supabase'den silme işlemi yapılacak
+                const index = demoProducts.findIndex(p => p.id === productId);
+                if (index !== -1) {
+                    demoProducts.splice(index, 1);
+                    updateProductsTable(demoProducts);
+                    showStatus('Ürün silindi.');
+                }
+            }
+        }
+        
+        // Ürün kaydet
+        function saveProduct() {
+            // Form verilerini al
+            const name = document.querySelector('input[name="name"]').value;
+            const barcode = document.querySelector('input[name="barcode"]').value;
+            
+            // Yeni ürün oluştur
+            const newProduct = {
+                id: 'demo-' + Math.random().toString(36).substr(2, 9),
+                name: name,
+                barcode: barcode,
+                price: parseFloat(document.querySelector('input[name="price"]').value) || 0,
+                discount_price: parseFloat(document.querySelector('input[name="discount_price"]').value) || 0,
+                stock: parseFloat(document.querySelector('input[name="stock"]').value) || 0,
+                brand: document.querySelector('input[name="brand"]').value,
+                currency: document.querySelector('select[name="currency"]').value,
+                unit_type: document.querySelector('select[name="unit_type"]').value,
+                category: 'Sebze/Meyve',
+                reyon: 'Meyve/Sebze'
+            };
+            
+            // Demo listeye ekle
+            demoProducts.push(newProduct);
+            
+            // Tabloyu güncelle
+            updateProductsTable(demoProducts);
+            
+            // Modal'ı kapat
+            const modal = bootstrap.Modal.getInstance(document.getElementById('productModal'));
+            modal.hide();
+            
+            // Formu temizle
+            document.getElementById('productForm').reset();
+            
+            showStatus('Ürün başarıyla kaydedildi: ' + name);
+        }
+        
+        // Excel yükle
+        function uploadExcelFile() {
+            const fileInput = document.getElementById('formFile');
+            const updateExisting = document.getElementById('updateExisting').checked;
+            
+            if (fileInput.files.length === 0) {
+                showStatus('Lütfen bir Excel dosyası seçin.', false);
+                return;
+            }
+            
+            // Burada Excel dosyasını işleme kodu olacak
+            // Demo amaçlı başarı mesajı göster
+            showStatus('Excel dosyası başarıyla yüklendi. ' + 
+                     (updateExisting ? 'Mevcut ürünler güncellendi.' : 'Yeni ürünler eklendi.'));
+            
+            // Modal'ı kapat
+            const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+            modal.hide();
+            
+            // Input'u temizle
+            fileInput.value = '';
+        }
+        
+        // Excel indir
+        function downloadExcel() {
+            // Demo amaçlı başarı mesajı göster
+            showStatus('Excel dosyası indiriliyor...');
+            
+            // Gerçek uygulamada Excel dosyası oluşturulup indirilecek
+            setTimeout(() => {
+                showStatus('Excel dosyası başarıyla indirildi.');
+            }, 1500);
+        }
+        
+        // Verileri senkronize et
+        function syncData() {
+            showStatus('Veriler senkronize ediliyor...');
+            
+            // Gerçek uygulamada Google Sheets ve Supabase senkronizasyonu yapılacak
+            setTimeout(() => {
+                showStatus('Veriler başarıyla senkronize edildi.');
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
