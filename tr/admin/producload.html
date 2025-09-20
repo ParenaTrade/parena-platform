@@ -490,25 +490,21 @@
         let reyons = [];
         let productsList = [];
         let sheetProducts = [];
-        
-        // Sayfa yüklendiğinde
-        document.addEventListener('DOMContentLoaded', function() {
-            // Varsayılan değerler
-            document.getElementById('supabaseUrl').value = "https://xliutvspwodhoaxvysks.supabase.co";
-            document.getElementById('supabaseKey').value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
-        });
-        
-        // Supabase bağlantısını kur
-        function initSupabase() {
-            const supabaseUrl = document.getElementById('supabaseUrl').value;
-            const supabaseKey = document.getElementById('supabaseKey').value;
-            
-            if (!supabaseUrl || !supabaseKey) {
-                showNotification('Lütfen Supabase URL ve Anon Key giriniz', 'error');
-                return;
-            }
-            
-            try {
+
+// Global değişken olarak tanımla
+        let supabaseClient = null;
+
+function initSupabase() {
+    // Eğer zaten bir istemci varsa yeniden oluşturma
+    if (supabaseClient) return supabaseClient;
+    
+    const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+    
+    supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    return supabaseClient;
+}      
+        try {
                 // Supabase istemcisini oluştur
                 supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
                 
@@ -525,6 +521,10 @@
         async function testSupabaseConnection() {
             showLoading(true);
             updateConnectionStatus(false, "Bağlanılıyor...");
+
+
+
+
             
             try {
                 // Basit bir sorgu ile bağlantıyı test et
@@ -567,6 +567,62 @@
                 document.getElementById('exportExcelBtn').disabled = true;
             }
         }
+
+
+
+// Sayfa yüklendiğinde çalıştır
+document.addEventListener('DOMContentLoaded', function() {
+    initSupabase();
+    loadInitialData();
+});
+
+async function loadInitialData() {
+    try {
+        await testSupabaseConnection();
+        await loadAllProductsData();
+        await loadFilterOptions(); // Filtre seçeneklerini yükle
+    } catch (error) {
+        console.error('Başlangıç verileri yüklenirken hata:', error);
+    }
+}
+
+async function loadFilterOptions() {
+    // Satıcı filtre seçeneklerini yükle
+    const { data: sellers } = await supabaseClient
+        .from('profiles')
+        .select('id, full_name')
+        .order('full_name');
+    
+    // Reyon filtre seçeneklerini yükle
+    const { data: reyonlar } = await supabaseClient
+        .from('reyon')
+        .select('id, name')
+        .order('name');
+    
+    // Kategori filtre seçeneklerini yükle
+    const { data: kategoriler } = await supabaseClient
+        .from('categories')
+        .select('id, name')
+        .order('name');
+    
+    // UI'da filtre seçeneklerini doldur
+    populateSelect('sellerFilter', sellers, 'Tüm Satıcılar');
+    populateSelect('reyonFilter', reyonlar, 'Tüm Reyonlar');
+    populateSelect('categoryFilter', kategoriler, 'Tüm Kategoriler');
+}
+
+function populateSelect(selectId, data, defaultText) {
+    const select = document.getElementById(selectId);
+    select.innerHTML = `<option value="">${defaultText}</option>`;
+    
+    data.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = item.name || item.full_name;
+        select.appendChild(option);
+    });
+}
+
         
         // İlk verileri yükle
         async function loadInitialData() {
@@ -591,65 +647,76 @@
             }
         }
         
-        // Tüm ürün verilerini yükle
-        async function loadAllProductsData() {
-            try {
-                // Önce products tablosundan verileri çek
-                const { data: productsData, error: productsError } = await supabaseClient
-                    .from('products')
-                    .select('*')
-                    .order('name');
-                
-                if (productsError) throw productsError;
-                
-                // Sonra product_prices tablosundan verileri çek
-                const { data: pricesData, error: pricesError } = await supabaseClient
-                    .from('product_prices')
-                    .select('*')
-                    .order('created', { ascending: false });
-                
-                if (pricesError) throw pricesError;
-                
-                // Son olarak profiles tablosundan verileri çek
-                const { data: profilesData, error: profilesError } = await supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .order('full_name');
-                
-                if (profilesError) throw profilesError;
-                
-                // Verileri birleştir
-              // Veriyi işle - düzeltilmiş versiyon
-allProducts = data.map(item => ({
-  seller_id: item.profiles.id,
-  seller_name: item.profiles.full_name,
-  seller_role: item.profiles.role,
-  seller_type: item.profiles.seller_type,
-  seller_sheets_url: item.profiles.sheets_url,
-  product_id: item.products.id,
-  barcode: item.products.barcode,
-  name: item.products.name,
-  brand: item.products.brand,
-  // Reyona ait bilgiler
-  reyon_id: item.products.reyon.id,
-  reyon_name: item.products.reyon.name,
-  // Kategoriye ait bilgiler
-  category_id: item.products.category.id,
-  category_name: item.products.category.name,
-  imgurl: item.products.imgurl,
-  price: item.price,
-  discount_price: item.discount_price,
-  created: item.created
-}));
-                
-                filteredProducts = [...allProducts];
-                renderProductsTable();
-                
-            } catch (error) {
-                showNotification('Ürün verileri yüklenirken hata oluştu: ' + error.message, 'error');
-                console.error(error);
-            }
-        }
+        // Tüm ürün verilerini yükle - DÜZELTİLMİŞ VERSİYON
+async function loadAllProductsData() {
+    try {
+        // Önce products tablosundan verileri çek
+        const { data: productsData, error: productsError } = await supabaseClient
+            .from('products')
+            .select(`
+                *,
+                reyon:reyon_id (id, name),
+                category:category_id (id, name)
+            `)
+            .order('name');
+        
+        if (productsError) throw productsError;
+        
+        // Sonra product_prices tablosundan verileri çek
+        const { data: pricesData, error: pricesError } = await supabaseClient
+            .from('product_prices')
+            .select('*')
+            .order('created', { ascending: false });
+        
+        if (pricesError) throw pricesError;
+        
+        // Son olarak profiles tablosundan verileri çek
+        const { data: profilesData, error: profilesError } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .order('full_name');
+        
+        if (profilesError) throw profilesError;
+        
+        // Verileri birleştir - DÜZELTİLMİŞ
+        allProducts = productsData.map(product => {
+            // İlgili fiyatı bul
+            const productPrice = pricesData.find(price => price.product_id === product.id);
+            
+            // İlgili satıcıyı bul
+            const sellerProfile = profilesData.find(profile => profile.id === productPrice?.sube_id);
+            
+            return {
+                seller_id: sellerProfile?.id,
+                seller_name: sellerProfile?.full_name,
+                seller_role: sellerProfile?.role,
+                seller_type: sellerProfile?.seller_type,
+                seller_sheets_url: sellerProfile?.sheets_url,
+                product_id: product.id,
+                barcode: product.barcode,
+                name: product.name,
+                brand: product.brand,
+                // Reyona ait bilgiler
+                reyon_id: product.reyon?.id,
+                reyon_name: product.reyon?.name,
+                // Kategoriye ait bilgiler
+                category_id: product.category?.id,
+                category_name: product.category?.name,
+                imgurl: product.imgurl,
+                price: productPrice?.price || product.price,
+                discount_price: productPrice?.discount_price,
+                created: productPrice?.created
+            };
+        });
+        
+        filteredProducts = [...allProducts];
+        renderProductsTable();
+        
+    } catch (error) {
+        showNotification('Ürün verileri yüklenirken hata oluştu: ' + error.message, 'error');
+        console.error(error);
+    }
+}
         
         // Satıcıları yükle
         async function loadSellers() {
@@ -802,26 +869,25 @@ allProducts = data.map(item => ({
         }
         
         // Verileri filtrele
-        function filterData() {
-            const sellerId = document.getElementById('sellerSelect').value;
-            const role = document.getElementById('roleSelect').value;
-            const sellerType = document.getElementById('sellerTypeSelect').value;
-            const reyonId = document.getElementById('reyonSelect').value;
-            const categoryId = document.getElementById('categorySelect').value;
-            const productName = document.getElementById('productSelect').value;
-            
-          filteredProducts = allProducts.filter(product => {
-  return (!sellerId || product.seller_id === sellerId) &&
-         (!role || product.seller_role === role) &&
-         (!sellerType || product.seller_type === sellerType) &&
-         // Reyona göre filtreleme (reyon_id veya reyon_name kullanılabilir)
-         (!reyonId || product.reyon_id === reyonId) &&
-         // Kategoriye göre filtreleme (category_id veya category_name kullanılabilir)
-         (!categoryId || product.category_id === categoryId) &&
-         (!productName || product.name.includes(productName));
-});
-            
-            renderProductsTable();
+       function filterProducts() {
+    const sellerId = document.getElementById('sellerFilter').value;
+    const role = document.getElementById('roleFilter').value;
+    const sellerType = document.getElementById('sellerTypeFilter').value;
+    const reyonId = document.getElementById('reyonFilter').value;
+    const categoryId = document.getElementById('categoryFilter').value;
+    const productName = document.getElementById('productNameFilter').value.toLowerCase();
+    
+    filteredProducts = allProducts.filter(product => {
+        return (!sellerId || product.seller_id === sellerId) &&
+               (!role || product.seller_role === role) &&
+               (!sellerType || product.seller_type === sellerType) &&
+               (!reyonId || product.reyon_id === reyonId) &&
+               (!categoryId || product.category_id === categoryId) &&
+               (!productName || product.name.toLowerCase().includes(productName));
+    });
+    
+    renderProductsTable();
+}
             
             // Filtre bilgisini güncelle
             const filterInfo = document.getElementById('filterInfo');
