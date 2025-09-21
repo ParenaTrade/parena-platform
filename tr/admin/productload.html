@@ -130,7 +130,7 @@
             background-color: #d1e7ff;
         }
 
- .task-list {
+        .task-list {
             min-height: 400px;
             padding: 10px;
             border-radius: 8px;
@@ -194,9 +194,6 @@
             border: 2px dashed #3498db;
         }
         
-
-
-        
         .action-buttons .btn {
             margin-right: 5px;
         }
@@ -237,6 +234,15 @@
         
         .filter-highlight {
             background-color: #fff3cd;
+        }
+
+        .excel-mapping-table {
+            font-size: 0.85rem;
+            margin-top: 15px;
+        }
+        
+        .excel-mapping-table th {
+            background-color: #f8f9fa;
         }
     </style>
 </head>
@@ -506,7 +512,7 @@
 
     <!-- Excel Yükleme Modal -->
     <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="uploadModalLabel">Excel Dosyası Yükle</h5>
@@ -517,11 +523,70 @@
                         <label for="formFile" class="form-label">Excel dosyasını seçin</label>
                         <input class="form-control" type="file" id="formFile" accept=".xlsx, .xls">
                     </div>
-                    <div class="form-check">
+                    <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="updateExisting">
                         <label class="form-check-label" for="updateExisting">
                             Barkodu eşleşen ürünlerin fiyatlarını güncelle
                         </label>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h6>Excel Dosyası Formatı:</h6>
+                        <p>Excel dosyanız aşağıdaki sütunları içermelidir:</p>
+                        
+                        <table class="table table-bordered excel-mapping-table">
+                            <thead>
+                                <tr>
+                                    <th>Excel Sütun Adı</th>
+                                    <th>Açıklama</th>
+                                    <th>Zorunlu</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Ürün Adı</td>
+                                    <td>Ürünün adı</td>
+                                    <td>Evet</td>
+                                </tr>
+                                <tr>
+                                    <td>Barkod</td>
+                                    <td>Ürün barkodu</td>
+                                    <td>Evet</td>
+                                </tr>
+                                <tr>
+                                    <td>Fiyat</td>
+                                    <td>Normal fiyat</td>
+                                    <td>Evet</td>
+                                </tr>
+                                <tr>
+                                    <td>İndirimli Fiyat</td>
+                                    <td>İndirimli fiyat (boş bırakılabilir)</td>
+                                    <td>Hayır</td>
+                                </tr>
+                                <tr>
+                                    <td>Stok</td>
+                                    <td>Stok miktarı</td>
+                                    <td>Evet</td>
+                                </tr>
+                                <tr>
+                                    <td>Marka</td>
+                                    <td>Ürün markası</td>
+                                    <td>Hayır</td>
+                                </tr>
+                                <tr>
+                                    <td>Kategori</td>
+                                    <td>Kategori adı</td>
+                                    <td>Hayır</td>
+                                </tr>
+                                <tr>
+                                    <td>Reyon</td>
+                                    <td>Reyon adı</td>
+                                    <td>Hayır</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <p class="mb-0 mt-2"><strong>Not:</strong> İndirilen Excel formatını kullanarak yükleme yapabilirsiniz.</p>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -562,7 +627,6 @@
             document.getElementById('syncButton').addEventListener('click', syncData);
             document.getElementById('resetColumns').addEventListener('click', resetColumns);
             document.getElementById('newProductButton').addEventListener('click', resetForm);
-           
 
             // Sürükle bırak işlevselliğini başlat
             initDragAndDrop();
@@ -955,6 +1019,9 @@
             });
         }
 
+
+
+
         document.addEventListener('DOMContentLoaded', function() {
             const taskLists = document.querySelectorAll('.task-list');
             const taskItems = document.querySelectorAll('.task-item');
@@ -1032,9 +1099,7 @@
                 });
             });
         });
-   
 
-        
         // Sürükle bırak işlevselliğini başlat
         function initDragAndDrop() {
             const dragHandles = document.querySelectorAll('.drag-item');
@@ -1242,7 +1307,8 @@
                     }
                     
                     // İndirimli fiyatı doldur
-                    const discountPrice = product.product_prices && product.product_prices[0] ? product.product_prices[0].discount_price : '';
+                    const discountPrice = product.product_prices && product.product_prices[0] ? 
+                        product.product_prices[0].discount_price : '';
                     document.querySelector('input[name="discount_price"]').value = discountPrice;
                     
                     // Modal başlığını güncelle
@@ -1310,9 +1376,10 @@
                     updated_at: new Date().toISOString()
                 };
                 
-                // Satıcı ve indirimli fiyat
+                // Satıcı ve indirimli fiyat - HATA DÜZELTİLMİŞ
                 const sube_id = document.getElementById('sellerSelect').value;
-                const discount_price = parseFloat(document.querySelector('input[name="discount_price"]').value) || null;
+                const discount_price_input = document.querySelector('input[name="discount_price"]');
+                const discount_price = discount_price_input.value ? parseFloat(discount_price_input.value) : null;
                 
                 if (currentProductId) {
                     // Mevcut ürünü güncelle
@@ -1437,56 +1504,171 @@
             }
             
             try {
+                showStatus('Excel dosyası işleniyor...');
+                
                 const file = fileInput.files[0];
                 const data = await readExcelFile(file);
                 
+                if (!data || data.length === 0) {
+                    showStatus('Excel dosyasında veri bulunamadı.', false);
+                    return;
+                }
+                
                 // Excel verilerini işle
+                let successCount = 0;
+                let errorCount = 0;
+                
                 for (const row of data) {
-                    // Barkoda göre ürünü kontrol et
-                    const existingProduct = allProducts.find(p => p.barcode === row.barcode);
-                    
-                    if (existingProduct && updateExisting) {
-                        // Ürünü güncelle
-                        const { error } = await supabase
-                            .from('products')
-                            .update({
-                                name: row.name,
-                                price: row.price,
-                                stock: row.stock,
-                                brand: row.brand,
+                    try {
+                        // Gerekli alanları kontrol et
+                        if (!row['Barkod'] || !row['Ürün Adı'] || row['Fiyat'] === undefined) {
+                            errorCount++;
+                            continue;
+                        }
+                        
+                        // Kategori ID'sini bul
+                        let category_id = null;
+                        if (row['Kategori']) {
+                            const category = categories.find(c => c.name === row['Kategori']);
+                            if (category) category_id = category.id;
+                        }
+                        
+                        // Reyon ID'sini bul
+                        let reyon_id = null;
+                        if (row['Reyon']) {
+                            const reyon = reyons.find(r => r.name === row['Reyon']);
+                            if (reyon) reyon_id = reyon.id;
+                        }
+                        
+                        // Barkoda göre ürünü kontrol et
+                        const existingProduct = allProducts.find(p => p.barcode === row['Barkod']);
+                        
+                        if (existingProduct && updateExisting) {
+                            // Ürünü güncelle
+                            const updateData = {
+                                name: row['Ürün Adı'],
+                                price: parseFloat(row['Fiyat']),
+                                stock: parseFloat(row['Stok'] || 0),
+                                brand: row['Marka'] || '',
+                                category_id: category_id,
+                                reyon_id: reyon_id,
                                 updated_at: new Date().toISOString()
-                            })
-                            .eq('barcode', row.barcode);
-                        
-                        if (error) throw error;
-                    } else if (!existingProduct) {
-                        // Yeni ürün ekle
-                        const newProduct = {
-                            name: row.name,
-                            barcode: row.barcode,
-                            price: row.price,
-                            stock: row.stock,
-                            brand: row.brand,
-                            currency: 'TRY',
-                            unit_type: 'Adet',
-                            created_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                        };
-                        
-                        const { data: insertedProduct, error } = await supabase
-                            .from('products')
-                            .insert(newProduct)
-                            .select();
-                        
-                        if (error) throw error;
+                            };
+                            
+                            const { error } = await supabase
+                                .from('products')
+                                .update(updateData)
+                                .eq('barcode', row['Barkod']);
+                            
+                            if (error) throw error;
+                            
+                            // İndirimli fiyatı güncelle (product_prices tablosu)
+                            if (row['İndirimli Fiyat'] !== undefined) {
+                                const discount_price = parseFloat(row['İndirimli Fiyat']) || null;
+                                
+                                // Varsayılan satıcıyı kullan (ilk satıcı)
+                                const defaultSeller = sellers.length > 0 ? sellers[0].id : null;
+                                
+                                if (defaultSeller) {
+                                    // Önce mevcut kaydı kontrol et
+                                    const { data: existingPrices, error: checkError } = await supabase
+                                        .from('product_prices')
+                                        .select('id')
+                                        .eq('product_id', existingProduct.id)
+                                        .eq('sube_id', defaultSeller);
+                                    
+                                    if (checkError) throw checkError;
+                                    
+                                    const priceData = {
+                                        product_id: existingProduct.id,
+                                        sube_id: defaultSeller,
+                                        price: parseFloat(row['Fiyat']),
+                                        discount_price: discount_price,
+                                        updated: new Date().toISOString()
+                                    };
+                                    
+                                    if (existingPrices && existingPrices.length > 0) {
+                                        // Mevcut kaydı güncelle
+                                        const { error: updateError } = await supabase
+                                            .from('product_prices')
+                                            .update(priceData)
+                                            .eq('id', existingPrices[0].id);
+                                        
+                                        if (updateError) throw updateError;
+                                    } else {
+                                        // Yeni kayıt oluştur
+                                        priceData.created = new Date().toISOString();
+                                        
+                                        const { error: insertError } = await supabase
+                                            .from('product_prices')
+                                            .insert(priceData);
+                                        
+                                        if (insertError) throw insertError;
+                                    }
+                                }
+                            }
+                            
+                            successCount++;
+                        } else if (!existingProduct) {
+                            // Yeni ürün ekle
+                            const newProduct = {
+                                name: row['Ürün Adı'],
+                                barcode: row['Barkod'],
+                                price: parseFloat(row['Fiyat']),
+                                stock: parseFloat(row['Stok'] || 0),
+                                brand: row['Marka'] || '',
+                                category_id: category_id,
+                                reyon_id: reyon_id,
+                                currency: 'TRY',
+                                unit_type: 'Adet',
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                            };
+                            
+                            const { data: insertedProduct, error } = await supabase
+                                .from('products')
+                                .insert(newProduct)
+                                .select();
+                            
+                            if (error) throw error;
+                            
+                            // İndirimli fiyatı ekle (product_prices tablosu)
+                            if (row['İndirimli Fiyat'] !== undefined) {
+                                const discount_price = parseFloat(row['İndirimli Fiyat']) || null;
+                                
+                                // Varsayılan satıcıyı kullan (ilk satıcı)
+                                const defaultSeller = sellers.length > 0 ? sellers[0].id : null;
+                                
+                                if (defaultSeller) {
+                                    const priceData = {
+                                        product_id: insertedProduct[0].id,
+                                        sube_id: defaultSeller,
+                                        price: parseFloat(row['Fiyat']),
+                                        discount_price: discount_price,
+                                        created: new Date().toISOString(),
+                                        updated: new Date().toISOString()
+                                    };
+                                    
+                                    const { error: priceError } = await supabase
+                                        .from('product_prices')
+                                        .insert(priceData);
+                                    
+                                    if (priceError) throw priceError;
+                                }
+                            }
+                            
+                            successCount++;
+                        }
+                    } catch (error) {
+                        console.error('Excel satır işleme hatası:', error, row);
+                        errorCount++;
                     }
                 }
                 
                 // Ürün listesini yenile
                 await loadProducts();
                 
-                showStatus('Excel dosyası başarıyla işlendi. ' + 
-                         (updateExisting ? 'Mevcut ürünler güncellendi.' : 'Yeni ürünler eklendi.'));
+                showStatus(`Excel dosyası işlendi. Başarılı: ${successCount}, Hatalı: ${errorCount}`);
                 
                 // Modal'ı kapat
                 const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
