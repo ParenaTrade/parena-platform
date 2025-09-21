@@ -495,6 +495,12 @@
             document.getElementById('syncButton').addEventListener('click', syncData);
             document.getElementById('resetColumns').addEventListener('click', resetColumns);
             document.getElementById('newProductButton').addEventListener('click', resetForm);
+           
+            const taskLists = document.querySelectorAll('.task-list');
+            const taskItems = document.querySelectorAll('.task-item');
+            const dragHandles = document.querySelectorAll('.drag-handle');
+            const boardHeaders = document.querySelectorAll('.board-header');
+            let draggedItem = null;
 
             // Sürükle bırak işlevselliğini başlat
             initDragAndDrop();
@@ -887,6 +893,79 @@
             });
         }
 
+
+        // Sadece tutamaçlara sürükleme özelliği ekle
+            dragHandles.forEach(handle => {
+                handle.setAttribute('draggable', 'true');
+                
+                handle.addEventListener('dragstart', function(e) {
+                    draggedItem = this.closest('.task-item');
+                    setTimeout(() => {
+                        draggedItem.classList.add('dragging');
+                    }, 0);
+                    
+                    // Veri transferi
+                    e.dataTransfer.setData('text/plain', draggedItem.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                
+                handle.addEventListener('dragend', function() {
+                    draggedItem.classList.remove('dragging');
+                    draggedItem = null;
+                    
+                    // Tüm task listelerinden drag-over sınıfını kaldır
+                    taskLists.forEach(list => {
+                        list.classList.remove('drag-over');
+                    });
+                });
+            });
+            
+            // Başlıkların sürüklenmesini engelle
+            boardHeaders.forEach(header => {
+                header.setAttribute('draggable', 'false');
+                header.addEventListener('dragstart', function(e) {
+                    e.preventDefault();
+                });
+            });
+            
+            // Task listeleri için event listeners
+            taskLists.forEach(list => {
+                list.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.classList.add('drag-over');
+                    
+                    // Sürüklenen öğeyi taşıma olarak işaretle
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                
+                list.addEventListener('dragleave', function() {
+                    this.classList.remove('drag-over');
+                });
+                
+                list.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('drag-over');
+                    
+                    if (draggedItem) {
+                        this.appendChild(draggedItem);
+                    }
+                });
+            });
+            
+            // Task öğelerinin sürüklenmesini engelle (sadece tutamaçlar sürüklenebilir)
+            taskItems.forEach(item => {
+                item.setAttribute('draggable', 'false');
+                item.addEventListener('dragstart', function(e) {
+                    // Sadece tutamacın sürüklenmesine izin ver
+                    if (!e.target.classList.contains('drag-handle')) {
+                        e.preventDefault();
+                    }
+                });
+            });
+        });
+
+
+        
         // Sürükle bırak işlevselliğini başlat
         function initDragAndDrop() {
             const dragItems = document.querySelectorAll('.drag-item');
