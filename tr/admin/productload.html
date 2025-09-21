@@ -116,6 +116,29 @@
             font-size: 14px;
             background-color: #e9ecef;
         }
+        
+        .action-buttons .btn {
+            margin-right: 5px;
+        }
+        
+        .autocomplete-list {
+            position: absolute;
+            background: white;
+            z-index: 1000;
+            border: 1px solid #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+            width: 100%;
+        }
+        
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        
+        .autocomplete-item:hover {
+            background-color: #f0f0f0;
+        }
     </style>
 </head>
 <body>
@@ -125,6 +148,16 @@
             <a class="navbar-brand" href="#">
                 <i class="fas fa-database me-2"></i>Ürün Yönetim Sistemi
             </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="syncButton"><i class="fas fa-sync-alt me-1"></i> Senkronize Et</a>
+                    </li>
+                </ul>
+            </div>
         </div>
     </nav>
 
@@ -192,6 +225,48 @@
                         </div>
                     </div>
 
+                    <!-- Sütun Yönetimi -->
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span>Görüntülenecek Sütunları Yönetin</span>
+                            <button class="btn btn-sm btn-outline-primary" id="resetColumns">Varsayılana Sıfırla</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <h6>Mevcut Sütunlar</h6>
+                                    <div class="drag-container" id="availableColumns">
+                                        <span class="drag-item" data-field="id">ID <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="name">Ürün Adı <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="price">Fiyat <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="discount_price">İndirimli Fiyat <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="stock">Stok <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="barcode">Barkod <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="brand">Marka <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="category_name">Kategori <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="reyon_name">Reyon <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 d-flex align-items-center justify-content-center">
+                                    <div class="text-center">
+                                        <i class="fas fa-arrows-alt-h fa-2x text-muted"></i>
+                                        <p class="mt-2 small text-muted">Sütunları sürükleyip bırakın</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <h6>Görüntülenecek Sütunlar</h6>
+                                    <div class="drag-container" id="selectedColumns">
+                                        <span class="drag-item" data-field="name">Ürün Adı <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="price">Fiyat <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="discount_price">İndirimli Fiyat <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="stock">Stok <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="barcode">Barkod <i class="fas fa-grip-vertical ms-1"></i></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Ürün Listesi -->
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
@@ -212,7 +287,7 @@
                             <div class="table-responsive">
                                 <table class="table table-hover">
                                     <thead>
-                                        <tr>
+                                        <tr id="tableHeader">
                                             <th>Ürün Adı</th>
                                             <th>Fiyat</th>
                                             <th>İndirimli Fiyat</th>
@@ -240,7 +315,7 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="productModalLabel">Yeni Ürün Ekle</h5>
+                    <h5 class="modal-title" id="productModalLabel">Yeni Ürün Ekle / Düzenle</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -268,7 +343,10 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Marka</label>
-                                <input type="text" class="form-control" name="brand">
+                                <div class="autocomplete-container">
+                                    <input type="text" class="form-control" name="brand" id="brandInput" autocomplete="off">
+                                    <div class="autocomplete-list" id="brandAutocomplete"></div>
+                                </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Satıcı</label>
@@ -305,6 +383,17 @@
                                     <option value="EUR">Euro (€)</option>
                                 </select>
                             </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">GTIP Kodu</label>
+                                <div class="autocomplete-container">
+                                    <input type="text" class="form-control" name="gtip_code" id="gtipInput" autocomplete="off">
+                                    <div class="autocomplete-list" id="gtipAutocomplete"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Açıklama</label>
+                                <textarea class="form-control" name="description" rows="2"></textarea>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -316,11 +405,46 @@
         </div>
     </div>
 
+    <!-- Excel Yükleme Modal -->
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadModalLabel">Excel Dosyası Yükle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="formFile" class="form-label">Excel dosyasını seçin</label>
+                        <input class="form-control" type="file" id="formFile" accept=".xlsx, .xls">
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="updateExisting">
+                        <label class="form-check-label" for="updateExisting">
+                            Barkodu eşleşen ürünlerin fiyatlarını güncelle
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-primary" id="uploadExcel">Yükle ve İşle</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Global değişkenler
         let supabase;
         let products = [];
+        let brands = [];
+        let gtipCodes = [];
+        let sellers = [];
+        let categories = [];
+        let reyons = [];
+        let selectedColumns = ['name', 'price', 'discount_price', 'stock', 'barcode'];
+        let currentProductId = null;
 
         // Sayfa yüklendiğinde
         document.addEventListener('DOMContentLoaded', function() {
@@ -333,6 +457,22 @@
             document.getElementById('saveProduct').addEventListener('click', saveProduct);
             document.getElementById('filterButton').addEventListener('click', applyFilters);
             document.getElementById('clearFilters').addEventListener('click', clearFilters);
+            document.getElementById('downloadExcel').addEventListener('click', downloadExcel);
+            document.getElementById('uploadExcel').addEventListener('click', uploadExcelFile);
+            document.getElementById('syncButton').addEventListener('click', syncData);
+            document.getElementById('resetColumns').addEventListener('click', resetColumns);
+
+            // Sürükle bırak işlevselliğini başlat
+            initDragAndDrop();
+
+            // Otomatik tamamlama event'lerini bağla
+            document.getElementById('brandInput').addEventListener('input', function() {
+                showAutocomplete(this.value, 'brand');
+            });
+            
+            document.getElementById('gtipInput').addEventListener('input', function() {
+                showAutocomplete(this.value, 'gtip');
+            });
         });
 
         // Supabase'e bağlan
@@ -399,6 +539,8 @@
             
             try {
                 await Promise.all([
+                    loadBrands(),
+                    loadGtipCodes(),
                     loadSellers(),
                     loadCategories(),
                     loadReyons(),
@@ -413,6 +555,42 @@
             }
         }
 
+        // Markaları yükle
+        async function loadBrands() {
+            try {
+                const { data, error } = await supabase
+                    .from('brands')
+                    .select('id, Brands')
+                    .order('Brands');
+                
+                if (error) throw error;
+                
+                brands = data;
+                
+            } catch (error) {
+                console.error('Markalar yüklenirken hata oluştu:', error);
+                throw error;
+            }
+        }
+
+        // GTIP kodlarını yükle
+        async function loadGtipCodes() {
+            try {
+                const { data, error } = await supabase
+                    .from('gtip')
+                    .select('code, name')
+                    .order('code');
+                
+                if (error) throw error;
+                
+                gtipCodes = data;
+                
+            } catch (error) {
+                console.error('GTIP kodları yüklenirken hata oluştu:', error);
+                throw error;
+            }
+        }
+
         // Satıcıları yükle
         async function loadSellers() {
             try {
@@ -423,6 +601,8 @@
                     .order('company_name');
                 
                 if (error) throw error;
+                
+                sellers = data;
                 
                 // Satıcı filtreleme seçeneğini doldur
                 const sellerFilter = document.getElementById('sellerFilter');
@@ -462,6 +642,8 @@
                 
                 if (error) throw error;
                 
+                categories = data;
+                
                 // Kategori filtreleme seçeneğini doldur
                 const categoryFilter = document.getElementById('categoryFilter');
                 categoryFilter.innerHTML = '<option value="">Tüm Kategoriler</option>';
@@ -499,6 +681,8 @@
                     .order('name');
                 
                 if (error) throw error;
+                
+                reyons = data;
                 
                 // Reyon filtreleme seçeneğini doldur
                 const reyonFilter = document.getElementById('reyonFilter');
@@ -557,32 +741,226 @@
         // Tabloyu güncelle
         function updateProductsTable() {
             const tbody = document.getElementById('productsTableBody');
+            const thead = document.getElementById('tableHeader');
             tbody.innerHTML = '';
             
+            // Tablo başlıklarını güncelle
+            thead.innerHTML = '';
+            selectedColumns.forEach(col => {
+                const th = document.createElement('th');
+                
+                switch(col) {
+                    case 'id': th.textContent = 'ID'; break;
+                    case 'name': th.textContent = 'Ürün Adı'; break;
+                    case 'price': th.textContent = 'Fiyat'; break;
+                    case 'discount_price': th.textContent = 'İndirimli Fiyat'; break;
+                    case 'stock': th.textContent = 'Stok'; break;
+                    case 'barcode': th.textContent = 'Barkod'; break;
+                    case 'brand': th.textContent = 'Marka'; break;
+                    case 'category_name': th.textContent = 'Kategori'; break;
+                    case 'reyon_name': th.textContent = 'Reyon'; break;
+                    default: th.textContent = col;
+                }
+                
+                thead.appendChild(th);
+            });
+            
+            // İşlemler sütunu ekle
+            const actionsTh = document.createElement('th');
+            actionsTh.textContent = 'İşlemler';
+            thead.appendChild(actionsTh);
+            
             if (products.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center">Kayıtlı ürün bulunamadı</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="' + (selectedColumns.length + 1) + '" class="text-center">Kayıtlı ürün bulunamadı</td></tr>';
                 return;
             }
             
             products.forEach(product => {
-                const discountPrice = product.product_prices && product.product_prices[0] ? 
-                    product.product_prices[0].discount_price : '-';
-                
                 const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${product.name}</td>
-                    <td>${product.price} ${product.currency}</td>
-                    <td>${discountPrice !== '-' ? discountPrice + ' ' + product.currency : '-'}</td>
-                    <td>${product.stock} ${product.unit_type}</td>
-                    <td>${product.barcode}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
-                    </td>
-                `;
+                
+                selectedColumns.forEach(col => {
+                    const cell = document.createElement('td');
+                    
+                    switch(col) {
+                        case 'id':
+                            cell.textContent = product.id;
+                            break;
+                        case 'name':
+                            cell.textContent = product.name;
+                            break;
+                        case 'price':
+                            cell.textContent = `${product.price} ${product.currency}`;
+                            break;
+                        case 'discount_price':
+                            const discountPrice = product.product_prices && product.product_prices[0] ? 
+                                product.product_prices[0].discount_price : '-';
+                            cell.textContent = discountPrice !== '-' ? `${discountPrice} ${product.currency}` : discountPrice;
+                            break;
+                        case 'stock':
+                            cell.textContent = `${product.stock} ${product.unit_type}`;
+                            break;
+                        case 'barcode':
+                            cell.textContent = product.barcode;
+                            break;
+                        case 'brand':
+                            cell.textContent = product.brand || '-';
+                            break;
+                        case 'category_name':
+                            cell.textContent = product.categories ? product.categories.name : '-';
+                            break;
+                        case 'reyon_name':
+                            cell.textContent = product.reyon ? product.reyon.name : '-';
+                            break;
+                        default:
+                            cell.textContent = product[col] || '-';
+                    }
+                    
+                    row.appendChild(cell);
+                });
+                
+                // İşlemler sütunu
+                const actionsCell = document.createElement('td');
+                actionsCell.className = 'action-buttons';
+                
+                const editButton = document.createElement('button');
+                editButton.className = 'btn btn-sm btn-outline-primary';
+                editButton.innerHTML = '<i class="fas fa-edit"></i>';
+                editButton.onclick = () => editProduct(product.id);
+                
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'btn btn-sm btn-outline-danger';
+                deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
+                deleteButton.onclick = () => deleteProduct(product.id);
+                
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+                row.appendChild(actionsCell);
                 
                 tbody.appendChild(row);
             });
+        }
+
+        // Sürükle bırak işlevselliğini başlat
+        function initDragAndDrop() {
+            const dragItems = document.querySelectorAll('.drag-item');
+            const containers = document.querySelectorAll('.drag-container');
+            
+            let draggedItem = null;
+            
+            dragItems.forEach(item => {
+                item.addEventListener('dragstart', function() {
+                    draggedItem = this;
+                    setTimeout(() => this.style.opacity = '0.5', 0);
+                });
+                
+                item.addEventListener('dragend', function() {
+                    draggedItem = null;
+                    this.style.opacity = '1';
+                });
+            });
+            
+            containers.forEach(container => {
+                container.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                });
+                
+                container.addEventListener('dragenter', function(e) {
+                    e.preventDefault();
+                    this.style.backgroundColor = '#e9ecef';
+                });
+                
+                container.addEventListener('dragleave', function() {
+                    this.style.backgroundColor = '#f8f9fa';
+                });
+                
+                container.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.style.backgroundColor = '#f8f9fa';
+                    if (draggedItem) {
+                        this.appendChild(draggedItem);
+                        
+                        // Seçilen sütunları güncelle
+                        if (this.id === 'selectedColumns') {
+                            const field = draggedItem.getAttribute('data-field');
+                            if (!selectedColumns.includes(field)) {
+                                selectedColumns.push(field);
+                            }
+                        } else {
+                            const field = draggedItem.getAttribute('data-field');
+                            const index = selectedColumns.indexOf(field);
+                            if (index > -1) {
+                                selectedColumns.splice(index, 1);
+                            }
+                        }
+                        
+                        updateProductsTable();
+                    }
+                });
+            });
+        }
+
+        // Sütunları varsayılana sıfırla
+        function resetColumns() {
+            selectedColumns = ['name', 'price', 'discount_price', 'stock', 'barcode'];
+            
+            const selectedContainer = document.getElementById('selectedColumns');
+            const availableContainer = document.getElementById('availableColumns');
+            
+            // Tüm öğeleri available'a taşı
+            while (selectedContainer.firstChild) {
+                availableContainer.appendChild(selectedContainer.firstChild);
+            }
+            
+            // Varsayılan sütunları selected'a taşı
+            const defaultFields = ['name', 'price', 'discount_price', 'stock', 'barcode'];
+            defaultFields.forEach(field => {
+                const item = availableContainer.querySelector(`[data-field="${field}"]`);
+                if (item) {
+                    selectedContainer.appendChild(item);
+                }
+            });
+            
+            updateProductsTable();
+            showStatus('Sütun görünümü varsayılana sıfırlandı.');
+        }
+
+        // Otomatik tamamlama göster
+        function showAutocomplete(value, type) {
+            const autocompleteElement = document.getElementById(`${type}Autocomplete`);
+            autocompleteElement.innerHTML = '';
+            
+            if (!value) {
+                autocompleteElement.style.display = 'none';
+                return;
+            }
+            
+            let items = [];
+            if (type === 'brand') {
+                items = brands.filter(brand => 
+                    brand.Brands.toLowerCase().includes(value.toLowerCase())
+                ).map(brand => brand.Brands);
+            } else if (type === 'gtip') {
+                items = gtipCodes.filter(gtip => 
+                    gtip.code.includes(value) || gtip.name.toLowerCase().includes(value.toLowerCase())
+                ).map(gtip => `${gtip.code} - ${gtip.name}`);
+            }
+            
+            if (items.length > 0) {
+                autocompleteElement.style.display = 'block';
+                
+                items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'autocomplete-item';
+                    div.textContent = item;
+                    div.addEventListener('click', function() {
+                        document.getElementById(`${type}Input`).value = item;
+                        autocompleteElement.style.display = 'none';
+                    });
+                    autocompleteElement.appendChild(div);
+                });
+            } else {
+                autocompleteElement.style.display = 'none';
+            }
         }
 
         // Filtreleri uygula
@@ -592,8 +970,31 @@
             const reyon = document.getElementById('reyonFilter').value;
             const searchText = document.getElementById('searchInput').value.toLowerCase();
             
-            // Burada filtreleme işlemleri yapılacak
-            // Şu an için sadece mesaj gösteriyoruz
+            // Filtreleme işlemi
+            const filteredProducts = products.filter(product => {
+                let match = true;
+                
+                if (seller) {
+                    const hasSeller = product.product_prices && 
+                        product.product_prices.some(pp => pp.sube_id === seller);
+                    if (!hasSeller) match = false;
+                }
+                
+                if (category && product.category_id !== category) match = false;
+                if (reyon && product.reyon_id !== reyon) match = false;
+                
+                if (searchText && 
+                    !product.name.toLowerCase().includes(searchText) && 
+                    !product.barcode.includes(searchText)) {
+                    match = false;
+                }
+                
+                return match;
+            });
+            
+            // Tabloyu güncelle
+            products = filteredProducts;
+            updateProductsTable();
             showStatus('Filtreleme uygulandı.');
         }
         
@@ -604,7 +1005,83 @@
             document.getElementById('reyonFilter').value = '';
             document.getElementById('searchInput').value = '';
             
+            // Tüm ürünleri yeniden yükle
+            loadProducts();
             showStatus('Filtreler temizlendi.');
+        }
+        
+        // Ürün düzenle
+        async function editProduct(productId) {
+            try {
+                const product = products.find(p => p.id === productId);
+                if (product) {
+                    currentProductId = productId;
+                    
+                    // Formu doldur
+                    document.querySelector('input[name="name"]').value = product.name || '';
+                    document.querySelector('input[name="barcode"]').value = product.barcode || '';
+                    document.querySelector('input[name="brand"]').value = product.brand || '';
+                    document.querySelector('input[name="price"]').value = product.price || '';
+                    document.querySelector('input[name="stock"]').value = product.stock || '';
+                    document.querySelector('input[name="gtip_code"]').value = product.gtip_code || '';
+                    document.querySelector('textarea[name="description"]').value = product.description || '';
+                    
+                    // Select'leri doldur
+                    document.getElementById('categorySelect').value = product.category_id || '';
+                    document.getElementById('reyonSelect').value = product.reyon_id || '';
+                    document.querySelector('select[name="unit_type"]').value = product.unit_type || 'Kilo';
+                    document.querySelector('select[name="currency"]').value = product.currency || 'TRY';
+                    
+                    // Satıcıyı doldur (product_prices'dan)
+                    if (product.product_prices && product.product_prices.length > 0) {
+                        document.getElementById('sellerSelect').value = product.product_prices[0].sube_id || '';
+                    }
+                    
+                    // İndirimli fiyatı doldur
+                    const discountPrice = product.product_prices && product.product_prices[0] ? 
+                        product.product_prices[0].discount_price : '';
+                    document.querySelector('input[name="discount_price"]').value = discountPrice;
+                    
+                    // Modal'ı göster
+                    const modal = new bootstrap.Modal(document.getElementById('productModal'));
+                    modal.show();
+                }
+            } catch (error) {
+                console.error('Ürün düzenleme hatası:', error);
+                showStatus('Ürün düzenlenirken hata oluştu: ' + error.message, false);
+            }
+        }
+        
+        // Ürün sil
+        async function deleteProduct(productId) {
+            if (confirm('Bu ürünü silmek istediğinize emin misiniz?')) {
+                try {
+                    // Önce product_prices kayıtlarını sil
+                    const { error: pricesError } = await supabase
+                        .from('product_prices')
+                        .delete()
+                        .eq('product_id', productId);
+                    
+                    if (pricesError) throw pricesError;
+                    
+                    // Sonra ürünü sil
+                    const { error: productError } = await supabase
+                        .from('products')
+                        .delete()
+                        .eq('id', productId);
+                    
+                    if (productError) throw productError;
+                    
+                    // Yerel listeden kaldır
+                    products = products.filter(p => p.id !== productId);
+                    updateProductsTable();
+                    
+                    showStatus('Ürün başarıyla silindi.');
+                } catch (error) {
+                    console.error('Ürün silme hatası:', error);
+                    showStatus('Ürün silinirken hata oluştu: ' + error.message, false);
+                }
+            }
         }
         
         // Ürün kaydet
@@ -617,11 +1094,12 @@
                     brand: document.querySelector('input[name="brand"]').value,
                     price: parseFloat(document.querySelector('input[name="price"]').value),
                     stock: parseFloat(document.querySelector('input[name="stock"]').value),
+                    gtip_code: document.querySelector('input[name="gtip_code"]').value,
+                    description: document.querySelector('textarea[name="description"]').value,
                     category_id: document.getElementById('categorySelect').value,
                     reyon_id: document.getElementById('reyonSelect').value,
                     unit_type: document.querySelector('select[name="unit_type"]').value,
                     currency: document.querySelector('select[name="currency"]').value,
-                    created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 };
                 
@@ -629,32 +1107,68 @@
                 const sube_id = document.getElementById('sellerSelect').value;
                 const discount_price = parseFloat(document.querySelector('input[name="discount_price"]').value) || null;
                 
-                // Ürünü kaydet
-                const { data, error } = await supabase
-                    .from('products')
-                    .insert(formData)
-                    .select();
+                if (currentProductId) {
+                    // Mevcut ürünü güncelle
+                    const { error } = await supabase
+                        .from('products')
+                        .update(formData)
+                        .eq('id', currentProductId);
+                    
+                    if (error) throw error;
+                    
+                    showStatus('Ürün başarıyla güncellendi: ' + formData.name);
+                } else {
+                    // Yeni ürün ekle
+                    formData.created_at = new Date().toISOString();
+                    
+                    const { data, error } = await supabase
+                        .from('products')
+                        .insert(formData)
+                        .select();
+                    
+                    if (error) throw error;
+                    
+                    currentProductId = data[0].id;
+                    showStatus('Ürün başarıyla eklendi: ' + formData.name);
+                }
                 
-                if (error) throw error;
-                
-                // Product_prices kaydını oluştur
-                if (data && data.length > 0 && sube_id) {
-                    const productId = data[0].id;
+                // Product_prices kaydını güncelle
+                if (currentProductId && sube_id) {
+                    // Önce mevcut kaydı kontrol et
+                    const { data: existingPrices, error: checkError } = await supabase
+                        .from('product_prices')
+                        .select('id')
+                        .eq('product_id', currentProductId)
+                        .eq('sube_id', sube_id);
+                    
+                    if (checkError) throw checkError;
                     
                     const priceData = {
-                        product_id: productId,
+                        product_id: currentProductId,
                         sube_id: sube_id,
                         price: formData.price,
                         discount_price: discount_price,
-                        created: new Date().toISOString(),
                         updated: new Date().toISOString()
                     };
                     
-                    const { error: priceError } = await supabase
-                        .from('product_prices')
-                        .insert(priceData);
-                    
-                    if (priceError) throw priceError;
+                    if (existingPrices && existingPrices.length > 0) {
+                        // Mevcut kaydı güncelle
+                        const { error: updateError } = await supabase
+                            .from('product_prices')
+                            .update(priceData)
+                            .eq('id', existingPrices[0].id);
+                        
+                        if (updateError) throw updateError;
+                    } else {
+                        // Yeni kayıt oluştur
+                        priceData.created = new Date().toISOString();
+                        
+                        const { error: insertError } = await supabase
+                            .from('product_prices')
+                            .insert(priceData);
+                        
+                        if (insertError) throw insertError;
+                    }
                 }
                 
                 // Ürün listesini yenile
@@ -666,14 +1180,175 @@
                 
                 // Formu temizle
                 document.getElementById('productForm').reset();
-                
-                showStatus('Ürün başarıyla eklendi: ' + formData.name);
+                currentProductId = null;
                 
             } catch (error) {
                 console.error('Ürün kaydetme hatası:', error);
                 showStatus('Ürün kaydedilirken hata oluştu: ' + error.message, false);
             }
         }
+        
+        // Excel indir
+        async function downloadExcel() {
+            try {
+                // Excel verilerini hazırla
+                const excelData = products.map(product => ({
+                    'Ürün Adı': product.name,
+                    'Barkod': product.barcode,
+                    'Fiyat': product.price,
+                    'İndirimli Fiyat': product.product_prices && product.product_prices[0] ? 
+                        product.product_prices[0].discount_price : '',
+                    'Stok': product.stock,
+                    'Marka': product.brand || '',
+                    'Para Birimi': product.currency,
+                    'Birim Tipi': product.unit_type,
+                    'Kategori': product.categories ? product.categories.name : '',
+                    'Reyon': product.reyon ? product.reyon.name : ''
+                }));
+                
+                // Çalışma sayfası oluştur
+                const worksheet = XLSX.utils.json_to_sheet(excelData);
+                
+                // Çalışma kitabı oluştur
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'Ürünler');
+                
+                // Excel dosyasını indir
+                XLSX.writeFile(workbook, 'urun_listesi.xlsx');
+                
+                showStatus('Excel dosyası indirildi: urun_listesi.xlsx');
+            } catch (error) {
+                console.error('Excel indirme hatası:', error);
+                showStatus('Excel dosyası indirilirken hata oluştu: ' + error.message, false);
+            }
+        }
+        
+        // Excel yükle
+        async function uploadExcelFile() {
+            const fileInput = document.getElementById('formFile');
+            const updateExisting = document.getElementById('updateExisting').checked;
+            
+            if (fileInput.files.length === 0) {
+                showStatus('Lütfen bir Excel dosyası seçin.', false);
+                return;
+            }
+            
+            try {
+                const file = fileInput.files[0];
+                const data = await readExcelFile(file);
+                
+                // Excel verilerini işle
+                for (const row of data) {
+                    // Barkoda göre ürünü kontrol et
+                    const existingProduct = products.find(p => p.barcode === row.barcode);
+                    
+                    if (existingProduct && updateExisting) {
+                        // Ürünü güncelle
+                        const { error } = await supabase
+                            .from('products')
+                            .update({
+                                name: row.name,
+                                price: row.price,
+                                stock: row.stock,
+                                brand: row.brand,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('barcode', row.barcode);
+                        
+                        if (error) throw error;
+                    } else if (!existingProduct) {
+                        // Yeni ürün ekle
+                        const newProduct = {
+                            name: row.name,
+                            barcode: row.barcode,
+                            price: row.price,
+                            stock: row.stock,
+                            brand: row.brand,
+                            currency: 'TRY',
+                            unit_type: 'Adet',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        };
+                        
+                        const { data: insertedProduct, error } = await supabase
+                            .from('products')
+                            .insert(newProduct)
+                            .select();
+                        
+                        if (error) throw error;
+                    }
+                }
+                
+                // Ürün listesini yenile
+                await loadProducts();
+                
+                showStatus('Excel dosyası başarıyla işlendi. ' + 
+                         (updateExisting ? 'Mevcut ürünler güncellendi.' : 'Yeni ürünler eklendi.'));
+                
+                // Modal'ı kapat
+                const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+                modal.hide();
+                
+                // Input'u temizle
+                fileInput.value = '';
+            } catch (error) {
+                console.error('Excel yükleme hatası:', error);
+                showStatus('Excel dosyası işlenirken hata oluştu: ' + error.message, false);
+            }
+        }
+        
+        // Excel dosyasını oku
+        function readExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        
+                        // İlk sayfayı al
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        
+                        // JSON'a dönüştür
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                        
+                        resolve(jsonData);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                reader.onerror = function(error) {
+                    reject(error);
+                };
+                
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        // Verileri senkronize et
+        async function syncData() {
+            try {
+                showStatus('Veriler senkronize ediliyor...');
+                
+                // Tüm verileri yeniden yükle
+                await loadAllData();
+                
+                showStatus('Veriler başarıyla senkronize edildi.');
+            } catch (error) {
+                console.error('Senkronizasyon hatası:', error);
+                showStatus('Veriler senkronize edilirken hata oluştu: ' + error.message, false);
+            }
+        }
+
+        // Sayfa dışına tıklandığında otomatik tamamlamayı gizle
+        document.addEventListener('click', function(e) {
+            if (!e.target.matches('.autocomplete-item') && !e.target.matches('#brandInput') && !e.target.matches('#gtipInput')) {
+                document.getElementById('brandAutocomplete').style.display = 'none';
+                document.getElementById('gtipAutocomplete').style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>
