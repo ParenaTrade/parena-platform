@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ürün Yönetim Sistemi - Google Sheets ve Supabase Entegrasyonu</title>
+    <title>Ürün Yönetim Sistemi - Supabase Entegrasyonu</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -172,7 +172,6 @@
             padding: 10px;
             margin: 10px 0;
             border-radius: 5px;
-            display: none;
         }
         
         .status-success {
@@ -192,33 +191,25 @@
             overflow-y: auto;
         }
         
-        .autocomplete-items {
-            position: absolute;
-            border: 1px solid #d4d4d4;
-            border-bottom: none;
-            border-top: none;
-            z-index: 99;
-            top: 100%;
-            left: 0;
-            right: 0;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        .autocomplete-items div {
+        .connection-status {
             padding: 10px;
-            cursor: pointer;
-            background-color: #fff;
-            border-bottom: 1px solid #d4d4d4;
+            margin: 10px 0;
+            border-radius: 5px;
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
         }
         
-        .autocomplete-items div:hover {
-            background-color: #e9e9e9;
+        .connection-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
         }
         
-        .autocomplete-active {
-            background-color: DodgerBlue !important;
-            color: #ffffff;
+        .connection-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
     </style>
 </head>
@@ -251,8 +242,13 @@
     <div class="container-fluid mt-4">
         <div class="row">
             <div class="col-lg-12">
+                <!-- Bağlantı Durumu -->
+                <div id="connectionStatus" class="connection-status">
+                    Supabase bağlantısı kontrol ediliyor...
+                </div>
+                
                 <!-- Durum Mesajları -->
-                <div id="statusMessage" class="status-message"></div>
+                <div id="statusMessage" class="status-message" style="display: none;"></div>
 
                 <!-- Filtreleme Bölümü -->
                 <div class="filter-section">
@@ -368,7 +364,9 @@
                                     </tr>
                                 </thead>
                                 <tbody id="productsTableBody">
-                                    <!-- Veriler JavaScript ile doldurulacak -->
+                                    <tr>
+                                        <td colspan="6" class="text-center">Yükleniyor...</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -499,14 +497,12 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Supabase bağlantı ayarları
-       	const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+        // Supabase bağlantı ayarları - BU BÖLÜMÜ KENDİ BİLGİLERİNİZLE GÜNCELLEYİN
+       const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
   	const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
-  
-  // Supabase'i başlat
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
-        // Uygulama durumu
+        // Global değişkenler
+        let supabase;
         let currentProductId = null;
         let brands = [];
         let gtipCodes = [];
@@ -529,17 +525,42 @@
             }, 5000);
         }
 
+        // Bağlantı durumunu güncelle
+        function updateConnectionStatus(message, isSuccess = false) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.textContent = message;
+            statusElement.className = isSuccess ? 'connection-status connection-success' : 'connection-status connection-error';
+        }
+
         // Sayfa yüklendiğinde
         document.addEventListener('DOMContentLoaded', function() {
-            initApp();
+            initializeApp();
         });
 
         // Uygulamayı başlat
-        async function initApp() {
+        async function initializeApp() {
             try {
-                showStatus('Veriler yükleniyor...');
+                // Supabase bağlantısını kur
+                supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                updateConnectionStatus('Supabase bağlantısı başarılı.', true);
                 
-                // Tüm verileri paralel olarak yükle
+                // Tüm verileri yükle
+                await loadAllData();
+                
+                // Event listener'ları bağla
+                bindEventListeners();
+                
+            } catch (error) {
+                console.error('Uygulama başlatılırken hata oluştu:', error);
+                updateConnectionStatus('Supabase bağlantı hatası: ' + error.message, false);
+            }
+        }
+
+        // Tüm verileri yükle
+        async function loadAllData() {
+            showStatus('Veriler yükleniyor...');
+            
+            try {
                 await Promise.all([
                     loadBrands(),
                     loadGtipCodes(),
@@ -558,13 +579,11 @@
                 // Sürükle bırak işlevselliğini başlat
                 initDragAndDrop();
                 
-                // Event listener'ları bağla
-                bindEventListeners();
+                showStatus('Veriler başarıyla yüklendi.');
                 
-                showStatus('Uygulama başlatıldı. Veriler yüklendi.');
             } catch (error) {
-                console.error('Uygulama başlatılırken hata oluştu:', error);
-                showStatus('Uygulama başlatılırken hata oluştu: ' + error.message, false);
+                console.error('Veriler yüklenirken hata oluştu:', error);
+                showStatus('Veriler yüklenirken hata oluştu: ' + error.message, false);
             }
         }
 
@@ -875,6 +894,13 @@
             thead.appendChild(actionsTh);
             
             // Tablo içeriğini doldur
+            if (products.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="${selectedColumns.length + 1}" class="text-center">Kayıtlı ürün bulunamadı</td>`;
+                tbody.appendChild(row);
+                return;
+            }
+            
             products.forEach(product => {
                 const row = document.createElement('tr');
                 
@@ -1332,14 +1358,7 @@
                 showStatus('Veriler senkronize ediliyor...');
                 
                 // Tüm verileri yeniden yükle
-                await Promise.all([
-                    loadBrands(),
-                    loadGtipCodes(),
-                    loadSellers(),
-                    loadCategories(),
-                    loadReyons(),
-                    loadProducts()
-                ]);
+                await loadAllData();
                 
                 showStatus('Veriler başarıyla senkronize edildi.');
             } catch (error) {
