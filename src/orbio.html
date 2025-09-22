@@ -633,7 +633,7 @@
         const payBonusBtn = document.getElementById('payBonus');
         const mainContent = document.getElementById('mainContent');
 
-        // Utility functions
+         // Utility functions
         function money(n){ return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; }
 
         // Initialize the application
@@ -657,336 +657,209 @@
             initVoiceAssistant();
         }
 
-        // Ses durumu kutusunu gizle
-        function hideVoiceStatus() {
-            voiceStatusPanel.style.display = 'none';
-        }
-
-        // Referans kodu işleme
-        async function processReferralCode(code, groupCode) {
-            try {
-                const { data, error } = await supabase
-                    .from('referral_links')
-                    .select('owner_user_id, referral_code, group_code, is_used')
-                    .eq('referral_code', code)
-                    .eq('group_code', groupCode)
-                    .single();
-                
-                if (error) throw error;
-                
-                if (data) {
-                    if (data.is_used) {
-                        assistantMessage.textContent = "Bu referans linki daha önce kullanılmış.";
-                        return;
-                    }
-                    
-                    referralGroupCode = data.group_code;
-                    // Referans sahibinin bilgilerini al
-                    const { data: ownerData } = await supabase
-                        .from('profiles')
-                        .select('full_name')
-                        .eq('id', data.owner_user_id)
-                        .single();
-                    
-                    if (ownerData) {
-                        assistantMessage.textContent += ` Referans ile geldiniz: ${ownerData.full_name}`;
-                    }
-                }
-            } catch (error) {
-                console.error('Referans kodu işleme hatası:', error);
-            }
-        }
-
-        // Sesli asistanı başlat
-        function initVoiceAssistant() {
-            // Sesli asistan event listener'ları
-            microphoneToggle.addEventListener('click', toggleMicrophone);
-            closeVoiceStatus.addEventListener('click', hideVoiceStatus);
-            
-            // Mikrofonu otomatik olarak etkinleştir
-            setTimeout(() => {
-                enableMicrophone();
-            }, 1000);
-        }
-
-        // Mikrofonu aç/kapa
-        function toggleMicrophone() {
-            if (isMicrophoneEnabled) {
-                disableMicrophone();
-            } else {
-                enableMicrophone();
-            }
-        }
-
-        // Mikrofon iznini kontrol et
-        async function checkMicrophonePermission() {
-            try {
-                // Mikrofon erişim durumunu kontrol et
-                if (navigator.permissions) {
-                    const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-                    
-                    if (permissionStatus.state === 'granted') {
-                        // İzin zaten verilmiş
-                        enableMicrophone();
-                    } else {
-                        // İzin verilmemiş veya sorulmamış
-                        disableMicrophone();
-                    }
-                    
-                    // İzin durumu değiştiğinde
-                    permissionStatus.onchange = function() {
-                        if (permissionStatus.state === 'granted') {
-                            enableMicrophone();
-                        } else {
-                            disableMicrophone();
-                        }
-                    };
-                }
-            } catch (error) {
-                console.error('Mikrofon izni kontrol hatası:', error);
-                // Fallback: Doğrudan mikrofon erişimini dene
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    enableMicrophone();
-                    stream.getTracks().forEach(track => track.stop());
-                } catch (err) {
-                    disableMicrophone();
-                }
-            }
-        }
-
-        // Mikrofonu etkinleştir
-        async function enableMicrophone() {
-            try {
-                // Mikrofon erişim isteği gönder
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // Mikrofon etkin
-                isMicrophoneEnabled = true;
-                microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (Açık)</span>';
-                microphoneToggle.classList.add('listening');
-                
-                // Ses tanıma başlat
-                initializeSpeechRecognition();
-                
-                // Kullanıcıya bildir
-                assistantMessage.textContent = "Mikrofon erişimi sağlandı. Lütfen 'Evet' diyerek giriş yapın.";
-                
-                // Mikrofon stream'ini serbest bırak (sadece izin için kullandık)
-                stream.getTracks().forEach(track => track.stop());
-                
-            } catch (error) {
-                console.error("Mikrofon erişim hatası:", error);
-                
-                let errorMessage = "Mikrofon erişimi sağlanamadı. ";
-                if (error.name === "NotAllowedError") {
-                    errorMessage += "Lütfen tarayıcı ayarlarınızdan mikrofon erişimine izin verin.";
-                } else if (error.name === "NotFoundError") {
-                    errorMessage += "Mikrofon cihazı bulunamadı.";
-                } else if (error.name === "NotReadableError") {
-                    errorMessage += "Mikrofon başka bir uygulama tarafından kullanılıyor.";
-                } else {
-                    errorMessage += "Beklenmeyen bir hata oluştu.";
-                }
-                
-                assistantMessage.textContent = errorMessage;
-                disableMicrophone();
-            }
-        }
-
-        // Mikrofonu devre dışı bırak
-        function disableMicrophone() {
-            isMicrophoneEnabled = false;
-            microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon (Kapalı)</span>';
-            microphoneToggle.classList.remove('listening');
-            
-            // Ses tanımayı durdur
-            if (recognition) {
-                recognition.stop();
-            }
-            
-            // Ses göstergesini sıfırla
-            voiceIndicator.classList.remove('listening');
-            
-            // Kullanıcıya bildir
-            assistantMessage.textContent = "Mikrofon erişimi kapalı. Sesli sipariş için lütfen mikrofon erişimine izin verin.";
-        }
-
-        // Ses tanıma sistemini başlat
-        function initializeSpeechRecognition() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            
-            if (!SpeechRecognition) {
-                assistantMessage.textContent = "Tarayıcınız ses tanıma özelliğini desteklemiyor";
+        // Satıcıları konuma göre yükle - DÜZELTİLMİŞ VERSİYON
+        async function loadSellersByLocation() {
+            if (!currentCustomer?.location) {
+                sellerSelect.innerHTML = '<option value="">-- Lokasyon yok --</option>';
+                speakToUser("Konum bilginiz bulunamadı. Lütfen satıcıyı manuel olarak seçin.");
                 return;
             }
             
-            recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.lang = 'tr-TR';
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
-            
-            recognition.onstart = function() {
-                isListening = true;
-                voiceIndicator.classList.add('listening');
-                voiceStatus.textContent = "Dinleniyor...";
-                assistantMessage.textContent = "Dinliyorum...";
-            };
-            
-            recognition.onresult = function(event) {
-                const transcript = event.results[event.results.length - 1][0].transcript;
-                userMessage.textContent = transcript;
-                
-                // Sesli komutları işle
-                processVoiceCommand(transcript.toLowerCase());
-            };
-            
-            recognition.onerror = function(event) {
-                console.error('Ses tanıma hatası:', event.error);
-                
-                if (event.error === 'not-allowed') {
-                    assistantMessage.textContent = "Mikrofon erişimine izin verilmedi. Lütfen tarayıcı ayarlarınızdan izin verin.";
-                    disableMicrophone();
-                } else if (event.error === 'no-speech') {
-                    // "no-speech" hatasını görmezden gel, sessizlik normaldir
-                    console.log('Ses algılanmadı');
-                } else {
-                    assistantMessage.textContent = "Ses tanıma hatası: " + event.error;
-                }
-                
-                isListening = false;
-                voiceIndicator.classList.remove('listening');
-            };
-            
-            recognition.onend = function() {
-                isListening = false;
-                voiceIndicator.classList.remove('listening');
-                
-                // Mikrofon hala açıksa yeniden başlat
-                if (isMicrophoneEnabled) {
-                    setTimeout(() => {
-                        if (!isListening) {
-                            recognition.start();
-                        }
-                    }, 500);
-                }
-            };
-            
-            // Ses tanımayı başlat
-            recognition.start();
-        }
-
-        // Sesli komutları işle
-        function processVoiceCommand(transcript) {
-            switch(conversationStep) {
-                case 0: // Giriş sorusu
-                    if (transcript.includes('evet') || transcript.includes('isterim') || transcript.includes('tabi') || transcript.includes('olur')) {
-                        speakToUser("Harika! Telefon numaranızı söyler misiniz?");
-                        conversationStep = 1;
-                    } else if (transcript.includes('hayır') || transcript.includes('istemiyorum')) {
-                        speakToUser("Peki, giriş yapmak istediğiniz zaman bana 'Evet' deyin. Size nasıl yardımcı olabilirim?");
-                    } else {
-                        speakToUser("Giriş yapmak istiyor musunuz? Lütfen 'Evet' veya 'Hayır' diyerek yanıt verin.");
-                    }
-                    break;
-                case 1: // Telefon numarası isteme
-                    const phoneMatch = transcript.match(/\d+/g);
-                    if (phoneMatch) {
-                        const phone = phoneMatch.join('');
-                        document.getElementById('p_phone').textContent = phone;
-                        checkCustomerByPhone(phone);
-                    } else {
-                        speakToUser("Telefon numaranızı anlayamadım. Lütfen numaranızı söyler misiniz?");
-                    }
-                    break;
-                case 2: // Yeni kullanıcı kaydı - İsim
-                    document.getElementById('p_name').textContent = transcript;
-                    speakToUser("Teşekkürler. Hangi şehirden alışveriş yapmak istiyorsunuz?");
-                    conversationStep = 3;
-                    break;
-                case 3: // Yeni kullanıcı kaydı - Şehir
-                    document.getElementById('p_city').textContent = transcript;
-                    speakToUser("Tamam. Son olarak, adresinizi öğrenebilir miyim?");
-                    conversationStep = 4;
-                    break;
-                case 4: // Yeni kullanıcı kaydı - Adres
-                    document.getElementById('p_address').textContent = transcript;
-                    speakToUser("Teşekkürler. Konumunuz belirleniyor ve profiliniz oluşturuluyor.");
-                    // Konum bilgisini al ve profili kaydet
-                    getLocationFromAddress(transcript);
-                    conversationStep = 5;
-                    break;
-                case 5: // Profil oluşturuldu, satıcılar yükleniyor
-                    // Satıcıları yükle
-                    loadSellersByLocation();
-                    break;
-                default:
-                    // Normal sipariş süreci
-                    processOrderCommand(transcript);
-                    break;
-            }
-        }
-
-        // Kullanıcıya sesli yanıt ver
-        function speakToUser(message) {
-            assistantMessage.textContent = message;
-            
-            // Tarayıcı ses sentezleme API'si
-            if ('speechSynthesis' in window) {
-                const speech = new SpeechSynthesisUtterance(message);
-                speech.lang = 'tr-TR';
-                speech.volume = 1;
-                speech.rate = 1;
-                speech.pitch = 1;
-                
-                window.speechSynthesis.speak(speech);
-            }
-        }
-
-        // Telefon numarası ile kullanıcı kontrolü
-        async function checkCustomerByPhone(phone) {
             try {
+                console.log("Müşteri konumu:", currentCustomer.location);
+                
+                // Profiles tablosundan seller rolündeki kullanıcıları al
+                // Konum eşleştirmesi için daha esnek sorgu
                 const { data, error } = await supabase
-                    .from('customers')
-                    .select('*')
-                    .eq('phone', phone)
-                    .single();
+                    .from('profiles')
+                    .select('id, full_name, phone, city, address, location')
+                    .eq('role', 'seller')
+                    .or(`location.ilike.%${currentCustomer.location}%,city.ilike.%${currentCustomer.location}%,address.ilike.%${currentCustomer.location}%`)
+                    .limit(100);
                 
                 if (error) {
-                    // Kullanıcı bulunamadı, yeni kayıt moduna geç
-                    speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
-                    conversationStep = 2;
+                    console.error('Satıcı sorgu hatası:', error);
+                    speakToUser("Satıcılar yüklenirken bir hata oluştu.");
                     return;
                 }
                 
-                if (data) {
-                    // Kullanıcı bulundu
-                    currentCustomer = data;
-                    updateCustomerUI();
-                    speakToUser(`Hoş geldiniz ${data.name}! Sisteminiz açılmıştır, sipariş işleminize başlayabilirsiniz.`);
-                    conversationStep = 10; // Normal sipariş sürecine geç
+                sellers = data || [];
+                console.log("Bulunan satıcılar:", sellers);
+                
+                sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
+                
+                if (sellers.length === 0) {
+                    // Eğer konuma göre satıcı bulunamazsa, tüm satıcıları göster
+                    const { data: allSellers, error: allError } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, phone, city, address, location')
+                        .eq('role', 'seller')
+                        .limit(100);
                     
-                    // Arayüzü etkinleştir
-                    enableUI();
+                    if (!allError && allSellers.length > 0) {
+                        sellers = allSellers;
+                        speakToUser("Size en yakın satıcı bulunamadı. Tüm satıcılar listeleniyor.");
+                    } else {
+                        sellerSelect.innerHTML = '<option value="">-- Satıcı bulunamadı --</option>';
+                        speakToUser("Sistemde kayıtlı satıcı bulunamadı.");
+                        return;
+                    }
+                } else {
+                    speakToUser(`Size en yakın ${sellers.length} satıcı bulundu.`);
                 }
                 
+                // Satıcıları dropdown'a ekle
+                sellers.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    // Satıcı bilgilerini daha anlaşılır şekilde göster
+                    const displayText = s.full_name ? 
+                        `${s.full_name} (${s.city || s.location || 'Konum bilgisi yok'})` : 
+                        s.phone || s.id;
+                    opt.textContent = displayText;
+                    opt.setAttribute('data-city', s.city || '');
+                    opt.setAttribute('data-location', s.location || '');
+                    sellerSelect.appendChild(opt);
+                });
+                
+                // Satıcı seçildiğinde ürünleri yükle
+                sellerSelect.addEventListener('change', function() {
+                    if (this.value) {
+                        loadSellerData(this.value);
+                    }
+                });
+                
             } catch (error) {
-                console.error('Telefon ile kullanıcı kontrol hatası:', error);
-                speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
-                conversationStep = 2;
+                console.error('Satıcı yükleme hatası:', error);
+                speakToUser("Satıcılar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
             }
         }
 
-        // Adresden konum bilgisi al
+        // Satıcı verilerini yükle
+        async function loadSellerData(sellerId) {
+            try {
+                console.log("Satıcı ID:", sellerId);
+                
+                // Seçilen satıcıyı bul
+                const selectedSeller = sellers.find(s => s.id === sellerId);
+                if (selectedSeller) {
+                    speakToUser(`${selectedSeller.full_name} satıcısının ürünleri yükleniyor.`);
+                }
+                
+                // Reyonaları yükle
+                const { data: reyonData, error: reyonError } = await supabase
+                    .from('reyon')
+                    .select('id, name')
+                    .order('name');
+                
+                if (reyonError) throw reyonError;
+                
+                reyonlar = reyonData || [];
+                reyonSelect.innerHTML = '<option value="">-- Reyon seçin --</option>';
+                reyonlar.forEach(r => {
+                    const opt = document.createElement('option');
+                    opt.value = r.id;
+                    opt.textContent = r.name;
+                    reyonSelect.appendChild(opt);
+                });
+                
+                // Kategorileri yükle
+                const { data: categoryData, error: categoryError } = await supabase
+                    .from('categories')
+                    .select('id, name')
+                    .order('name');
+                
+                if (categoryError) throw categoryError;
+                
+                categories = categoryData || [];
+                categorySelect.innerHTML = '<option value="">-- Kategori seçin --</option>';
+                categories.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    categorySelect.appendChild(opt);
+                });
+                
+                // Ürünleri yükle - Bu satıcıya ait ürünleri getir
+                const { data: productData, error: productError } = await supabase
+                    .from('products')
+                    .select(`
+                        id, name, description, price, stock, currency, 
+                        gtip_code, imgurl, unit_type, barcode, brand, category_id, reyon_id,
+                        product_prices (price, discount_price, seller_id)
+                    `)
+                    .eq('product_prices.seller_id', sellerId);
+                
+                if (productError) {
+                    console.error('Ürün yükleme hatası:', productError);
+                    // Alternatif sorgu deneyelim
+                    const { data: altProductData, error: altError } = await supabase
+                        .from('products')
+                        .select('*')
+                        .limit(50); // Tüm ürünleri getir, filtreleme frontend'de yapılacak
+                    
+                    if (altError) throw altError;
+                    
+                    products = altProductData || [];
+                } else {
+                    products = productData || [];
+                }
+                
+                console.log("Yüklenen ürünler:", products.length);
+                
+                productSelect.innerHTML = '<option value="">-- Ürün seçin --</option>';
+                products.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.name;
+                    productSelect.appendChild(opt);
+                });
+                
+                // Ürün grid'ini güncelle
+                updateProductsGrid();
+                
+                speakToUser(`${products.length} ürün yüklendi. Sesli olarak veya listeden ürün seçebilirsiniz.`);
+                
+            } catch (error) {
+                console.error('Satıcı verileri yükleme hatası:', error);
+                speakToUser("Satıcı verileri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+            }
+        }
+
+        // Konum belirleme fonksiyonunu iyileştirelim
         async function getLocationFromAddress(address) {
             try {
-                // Basit bir konum belirleme (gerçek uygulamada Google Maps API kullanılmalı)
-                const location = address.includes('istanbul') ? 'İstanbul' : 
-                                address.includes('ankara') ? 'Ankara' : 
-                                address.includes('izmir') ? 'İzmir' : 
-                                address.includes('bursa') ? 'Bursa' : 'Türkiye';
-                                address.includes('balıkesir') ? 'Balıkesir' : 'Türkiye';
+                // Daha akıllı konum belirleme
+                let location = 'Türkiye'; // Varsayılan
+                
+                // Şehir isimlerini kontrol et
+                const cities = [
+                    'istanbul', 'ankara', 'izmir', 'bursa', 'balıkesir', 
+                    'bandırma', 'bandirma', 'paşabayır', 'paşabyır'
+                ];
+                
+                const cityMap = {
+                    'istanbul': 'İstanbul',
+                    'ankara': 'Ankara', 
+                    'izmir': 'İzmir',
+                    'bursa': 'Bursa',
+                    'balıkesir': 'Balıkesir',
+                    'bandırma': 'Bandırma',
+                    'bandirma': 'Bandırma',
+                    'paşabayır': 'Bandırma',
+                    'paşabyır': 'Bandırma'
+                };
+                
+                const lowerAddress = address.toLowerCase();
+                
+                for (const city of cities) {
+                    if (lowerAddress.includes(city)) {
+                        location = cityMap[city] || city;
+                        break;
+                    }
+                }
+                
+                console.log("Belirlenen konum:", location);
                 
                 // Profili kaydet
                 await saveCustomerProfile(location);
@@ -998,7 +871,7 @@
             }
         }
 
-        // Kullanıcı profilini kaydet
+        // Kullanıcı profilini kaydet - RLS sorununu çözmek için
         async function saveCustomerProfile(location) {
             try {
                 const name = document.getElementById('p_name').textContent;
@@ -1006,33 +879,47 @@
                 const city = document.getElementById('p_city').textContent;
                 const address = document.getElementById('p_address').textContent;
                 
+                // RLS politikasını aşmak için gerekli alanları ekleyelim
+                const customerData = {
+                    name: name.trim(),
+                    phone: phone.trim(),
+                    city: city.trim(),
+                    address: address.trim(),
+                    location: location.trim(),
+                    role: 'Üye',
+                    customer_type: 'Market Müşterisi',
+                    bonus_amount: 0,
+                    created_at: new Date().toISOString(),
+                    status: 'active'
+                };
+                
+                // Referans bilgilerini ekle
+                if (referralGroupCode) {
+                    customerData.group_code = referralGroupCode;
+                }
+                if (referralCode) {
+                    customerData.referrer_id = await getReferrerId(referralCode);
+                }
+                
+                console.log("Kaydedilecek müşteri verisi:", customerData);
+                
                 const { data, error } = await supabase
                     .from('customers')
-                    .insert([
-                        {
-                            name: name,
-                            phone: phone,
-                            city: city,
-                            address: address,
-                            location: location,
-                            role: 'Üye',
-                            customer_type: 'Market Müşterisi',
-                            group_code: referralGroupCode,
-                            bonus_amount: 0,
-                            referrer_id: referralCode ? await getReferrerId(referralCode) : null,
-                            created_at: new Date().toISOString()
-                        }
-                    ])
+                    .insert([customerData])
                     .select()
                     .single();
-            
-                   if (error) {
-                    console.error('Profil kaydetme hatası:',  error);
+                
+                if (error) {
+                    console.error('Profil kaydetme hatası:', error);
+                    
+                    // RLS hatası durumunda alternatif çözüm
+                    if (error.code === '42501') {
+                        speakToUser("Sistem güvenlik ayarlarında bir sorun oluştu. Lütcep yöneticiyle iletişime geçin.");
+                        return;
+                    }
                     throw error;
                 }
                 
-                currentCustomer = data;
-                updateCustomerUI();
                 currentCustomer = data;
                 updateCustomerUI();
                 
