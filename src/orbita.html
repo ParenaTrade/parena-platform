@@ -93,7 +93,7 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             width: 300px;
             z-index: 100;
-            display: none;
+            display: block; /* Her zaman göster */
         }
         
         .status-header {
@@ -253,6 +253,19 @@
                 grid-template-columns: 1fr;
             }
         }
+        
+        .login-panel {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .section-disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -265,7 +278,7 @@
             
             <div id="userBox" class="text-right">
                 <div id="userName" class="font-semibold">Giriş yapılmadı</div>
-                <div id="userMeta" class="text-sm text-gray-500"></div>
+                <div id="userMeta" class="text-sm text-gray-500">Lütfen sesli asistan ile giriş yapın</div>
             </div>
             
             <button id="microphoneToggle" class="microphone-toggle">
@@ -274,7 +287,14 @@
             </button>
         </header>
         
-        <main class="grid grid-cols-1 lg:grid-cols-4 gap-6 p-4">
+        <div class="login-panel">
+            <div class="flex items-center">
+                <i class="fas fa-info-circle text-yellow-500 mr-2"></i>
+                <span>Lütfen sesli asistan ile giriş yaparak sipariş verebilirsiniz</span>
+            </div>
+        </div>
+        
+        <main class="grid grid-cols-1 lg:grid-cols-4 gap-6 p-4 section-disabled" id="mainContent">
             <!-- LEFT: Seller & Filters -->
             <aside class="col-span-1 bg-white rounded shadow p-4">
                 <h2 class="font-semibold mb-2">Satıcı & Filtreler</h2>
@@ -339,7 +359,7 @@
                 <div id="productsGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     <div class="flex flex-col items-center justify-center p-8 text-gray-400">
                         <i class="fas fa-box-open text-4xl mb-3"></i>
-                        <p>Satıcı seçerek ürünleri görüntüleyin</p>
+                        <p>Önce giriş yapmalısınız</p>
                     </div>
                 </div>
             </section>
@@ -348,7 +368,7 @@
             <aside class="col-span-1 bg-white rounded shadow p-4">
                 <h2 class="font-semibold mb-2">Sepet</h2>
                 <div id="cartList" class="space-y-2 max-h-[420px] overflow-y-auto mb-3">
-                    <div class="text-sm text-gray-500">Sepete ürün ekleyin</div>
+                    <div class="text-sm text-gray-500">Önce giriş yapmalısınız</div>
                 </div>
 
                 <div class="border-t pt-3">
@@ -387,7 +407,7 @@
             </button>
         </div>
         <div class="status-content">
-            <div class="assistant-message" id="assistantMessage">Mikrofon erişimi için lütfen butona tıklayın.</div>
+            <div class="assistant-message" id="assistantMessage">Merhaba efendim hoş geldiniz! Kullanıcı girişi yapmak ister misiniz?</div>
             <div class="user-message" id="userMessage"></div>
         </div>
         <div class="voice-indicator" id="voiceIndicator">
@@ -408,7 +428,6 @@
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // Global state
-        let currentUser = null;
         let currentCustomer = null;
         let sellers = [];
         let reyonlar = [];
@@ -418,7 +437,6 @@
         let recognition = null;
         let isListening = false;
         let isMicrophoneEnabled = false;
-        let voiceCode = null;
         let conversationStep = 0;
         let currentPaymentMethod = null;
         let orderStatusInterval = null;
@@ -457,6 +475,7 @@
         const payCashBtn = document.getElementById('payCash');
         const payCardBtn = document.getElementById('payCard');
         const payBonusBtn = document.getElementById('payBonus');
+        const mainContent = document.getElementById('mainContent');
 
         // Utility functions
         function money(n){ return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; }
@@ -476,10 +495,7 @@
                 await processReferralCode(referralCode, referralGroupCode);
             }
             
-            await loadSessionAndCustomer();
-            await loadSellersByLocation();
             setupEventHandlers();
-            await loadBonusSummary();
             
             // Sesli asistanı başlat
             initVoiceAssistant();
@@ -512,7 +528,7 @@
                         .single();
                     
                     if (ownerData) {
-                        assistantMessage.textContent = `Referans ile geldiniz: ${ownerData.name}`;
+                        assistantMessage.textContent += ` Referans ile geldiniz: ${ownerData.name}`;
                     }
                 }
             } catch (error) {
@@ -526,10 +542,9 @@
             microphoneToggle.addEventListener('click', toggleMicrophone);
             closeVoiceStatus.addEventListener('click', hideVoiceStatus);
             
-            // Sayfa yüklendiğinde sesli asistanı göster
+            // Mikrofonu otomatik olarak etkinleştir
             setTimeout(() => {
-                showVoiceStatus();
-                speakToUser("Merhaba! Onur Market Sesli Sipariş sistemine hoş geldiniz. Mikrofon butonuna tıklayarak sesli sipariş verebilirsiniz.");
+                enableMicrophone();
             }, 1000);
         }
 
@@ -594,8 +609,7 @@
                 initializeSpeechRecognition();
                 
                 // Kullanıcıya bildir
-                assistantMessage.textContent = "Mikrofon erişimi sağlandı. Lütfen 'Merhaba' diyerek sistemi başlatın.";
-                speakToUser("Mikrofon erişimi sağlandı. Lütfen merhaba diyerek sistemi başlatın.");
+                assistantMessage.textContent = "Mikrofon erişimi sağlandı. Lütfen 'Evet' diyerek giriş yapın.";
                 
                 // Mikrofon stream'ini serbest bırak (sadece izin için kullandık)
                 stream.getTracks().forEach(track => track.stop());
@@ -702,13 +716,14 @@
         // Sesli komutları işle
         function processVoiceCommand(transcript) {
             switch(conversationStep) {
-                case 0: // İlk karşılama
-                    if (transcript.includes('merhaba')) {
-                        speakToUser("Merhaba efendim! Hoş geldiniz. Sesi tanıyorum, profiliniz yükleniyor.");
-                        // Ses kodu ile kullanıcıyı bulmaya çalış
-                        findCustomerByVoiceCode();
+                case 0: // Giriş sorusu
+                    if (transcript.includes('evet') || transcript.includes('isterim') || transcript.includes('tabi') || transcript.includes('olur')) {
+                        speakToUser("Harika! Telefon numaranızı söyler misiniz?");
+                        conversationStep = 1;
+                    } else if (transcript.includes('hayır') || transcript.includes('istemiyorum')) {
+                        speakToUser("Peki, giriş yapmak istediğiniz zaman bana 'Evet' deyin. Size nasıl yardımcı olabilirim?");
                     } else {
-                        speakToUser("Önce 'Merhaba' diyerek başlayalım mı?");
+                        speakToUser("Giriş yapmak istiyor musunuz? Lütfen 'Evet' veya 'Hayır' diyerek yanıt verin.");
                     }
                     break;
                 case 1: // Telefon numarası isteme
@@ -765,50 +780,6 @@
             }
         }
 
-        // Ses durumu kutusunu göster
-        function showVoiceStatus() {
-            voiceStatusPanel.style.display = 'block';
-        }
-
-        // Ses durumu kutusunu gizle
-        function hideVoiceStatus() {
-            voiceStatusPanel.style.display = 'none';
-        }
-
-        // Kullanıcıyı ses kodu ile bul
-        async function findCustomerByVoiceCode() {
-            try {
-                // Önce ses kodunu kontrol et
-                if (voiceCode) {
-                    const { data, error } = await supabase
-                        .from('customers')
-                        .select('*')
-                        .eq('voice_code', voiceCode)
-                        .single();
-                    
-                    if (error) throw error;
-                    
-                    if (data) {
-                        // Kullanıcı bulundu
-                        currentCustomer = data;
-                        updateCustomerUI();
-                        speakToUser(`Hoş geldiniz ${data.name}! Sesi tanıdım. Nasıl yardımcı olabilirim?`);
-                        conversationStep = 10; // Normal sipariş sürecine geç
-                        return;
-                    }
-                }
-                
-                // Ses kodu bulunamadı, telefon sorma moduna geç
-                speakToUser("Ses kodu bulunamadı. Lütfen telefon numaranızı söyler misiniz?");
-                conversationStep = 1;
-                
-            } catch (error) {
-                console.error('Ses kodu ile kullanıcı bulma hatası:', error);
-                speakToUser("Ses kodu ile kullanıcı bulunamadı. Lütfen telefon numaranızı söyler misiniz?");
-                conversationStep = 1;
-            }
-        }
-
         // Telefon numarası ile kullanıcı kontrolü
         async function checkCustomerByPhone(phone) {
             try {
@@ -818,24 +789,27 @@
                     .eq('phone', phone)
                     .single();
                 
-                if (error) throw error;
+                if (error) {
+                    // Kullanıcı bulunamadı, yeni kayıt moduna geç
+                    speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
+                    conversationStep = 2;
+                    return;
+                }
                 
                 if (data) {
                     // Kullanıcı bulundu
                     currentCustomer = data;
-                    voiceCode = data.voice_code;
                     updateCustomerUI();
-                    speakToUser(`Hoş geldiniz ${data.name}! Telefon numaranızı tanıdım. Nasıl yardımcı olabilirim?`);
+                    speakToUser(`Hoş geldiniz ${data.name}! Sisteminiz açılmıştır, sipariş işleminize başlayabilirsiniz.`);
                     conversationStep = 10; // Normal sipariş sürecine geç
-                } else {
-                    // Kullanıcı bulunamadı, yeni kayıt moduna geç
-                    speakToUser("Kullanıcı profiliniz bulunamadı. İlk defa kullanıcı profilinizi oluşturmak için bana adınızı soyadınızı söyler misiniz?");
-                    conversationStep = 2;
+                    
+                    // Arayüzü etkinleştir
+                    enableUI();
                 }
                 
             } catch (error) {
                 console.error('Telefon ile kullanıcı kontrol hatası:', error);
-                speakToUser("Kullanıcı profiliniz bulunamadı. İlk defa kullanıcı profilinizi oluşturmak için bana adınızı soyadınızı söyler misiniz?");
+                speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
                 conversationStep = 2;
             }
         }
@@ -866,9 +840,6 @@
                 const city = document.getElementById('p_city').textContent;
                 const address = document.getElementById('p_address').textContent;
                 
-                // Benzersiz ses kodu oluştur
-                voiceCode = generateVoiceCode();
-                
                 const { data, error } = await supabase
                     .from('customers')
                     .insert([
@@ -878,7 +849,6 @@
                             city: city,
                             address: address,
                             location: location,
-                            voice_code: voiceCode,
                             role: 'customer',
                             group_code: referralGroupCode,
                             bonus_amount: 0,
@@ -900,6 +870,9 @@
                 
                 speakToUser("Teşekkürler efendim. Kullanıcı bilgileriniz tanımlanmıştır. Size en yakın satıcılar yükleniyor.");
                 conversationStep = 5;
+                
+                // Arayüzü etkinleştir
+                enableUI();
                 
             } catch (error) {
                 console.error('Profil kaydetme hatası:', error);
@@ -958,11 +931,6 @@
             }
         }
 
-        // Benzersiz ses kodu oluştur
-        function generateVoiceCode() {
-            return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
-        }
-
         // Profil UI güncelleme
         function updateCustomerUI() {
             if (currentCustomer) {
@@ -977,54 +945,11 @@
             }
         }
 
-        // ORİJİNAL FONKSİYONLAR
-        async function loadSessionAndCustomer(){
-            // Customers tablosuna göre güncellendi
-            const { data: sessionData } = await supabase.auth.getSession();
-            const session = sessionData?.session;
-            if(!session?.user){
-                userNameEl.textContent = "Giriş yapılmadı";
-                userMetaEl.textContent = "Lütfen giriş yapın.";
-                return;
-            }
-            currentUser = session.user;
-            const { data: customer } = await supabase
-                .from('customers')
-                .select('id, name, role, phone, address, city, location, voice_code, bonus_amount')
-                .eq('id', currentUser.id)
-                .maybeSingle();
-            currentCustomer = customer;
-            voiceCode = customer?.voice_code;
-            userNameEl.textContent = customer?.name || currentUser.email || "Kullanıcı";
-            userMetaEl.textContent = customer?.city ? `${customer.city} • ${customer.location || ''}` : '';
-            p_name.textContent = customer?.name || '-';
-            p_phone.textContent = customer?.phone || '-';
-            p_role.textContent = customer?.role || '-';
-            p_address.textContent = customer?.address || '-';
-            p_city.textContent = customer?.city || '-';
-            p_bonus.textContent = money(customer?.bonus_amount || 0);
-        }
-
-        async function loadSellersByLocation(){
-            if(!currentCustomer?.location){
-                sellerSelect.innerHTML = '<option value="">-- Lokasyon yok --</option>';
-                return;
-            }
-            const { data, error } = await supabase
-                .from('customers')
-                .select('id, name, phone, city, location')
-                .eq('role','seller')
-                .eq('location', currentCustomer.location)
-                .limit(100);
-            if(error){ console.error(error); return; }
-            sellers = data || [];
-            sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
-            sellers.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s.id;
-                opt.textContent = s.name || s.phone || s.id;
-                sellerSelect.appendChild(opt);
-            });
+        // Arayüzü etkinleştir
+        function enableUI() {
+            mainContent.classList.remove('section-disabled');
+            userNameEl.textContent = currentCustomer.name;
+            userMetaEl.textContent = `${currentCustomer.city} • ${currentCustomer.location || ''}`;
         }
 
         function setupEventHandlers(){
