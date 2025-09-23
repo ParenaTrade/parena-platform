@@ -822,6 +822,11 @@
 
         // Initialize Supabase client
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+ 
+	 // API endpoint - EKSİK EKLENDİ
+        const CHAT_API_URL = '/api/chat';
+
+
 
         // Global state
         let currentCustomer = null;
@@ -1074,48 +1079,53 @@ async function checkCustomerByPhone(phone) {
             }
         }
 
-         // Satıcıları konuma göre yükle
         async function loadSellersByLocation() {
-    if (!currentCustomer?.city) {
-        console.log("Konum bilgisi yok, satıcı yüklenemiyor");
-        return;
-    }
-    
-    try {
-        console.log("Müşteri konumuna göre satıcılar aranıyor:", currentCustomer.city);
-        
-        // SADECE profiles tablosundan seller rolündeki kullanıcıları al
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('id, full_name, phone, city, address, location, imgurl')
-            .eq('role', 'seller') // Sadece satıcılar
-            .or(`city.ilike.%${currentCustomer.city}%,location.ilike.%${currentCustomer.city}%`)
-            .limit(100);
-        
-        if (error) {
-            console.error('Satıcı sorgu hatası:', error);
-            speakToUser("Satıcılar yüklenirken bir hata oluştu.");
-            return;
+            if (!currentCustomer?.city) {
+                speakToUser("Konum bilginiz bulunamadı. Lütfen satıcıyı manuel olarak seçin.");
+                return;
+            }
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, phone, city, address, location, imgurl')
+                    .eq('role', 'seller')
+                    .or(`location.ilike.%${currentCustomer.city}%,city.ilike.%${currentCustomer.city}%,address.ilike.%${currentCustomer.city}%`)
+                    .limit(100);
+                
+                if (error) {
+                    console.error('Satıcı sorgu hatası:', error);
+                    speakToUser("Satıcılar yüklenirken bir hata oluştu.");
+                    return;
+                }
+                
+                sellers = data || [];
+                updateSellersGrid();
+                
+                if (sellers.length === 0) {
+                    const { data: allSellers, error: allError } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, phone, city, address, location, imgurl')
+                        .eq('role', 'seller')
+                        .limit(100);
+                    
+                    if (!allError && allSellers.length > 0) {
+                        sellers = allSellers;
+                        speakToUser("Size en yakın satıcı bulunamadı. Tüm satıcılar listeleniyor.");
+                        updateSellersGrid();
+                    } else {
+                        speakToUser("Sistemde kayıtlı satıcı bulunamadı.");
+                    }
+                } else {
+                    speakToUser(`Size en yakın ${sellers.length} satıcı bulundu.`);
+                }
+                
+            } catch (error) {
+                console.error('Satıcı yükleme hatası:', error);
+                speakToUser("Satıcılar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+            }
         }
-        
-        sellers = data || [];
-        console.log("Bulunan satıcılar:", sellers.length);
-        
-        // Satıcıları hem dropdown'a hem de grid'e ekle
-        updateSellerDropdown();
-        updateSellersGrid();
-        
-        if (sellers.length === 0) {
-            speakToUser("Size yakın satıcı bulunamadı. Lütfen daha sonra tekrar deneyin.");
-        } else {
-            speakToUser(`Size en yakın ${sellers.length} satıcı bulundu.`);
-        }
-        
-    } catch (error) {
-        console.error('Satıcı yükleme hatası:', error);
-        speakToUser("Satıcılar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
-    }
-}
+
         // Sesli asistanı başlat
         function initVoiceAssistant() {
             microphoneToggle.addEventListener('click', toggleMicrophone);
