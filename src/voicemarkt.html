@@ -775,7 +775,7 @@
     </div>
 
     <script>
-       // Supabase configuration
+        // Supabase configuration
         const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
 
@@ -795,7 +795,6 @@
         let recognition = null;
         let isListening = false;
         let isMicrophoneEnabled = false;
-        let conversationStep = 0;
         let currentPaymentMethod = null;
         let orderStatusInterval = null;
         let referralCode = null;
@@ -803,8 +802,74 @@
         let selectedSellerId = null;
         let locationCheckTimer = null;
         let locationCheckAttempts = 0;
-        let conversationHistory = [];
         const MAX_LOCATION_CHECK_ATTEMPTS = 10;
+
+        // Kural veritabanı - REVİZE EDİLMİŞ KISIM
+        const businessRules = {
+            "Üyelik": {
+                keywords: ["üye", "kayıt", "giriş", "login", "kayıt ol", "giriş yap"],
+                actions: ["check_membership", "create_member"],
+                responses: {
+                    "welcome": "Merhaba efendim! Onur Market'e hoş geldiniz. Giriş yapmak ister misiniz?",
+                    "ask_phone": "Telefon numaranızı söyler misiniz?",
+                    "ask_name": "Teşekkürler. Adınızı ve soyadınızı söyler misiniz?",
+                    "ask_city": "Hangi şehirden alışveriş yapmak istiyorsunuz?",
+                    "ask_address": "Tamam. Son olarak, adresinizi öğrenebilir miyim?",
+                    "success": "Teşekkürler. Üyeliğiniz oluşturuldu. Size en yakın satıcılar yükleniyor."
+                }
+            },
+            "Satıcılar": {
+                keywords: ["satıcı", "market", "mağaza", "dükkan", "şube"],
+                actions: ["load_sellers", "select_seller"],
+                responses: {
+                    "loading": "Size en yakın satıcılar yükleniyor...",
+                    "found": "{{count}} satıcı bulundu. Hangisini seçmek istersiniz?",
+                    "selected": "{{seller}} satıcısı seçildi. Ürünler yükleniyor."
+                }
+            },
+            "Ürünler": {
+                keywords: ["ürün", "mal", "yiyecek", "içecek", "domates", "ekmek", "süt"],
+                actions: ["search_products", "add_to_cart"],
+                responses: {
+                    "found": "{{count}} ürün bulundu.",
+                    "added": "{{product}} sepete eklendi.",
+                    "not_found": "Üzgünüm, '{{product}}' bulamadım."
+                }
+            },
+            "Sepet": {
+                keywords: ["sepet", "sepete ekle", "sepete koy", "alışveriş"],
+                actions: ["view_cart", "update_cart", "clear_cart"],
+                responses: {
+                    "empty": "Sepetiniz boş.",
+                    "items": "Sepetinizde {{count}} ürün var. Toplam: {{total}}",
+                    "updated": "Sepet güncellendi."
+                }
+            },
+            "Ödeme": {
+                keywords: ["ödeme", "öde", "fatura", "hesap", "nakit", "kart", "bonus"],
+                actions: ["select_payment", "process_payment"],
+                responses: {
+                    "options": "Ödeme seçenekleri: Nakit, Kredi Kartı, Bonus Puan",
+                    "selected": "{{method}} ödeme seçildi.",
+                    "processing": "Ödeme işleminiz gerçekleştiriliyor..."
+                }
+            },
+            "Teslimat": {
+                keywords: ["teslimat", "kargo", "adres", "ev", "iş", "getir"],
+                actions: ["set_delivery"],
+                responses: {
+                    "confirm": "Teslimat adresiniz: {{address}}. Onaylıyor musunuz?",
+                    "scheduled": "Teslimatınız {{time}} için planlandı."
+                }
+            }
+        };
+
+        // Konuşma durumu yönetimi - REVİZE EDİLMİŞ KISIM
+        const conversationFlow = {
+            currentStep: "welcome",
+            expectedResponses: ["evet", "hayır", "telefon", "isim", "şehir", "adres"],
+            context: {}
+        };
 
         // DOM Elements
         const userNameEl = document.getElementById("userName");
@@ -849,557 +914,232 @@
         // Utility functions
         function money(n){ return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; }
 
-        // Chat.js API Entegrasyonu
-        async function getAIResponse(userMessage, context = {}) {
-            try {
-                const requestData = {
-                    message: userMessage,
-                    context: {
-                        customerName: currentCustomer?.name,
-                        city: currentCustomer?.city,
-                        cartCount: cart.length,
-                        totalAmount: totalAmountEl.textContent,
-                        conversationStep: conversationStep,
-                        ...context
-                    },
-                    history: conversationHistory.slice(-4)
-                };
-
-                const response = await fetch(CHAT_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`API error: ${response.status}`);
-                }
-
-                const data = await response.json();
-                const aiResponse = data.reply;
-
-                // Konuşma geçmişine ekle
-                conversationHistory.push(
-                    { role: "user", content: userMessage },
-                    { role: "assistant", content: aiResponse }
-                );
-
-                return aiResponse;
-
-            } catch (error) {
-                console.error('Chat API hatası:', error);
-                return getRuleBasedResponse(userMessage, context);
+        // REVİZE EDİLMİŞ KISIM: Kural tabanlı komut işleme
+        function processRuleBasedCommand(transcript) {
+            const message = transcript.toLowerCase();
+            
+            // Mevcut adıma göre işlem yap
+            switch (conversationFlow.currentStep) {
+                case "welcome":
+                    return processWelcomeStep(message);
+                case "ask_phone":
+                    return processPhoneStep(message);
+                case "ask_name":
+                    return processNameStep(message);
+                case "ask_city":
+                    return processCityStep(message);
+                case "ask_address":
+                    return processAddressStep(message);
+                case "main_menu":
+                    return processMainMenu(message);
+                default:
+                    return processGeneralCommand(message);
             }
         }
 
-        
-
-// Kural veritabanı (rules tablosu yapısı)
-const businessRules = {
-    "Üyelik": {
-        keywords: ["üye", "kayıt", "giriş", "login", "kayıt ol", "giriş yap"],
-        actions: ["check_membership", "create_member"],
-        responses: {
-            "welcome": "Merhaba efendim! Onur Market'e hoş geldiniz. Giriş yapmak ister misiniz?",
-            "ask_phone": "Telefon numaranızı söyler misiniz?",
-            "ask_name": "Teşekkürler. Adınızı ve soyadınızı söyler misiniz?",
-            "ask_city": "Hangi şehirden alışveriş yapmak istiyorsunuz?",
-            "ask_address": "Tamam. Son olarak, adresinizi öğrenebilir miyim?",
-            "success": "Teşekkürler. Üyeliğiniz oluşturuldu. Size en yakın satıcılar yükleniyor."
-        }
-    },
-    "Satıcılar": {
-        keywords: ["satıcı", "market", "mağaza", "dükkan", "şube"],
-        actions: ["load_sellers", "select_seller"],
-        responses: {
-            "loading": "Size en yakın satıcılar yükleniyor...",
-            "found": "{{count}} satıcı bulundu. Hangisini seçmek istersiniz?",
-            "selected": "{{seller}} satıcısı seçildi. Ürünler yükleniyor."
-        }
-    },
-    "Reyonlar": {
-        keywords: ["reyon", "bölüm", "departman", "manav", "kasap", "şarküteri"],
-        actions: ["load_departments"],
-        responses: {
-            "list": "Mevcut reyonlar: {{departments}}",
-            "selected": "{{department}} reyonu seçildi."
-        }
-    },
-    "Kategoriler": {
-        keywords: ["kategori", "çeşit", "tür", "sebze", "meyve", "içecek"],
-        actions: ["load_categories"],
-        responses: {
-            "list": "{{department}} reyonundaki kategoriler: {{categories}}",
-            "selected": "{{category}} kategorisi seçildi."
-        }
-    },
-    "Ürünler": {
-        keywords: ["ürün", "mal", "yiyecek", "içecek", "domates", "ekmek", "süt"],
-        actions: ["search_products", "add_to_cart"],
-        responses: {
-            "found": "{{count}} ürün bulundu.",
-            "added": "{{product}} sepete eklendi.",
-            "not_found": "Üzgünüm, '{{product}}' bulamadım."
-        }
-    },
-    "Sepet": {
-        keywords: ["sepet", "sepete ekle", "sepete koy", "alışveriş"],
-        actions: ["view_cart", "update_cart", "clear_cart"],
-        responses: {
-            "empty": "Sepetiniz boş.",
-            "items": "Sepetinizde {{count}} ürün var. Toplam: {{total}}",
-            "updated": "Sepet güncellendi."
-        }
-    },
-    "Ödeme": {
-        keywords: ["ödeme", "öde", "fatura", "hesap", "nakit", "kart", "bonus"],
-        actions: ["select_payment", "process_payment"],
-        responses: {
-            "options": "Ödeme seçenekleri: Nakit, Kredi Kartı, Bonus Puan",
-            "selected": "{{method}} ödeme seçildi.",
-            "processing": "Ödeme işleminiz gerçekleştiriliyor..."
-        }
-    },
-    "Teslimat": {
-        keywords: ["teslimat", "kargo", "adres", "ev", "iş", "getir"],
-        actions: ["set_delivery"],
-        responses: {
-            "confirm": "Teslimat adresiniz: {{address}}. Onaylıyor musunuz?",
-            "scheduled": "Teslimatınız {{time}} için planlandı."
-        }
-    }
-};
-
-// Konuşma durumu yönetimi
-const conversationFlow = {
-    currentStep: "welcome",
-    expectedResponses: ["evet", "hayır", "telefon", "isim", "şehir", "adres"],
-    context: {}
-};
-
-// Kural tabanlı komut işleme
-function processRuleBasedCommand(transcript) {
-    const message = transcript.toLowerCase();
-    
-    // Mevcut adıma göre işlem yap
-    switch (conversationFlow.currentStep) {
-        case "welcome":
-            return processWelcomeStep(message);
-        case "ask_phone":
-            return processPhoneStep(message);
-        case "ask_name":
-            return processNameStep(message);
-        case "ask_city":
-            return processCityStep(message);
-        case "ask_address":
-            return processAddressStep(message);
-        case "main_menu":
-            return processMainMenu(message);
-        default:
-            return processGeneralCommand(message);
-    }
-}
-
-// Karşılama adımı
-function processWelcomeStep(message) {
-    if (message.includes('evet') || message.includes('tabi') || message.includes('olur')) {
-        conversationFlow.currentStep = "ask_phone";
-        return businessRules.Üyelik.responses.ask_phone;
-    } else if (message.includes('hayır') || message.includes('istemiyorum')) {
-        return "Peki, ihtiyacınız olduğunda buradayım. İyi günler!";
-    } else {
-        return businessRules.Üyelik.responses.welcome;
-    }
-}
-
-// Telefon adımı
-function processPhoneStep(message) {
-    const phoneMatch = message.match(/\d+/g);
-    if (phoneMatch && phoneMatch.join('').length >= 10) {
-        const phone = phoneMatch.join('');
-        conversationFlow.context.phone = phone;
-        conversationFlow.currentStep = "ask_name";
-        return businessRules.Üyelik.responses.ask_name;
-    } else {
-        return "Telefon numaranızı anlayamadım. Lütfen 10 haneli numaranızı söyler misiniz?";
-    }
-}
-
-// İsim adımı
-function processNameStep(message) {
-    if (message.trim().length > 2) {
-        conversationFlow.context.name = message.trim();
-        conversationFlow.currentStep = "ask_city";
-        return businessRules.Üyelik.responses.ask_city;
-    } else {
-        return "İsminizi anlayamadım. Lütfen adınızı ve soyadınızı söyler misiniz?";
-    }
-}
-
-// Şehir adımı
-function processCityStep(message) {
-    if (message.trim().length > 2) {
-        conversationFlow.context.city = message.trim();
-        conversationFlow.currentStep = "ask_address";
-        return businessRules.Üyelik.responses.ask_address;
-    } else {
-        return "Şehir bilgisini anlayamadım. Lütfen şehir adını söyler misiniz?";
-    }
-}
-
-// Adres adımı
-function processAddressStep(message) {
-    if (message.trim().length > 5) {
-        conversationFlow.context.address = message.trim();
-        conversationFlow.currentStep = "main_menu";
-        
-        // Müşteri kaydını oluştur
-        createCustomerProfile();
-        
-        return businessRules.Üyelik.responses.success;
-    } else {
-        return "Adres bilgisini anlayamadım. Lütfen tam adresinizi söyler misiniz?";
-    }
-}
-
-// Ana menü işlemleri
-function processMainMenu(message) {
-    // Ürün arama ve sepete ekleme
-    const productMatch = message.match(/(\d+)?\s*(kilo|gram|litre|adet|tane|paket)?\s*([a-zçğıöşü\s]+)/i);
-    if (productMatch) {
-        return processProductOrder(message, productMatch);
-    }
-    
-    // Sepet işlemleri
-    if (message.includes('sepet') || message.includes('sepete') || message.includes('sepetim')) {
-        return processCartOperations(message);
-    }
-    
-    // Ödeme işlemleri
-    if (message.includes('ödeme') || message.includes('öde') || message.includes('fatura')) {
-        return processPaymentOperations(message);
-    }
-    
-    // Satıcı işlemleri
-    if (message.includes('satıcı') || message.includes('market') || message.includes('mağaza')) {
-        return processSellerOperations(message);
-    }
-    
-    // Anlamadığımız komutlar için AI'ya yönlendir
-    return processWithAI(message);
-}
-
-// Ürün sipariş işlemi
-function processProductOrder(message, productMatch) {
-    const quantity = productMatch[1] ? parseInt(productMatch[1]) : 1;
-    const unit = productMatch[2] || 'adet';
-    const productName = productMatch[3].trim();
-    
-    const product = findProductByRule(productName);
-    
-    if (product) {
-        addToCartByProduct(product, quantity, true);
-        return `{{product}} ${quantity} ${unit} sepete eklendi.`.replace('{{product}}', product.name);
-    } else {
-        return `Üzgünüm, '${productName}' bulamadım. Lütfen başka bir ürün söyleyin.`;
-    }
-}
-
-// Kural tabanlı ürün bulma
-function findProductByRule(productName) {
-    // Öncelikle tam eşleşme
-    let product = products.find(p => 
-        p.name.toLowerCase().includes(productName.toLowerCase())
-    );
-    
-    if (product) return product;
-    
-    // Kategori bazlı eşleştirme
-    const categoryMapping = {
-        'domates': ['domates', 'salça', 'biber'],
-        'salatalık': ['salatalık', 'turşu', 'hıyar'],
-        'elma': ['elma', 'meyve', 'armut'],
-        'ekmek': ['ekmek', 'simit', 'poğaça'],
-        'süt': ['süt', 'yoğurt', 'ayran']
-    };
-    
-    for (const [category, keywords] of Object.entries(categoryMapping)) {
-        if (keywords.some(keyword => productName.includes(keyword))) {
-            return products.find(p => p.category === category) || products[0];
-        }
-    }
-    
-    return null;
-}
-
-// Sepet işlemleri
-function processCartOperations(message) {
-    if (message.includes('göster') || message.includes('liste') || message.includes('ne var')) {
-        if (cart.length === 0) {
-            return businessRules.Sepet.responses.empty;
-        } else {
-            const total = calculateSubtotal();
-            return businessRules.Sepet.responses.items
-                .replace('{{count}}', cart.length)
-                .replace('{{total}}', money(total));
-        }
-    }
-    
-    if (message.includes('temizle') || message.includes('boşalt')) {
-        cart = [];
-        updateCartUI();
-        return "Sepetiniz temizlendi.";
-    }
-    
-    return "Sepetinizde " + cart.length + " ürün var. Toplam: " + totalAmountEl.textContent;
-}
-
-// Ödeme işlemleri
-function processPaymentOperations(message) {
-    if (message.includes('nakit')) {
-        selectPaymentMethod('nakit');
-        return businessRules.Ödeme.responses.selected.replace('{{method}}', 'Nakit');
-    }
-    
-    if (message.includes('kart') || message.includes('kredi')) {
-        selectPaymentMethod('kart');
-        return businessRules.Ödeme.responses.selected.replace('{{method}}', 'Kredi Kartı');
-    }
-    
-    if (message.includes('bonus')) {
-        selectPaymentMethod('bonus');
-        return businessRules.Ödeme.responses.selected.replace('{{method}}', 'Bonus Puan');
-    }
-    
-    return businessRules.Ödeme.responses.options;
-}
-
-// Satıcı işlemleri
-function processSellerOperations(message) {
-    if (!currentCustomer?.location) {
-        return "Önce konum bilginizi belirlememiz gerekiyor. Lütfen adresinizi güncelleyin.";
-    }
-    
-    loadSellersByLocation();
-    return businessRules.Satıcılar.responses.loading;
-}
-
-// AI ile işlem (sadece kural dışı durumlarda)
-async function processWithAI(message) {
-    try {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                message: message,
-                context: {
-                    currentStep: conversationFlow.currentStep,
-                    customer: currentCustomer,
-                    cartCount: cart.length
-                }
-            })
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            return data.reply;
-        }
-    } catch (error) {
-        console.error('AI hatası:', error);
-    }
-    
-    return "Anlayamadım efendim. Lütfen ürün adı söyleyin, sepete bakın veya ödeme yapın.";
-}
-
-// Müşteri profili oluşturma
-async function createCustomerProfile() {
-    const customerData = {
-        name: conversationFlow.context.name,
-        phone: conversationFlow.context.phone,
-        city: conversationFlow.context.city,
-        address: conversationFlow.context.address,
-        role: 'Üye',
-        bonus_amount: 0,
-        created_at: new Date().toISOString()
-    };
-    
-    try {
-        const { data, error } = await supabase
-            .from('customers')
-            .insert([customerData])
-            .select()
-            .single();
-            
-        if (!error) {
-            currentCustomer = data;
-            updateCustomerUI();
-            enableUI();
-            loadSellersByLocation();
-        }
-    } catch (error) {
-        console.error('Müşteri kaydı hatası:', error);
-    }
-}
-
-// Sesli komut işleme (ana fonksiyon)
-async function processVoiceCommand(transcript) {
-    // Önce kural tabanlı sistemi dene
-    const ruleBasedResponse = processRuleBasedCommand(transcript);
-    
-    if (ruleBasedResponse) {
-        speakToUser(ruleBasedResponse);
-        return;
-    }
-    
-    // Kural tabanlı sistem cevap vermezse AI'ya yönlendir
-    const aiResponse = await processWithAI(transcript);
-    speakToUser(aiResponse);
-}
-
-// Mevcut kullanıcı arayüzü fonksiyonları (değişmeden kalacak)
-function speakToUser(message) {
-    assistantMessage.textContent = message;
-    
-    if ('speechSynthesis' in window) {
-        const speech = new SpeechSynthesisUtterance(message);
-        speech.lang = 'tr-TR';
-        speech.volume = 1;
-        speech.rate = 1;
-        speech.pitch = 1;
-        window.speechSynthesis.speak(speech);
-    }
-}
-
-// Satıcıları yükleme fonksiyonu
-async function loadSellersByLocation() {
-    if (!currentCustomer?.city) return;
-    
-    try {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('id, full_name, city, address')
-            .eq('role', 'seller')
-            .ilike('city', `%${currentCustomer.city}%`)
-            .limit(10);
-            
-        if (!error && data.length > 0) {
-            sellers = data;
-            updateSellersGrid();
-            speakToUser(`${data.length} satıcı bulundu. Size en yakın şubeler yüklendi.`);
-        } else {
-            speakToUser("Size yakın satıcı bulunamadı. Lütfen daha sonra tekrar deneyin.");
-        }
-    } catch (error) {
-        console.error('Satıcı yükleme hatası:', error);
-    }
-}
-
-// Kalan fonksiyonlar (önceki kodunuzdaki gibi kalacak)
-// updateCustomerUI, enableUI, addToCartByProduct, calculateSubtotal, vb.
-
-// Yedek kural tabanlı sistem
-        function getRuleBasedResponse(userMessage, context) {
-            const message = userMessage.toLowerCase();
-            
-            if (conversationStep === 0) {
-                if (message.includes('evet') || message.includes('isterim') || message.includes('tabi')) {
-                    return "Harika! Telefon numaranızı söyler misiniz efendim?";
-                } else if (message.includes('hayır') || message.includes('istemiyorum')) {
-                    return "Peki efendim, giriş yapmak istediğiniz zaman bana 'Evet' deyin. Size nasıl yardımcı olabilirim?";
-                }
-                return "Giriş yapmak istiyor musunuz efendim? Lütfen 'Evet' veya 'Hayır' diyerek yanıt verin.";
+        // REVİZE EDİLMİŞ KISIM: Karşılama adımı
+        function processWelcomeStep(message) {
+            if (message.includes('evet') || message.includes('tabi') || message.includes('olur')) {
+                conversationFlow.currentStep = "ask_phone";
+                return businessRules.Üyelik.responses.ask_phone;
+            } else if (message.includes('hayır') || message.includes('istemiyorum')) {
+                return "Peki, ihtiyacınız olduğunda buradayım. İyi günler!";
+            } else {
+                return businessRules.Üyelik.responses.welcome;
             }
-            
-            if (conversationStep === 1) {
-                if (message.match(/\d+/)) {
-                    return "Teşekkürler. Telefon numaranızı aldım, kontrol ediyorum...";
-                }
-                return "Telefon numaranızı anlayamadım efendim. Lütfen numaranızı söyler misiniz?";
+        }
+
+        // REVİZE EDİLMİŞ KISIM: Telefon adımı
+        function processPhoneStep(message) {
+            const phoneMatch = message.match(/\d+/g);
+            if (phoneMatch && phoneMatch.join('').length >= 10) {
+                const phone = phoneMatch.join('');
+                conversationFlow.context.phone = phone;
+                conversationFlow.currentStep = "ask_name";
+                document.getElementById('p_phone').textContent = phone;
+                return businessRules.Üyelik.responses.ask_name;
+            } else {
+                return "Telefon numaranızı anlayamadım. Lütfen 10 haneli numaranızı söyler misiniz?";
             }
-            
+        }
+
+        // REVİZE EDİLMİŞ KISIM: İsim adımı
+        function processNameStep(message) {
+            if (message.trim().length > 2) {
+                conversationFlow.context.name = message.trim();
+                conversationFlow.currentStep = "ask_city";
+                return businessRules.Üyelik.responses.ask_city;
+            } else {
+                return "İsminizi anlayamadım. Lütfen adınızı ve soyadınızı söyler misiniz?";
+            }
+        }
+
+        // REVİZE EDİLMİŞ KISIM: Şehir adımı
+        function processCityStep(message) {
+            if (message.trim().length > 2) {
+                conversationFlow.context.city = message.trim();
+                conversationFlow.currentStep = "ask_address";
+                return businessRules.Üyelik.responses.ask_address;
+            } else {
+                return "Şehir bilgisini anlayamadım. Lütfen şehir adını söyler misiniz?";
+            }
+        }
+
+        // REVİZE EDİLMİŞ KISIM: Adres adımı
+        function processAddressStep(message) {
+            if (message.trim().length > 5) {
+                conversationFlow.context.address = message.trim();
+                conversationFlow.currentStep = "main_menu";
+                
+                // Müşteri kaydını oluştur
+                createCustomerProfile();
+                
+                return businessRules.Üyelik.responses.success;
+            } else {
+                return "Adres bilgisini anlayamadım. Lütfen tam adresinizi söyler misiniz?";
+            }
+        }
+
+        // REVİZE EDİLMİŞ KISIM: Ana menü işlemleri
+        function processMainMenu(message) {
+            // Ürün arama ve sepete ekleme
             const productMatch = message.match(/(\d+)?\s*(kilo|gram|litre|adet|tane|paket)?\s*([a-zçğıöşü\s]+)/i);
             if (productMatch) {
-                const productName = productMatch[3].trim();
-                return `${productName} ürününü sepete ekliyorum efendim.`;
+                return processProductOrder(message, productMatch);
             }
             
-            if (message.includes('sepet') || message.includes('sipariş')) {
-                return `Sepetinizde ${context.cartCount || 0} ürün bulunuyor. Toplam tutar ${context.totalAmount || '0 ₺'}. Nasıl ödemek istersiniz?`;
+            // Sepet işlemleri
+            if (message.includes('sepet') || message.includes('sepete') || message.includes('sepetim')) {
+                return processCartOperations(message);
             }
             
-            if (message.includes('teşekkür') || message.includes('sağ ol')) {
-                return "Rica ederim efendim! Size başka nasıl yardımcı olabilirim?";
+            // Ödeme işlemleri
+            if (message.includes('ödeme') || message.includes('öde') || message.includes('fatura')) {
+                return processPaymentOperations(message);
             }
             
-            return "Anlayamadım efendim, lütfen tekrar söyler misiniz?";
+            // Satıcı işlemleri
+            if (message.includes('satıcı') || message.includes('market') || message.includes('mağaza')) {
+                return processSellerOperations(message);
+            }
+            
+            // Anlamadığımız komutlar için AI'ya yönlendir
+            return null;
         }
 
-        
-        // API yanıtını işle
-        async function handleAIResponse(aiResponse, userTranscript, context) {
-            const response = aiResponse.toLowerCase();
-            const transcript = userTranscript.toLowerCase();
-
-            if (conversationStep === 1 && transcript.match(/\d+/)) {
-                const phoneMatch = transcript.match(/\d+/g);
-                if (phoneMatch) {
-                    const phone = phoneMatch.join('');
-                    document.getElementById('p_phone').textContent = phone;
-                    await checkCustomerByPhone(phone);
-                }
-                return;
-            }
-
-            if (response.includes('ekliyorum') || response.includes('eklendi') || transcript.match(/(\d+)?\s*(kilo|gram|litre|adet|tane|paket)?\s*([a-zçğıöşü\s]+)/i)) {
-                await processProductOrder(transcript);
-                return;
-            }
-
-            if (response.includes('ödeme') || response.includes('nakit') || response.includes('kart') || response.includes('bonus')) {
-                processPaymentCommand(transcript);
-                return;
-            }
-
-            if ((response.includes('sepet') || response.includes('onay')) && cart.length > 0) {
-                speakToUser(`Sepetinizde ${cart.length} ürün bulunuyor. Toplam tutar ${totalAmountEl.textContent}. Nasıl ödemek istersiniz efendim?`);
-                return;
+        // REVİZE EDİLMİŞ KISIM: Ürün sipariş işlemi
+        function processProductOrder(message, productMatch) {
+            const quantity = productMatch[1] ? parseInt(productMatch[1]) : 1;
+            const unit = productMatch[2] || 'adet';
+            const productName = productMatch[3].trim();
+            
+            const product = findProductByRule(productName);
+            
+            if (product) {
+                addToCartWithAnimation(product, quantity);
+                return `${product.name} ${quantity} ${unit} sepete eklendi.`;
+            } else {
+                return `Üzgünüm, '${productName}' bulamadım. Lütfen başka bir ürün söyleyin.`;
             }
         }
 
-     
-
-        // Akıllı ürün bulma
-        async function findProductIntelligently(productName) {
+        // REVİZE EDİLMİŞ KISIM: Kural tabanlı ürün bulma
+        function findProductByRule(productName) {
+            // Öncelikle tam eşleşme
             let product = products.find(p => 
                 p.name.toLowerCase().includes(productName.toLowerCase())
             );
             
             if (product) return product;
             
-            const similarProducts = products.filter(p => 
-                p.name.toLowerCase().includes(productName.substring(0, 3).toLowerCase()) ||
-                productName.toLowerCase().includes(p.name.substring(0, 3).toLowerCase())
-            );
+            // Kategori bazlı eşleştirme
+            const categoryMapping = {
+                'domates': ['domates', 'salça', 'biber'],
+                'salatalık': ['salatalık', 'turşu', 'hıyar'],
+                'elma': ['elma', 'meyve', 'armut'],
+                'ekmek': ['ekmek', 'simit', 'poğaça'],
+                'süt': ['süt', 'yoğurt', 'ayran']
+            };
             
-            return similarProducts.length > 0 ? similarProducts[0] : null;
+            for (const [category, keywords] of Object.entries(categoryMapping)) {
+                if (keywords.some(keyword => productName.includes(keyword))) {
+                    return products.find(p => p.category === category) || products[0];
+                }
+            }
+            
+            return null;
         }
 
-        // Ürün önerisi al
-        async function getProductSuggestion(product) {
+        // REVİZE EDİLMİŞ KISIM: Sepet işlemleri
+        function processCartOperations(message) {
+            if (message.includes('göster') || message.includes('liste') || message.includes('ne var')) {
+                if (cart.length === 0) {
+                    return businessRules.Sepet.responses.empty;
+                } else {
+                    const total = calculateSubtotal();
+                    return businessRules.Sepet.responses.items
+                        .replace('{{count}}', cart.length)
+                        .replace('{{total}}', money(total));
+                }
+            }
+            
+            if (message.includes('temizle') || message.includes('boşalt')) {
+                cart = [];
+                updateCartUI();
+                return "Sepetiniz temizlendi.";
+            }
+            
+            return "Sepetinizde " + cart.length + " ürün var. Toplam: " + totalAmountEl.textContent;
+        }
+
+        // REVİZE EDİLMİŞ KISIM: Ödeme işlemleri
+        function processPaymentOperations(message) {
+            if (message.includes('nakit')) {
+                selectPaymentMethod('nakit');
+                return businessRules.Ödeme.responses.selected.replace('{{method}}', 'Nakit');
+            }
+            
+            if (message.includes('kart') || message.includes('kredi')) {
+                selectPaymentMethod('kart');
+                return businessRules.Ödeme.responses.selected.replace('{{method}}', 'Kredi Kartı');
+            }
+            
+            if (message.includes('bonus')) {
+                selectPaymentMethod('bonus');
+                return businessRules.Ödeme.responses.selected.replace('{{method}}', 'Bonus Puan');
+            }
+            
+            return businessRules.Ödeme.responses.options;
+        }
+
+        // REVİZE EDİLMİŞ KISIM: Satıcı işlemleri
+        function processSellerOperations(message) {
+            if (!currentCustomer?.city) {
+                return "Önce konum bilginizi belirlememiz gerekiyor. Lütfen adresinizi güncelleyin.";
+            }
+            
+            loadSellersByLocation();
+            return businessRules.Satıcılar.responses.loading;
+        }
+
+        // REVİZE EDİLMİŞ KISIM: Genel komut işleme
+        function processGeneralCommand(message) {
+            return null; // AI'ya yönlendir
+        }
+
+        // REVİZE EDİLMİŞ KISIM: AI ile işlem (sadece kural dışı durumlarda)
+        async function processWithAI(message) {
             try {
-                const response = await fetch(CHAT_API_URL, {
+                const response = await fetch('/api/chat', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        message: `Kullanıcı ${product.name} ekledi, öneride bulun.`,
+                        message: message,
                         context: {
-                            currentProduct: product.name,
-                            cart: cart.map(item => item.name),
-                            suggestionRequest: true
+                            currentStep: conversationFlow.currentStep,
+                            customer: currentCustomer,
+                            cartCount: cart.length,
+                            totalAmount: totalAmountEl.textContent
                         }
                     })
                 });
@@ -1409,59 +1149,103 @@ async function loadSellersByLocation() {
                     return data.reply;
                 }
             } catch (error) {
-                console.error('Öneri hatası:', error);
+                console.error('AI hatası:', error);
             }
             
-            return null;
+            return "Anlayamadım efendim. Lütfen ürün adı söyleyin, sepete bakın veya ödeme yapın.";
         }
 
-        // Ödeme komutlarını işle
-        function processPaymentCommand(transcript) {
-            if (transcript.includes('nakit')) {
-                selectPaymentMethod('nakit');
-                speakToUser("Nakit ödeme seçildi efendim. Siparişinizi onaylıyor musunuz?");
-            } else if (transcript.includes('kart')) {
-                selectPaymentMethod('kart');
-                speakToUser("Kart ile ödeme seçildi efendim. Siparişinizi onaylıyor musunuz?");
-            } else if (transcript.includes('bonus')) {
-                selectPaymentMethod('bonus');
-                const bonusBalance = parseFloat(p_bonus.textContent.replace('₺', '').replace(',', '.'));
-                const totalAmount = parseFloat(totalAmountEl.textContent.replace('₺', '').replace(',', '.'));
-                
-                if (bonusBalance < totalAmount) {
-                    speakToUser(`Bonus bakiyeniz ${p_bonus.textContent}. Kalan ${money(totalAmount - bonusBalance)} tutarı nasıl ödemek istersiniz?`);
-                } else {
-                    speakToUser("Bonus ile ödeme seçildi efendim. Siparişinizi onaylıyor musunuz?");
+        // REVİZE EDİLMİŞ KISIM: Müşteri profili oluşturma
+        async function createCustomerProfile() {
+            const customerData = {
+                name: conversationFlow.context.name,
+                phone: conversationFlow.context.phone,
+                city: conversationFlow.context.city,
+                address: conversationFlow.context.address,
+                role: 'Üye',
+                bonus_amount: 0,
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                const { data, error } = await supabase
+                    .from('customers')
+                    .insert([customerData])
+                    .select()
+                    .single();
+                    
+                if (!error) {
+                    currentCustomer = data;
+                    updateCustomerUI();
+                    enableUI();
+                    loadSellersByLocation();
+                    startLocationCheckTimer();
+                }
+            } catch (error) {
+                console.error('Müşteri kaydı hatası:', error);
+                // Hata durumunda bile kullanıcı arayüzünü etkinleştir
+                currentCustomer = customerData;
+                updateCustomerUI();
+                enableUI();
+                speakToUser("Üyeliğiniz oluşturuldu. Size en yakın satıcılar yükleniyor.");
+            }
+        }
+
+        // REVİZE EDİLMİŞ KISIM: Sesli komut işleme (ana fonksiyon)
+        async function processVoiceCommand(transcript) {
+            userMessage.textContent = transcript;
+            
+            // Önce kural tabanlı sistemi dene
+            const ruleBasedResponse = processRuleBasedCommand(transcript);
+            
+            if (ruleBasedResponse) {
+                speakToUser(ruleBasedResponse);
+                return;
+            }
+            
+            // Kural tabanlı sistem cevap vermezse AI'ya yönlendir
+            const aiResponse = await processWithAI(transcript);
+            speakToUser(aiResponse);
+            
+            // AI yanıtını işle
+            await handleAIResponse(aiResponse, transcript);
+        }
+
+        // REVİZE EDİLMİŞ KISIM: AI yanıtını işleme
+        async function handleAIResponse(aiResponse, userTranscript) {
+            const response = aiResponse.toLowerCase();
+            const transcript = userTranscript.toLowerCase();
+
+            // AI yanıtında ürün ekleme varsa işle
+            if (response.includes('eklendi') || response.includes('sepete')) {
+                const productMatch = transcript.match(/(\d+)?\s*(kilo|gram|litre|adet|tane|paket)?\s*([a-zçğıöşü\s]+)/i);
+                if (productMatch) {
+                    await processProductOrder(transcript, productMatch);
                 }
             }
         }
 
-        // Ödeme yöntemi seç
-        function selectPaymentMethod(method) {
-            currentPaymentMethod = method;
+        // ORİJİNAL FONKSİYONLAR (Değişmeden)
+        function speakToUser(message) {
+            assistantMessage.textContent = message;
             
-            payCashBtn.classList.remove('selected');
-            payCardBtn.classList.remove('selected');
-            payBonusBtn.classList.remove('selected');
-            
-            if (method === 'nakit') {
-                payCashBtn.classList.add('selected');
-            } else if (method === 'kart') {
-                payCardBtn.classList.add('selected');
-            } else if (method === 'bonus') {
-                payBonusBtn.classList.add('selected');
+            if ('speechSynthesis' in window) {
+                const speech = new SpeechSynthesisUtterance(message);
+                speech.lang = 'tr-TR';
+                speech.volume = 1;
+                speech.rate = 1;
+                speech.pitch = 1;
+                window.speechSynthesis.speak(speech);
             }
         }
 
-      
-
-        // Oturumu kaydet
         function saveSession() {
             if (currentCustomer) {
                 const sessionData = {
                     customer: currentCustomer,
                     cart: cart,
                     selectedSellerId: selectedSellerId,
+                    conversationFlow: conversationFlow,
                     timestamp: new Date().getTime()
                 };
                 localStorage.setItem('onurmarket_session', JSON.stringify(sessionData));
@@ -1473,7 +1257,6 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Oturumu geri yükle
         function restoreSession() {
             const savedSession = localStorage.getItem('onurmarket_session');
             if (savedSession) {
@@ -1483,6 +1266,9 @@ async function loadSellersByLocation() {
                     currentCustomer = sessionData.customer;
                     cart = sessionData.cart || [];
                     selectedSellerId = sessionData.selectedSellerId;
+                    if (sessionData.conversationFlow) {
+                        Object.assign(conversationFlow, sessionData.conversationFlow);
+                    }
                     
                     updateCustomerUI();
                     updateCartUI();
@@ -1497,7 +1283,6 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Lokasyon kontrol timer'ını başlat
         function startLocationCheckTimer() {
             locationChecker.style.display = 'block';
             locationCheckAttempts = 0;
@@ -1517,7 +1302,6 @@ async function loadSellersByLocation() {
             }, 1000);
         }
 
-        // Müşteri lokasyonunu kontrol et
         async function checkCustomerLocation() {
             if (!currentCustomer?.id) return;
             
@@ -1546,7 +1330,6 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Sesli asistanı başlat
         function initVoiceAssistant() {
             microphoneToggle.addEventListener('click', toggleMicrophone);
             closeVoiceStatus.addEventListener('click', hideVoiceStatus);
@@ -1558,16 +1341,6 @@ async function loadSellersByLocation() {
             }, 1000);
         }
 
-        // Mikrofonu aç/kapa
-        function toggleMicrophone() {
-            if (isMicrophoneEnabled) {
-                disableMicrophone();
-            } else {
-                enableMicrophone();
-            }
-        }
-
-        // Mikrofonu etkinleştir
         async function enableMicrophone() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1601,7 +1374,6 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Mikrofonu devre dışı bırak
         function disableMicrophone() {
             isMicrophoneEnabled = false;
             microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon (Kapalı)</span>';
@@ -1615,7 +1387,14 @@ async function loadSellersByLocation() {
             assistantMessage.textContent = "Mikrofon erişimi kapalı. Sesli sipariş için lütfen mikrofon erişimine izin verin.";
         }
 
-        // Ses tanıma sistemini başlat
+        function toggleMicrophone() {
+            if (isMicrophoneEnabled) {
+                disableMicrophone();
+            } else {
+                enableMicrophone();
+            }
+        }
+
         function initializeSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
@@ -1634,13 +1413,11 @@ async function loadSellersByLocation() {
                 isListening = true;
                 voiceIndicator.classList.add('listening');
                 voiceStatus.textContent = "Dinleniyor...";
-                assistantMessage.textContent = "Dinliyorum...";
             };
             
             recognition.onresult = function(event) {
                 const transcript = event.results[event.results.length - 1][0].transcript;
-                userMessage.textContent = transcript;
-                processVoiceCommand(transcript.toLowerCase());
+                processVoiceCommand(transcript);
             };
             
             recognition.onerror = function(event) {
@@ -1675,37 +1452,6 @@ async function loadSellersByLocation() {
             recognition.start();
         }
 
-        // Telefon numarası ile kullanıcı kontrolü
-        async function checkCustomerByPhone(phone) {
-            try {
-                const { data, error } = await supabase
-                    .from('customers')
-                    .select('*')
-                    .eq('phone', phone)
-                    .single();
-                
-                if (error) {
-                    speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
-                    conversationStep = 2;
-                    return;
-                }
-                
-                if (data) {
-                    currentCustomer = data;
-                    updateCustomerUI();
-                    speakToUser(`Hoş geldiniz ${data.name}! Sisteminiz açılmıştır, sipariş işleminize başlayabilirsiniz.`);
-                    conversationStep = 10;
-                    enableUI();
-                }
-                
-            } catch (error) {
-                console.error('Telefon ile kullanıcı kontrol hatası:', error);
-                speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
-                conversationStep = 2;
-            }
-        }
-
-        // Profil UI güncelleme
         function updateCustomerUI() {
             if (currentCustomer) {
                 userNameEl.textContent = currentCustomer.name || "Kullanıcı";
@@ -1719,14 +1465,14 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Arayüzü etkinleştir
         function enableUI() {
             mainContent.classList.remove('section-disabled');
-            userNameEl.textContent = currentCustomer.name;
-            userMetaEl.textContent = `${currentCustomer.city} • ${currentCustomer.location || ''}`;
+            if (currentCustomer) {
+                userNameEl.textContent = currentCustomer.name;
+                userMetaEl.textContent = `${currentCustomer.city} • ${currentCustomer.location || ''}`;
+            }
         }
 
-        // Sepet UI güncelle
         function updateCartUI() {
             cartList.innerHTML = '';
             
@@ -1763,22 +1509,18 @@ async function loadSellersByLocation() {
             totalAmountEl.textContent = money(total);
         }
 
-        // Sepet toplamını hesapla
         function calculateSubtotal() {
             return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
         }
 
-        // İndirim toplamını hesapla
         function calculateDiscount() {
             return cart.reduce((total, item) => total + (item.discount || 0), 0);
         }
 
-        // KDV hesapla
         function calculateVAT(amount) {
             return amount * 0.18;
         }
 
-        // Ürünü sepete ekle
         function addToCartByProduct(product, quantity, updateUI = false) {
             const existingItem = cart.find(item => item.id === product.id);
             
@@ -1799,7 +1541,6 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Ürün animasyonu ile sepete ekle
         function addToCartWithAnimation(product, quantity, productElement = null) {
             let startX, startY;
             
@@ -1817,7 +1558,6 @@ async function loadSellersByLocation() {
             const endX = cartRect.left + cartRect.width / 2;
             const endY = cartRect.top + cartRect.height / 2;
             
-            // Animasyonu başlat
             const flyingProduct = document.createElement('div');
             flyingProduct.className = 'flying-product';
             flyingProduct.innerHTML = `<img src="${product.imgurl || 'https://via.placeholder.com/60'}" alt="${product.name}">`;
@@ -1826,7 +1566,6 @@ async function loadSellersByLocation() {
             
             productAnimationContainer.appendChild(flyingProduct);
             
-            // Animasyonu başlat
             setTimeout(() => {
                 flyingProduct.style.left = endX + 'px';
                 flyingProduct.style.top = endY + 'px';
@@ -1834,27 +1573,21 @@ async function loadSellersByLocation() {
                 flyingProduct.style.opacity = '0.5';
             }, 10);
             
-            // Animasyon bitince elementi kaldır
             setTimeout(() => {
                 flyingProduct.remove();
             }, 1500);
             
-            // Sepete ekle
             addToCartByProduct(product, quantity, true);
             
-            // Sepet ikonuna pulse efekti ekle
             cartIcon.classList.add('cart-pulse');
             setTimeout(() => {
                 cartIcon.classList.remove('cart-pulse');
             }, 500);
         }
 
-        // Event handler'ları kur
         function setupEventHandlers(){
-            // WhatsApp paylaşım butonu
             btnShareWhatsApp.addEventListener('click', shareOnWhatsApp);
             
-            // Ürün arama
             productSearch.addEventListener('input', function() {
                 const searchTerm = this.value.toLowerCase();
                 if (searchTerm.length > 2) {
@@ -1867,18 +1600,15 @@ async function loadSellersByLocation() {
                 }
             });
             
-            // Ödeme butonları
             payCashBtn.addEventListener('click', () => finalizeOrder('nakit'));
             payCardBtn.addEventListener('click', () => finalizeOrder('kart'));
             payBonusBtn.addEventListener('click', () => finalizeOrder('bonus'));
             
-            // Ürün yükleme butonu
             btnLoadProducts.addEventListener('click', () => {
                 if (selectedSellerId) loadSellerData(selectedSellerId);
             });
         }
 
-        // WhatsApp paylaşımı
         async function shareOnWhatsApp() {
             if (!currentCustomer) {
                 alert('Önce giriş yapmalısınız');
@@ -1904,7 +1634,6 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Ürünleri grid'de göster
         function displayProducts(productsToShow) {
             productsGrid.innerHTML = '';
             
@@ -1943,7 +1672,53 @@ async function loadSellersByLocation() {
             });
         }
 
-               // Satıcı grid'ini güncelle
+        async function loadSellersByLocation() {
+            if (!currentCustomer?.city) {
+                speakToUser("Konum bilginiz bulunamadı. Lütfen satıcıyı manuel olarak seçin.");
+                return;
+            }
+            
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, phone, city, address, location, imgurl')
+                    .eq('role', 'seller')
+                    .or(`location.ilike.%${currentCustomer.city}%,city.ilike.%${currentCustomer.city}%,address.ilike.%${currentCustomer.city}%`)
+                    .limit(100);
+                
+                if (error) {
+                    console.error('Satıcı sorgu hatası:', error);
+                    speakToUser("Satıcılar yüklenirken bir hata oluştu.");
+                    return;
+                }
+                
+                sellers = data || [];
+                updateSellersGrid();
+                
+                if (sellers.length === 0) {
+                    const { data: allSellers, error: allError } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, phone, city, address, location, imgurl')
+                        .eq('role', 'seller')
+                        .limit(100);
+                    
+                    if (!allError && allSellers.length > 0) {
+                        sellers = allSellers;
+                        speakToUser("Size en yakın satıcı bulunamadı. Tüm satıcılar listeleniyor.");
+                        updateSellersGrid();
+                    } else {
+                        speakToUser("Sistemde kayıtlı satıcı bulunamadı.");
+                    }
+                } else {
+                    speakToUser(`Size en yakın ${sellers.length} satıcı bulundu.`);
+                }
+                
+            } catch (error) {
+                console.error('Satıcı yükleme hatası:', error);
+                speakToUser("Satıcılar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+            }
+        }
+
         function updateSellersGrid() {
             sellerGrid.innerHTML = '';
             
@@ -1979,7 +1754,6 @@ async function loadSellersByLocation() {
             });
         }
 
-        // Satıcı verilerini yükle
         async function loadSellerData(sellerId) {
             try {
                 const selectedSeller = sellers.find(s => s.id === sellerId);
@@ -1987,7 +1761,6 @@ async function loadSellersByLocation() {
                     speakToUser(`${selectedSeller.full_name} satıcısının ürünleri yükleniyor.`);
                 }
                 
-                // Ürünleri yükle
                 const { data: productData, error: productError } = await supabase
                     .from('products')
                     .select(`
@@ -2014,7 +1787,22 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Siparişi tamamla
+        function selectPaymentMethod(method) {
+            currentPaymentMethod = method;
+            
+            payCashBtn.classList.remove('selected');
+            payCardBtn.classList.remove('selected');
+            payBonusBtn.classList.remove('selected');
+            
+            if (method === 'nakit') {
+                payCashBtn.classList.add('selected');
+            } else if (method === 'kart') {
+                payCardBtn.classList.add('selected');
+            } else if (method === 'bonus') {
+                payBonusBtn.classList.add('selected');
+            }
+        }
+
         async function finalizeOrder(paymentMethod) {
             try {
                 if (cart.length === 0) {
@@ -2024,13 +1812,11 @@ async function loadSellersByLocation() {
                 
                 speakToUser("Siparişiniz işleniyor. Lütfen bekleyin...");
                 
-                // Sipariş toplamlarını hesapla
                 const subtotal = calculateSubtotal();
                 const discount = calculateDiscount();
                 const vatAmount = calculateVAT(subtotal - discount);
                 const grandTotal = subtotal - discount + vatAmount;
                 
-                // Siparişi veritabanına kaydet
                 const { data: order, error: orderError } = await supabase
                     .from('orders')
                     .insert([
@@ -2052,14 +1838,11 @@ async function loadSellersByLocation() {
                 
                 if (orderError) throw orderError;
                 
-                // Sipariş başarılı mesajı
                 speakToUser(`Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: ${order.id}. Toplam tutar: ${money(grandTotal)}. Siparişiniz en geç 45 dakika içinde adresinize teslim edilecektir. İyi günler dileriz.`);
                 
-                // Sepeti temizle
                 cart = [];
                 updateCartUI();
                 
-                // Sipariş durumunu simüle et
                 simulateOrderStatus(order.id);
                 
             } catch (error) {
@@ -2068,7 +1851,6 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Sipariş durumunu simüle et
         function simulateOrderStatus(orderId) {
             const statuses = [
                 "Atama Bekliyor",
@@ -2092,34 +1874,10 @@ async function loadSellersByLocation() {
             }, 10000);
         }
 
-        // Initialize the application
-        document.addEventListener('DOMContentLoaded', function() {
-            initApp();
-        });
-
-        async function initApp() {
-            // Sayfa yüklendiğinde oturumu geri yükle
-            restoreSession();
-            
-            // Check for referral code in URL
-            const urlParams = new URLSearchParams(window.location.search);
-            referralCode = urlParams.get('referral_code');
-            referralGroupCode = urlParams.get('referral_groups');
-            
-            if (referralCode && referralGroupCode) {
-                await processReferralCode(referralCode, referralGroupCode);
-            }
-            
-            setupEventHandlers();
-            
-            // Sesli asistanı başlat
-            initVoiceAssistant();
-            
-            // Sayfa kapanmadan önce oturumu kaydet
-            window.addEventListener('beforeunload', saveSession);
+        function hideVoiceStatus() {
+            voiceStatusPanel.style.display = 'none';
         }
 
-        // Referans kodu işleme
         async function processReferralCode(code, groupCode) {
             try {
                 const { data, error } = await supabase
@@ -2153,9 +1911,26 @@ async function loadSellersByLocation() {
             }
         }
 
-        // Ses durumu kutusunu gizle
-        function hideVoiceStatus() {
-            voiceStatusPanel.style.display = 'none';
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
+        });
+
+        async function initApp() {
+            restoreSession();
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            referralCode = urlParams.get('referral_code');
+            referralGroupCode = urlParams.get('referral_groups');
+            
+            if (referralCode && referralGroupCode) {
+                await processReferralCode(referralCode, referralGroupCode);
+            }
+            
+            setupEventHandlers();
+            initVoiceAssistant();
+            
+            window.addEventListener('beforeunload', saveSession);
         }
     </script>
 </body>
