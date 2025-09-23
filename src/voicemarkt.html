@@ -1109,9 +1109,8 @@ async function checkCustomerByPhone(phone) {
         }
 
         // DÜZELTİLMİŞ FONKSİYON: Satıcıları konuma göre yükle - SADECE profiles tablosundan
- // Satıcıları konuma göre yükle
- async function loadSellersByLocation() {
-            if (!currentCustomer?.city) {
+  async function loadSellersByLocation() {
+            if (!currentCustomer?.location) {
                 speakToUser("Konum bilginiz bulunamadı. Lütfen satıcıyı manuel olarak seçin.");
                 return;
             }
@@ -1121,7 +1120,7 @@ async function checkCustomerByPhone(phone) {
                     .from('profiles')
                     .select('id, full_name, phone, city, address, location, imgurl')
                     .eq('role', 'seller')
-                    .or(`location.ilike.%${currentCustomer.city}%,city.ilike.%${currentCustomer.city}%,address.ilike.%${currentCustomer.city}%`)
+                    .or(`location.ilike.%${currentCustomer.location}%,city.ilike.%${currentCustomer.location}%,address.ilike.%${currentCustomer.location}%`)
                     .limit(100);
                 
                 if (error) {
@@ -1156,8 +1155,8 @@ async function checkCustomerByPhone(phone) {
                 speakToUser("Satıcılar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
             }
         }
-  
-// Satıcı grid'ini güncelle
+
+        // Satıcı grid'ini güncelle
         function updateSellersGrid() {
             sellerGrid.innerHTML = '';
             
@@ -1179,21 +1178,53 @@ async function checkCustomerByPhone(phone) {
                 `;
                 
                 sellerCard.addEventListener('click', () => {
-                    // Tüm satıcı kartlarından seçimi kaldır
                     document.querySelectorAll('.seller-card').forEach(card => {
                         card.classList.remove('selected');
                     });
                     
-                    // Tıklanan satıcıyı seç
                     sellerCard.classList.add('selected');
                     selectedSellerId = seller.id;
                     
-                    // Satıcı verilerini yükle
                     loadSellerData(seller.id);
                 });
                 
                 sellerGrid.appendChild(sellerCard);
             });
+        }
+
+        // Satıcı verilerini yükle
+        async function loadSellerData(sellerId) {
+            try {
+                const selectedSeller = sellers.find(s => s.id === sellerId);
+                if (selectedSeller) {
+                    speakToUser(`${selectedSeller.full_name} satıcısının ürünleri yükleniyor.`);
+                }
+                
+                // Ürünleri yükle
+                const { data: productData, error: productError } = await supabase
+                    .from('products')
+                    .select(`
+                        id, name, description, price, stock, currency, 
+                        gtip_code, imgurl, unit_type, barcode, brand, category_id, reyon_id,
+                        discount_price
+                    `)
+                    .limit(50);
+                
+                if (productError) {
+                    console.error('Ürün yükleme hatası:', productError);
+                    products = [];
+                } else {
+                    products = productData || [];
+                }
+                
+                displayProducts(products);
+                
+                speakToUser(`${products.length} ürün yüklendi. Sesli olarak veya listeden ürün seçebilirsiniz.`);
+                
+            } catch (error) {
+                console.error('Satıcı verileri yüklenme hatası:', error);
+                speakToUser("Satıcı verileri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+            }
         }
 
 		
@@ -1739,6 +1770,7 @@ async function checkCustomerByPhone(phone) {
     </script>
 </body>
 </html>
+
 
 
 
