@@ -1255,13 +1255,50 @@ async function checkCustomerByPhone(phone) {
         }
 
 		// Satıcı verilerini yükle
-        async function loadSellerData(sellerId) {
-            try {
-                const selectedSeller = sellers.find(s => s.id === sellerId);
-                if (selectedSeller) {
-                    speakToUser(`${selectedSeller.full_name} satıcısının ürünleri yükleniyor.`);
-                }
-                
+        // DÜZELTİLMİŞ FONKSİYON: Satıcı verilerini yükle
+async function loadSellerData(sellerId) {
+    try {
+        const selectedSeller = sellers.find(s => s.id === sellerId);
+        if (selectedSeller) {
+            speakToUser(`${selectedSeller.full_name} satıcısının ürünleri yükleniyor.`);
+        }
+
+        // Ürünleri product_prices tablosundan sube_id (sellerId) ile yükle
+        const { data: productData, error: productError } = await supabase
+            .from('product_prices')
+            .select(`
+                id, price, stock, currency, discount_price, 
+                products (id, name, description, gtip_code, imgurl, unit_type, barcode, brand, category_id, reyon_id)
+            `)
+            .eq('sube_id', sellerId)
+            .limit(50);
+
+        if (productError) {
+            console.error('Ürün yükleme hatası:', productError);
+            products = [];
+        } else {
+            // productData'dan products dizisini oluştur
+            products = productData.map(item => {
+                return {
+                    ...item.products,
+                    price: item.price,
+                    stock: item.stock,
+                    currency: item.currency,
+                    discount_price: item.discount_price,
+                    price_id: item.id
+                };
+            });
+        }
+
+        displayProducts(products);
+
+        speakToUser(`${products.length} ürün yüklendi. Sesli olarak veya listeden ürün seçebilirsiniz.`);
+
+    } catch (error) {
+        console.error('Satıcı verileri yüklenme hatası:', error);
+        speakToUser("Satıcı verileri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+    }
+}        
                 // Ürünleri yükle
                 const { data: productData, error: productError } = await supabase
                     .from('products')
@@ -1910,6 +1947,7 @@ async function checkCustomerByPhone(phone) {
     </script>
 </body>
 </html>
+
 
 
 
