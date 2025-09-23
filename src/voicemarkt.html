@@ -1374,6 +1374,192 @@ async function loadSellersByLocation() {
             recognition.start();
         }
 
+  // Satıcı grid'ini güncelle
+        function updateSellersGrid() {
+            sellerGrid.innerHTML = '';
+            
+            if (sellers.length === 0) {
+                sellerGrid.innerHTML = '<div class="text-sm text-gray-500 text-center">Satıcı bulunamadı</div>';
+                return;
+            }
+            
+            sellers.forEach(seller => {
+                const sellerCard = document.createElement('div');
+                sellerCard.className = 'seller-card';
+                if (selectedSellerId === seller.id) {
+                    sellerCard.classList.add('selected');
+                }
+                
+                sellerCard.innerHTML = `
+                    <img src="${seller.imgurl || 'https://via.placeholder.com/50'}" alt="${seller.full_name}">
+                    <div class="seller-name">${seller.full_name}</div>
+                `;
+                
+                sellerCard.addEventListener('click', () => {
+                    // Tüm satıcı kartlarından seçimi kaldır
+                    document.querySelectorAll('.seller-card').forEach(card => {
+                        card.classList.remove('selected');
+                    });
+                    
+                    // Tıklanan satıcıyı seç
+                    sellerCard.classList.add('selected');
+                    selectedSellerId = seller.id;
+                    
+                    // Satıcı verilerini yükle
+                    loadSellerData(seller.id);
+                });
+                
+                sellerGrid.appendChild(sellerCard);
+            });
+        }
+
+        // Ürün animasyonu ekle
+        function addProductAnimation(product, startX, startY, endX, endY) {
+            const flyingProduct = document.createElement('div');
+            flyingProduct.className = 'flying-product';
+            flyingProduct.innerHTML = `<img src="${product.imgurl || 'https://via.placeholder.com/60'}" alt="${product.name}">`;
+            flyingProduct.style.left = startX + 'px';
+            flyingProduct.style.top = startY + 'px';
+            
+            productAnimationContainer.appendChild(flyingProduct);
+            
+            // Animasyonu başlat
+            setTimeout(() => {
+                flyingProduct.style.left = endX + 'px';
+                flyingProduct.style.top = endY + 'px';
+                flyingProduct.style.transform = 'scale(0.5)';
+                flyingProduct.style.opacity = '0.5';
+            }, 10);
+            
+            // Animasyon bitince elementi kaldır
+            setTimeout(() => {
+                flyingProduct.remove();
+            }, 1500);
+        }
+
+        // Sepete ürün ekle (animasyonlu)
+        function addToCartWithAnimation(product, quantity, productElement = null) {
+            let startX, startY;
+            
+            if (productElement) {
+                const rect = productElement.getBoundingClientRect();
+                startX = rect.left + rect.width / 2;
+                startY = rect.top + rect.height / 2;
+            } else {
+                startX = window.innerWidth / 2;
+                startY = window.innerHeight / 2;
+            }
+            
+            const cartIcon = document.querySelector('aside.col-span-1');
+            const cartRect = cartIcon.getBoundingClientRect();
+            const endX = cartRect.left + cartRect.width / 2;
+            const endY = cartRect.top + cartRect.height / 2;
+            
+            // Animasyonu başlat
+            addProductAnimation(product, startX, startY, endX, endY);
+            
+            // Sepete ekle
+            addToCartByProduct(product, quantity, true);
+            
+            // Sepet ikonuna pulse efekti ekle
+            cartIcon.classList.add('cart-pulse');
+            setTimeout(() => {
+                cartIcon.classList.remove('cart-pulse');
+            }, 500);
+        }
+
+        // WhatsApp paylaşımı
+        async function shareOnWhatsApp() {
+            if (!currentCustomer) {
+                alert('Önce giriş yapmalısınız');
+                return;
+            }
+            
+            try {
+                const orderSummary = cart.map(item => 
+                    `${item.name} - ${item.quantity} adet x ${money(item.price)}`
+                ).join('\n');
+                
+                const total = calculateSubtotal() - calculateDiscount() + calculateVAT(calculateSubtotal() - calculateDiscount());
+                
+                const message = `Merhaba! Onur Market'ten sipariş vermek istiyorum:\n\n${orderSummary}\n\nToplam: ${money(total)}\n\nTeslimat adresi: ${currentCustomer.address}, ${currentCustomer.city}`;
+                
+                const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                
+                window.open(whatsappUrl, '_blank');
+                
+            } catch (error) {
+                console.error('WhatsApp paylaşım hatası:', error);
+                alert('WhatsApp paylaşımı sırasında bir hata oluştu.');
+            }
+        }
+
+        // Event handler'ları kur
+        function setupEventHandlers(){
+            // WhatsApp paylaşım butonu
+            btnShareWhatsApp.addEventListener('click', shareOnWhatsApp);
+            
+            // Ürün arama
+            productSearch.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                if (searchTerm.length > 2) {
+                    const filteredProducts = products.filter(product => 
+                        product.name.toLowerCase().includes(searchTerm)
+                    );
+                    displayProducts(filteredProducts);
+                } else if (searchTerm.length === 0) {
+                    displayProducts(products);
+                }
+            });
+            
+            // Ödeme butonları
+            payCashBtn.addEventListener('click', () => finalizeOrder('nakit'));
+            payCardBtn.addEventListener('click', () => finalizeOrder('kart'));
+            payBonusBtn.addEventListener('click', () => finalizeOrder('bonus'));
+            
+            // Diğer event handler'lar...
+        }
+
+        // Ürünleri grid'de göster
+        function displayProducts(productsToShow) {
+            productsGrid.innerHTML = '';
+            
+            if (productsToShow.length === 0) {
+                productsGrid.innerHTML = `
+                    <div class="flex flex-col items-center justify-center p-8 text-gray-400 col-span-full">
+                        <i class="fas fa-search text-4xl mb-3"></i>
+                        <p>Ürün bulunamadı</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            productsToShow.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'product-card';
+                productCard.innerHTML = `
+                    <img src="${product.imgurl || 'https://via.placeholder.com/150'}" alt="${product.name}" class="product-image">
+                    <div class="product-info">
+                        <div class="product-name">${product.name}</div>
+                        <div>
+                            <span class="product-price">${money(product.price)}</span>
+                            ${product.discount_price ? 
+                                `<span class="product-discount">${money(product.discount_price)}</span>` : ''}
+                        </div>
+                        <button class="add-to-cart-btn mt-2 w-full bg-blue-600 text-white py-1 px-2 rounded text-sm" data-id="${product.id}">Sepete Ekle</button>
+                    </div>
+                `;
+                
+                const addToCartBtn = productCard.querySelector('.add-to-cart-btn');
+                addToCartBtn.addEventListener('click', function() {
+                    addToCartWithAnimation(product, 1, productCard);
+                });
+                
+                productsGrid.appendChild(productCard);
+            });
+        }
+
+		
         // Sipariş komutlarını işle
         function processOrderCommand(message) {
             // Ürün ekleme komutları
@@ -1548,6 +1734,7 @@ async function loadSellersByLocation() {
     </script>
 </body>
 </html>
+
 
 
 
