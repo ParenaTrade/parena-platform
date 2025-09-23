@@ -1109,7 +1109,8 @@ async function checkCustomerByPhone(phone) {
         }
 
         // DÜZELTİLMİŞ FONKSİYON: Satıcıları konuma göre yükle - SADECE profiles tablosundan
-  async function loadSellersByLocation() {
+      // Satıcıları konuma göre yükle
+        async function loadSellersByLocation() {
             if (!currentCustomer?.location) {
                 speakToUser("Konum bilginiz bulunamadı. Lütfen satıcıyı manuel olarak seçin.");
                 return;
@@ -1130,7 +1131,7 @@ async function checkCustomerByPhone(phone) {
                 }
                 
                 sellers = data || [];
-           
+                updateSellersGrid();
                 
                 if (sellers.length === 0) {
                     const { data: allSellers, error: allError } = await supabase
@@ -1142,7 +1143,7 @@ async function checkCustomerByPhone(phone) {
                     if (!allError && allSellers.length > 0) {
                         sellers = allSellers;
                         speakToUser("Size en yakın satıcı bulunamadı. Tüm satıcılar listeleniyor.");
-                    
+                        updateSellersGrid();
                     } else {
                         speakToUser("Sistemde kayıtlı satıcı bulunamadı.");
                     }
@@ -1156,11 +1157,43 @@ async function checkCustomerByPhone(phone) {
             }
         }
 
+        // Satıcı grid'ini güncelle
+        function updateSellersGrid() {
+            sellerGrid.innerHTML = '';
+            
+            if (sellers.length === 0) {
+                sellerGrid.innerHTML = '<div class="text-sm text-gray-500 text-center">Satıcı bulunamadı</div>';
+                return;
+            }
+            
+            sellers.forEach(seller => {
+                const sellerCard = document.createElement('div');
+                sellerCard.className = 'seller-card';
+                if (selectedSellerId === seller.id) {
+                    sellerCard.classList.add('selected');
+                }
+                
+                sellerCard.innerHTML = `
+                    <img src="${seller.imgurl || 'https://via.placeholder.com/50'}" alt="${seller.full_name}">
+                    <div class="seller-name">${seller.full_name}</div>
+                `;
+                
+                sellerCard.addEventListener('click', () => {
+                    document.querySelectorAll('.seller-card').forEach(card => {
+                        card.classList.remove('selected');
+                    });
+                    
+                    sellerCard.classList.add('selected');
+                    selectedSellerId = seller.id;
+                    
+                    loadSellerData(seller.id);
+                });
+                
+                sellerGrid.appendChild(sellerCard);
+            });
+        }
 
-
-
-		
-        // Satıcı verilerini yükle
+		// Satıcı verilerini yükle
         async function loadSellerData(sellerId) {
             try {
                 const selectedSeller = sellers.find(s => s.id === sellerId);
@@ -1738,6 +1771,7 @@ async function checkCustomerByPhone(phone) {
     </script>
 </body>
 </html>
+
 
 
 
