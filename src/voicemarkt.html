@@ -867,69 +867,55 @@
         // Utility functions
         function money(n){ return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; }
 
-        // DÜZELTİLMİŞ FONKSİYON: Telefon numarası ile kullanıcı kontrolü
-        async function checkCustomerByPhone(phone) {
-            try {
-                console.log("Telefon numarası kontrol ediliyor:", phone);
-                
-                // Telefon numarasını temizle (sadece rakamlar)
-                const cleanPhone = phone.replace(/\D/g, '');
-                
-                // Önce customers tablosunda ara
-                let { data, error } = await supabase
-                    .from('customers')
-                    .select('*')
-                    .eq('phone', cleanPhone)
-                    .maybeSingle();
-                
-                if (error) {
-                    console.error('Customers tablosu sorgu hatası:', error);
-                    // Profiles tablosunda da dene
-                    const { data: profileData, error: profileError } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('phone', cleanPhone)
-                        .maybeSingle();
-                    
-                    if (profileError) {
-                        console.error('Profiles tablosu sorgu hatası:', profileError);
-                        throw new Error('Müşteri bulunamadı');
-                    }
-                    
-                    if (profileData) {
-                        data = profileData;
-                    } else {
-                        throw new Error('Müşteri bulunamadı');
-                    }
-                }
-                
-                if (data) {
-                    console.log("Müşteri bulundu:", data);
-                    // Müşteri bulundu, mevcut kullanıcıyı yükle
-                    currentCustomer = data;
-                    updateCustomerUI();
-                    speakToUser(`Hoş geldiniz ${data.name || data.full_name}! Sisteminiz açılmıştır, sipariş işleminize başlayabilirsiniz.`);
-                    conversationStep = 10; // Normal sipariş sürecine geç
-                    
-                    // Arayüzü etkinleştir
-                    enableUI();
-                    
-                    // Satıcıları yükle
-                    loadSellersByLocation();
-                } else {
-                    console.log("Müşteri bulunamadı, yeni kayıt oluşturulacak");
-                    // Müşteri bulunamadı, yeni kayıt moduna geç
-                    speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
-                    conversationStep = 2;
-                }
-                
-            } catch (error) {
-                console.error('Telefon ile kullanıcı kontrol hatası:', error);
-                speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
-                conversationStep = 2;
-            }
+       // DÜZELTİLMİŞ FONKSİYON: Telefon numarası ile kullanıcı kontrolü
+async function checkCustomerByPhone(phone) {
+    try {
+        console.log("Telefon numarası kontrol ediliyor:", phone);
+        
+        // Telefon numarasını temizle (sadece rakamlar)
+        const cleanPhone = phone.replace(/\D/g, '');
+        
+        // SADECE customers tablosunda ara
+        const { data, error } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('phone', cleanPhone)
+            .maybeSingle(); // maybeSingle kullanıyoruz, kayıt yoksa null döner
+        
+        if (error) {
+            console.error('Customers tablosu sorgu hatası:', error);
+            // Hata durumunda bile yeni kayıt moduna geç
+            speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
+            conversationStep = 2;
+            return;
         }
-
+        
+        if (data) {
+            console.log("Mevcut müşteri bulundu:", data);
+            // Müşteri bulundu, mevcut kullanıcıyı yükle
+            currentCustomer = data;
+            updateCustomerUI();
+            speakToUser(`Hoş geldiniz ${data.name}! Sisteminiz açılmıştır, sipariş işleminize başlayabilirsiniz.`);
+            conversationStep = 10; // Normal sipariş sürecine geç
+            
+            // Arayüzü etkinleştir
+            enableUI();
+            
+            // Konuma göre satıcıları yükle (profiles tablosundan)
+            loadSellersByLocation();
+        } else {
+            console.log("Müşteri bulunamadı, yeni kayıt oluşturulacak");
+            // Müşteri bulunamadı, yeni kayıt moduna geç
+            speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
+            conversationStep = 2;
+        }
+        
+    } catch (error) {
+        console.error('Telefon ile kullanıcı kontrol hatası:', error);
+        speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
+        conversationStep = 2;
+    }
+}
         // DÜZELTİLMİŞ FONKSİYON: Sesli komutları işle
         function processVoiceCommand(transcript) {
             userMessage.textContent = transcript;
@@ -1001,83 +987,55 @@
             }
         }
 
-        // DÜZELTİLMİŞ FONKSİYON: Müşteri profili oluşturma
-        async function createCustomerProfile() {
-            try {
-                const name = document.getElementById('p_name').textContent;
-                const phone = document.getElementById('p_phone').textContent;
-                const city = document.getElementById('p_city').textContent;
-                const address = document.getElementById('p_address').textContent;
-                
-                // Telefon numarasını temizle
-                const cleanPhone = phone.replace(/\D/g, '');
-                
-                const customerData = {
-                    name: name.trim(),
-                    phone: cleanPhone,
-                    city: city.trim(),
-                    address: address.trim(),
-                    role: 'customer',
-                    bonus_amount: 0,
-                    created_at: new Date().toISOString(),
-                    status: 'active'
-                };
-                
-                console.log("Müşteri kaydı oluşturuluyor:", customerData);
-                
-                // Önce customers tablosuna kaydetmeyi dene
-                let { data, error } = await supabase
-                    .from('customers')
-                    .insert([customerData])
-                    .select()
-                    .single();
-                
-                if (error) {
-                    console.error('Customers tablosuna kayıt hatası:', error);
-                    
-                    // Customers tablosuna kayıt yapılamazsa profiles tablosuna kaydet
-                    const profileData = {
-                        full_name: name.trim(),
-                        phone: cleanPhone,
-                        city: city.trim(),
-                        address: address.trim(),
-                        role: 'customer',
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                    };
-                    
-                    const { data: profileResult, error: profileError } = await supabase
-                        .from('profiles')
-                        .insert([profileData])
-                        .select()
-                        .single();
-                    
-                    if (profileError) {
-                        console.error('Profiles tablosuna kayıt hatası:', profileError);
-                        throw profileError;
-                    }
-                    
-                    data = profileResult;
-                }
-                
-                currentCustomer = data;
-                updateCustomerUI();
-                
-                speakToUser("Teşekkürler efendim. Kullanıcı bilgileriniz tanımlanmıştır. Size en yakın satıcılar yükleniyor.");
-                conversationStep = 5;
-                
-                // Arayüzü etkinleştir
-                enableUI();
-                
-                // Satıcıları yükle
-                loadSellersByLocation();
-                
-            } catch (error) {
-                console.error('Profil kaydetme hatası:', error);
-                speakToUser("Profil kaydedilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
-            }
+       // DÜZELTİLMİŞ FONKSİYON: Telefon numarası ile kullanıcı kontrolü
+async function checkCustomerByPhone(phone) {
+    try {
+        console.log("Telefon numarası kontrol ediliyor:", phone);
+        
+        // Telefon numarasını temizle (sadece rakamlar)
+        const cleanPhone = phone.replace(/\D/g, '');
+        
+        // SADECE customers tablosunda ara
+        const { data, error } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('phone', cleanPhone)
+            .maybeSingle(); // maybeSingle kullanıyoruz, kayıt yoksa null döner
+        
+        if (error) {
+            console.error('Customers tablosu sorgu hatası:', error);
+            // Hata durumunda bile yeni kayıt moduna geç
+            speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
+            conversationStep = 2;
+            return;
         }
-
+        
+        if (data) {
+            console.log("Mevcut müşteri bulundu:", data);
+            // Müşteri bulundu, mevcut kullanıcıyı yükle
+            currentCustomer = data;
+            updateCustomerUI();
+            speakToUser(`Hoş geldiniz ${data.name}! Sisteminiz açılmıştır, sipariş işleminize başlayabilirsiniz.`);
+            conversationStep = 10; // Normal sipariş sürecine geç
+            
+            // Arayüzü etkinleştir
+            enableUI();
+            
+            // Konuma göre satıcıları yükle (profiles tablosundan)
+            loadSellersByLocation();
+        } else {
+            console.log("Müşteri bulunamadı, yeni kayıt oluşturulacak");
+            // Müşteri bulunamadı, yeni kayıt moduna geç
+            speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
+            conversationStep = 2;
+        }
+        
+    } catch (error) {
+        console.error('Telefon ile kullanıcı kontrol hatası:', error);
+        speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
+        conversationStep = 2;
+    }
+}
         // Profil UI güncelleme
         function updateCustomerUI() {
             if (currentCustomer) {
@@ -1116,7 +1074,7 @@
             }
         }
 
-        // Satıcıları konuma göre yükle
+         // Satıcıları konuma göre yükle
         async function loadSellersByLocation() {
     if (!currentCustomer?.city) {
         console.log("Konum bilgisi yok, satıcı yüklenemiyor");
@@ -1176,86 +1134,6 @@
                 enableMicrophone();
             }
         }
-
-
-// Seçilen satıcının ürünlerini yükle
-async function loadSellerProducts(sellerId) {
-    try {
-        const selectedSeller = sellers.find(s => s.id === sellerId);
-        if (selectedSeller) {
-            speakToUser(`${selectedSeller.full_name} satıcısının ürünleri yükleniyor.`);
-        }
-        
-        // Burada seller'a özel ürünleri yükleme mantığı
-        // Örnek: product_prices tablosundan seller_id'ye göre ürünleri getir
-        const { data: productData, error } = await supabase
-            .from('products')
-            .select(`
-                id, name, description, price, stock, 
-                imgurl, unit_type, brand, category_id,
-                product_prices!inner (seller_id, price, discount_price)
-            `)
-            .eq('product_prices.seller_id', sellerId)
-            .limit(50);
-        
-        if (error) {
-            console.error('Ürün yükleme hatası:', error);
-            // Fallback: Tüm ürünleri getir
-            const { data: allProducts } = await supabase
-                .from('products')
-                .select('*')
-                .limit(50);
-            
-            products = allProducts || [];
-        } else {
-            products = productData || [];
-        }
-        
-        displayProducts(products);
-        speakToUser(`${products.length} ürün yüklendi.`);
-        
-    } catch (error) {
-        console.error('Satıcı ürünleri yükleme hatası:', error);
-        speakToUser("Ürünler yüklenirken bir hata oluştu.");
-    }
-}
-
-// Satıcı dropdown'ını güncelle
-function updateSellerDropdown() {
-    sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
-    
-    sellers.forEach(seller => {
-        const option = document.createElement('option');
-        option.value = seller.id;
-        option.textContent = `${seller.full_name} - ${seller.city || seller.location || 'Konum bilgisi yok'}`;
-        sellerSelect.appendChild(option);
-    });
-}
-
-// Satıcı grid'ini güncelle
-function updateSellersGrid() {
-    const sellerGrid = document.getElementById('sellerGrid');
-    if (!sellerGrid) return;
-    
-    sellerGrid.innerHTML = '';
-    
-    sellers.forEach(seller => {
-        const sellerCard = document.createElement('div');
-        sellerCard.className = 'seller-card';
-        sellerCard.innerHTML = `
-            <img src="${seller.imgurl || 'https://via.placeholder.com/50'}" alt="${seller.full_name}">
-            <div class="seller-name">${seller.full_name}</div>
-            <div class="seller-location">${seller.city || seller.location || ''}</div>
-        `;
-        
-        sellerCard.addEventListener('click', () => {
-            // Satıcı seçildiğinde ürünleri yükle
-            loadSellerProducts(seller.id);
-        });
-        
-        sellerGrid.appendChild(sellerCard);
-    });
-}
 
         // Mikrofonu etkinleştir
         async function enableMicrophone() {
@@ -1534,3 +1412,4 @@ function updateSellersGrid() {
     </script>
 </body>
 </html>
+
