@@ -1118,71 +1118,46 @@
 
         // Satıcıları konuma göre yükle
         async function loadSellersByLocation() {
-            if (!currentCustomer?.city) {
-                sellerSelect.innerHTML = '<option value="">-- Lokasyon yok --</option>';
-                speakToUser("Konum bilginiz bulunamadı. Lütfen satıcıyı manuel olarak seçin.");
-                return;
-            }
-            
-            try {
-                console.log("Müşteri konumu:", currentCustomer.city);
-                
-                // Profiles tablosundan seller rolündeki kullanıcıları al
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, phone, city, address, location')
-                    .eq('role', 'seller')
-                    .ilike('city', `%${currentCustomer.city}%`)
-                    .limit(100);
-                
-                if (error) {
-                    console.error('Satıcı sorgu hatası:', error);
-                    speakToUser("Satıcılar yüklenirken bir hata oluştu.");
-                    return;
-                }
-                
-                sellers = data || [];
-                console.log("Bulunan satıcılar:", sellers);
-                
-                sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
-                
-                if (sellers.length === 0) {
-                    // Eğer konuma göre satıcı bulunamazsa, tüm satıcıları göster
-                    const { data: allSellers, error: allError } = await supabase
-                        .from('profiles')
-                        .select('id, full_name, phone, city, address, location')
-                        .eq('role', 'seller')
-                        .limit(100);
-                    
-                    if (!allError && allSellers.length > 0) {
-                        sellers = allSellers;
-                        speakToUser("Size en yakın satıcı bulunamadı. Tüm satıcılar listeleniyor.");
-                    } else {
-                        sellerSelect.innerHTML = '<option value="">-- Satıcı bulunamadı --</option>';
-                        speakToUser("Sistemde kayıtlı satıcı bulunamadı.");
-                        return;
-                    }
-                } else {
-                    speakToUser(`Size en yakın ${sellers.length} satıcı bulundu.`);
-                }
-                
-                // Satıcıları dropdown'a ekle
-                sellers.forEach(s => {
-                    const opt = document.createElement('option');
-                    opt.value = s.id;
-                    const displayText = s.full_name ? 
-                        `${s.full_name} (${s.city || s.location || 'Konum bilgisi yok'})` : 
-                        s.phone || s.id;
-                    opt.textContent = displayText;
-                    sellerSelect.appendChild(opt);
-                });
-                
-            } catch (error) {
-                console.error('Satıcı yükleme hatası:', error);
-                speakToUser("Satıcılar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
-            }
+    if (!currentCustomer?.city) {
+        console.log("Konum bilgisi yok, satıcı yüklenemiyor");
+        return;
+    }
+    
+    try {
+        console.log("Müşteri konumuna göre satıcılar aranıyor:", currentCustomer.city);
+        
+        // SADECE profiles tablosundan seller rolündeki kullanıcıları al
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, phone, city, address, location, imgurl')
+            .eq('role', 'seller') // Sadece satıcılar
+            .or(`city.ilike.%${currentCustomer.city}%,location.ilike.%${currentCustomer.city}%`)
+            .limit(100);
+        
+        if (error) {
+            console.error('Satıcı sorgu hatası:', error);
+            speakToUser("Satıcılar yüklenirken bir hata oluştu.");
+            return;
         }
-
+        
+        sellers = data || [];
+        console.log("Bulunan satıcılar:", sellers.length);
+        
+        // Satıcıları hem dropdown'a hem de grid'e ekle
+        updateSellerDropdown();
+        updateSellersGrid();
+        
+        if (sellers.length === 0) {
+            speakToUser("Size yakın satıcı bulunamadı. Lütfen daha sonra tekrar deneyin.");
+        } else {
+            speakToUser(`Size en yakın ${sellers.length} satıcı bulundu.`);
+        }
+        
+    } catch (error) {
+        console.error('Satıcı yükleme hatası:', error);
+        speakToUser("Satıcılar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+    }
+}
         // Sesli asistanı başlat
         function initVoiceAssistant() {
             microphoneToggle.addEventListener('click', toggleMicrophone);
@@ -1201,6 +1176,86 @@
                 enableMicrophone();
             }
         }
+
+
+// Seçilen satıcının ürünlerini yükle
+async function loadSellerProducts(sellerId) {
+    try {
+        const selectedSeller = sellers.find(s => s.id === sellerId);
+        if (selectedSeller) {
+            speakToUser(`${selectedSeller.full_name} satıcısının ürünleri yükleniyor.`);
+        }
+        
+        // Burada seller'a özel ürünleri yükleme mantığı
+        // Örnek: product_prices tablosundan seller_id'ye göre ürünleri getir
+        const { data: productData, error } = await supabase
+            .from('products')
+            .select(`
+                id, name, description, price, stock, 
+                imgurl, unit_type, brand, category_id,
+                product_prices!inner (seller_id, price, discount_price)
+            `)
+            .eq('product_prices.seller_id', sellerId)
+            .limit(50);
+        
+        if (error) {
+            console.error('Ürün yükleme hatası:', error);
+            // Fallback: Tüm ürünleri getir
+            const { data: allProducts } = await supabase
+                .from('products')
+                .select('*')
+                .limit(50);
+            
+            products = allProducts || [];
+        } else {
+            products = productData || [];
+        }
+        
+        displayProducts(products);
+        speakToUser(`${products.length} ürün yüklendi.`);
+        
+    } catch (error) {
+        console.error('Satıcı ürünleri yükleme hatası:', error);
+        speakToUser("Ürünler yüklenirken bir hata oluştu.");
+    }
+}
+
+// Satıcı dropdown'ını güncelle
+function updateSellerDropdown() {
+    sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
+    
+    sellers.forEach(seller => {
+        const option = document.createElement('option');
+        option.value = seller.id;
+        option.textContent = `${seller.full_name} - ${seller.city || seller.location || 'Konum bilgisi yok'}`;
+        sellerSelect.appendChild(option);
+    });
+}
+
+// Satıcı grid'ini güncelle
+function updateSellersGrid() {
+    const sellerGrid = document.getElementById('sellerGrid');
+    if (!sellerGrid) return;
+    
+    sellerGrid.innerHTML = '';
+    
+    sellers.forEach(seller => {
+        const sellerCard = document.createElement('div');
+        sellerCard.className = 'seller-card';
+        sellerCard.innerHTML = `
+            <img src="${seller.imgurl || 'https://via.placeholder.com/50'}" alt="${seller.full_name}">
+            <div class="seller-name">${seller.full_name}</div>
+            <div class="seller-location">${seller.city || seller.location || ''}</div>
+        `;
+        
+        sellerCard.addEventListener('click', () => {
+            // Satıcı seçildiğinde ürünleri yükle
+            loadSellerProducts(seller.id);
+        });
+        
+        sellerGrid.appendChild(sellerCard);
+    });
+}
 
         // Mikrofonu etkinleştir
         async function enableMicrophone() {
