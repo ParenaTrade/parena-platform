@@ -1156,7 +1156,48 @@ async function checkCustomerByPhone(phone) {
                 speakToUser("Satıcılar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
             }
         }
-        // Sesli asistanı başlat
+  
+// Satıcı grid'ini güncelle
+        function updateSellersGrid() {
+            sellerGrid.innerHTML = '';
+            
+            if (sellers.length === 0) {
+                sellerGrid.innerHTML = '<div class="text-sm text-gray-500 text-center">Satıcı bulunamadı</div>';
+                return;
+            }
+            
+            sellers.forEach(seller => {
+                const sellerCard = document.createElement('div');
+                sellerCard.className = 'seller-card';
+                if (selectedSellerId === seller.id) {
+                    sellerCard.classList.add('selected');
+                }
+                
+                sellerCard.innerHTML = `
+                    <img src="${seller.imgurl || 'https://via.placeholder.com/50'}" alt="${seller.full_name}">
+                    <div class="seller-name">${seller.full_name}</div>
+                `;
+                
+                sellerCard.addEventListener('click', () => {
+                    // Tüm satıcı kartlarından seçimi kaldır
+                    document.querySelectorAll('.seller-card').forEach(card => {
+                        card.classList.remove('selected');
+                    });
+                    
+                    // Tıklanan satıcıyı seç
+                    sellerCard.classList.add('selected');
+                    selectedSellerId = seller.id;
+                    
+                    // Satıcı verilerini yükle
+                    loadSellerData(seller.id);
+                });
+                
+                sellerGrid.appendChild(sellerCard);
+            });
+        }
+
+		
+		// Sesli asistanı başlat
         function initVoiceAssistant() {
             microphoneToggle.addEventListener('click', toggleMicrophone);
             closeVoiceStatus.addEventListener('click', hideVoiceStatus);
@@ -1278,45 +1319,7 @@ async function checkCustomerByPhone(phone) {
             recognition.start();
         }
 
-  // Satıcı grid'ini güncelle
-        function updateSellersGrid() {
-            sellerGrid.innerHTML = '';
-            
-            if (sellers.length === 0) {
-                sellerGrid.innerHTML = '<div class="text-sm text-gray-500 text-center">Satıcı bulunamadı</div>';
-                return;
-            }
-            
-            sellers.forEach(seller => {
-                const sellerCard = document.createElement('div');
-                sellerCard.className = 'seller-card';
-                if (selectedSellerId === seller.id) {
-                    sellerCard.classList.add('selected');
-                }
-                
-                sellerCard.innerHTML = `
-                    <img src="${seller.imgurl || 'https://via.placeholder.com/50'}" alt="${seller.full_name}">
-                    <div class="seller-name">${seller.full_name}</div>
-                `;
-                
-                sellerCard.addEventListener('click', () => {
-                    // Tüm satıcı kartlarından seçimi kaldır
-                    document.querySelectorAll('.seller-card').forEach(card => {
-                        card.classList.remove('selected');
-                    });
-                    
-                    // Tıklanan satıcıyı seç
-                    sellerCard.classList.add('selected');
-                    selectedSellerId = seller.id;
-                    
-                    // Satıcı verilerini yükle
-                    loadSellerData(seller.id);
-                });
-                
-                sellerGrid.appendChild(sellerCard);
-            });
-        }
-
+  
         // Ürün animasyonu ekle
         function addProductAnimation(product, startX, startY, endX, endY) {
             const flyingProduct = document.createElement('div');
@@ -1736,6 +1739,7 @@ async function checkCustomerByPhone(phone) {
     </script>
 </body>
 </html>
+
 
 
 
