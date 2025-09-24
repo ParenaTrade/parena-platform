@@ -890,10 +890,70 @@
         initApp();
     });
 
-   // DÜZELTİLMİŞ FONKSİYON: initApp - çift initVoiceAssistant çağrısını kaldır
+  // EKSİK FONKSİYON: Oturumu geri yükle
+function restoreSession() {
+    const savedSession = localStorage.getItem('onurmarket_session');
+    if (savedSession) {
+        try {
+            const sessionData = JSON.parse(savedSession);
+            
+            // Oturumun süresi dolmuş mu kontrol et (24 saat)
+            const now = new Date().getTime();
+            if (now - sessionData.timestamp < 24 * 60 * 60 * 1000) {
+                currentCustomer = sessionData.customer;
+                cart = sessionData.cart || [];
+                selectedSellerId = sessionData.selectedSellerId;
+                
+                updateCustomerUI();
+                updateCartUI();
+                
+                if (currentCustomer) {
+                    enableUI();
+                    // Lokasyon kontrol timer'ını başlat
+                    if (typeof startLocationCheckTimer === 'function') {
+                        startLocationCheckTimer();
+                    }
+                    
+                    // Satıcıları yükle
+                    if (selectedSellerId) {
+                        loadSellersByLocation();
+                    }
+                }
+            } else {
+                localStorage.removeItem('onurmarket_session');
+            }
+        } catch (error) {
+            console.error('Oturum geri yükleme hatası:', error);
+            localStorage.removeItem('onurmarket_session');
+        }
+    }
+}
+
+// EKSİK FONKSİYON: Oturumu kaydet
+function saveSession() {
+    if (currentCustomer) {
+        const sessionData = {
+            customer: currentCustomer,
+            cart: cart,
+            selectedSellerId: selectedSellerId,
+            timestamp: new Date().getTime()
+        };
+        localStorage.setItem('onurmarket_session', JSON.stringify(sessionData));
+        
+        // Kullanıcıya bildir
+        if (sessionSaver) {
+            sessionSaver.style.display = 'block';
+            setTimeout(() => {
+                sessionSaver.style.display = 'none';
+            }, 2000);
+        }
+    }
+}
+
+// DÜZELTİLMİŞ FONKSİYON: initApp - çift çağrıları kaldır
 async function initApp() {
     // Sayfa yüklendiğinde oturumu geri yükle
-    restoreSession(); 
+    restoreSession();
     
     // Check for referral code in URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -916,6 +976,71 @@ async function initApp() {
     window.addEventListener('beforeunload', saveSession);
 }
 
+// EKSİK FONKSİYON: Lokasyon kontrol timer'ını başlat
+function startLocationCheckTimer() {
+    if (!locationChecker || !locationTimer) return;
+    
+    locationChecker.style.display = 'block';
+    locationCheckAttempts = 0;
+    
+    if (locationCheckTimer) {
+        clearInterval(locationCheckTimer);
+    }
+    
+    locationCheckTimer = setInterval(async () => {
+        locationCheckAttempts++;
+        if (locationTimer) {
+            locationTimer.textContent = MAX_LOCATION_CHECK_ATTEMPTS - locationCheckAttempts;
+        }
+        
+        if (locationCheckAttempts >= MAX_LOCATION_CHECK_ATTEMPTS) {
+            clearInterval(locationCheckTimer);
+            if (locationChecker) {
+                locationChecker.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Lokasyon kontrolü zaman aşımına uğradı. Lütfen sayfayı yenileyin.';
+            }
+            return;
+        }
+        
+        // Lokasyon kontrolü yap
+        await checkCustomerLocation();
+        
+    }, 1000);
+}
+
+// EKSİK FONKSİYON: Müşteri lokasyonunu kontrol et
+async function checkCustomerLocation() {
+    if (!currentCustomer?.id) return;
+    
+    try {
+        const { data, error } = await supabase
+            .from('customers')
+            .select('location, city, address')
+            .eq('id', currentCustomer.id)
+            .single();
+        
+        if (error) throw error;
+        
+        if (data && data.location) {
+            // Lokasyon bulundu, timer'ı durdur ve satıcıları yükle
+            if (locationCheckTimer) {
+                clearInterval(locationCheckTimer);
+            }
+            if (locationChecker) {
+                locationChecker.style.display = 'none';
+            }
+            
+            currentCustomer.location = data.location;
+            currentCustomer.city = data.city;
+            currentCustomer.address = data.address;
+            
+            updateCustomerUI();
+            loadSellersByLocation();
+        }
+    } catch (error) {
+        console.error('Lokasyon kontrol hatası:', error);
+    }
+}
+		
        // DÜZELTİLMİŞ FONKSİYON: Telefon numarası ile kullanıcı kontrolü
 async function checkCustomerByPhone(phone) {
     try {
@@ -2115,61 +2240,6 @@ function updateCartItem(productId, quantity) {
         updateCartUI();
     }
 }
-        // Initialize the application
-        document.addEventListener('DOMContentLoaded', function() {
-            initApp();
-        });
-
-        // Lokasyon kontrol timer'ını başlat
-        function startLocationCheckTimer() {
-            locationChecker.style.display = 'block';
-            locationCheckAttempts = 0;
-            
-            locationCheckTimer = setInterval(async () => {
-                locationCheckAttempts++;
-                locationTimer.textContent = MAX_LOCATION_CHECK_ATTEMPTS - locationCheckAttempts;
-                
-                if (locationCheckAttempts >= MAX_LOCATION_CHECK_ATTEMPTS) {
-                    clearInterval(locationCheckTimer);
-                    locationChecker.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Lokasyon kontrolü zaman aşımına uğradı. Lütfen sayfayı yenileyin.';
-                    return;
-                }
-                
-                // Lokasyon kontrolü yap
-                await checkCustomerLocation();
-                
-            }, 1000);
-        }
-
-        // Müşteri lokasyonunu kontrol et
-        async function checkCustomerLocation() {
-            if (!currentCustomer?.id) return;
-            
-            try {
-                const { data, error } = await supabase
-                    .from('customers')
-                    .select('location, city, address')
-                    .eq('id', currentCustomer.id)
-                    .single();
-                
-                if (error) throw error;
-                
-                if (data && data.location) {
-                    // Lokasyon bulundu, timer'ı durdur ve satıcıları yükle
-                    clearInterval(locationCheckTimer);
-                    locationChecker.style.display = 'none';
-                    
-                    currentCustomer.location = data.location;
-                    currentCustomer.city = data.city;
-                    currentCustomer.address = data.address;
-                    
-                    updateCustomerUI();
-                    loadSellersByLocation();
-                }
-            } catch (error) {
-                console.error('Lokasyon kontrol hatası:', error);
-            }
-        }
 
 
 		
@@ -2233,6 +2303,7 @@ function findProductByName(productName) {
     </script>
 </body>
 </html>
+
 
 
 
