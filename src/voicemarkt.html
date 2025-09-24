@@ -1256,8 +1256,7 @@ async function checkCustomerByPhone(phone) {
         }
 
 		
-        // DÜZELTİLMİŞ FONKSİYON: Satıcı verilerini yükle
-// DÜZELTİLMİŞ FONKSİYON: Satıcı verilerini yükle
+// DÜZELTİLMİŞ FONKSİYON: Satıcı verilerini yükle (product_price_id olmadan)
 async function loadSellerData(sellerId) {
     try {
         const selectedSeller = sellers.find(s => s.id === sellerId);
@@ -1265,12 +1264,27 @@ async function loadSellerData(sellerId) {
             speakToUser(`${selectedSeller.full_name} satıcısının ürünleri yükleniyor.`);
         }
         
-        // Ürünleri product_prices tablosundan sube_id (sellerId) ile yükle ve products tablosuna join yap
+        // Doğru JOIN sorgusu - product_prices ve products tablolarını birleştir
         const { data: productPricesData, error: productError } = await supabase
             .from('product_prices')
             .select(`
-                id, price, stock, currency, discount_price, product_id,
-                products (id, name, description, gtip_code, imgurl, unit_type, barcode, brand, category_id, reyon_id)
+                id, 
+                price, 
+                stock, 
+                currency, 
+                discount_price,
+                products!inner (
+                    id, 
+                    name, 
+                    description, 
+                    gtip_code, 
+                    imgurl, 
+                    unit_type, 
+                    barcode, 
+                    brand, 
+                    category_id, 
+                    reyon_id
+                )
             `)
             .eq('sube_id', sellerId)
             .limit(50);
@@ -1279,11 +1293,10 @@ async function loadSellerData(sellerId) {
             console.error('Ürün yükleme hatası:', productError);
             products = [];
         } else {
-            // product_prices ve products tablolarını birleştir
+            // Verileri doğru şekilde birleştir (product_price_id olmadan)
             products = productPricesData.map(item => {
                 return {
-                    id: item.products.id,
-                    product_price_id: item.id, // product_prices tablosundaki id
+                    id: item.products.id, // products tablosundaki id
                     name: item.products.name,
                     description: item.products.description,
                     price: item.price,
@@ -1296,7 +1309,8 @@ async function loadSellerData(sellerId) {
                     brand: item.products.brand,
                     category_id: item.products.category_id,
                     reyon_id: item.products.reyon_id,
-                    discount_price: item.discount_price
+                    discount_price: item.discount_price,
+                    seller_id: sellerId // Satıcı ID'sini sakla
                 };
             });
         }
@@ -1309,8 +1323,7 @@ async function loadSellerData(sellerId) {
         console.error('Satıcı verileri yüklenme hatası:', error);
         speakToUser("Satıcı verileri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
     }
-}                
-
+}
 		
 		// Sesli asistanı başlat
         function initVoiceAssistant() {
@@ -1828,6 +1841,7 @@ function updateCartUI() {
 }
 
 		// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (hata yönetimi ile)
+// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (product_price_id olmadan)
 async function finalizeOrder(paymentMethod) {
     try {
         if (cart.length === 0) {
@@ -1847,7 +1861,7 @@ async function finalizeOrder(paymentMethod) {
         
         speakToUser("Siparişiniz alınıyor, lütfen bekleyin...");
         
-        // Sipariş verisini hazırla
+        // Sipariş verisini hazırla - orders tablosu
         const orderData = {
             customer_id: currentCustomer.id,
             seller_id: selectedSellerId,
@@ -1857,7 +1871,7 @@ async function finalizeOrder(paymentMethod) {
             created_at: new Date().toISOString()
         };
         
-        // Siparişi veritabanına ekle
+        // Siparişi veritabanına ekle (orders tablosuna)
         const { data: order, error: orderError } = await supabase
             .from('orders')
             .insert([orderData])
@@ -1866,21 +1880,23 @@ async function finalizeOrder(paymentMethod) {
         
         if (orderError) throw orderError;
         
-        // Sipariş detaylarını ekle
-        const orderItems = cart.map(item => ({
+        // Sipariş detaylarını hazırla - order_details tablosuna (product_price_id olmadan)
+        const orderDetails = cart.map(item => ({
             order_id: order.id,
-            product_id: item.id,
-            product_price_id: item.product_price_id,
+            product_id: item.id, // products tablosundaki ID
             quantity: item.quantity,
             unit_price: item.price,
-            total_price: item.price * item.quantity
+            discount: item.discount_price ? (item.price - item.discount_price) * item.quantity : 0,
+            tax_rate: 18, // %18 KDV
+            created_at: new Date().toISOString()
         }));
         
-        const { error: itemsError } = await supabase
-            .from('order_items')
-            .insert(orderItems);
+        // Sipariş detaylarını ekle (order_details tablosuna)
+        const { error: detailsError } = await supabase
+            .from('order_details')
+            .insert(orderDetails);
         
-        if (itemsError) throw itemsError;
+        if (detailsError) throw detailsError;
         
         speakToUser(`Siparişiniz alındı! Sipariş numaranız: ${order.id}. Teşekkür ederiz.`);
         
@@ -1924,55 +1940,35 @@ document.addEventListener('DOMContentLoaded', function() {
             return amount * 0.18;
         }
 
-        // Ürünü sepete ekle
-      // DÜZELTİLMİŞ FONKSİYON: Sepete ürün ekle (product_prices tablosundaki id ile)
+    // DÜZELTİLMİŞ FONKSİYON: Sepete ürün ekle (product_price_id olmadan)
 function addToCartByProduct(product, quantity, updateUI = false) {
-    // Sepetteki ürünü product_price_id ile bul
-    const existingItem = cart.find(item => item.product_price_id === product.product_price_id);
+    // Aynı product_id'ye sahip ürünü ara
+    const existingItem = cart.find(item => item.id === product.id);
     
     if (existingItem) {
         existingItem.quantity += quantity;
     } else {
         cart.push({
-            id: product.id,
-            product_price_id: product.product_price_id, // product_prices tablosundaki id
+            id: product.id, // products tablosu id
+            seller_id: product.seller_id, // Satıcı ID
             name: product.name,
             price: product.price,
-            discount: product.discount_price ? (product.price - product.discount_price) * quantity : 0,
+            discount_price: product.discount_price,
             quantity: quantity,
-            imgurl: product.imgurl
+            imgurl: product.imgurl,
+            barcode: product.barcode
         });
     }
     
     if (updateUI) {
         updateCartUI();
+        // Ürün grid'ini de güncelle (miktar değişiklikleri için)
+        if (typeof displayProducts === 'function') {
+            displayProducts(products);
+        }
     }
 }
-        // Sepet UI güncelle
-        function updateCartUI() {
-            cartList.innerHTML = '';
-            
-            if (cart.length === 0) {
-                cartList.innerHTML = '<div class="text-sm text-gray-500">Sepete ürün ekleyin</div>';
-                subtotalEl.textContent = '0 ₺';
-                discountEl.textContent = '0 ₺';
-                vatAmountEl.textContent = '0 ₺';
-                totalAmountEl.textContent = '0 ₺';
-                return;
-            }
-            
-            cart.forEach(item => {
-                const cartItem = document.createElement('div');
-                cartItem.className = 'flex justify-between items-center py-2 border-b';
-                cartItem.innerHTML = `
-                    <div class="flex-1">
-                        <div class="font-medium">${item.name}</div>
-                        <div class="text-sm text-gray-500">${item.quantity} adet x ${money(item.price)}</div>
-                    </div>
-                    <div class="font-semibold">${money(item.price * item.quantity)}</div>
-                `;
-                cartList.appendChild(cartItem);
-            });
+
 			
 // DÜZELTİLMİŞ FONKSİYON: Sepet öğesini güncelle (ürün kartında)
 function updateCartItem(productPriceId, quantity) {
@@ -2234,6 +2230,7 @@ function findProductByName(productName) {
     </script>
 </body>
 </html>
+
 
 
 
