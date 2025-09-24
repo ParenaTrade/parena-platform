@@ -1389,64 +1389,114 @@ async function loadSellerData(sellerId) {
             assistantMessage.textContent = "Mikrofon erişimi kapalı. Sesli sipariş için lütfen mikrofon erişimine izin verin.";
         }
 
-        // Ses tanıma sistemini başlat
-        function initializeSpeechRecognition() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            
-            if (!SpeechRecognition) {
-                assistantMessage.textContent = "Tarayıcınız ses tanıma özelliğini desteklemiyor";
-                return;
-            }
-            
-            recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.lang = 'tr-TR';
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
-            
-            recognition.onstart = function() {
-                isListening = true;
-                voiceIndicator.classList.add('listening');
-                voiceStatus.textContent = "Dinleniyor...";
-            };
-            
-            recognition.onresult = function(event) {
-                const transcript = event.results[event.results.length - 1][0].transcript;
-                processVoiceCommand(transcript);
-            };
-            
-            recognition.onerror = function(event) {
-                console.error('Ses tanıma hatası:', event.error);
-                
-                if (event.error === 'not-allowed') {
-                    assistantMessage.textContent = "Mikrofon erişimine izin verilmedi. Lütfen tarayıcı ayarlarınızdan izin verin.";
-                    disableMicrophone();
-                } else if (event.error === 'no-speech') {
-                    console.log('Ses algılanmadı');
-                } else {
-                    assistantMessage.textContent = "Ses tanıma hatası: " + event.error;
-                }
-                
-                isListening = false;
-                voiceIndicator.classList.remove('listening');
-            };
-            
-            recognition.onend = function() {
-                isListening = false;
-                voiceIndicator.classList.remove('listening');
-                
-                if (isMicrophoneEnabled) {
-                    setTimeout(() => {
-                        if (!isListening) {
-                            recognition.start();
-                        }
-                    }, 500);
-                }
-            };
-            
-            recognition.start();
+       // DÜZELTİLMİŞ FONKSİYON: Ses tanıma hatası yönetimi
+function initializeSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        assistantMessage.textContent = "Tarayıcınız ses tanıma özelliğini desteklemiyor";
+        return;
+    }
+    
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.lang = 'tr-TR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    
+    recognition.onstart = function() {
+        isListening = true;
+        voiceIndicator.classList.add('listening');
+        voiceStatus.textContent = "Dinleniyor...";
+    };
+    
+    recognition.onresult = function(event) {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        processVoiceCommand(transcript);
+    };
+    
+    recognition.onerror = function(event) {
+        console.error('Ses tanıma hatası:', event.error);
+        
+        // "no-speech" hatasını normal karşıla ve sessizce yeniden başlat
+        if (event.error === 'no-speech') {
+            console.log('Ses algılanmadı, yeniden başlatılıyor...');
+            // Bu hatayı kullanıcıya göstermeye gerek yok
+        } 
+        else if (event.error === 'not-allowed') {
+            assistantMessage.textContent = "Mikrofon erişimine izin verilmedi. Lütfen tarayıcı ayarlarınızdan izin verin.";
+            disableMicrophone();
+        } 
+        else {
+            assistantMessage.textContent = "Ses tanıma hatası: " + event.error;
         }
+        
+        isListening = false;
+        voiceIndicator.classList.remove('listening');
+    };
+    
+    recognition.onend = function() {
+        isListening = false;
+        voiceIndicator.classList.remove('listening');
+        
+        // "no-speech" hatasından sonra bile mikrofon açıksa yeniden başlat
+        if (isMicrophoneEnabled && !isListening) {
+            setTimeout(() => {
+                try {
+                    recognition.start();
+                } catch (error) {
+                    console.log('Ses tanıma yeniden başlatılamadı:', error);
+                }
+            }, 1000);
+        }
+    };
+    
+    // Ses tanımayı başlat
+    try {
+        recognition.start();
+    } catch (error) {
+        console.error('Ses tanıma başlatılamadı:', error);
+    }
+}
 
+		// YENİ FONKSİYON: Veritabanı constraint'lerini kontrol et
+async function checkDatabaseConstraints() {
+    try {
+        // Satıcının profiles tablosunda olduğunu doğrula
+        const { data: seller, error: sellerError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', selectedSellerId)
+            .single();
+            
+        if (sellerError || !seller) {
+            console.error('Satıcı bulunamadı:', selectedSellerId);
+            speakToUser("Seçili satıcı sistemde bulunamadı. Lütfen farklı bir satıcı seçin.");
+            return false;
+        }
+        
+        // Müşterinin customers tablosunda olduğunu doğrula
+        const { data: customer, error: customerError } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('id', currentCustomer.id)
+            .single();
+            
+        if (customerError || !customer) {
+            console.error('Müşteri bulunamadı:', currentCustomer.id);
+            speakToUser("Müşteri bilgileriniz bulunamadı. Lütfen tekrar giriş yapın.");
+            return false;
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.error('Constraint kontrol hatası:', error);
+        return false;
+    }
+}
+
+		
   
         // Ürün animasyonu ekle
         function addProductAnimation(product, startX, startY, endX, endY) {
@@ -2099,68 +2149,8 @@ function updateCartItem(productPriceId, quantity) {
             }
         }
 
-	// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (doğru veri yapısı ile)
-async function finalizeOrder(paymentMethod) {
-    if (cart.length === 0) {
-        speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
-        return;
-    }
-    
-    if (!selectedSellerId) {
-        speakToUser("Lütfen önce bir satıcı seçin.");
-        return;
-    }
-    
-    try {
-        // Sipariş verisini hazırla
-        const orderData = {
-            customer_id: currentCustomer.id,
-            seller_id: selectedSellerId,
-            total_amount: calculateSubtotal() - calculateDiscount() + calculateVAT(calculateSubtotal() - calculateDiscount()),
-            payment_method: paymentMethod,
-            status: 'pending',
-            created_at: new Date().toISOString()
-        };
-        
-        // Siparişi veritabanına ekle
-        const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .insert([orderData])
-            .select()
-            .single();
-        
-        if (orderError) throw orderError;
-        
-        // Sipariş detaylarını ekle
-        const orderItems = cart.map(item => ({
-            order_id: order.id,
-            product_id: item.id,
-            quantity: item.quantity,
-            unit_price: item.price,
-            total_price: item.price * item.quantity
-        }));
-        
-        const { error: itemsError } = await supabase
-            .from('order_details')
-            .insert(orderItems);
-        
-        if (itemsError) throw itemsError;
-        
-        speakToUser(`Siparişiniz alındı! Sipariş numaranız: ${order.id}. Teşekkür ederiz.`);
-        
-        // Sepeti temizle
-        cart = [];
-        updateCartUI();
-        displayProducts(products);
-        
-        // Sipariş durumunu güncelle
-        updateOrderStatus('completed');
-        
-    } catch (error) {
-        console.error('Sipariş hatası:', error);
-        speakToUser("Siparişiniz alınırken bir hata oluştu. Lütfen tekrar deneyin.");
-    }
-}
+
+		
 // YENİ FONKSİYON: Barkod ile ürün ara
 function findProductByBarcode(barcode) {
     return products.find(product => product.barcode === barcode);
@@ -2221,6 +2211,7 @@ function findProductByName(productName) {
     </script>
 </body>
 </html>
+
 
 
 
