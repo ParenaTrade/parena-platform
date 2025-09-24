@@ -2073,6 +2073,120 @@
             }
         }
 
+
+async function enableMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                isMicrophoneEnabled = true;
+                microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (Açık)</span>';
+                microphoneToggle.classList.add('listening');
+                
+                initializeSpeechRecognition();
+                
+                assistantMessage.textContent = "Mikrofon açıldı. Sipariş vermek için konuşun.";
+                
+                stream.getTracks().forEach(track => track.stop());
+                
+            } catch (error) {
+                console.error("Mikrofon erişim hatası:", error);
+                assistantMessage.textContent = "Mikrofon erişimi sağlanamadı. Lütfen tarayıcı ayarlarınızdan mikrofon erişimine izin verin.";
+                disableMicrophone();
+            }
+        }
+
+
+function disableMicrophone() {
+            isMicrophoneEnabled = false;
+            microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon (Kapalı)</span>';
+            microphoneToggle.classList.remove('listening');
+            
+            if (recognition) {
+                recognition.stop();
+            }
+            
+            voiceIndicator.classList.remove('listening');
+            assistantMessage.textContent = "Mikrofon kapalı. Sipariş vermek için mikrofonu açın.";
+        }
+
+        function initializeSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                assistantMessage.textContent = "Tarayıcınız ses tanıma özelliğini desteklemiyor";
+                return;
+            }
+            
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.lang = 'tr-TR';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            
+            recognition.onstart = function() {
+                isListening = true;
+                voiceIndicator.classList.add('listening');
+            };
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[event.results.length - 1][0].transcript;
+                userMessage.textContent = transcript;
+                processVoiceCommand(transcript);
+            };
+            
+            recognition.onerror = function(event) {
+                console.error('Ses tanıma hatası:', event.error);
+                
+                if (event.error === 'no-speech') {
+                    // Sessizlik hatasını sessizce yönet
+                    console.log('Ses algılanmadı');
+                } else if (event.error === 'not-allowed') {
+                    assistantMessage.textContent = "Mikrofon erişimine izin verilmedi.";
+                    disableMicrophone();
+                } else {
+                    assistantMessage.textContent = "Ses tanıma hatası: " + event.error;
+                }
+                
+                isListening = false;
+                voiceIndicator.classList.remove('listening');
+            };
+            
+            recognition.onend = function() {
+                isListening = false;
+                voiceIndicator.classList.remove('listening');
+                
+                if (isMicrophoneEnabled && !isListening) {
+                    setTimeout(() => {
+                        try {
+                            recognition.start();
+                        } catch (error) {
+                            console.log('Ses tanıma yeniden başlatılamadı:', error);
+                        }
+                    }, 1000);
+                }
+            };
+            
+            try {
+                recognition.start();
+            } catch (error) {
+                console.error('Ses tanıma başlatılamadı:', error);
+            }
+        }
+
+function speakToUser(message) {
+            assistantMessage.textContent = message;
+            
+            if ('speechSynthesis' in window) {
+                const speech = new SpeechSynthesisUtterance(message);
+                speech.lang = 'tr-TR';
+                speech.volume = 1;
+                speech.rate = 1;
+                speech.pitch = 1;
+                
+                window.speechSynthesis.speak(speech);
+            }
+        }
+
         async function restoreSession() {
             const savedSession = localStorage.getItem('onurmarket_session');
             if (savedSession) {
