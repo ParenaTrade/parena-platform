@@ -912,11 +912,12 @@
     // Utility functions
     function money(n){ return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; }
 
-    // Initialize the application
+     // Initialize the application
     document.addEventListener('DOMContentLoaded', function() {
         initApp();
     });
-
+		
+// DÜZELTİLMİŞ FONKSİYON: Oturumu geri yükle (çıkış butonunu kontrol et)
 // DÜZELTİLMİŞ FONKSİYON: Oturumu geri yükle (çıkış butonunu kontrol et)
 function restoreSession() {
     const savedSession = localStorage.getItem('onurmarket_session');
@@ -937,7 +938,9 @@ function restoreSession() {
                 if (currentCustomer) {
                     enableUI();
                     // Çıkış butonunu göster
-                    logoutBtn.style.display = 'flex';
+                    if (logoutBtn) {
+                        logoutBtn.style.display = 'flex';
+                    }
                     
                     // Lokasyon kontrol timer'ını başlat
                     if (typeof startLocationCheckTimer === 'function') {
@@ -1011,6 +1014,11 @@ async function initApp() {
     // Sayfa kapanmadan önce oturumu kaydet
     window.addEventListener('beforeunload', saveSession);
 }
+
+// Initialize the application - SADECE BURASI OLSUN
+document.addEventListener('DOMContentLoaded', function() {
+    initApp();
+});
 
 // EKSİK FONKSİYON: Lokasyon kontrol timer'ını başlat
 function startLocationCheckTimer() {
@@ -1554,35 +1562,35 @@ async function loadSellerData(sellerId) {
 }
 
 // EKSİK FONKSİYON: Tüm satıcıları yükle (dropdown için)
-async function loadAllSellers() {
-    try {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('id, full_name, city, address')
-            .eq('role', 'seller')
-            .order('full_name');
-        
-        if (error) {
+    async function loadAllSellers() {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name, city, address')
+                .eq('role', 'seller')
+                .order('full_name');
+            
+            if (error) {
+                console.error('Satıcı listesi yükleme hatası:', error);
+                return;
+            }
+            
+            // Dropdown'u güncelle
+            sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
+            
+            if (data && data.length > 0) {
+                data.forEach(seller => {
+                    const option = document.createElement('option');
+                    option.value = seller.id;
+                    option.textContent = `${seller.full_name} - ${seller.city}`;
+                    sellerSelect.appendChild(option);
+                });
+            }
+            
+        } catch (error) {
             console.error('Satıcı listesi yükleme hatası:', error);
-            return;
         }
-        
-        // Dropdown'u güncelle
-        sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
-        
-        if (data && data.length > 0) {
-            data.forEach(seller => {
-                const option = document.createElement('option');
-                option.value = seller.id;
-                option.textContent = `${seller.full_name} - ${seller.city}`;
-                sellerSelect.appendChild(option);
-            });
-        }
-        
-    } catch (error) {
-        console.error('Satıcı listesi yükleme hatası:', error);
     }
-}
 
 		
 		// Sesli asistanı başlat
@@ -2163,8 +2171,7 @@ function updateCartUI() {
     }
 }
 
-	// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (foreign key hatası düzeltildi)
-// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (order_details hatası düzeltildi)
+// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (çift kayıt hatası düzeltildi)
 async function finalizeOrder(paymentMethod) {
     try {
         // Ön kontroller
@@ -2183,15 +2190,25 @@ async function finalizeOrder(paymentMethod) {
             return;
         }
         
+        // Siparişin zaten işlenip işlenmediğini kontrol et
+        if (window.orderInProgress) {
+            speakToUser("Siparişiniz zaten işleniyor, lütfen bekleyin...");
+            return;
+        }
+        
+        // Sipariş işlemi başladığını işaretle
+        window.orderInProgress = true;
+        
         // Veritabanı constraint'lerini kontrol et
         const constraintsValid = await checkDatabaseConstraints();
         if (!constraintsValid) {
+            window.orderInProgress = false;
             return;
         }    
         
         speakToUser("Siparişiniz alınıyor, lütfen bekleyin...");
         
-        // Toplam tutarı hesapla
+        // Toplam tutarı hesapla (TEK SEFER)
         const subtotal = calculateSubtotal();
         const discount = calculateDiscount();
         const vatAmount = calculateVAT(subtotal - discount);
@@ -2209,7 +2226,7 @@ async function finalizeOrder(paymentMethod) {
         
         console.log("Sipariş verisi:", orderData);
         
-        // Siparişi veritabanına ekle (orders tablosuna)
+        // Siparişi veritabanına ekle (orders tablosuna) - TEK KAYIT
         const { data: order, error: orderError } = await supabase
             .from('orders')
             .insert([orderData])
@@ -2218,6 +2235,7 @@ async function finalizeOrder(paymentMethod) {
         
         if (orderError) {
             console.error('Sipariş kaydetme hatası:', orderError);
+            window.orderInProgress = false;
             
             if (orderError.code === '23503') {
                 if (orderError.message.includes('seller_id')) {
@@ -2236,7 +2254,7 @@ async function finalizeOrder(paymentMethod) {
         // Sipariş detaylarını hazırla - order_details tablosuna
         const orderDetails = cart.map(item => ({
             order_id: order.id,
-            product_id: item.id, // products tablosundaki ID
+            product_id: item.id,
             quantity: item.quantity,
             unit_price: item.price,
             discount: item.discount_price ? (item.price - item.discount_price) * item.quantity : 0,
@@ -2246,13 +2264,14 @@ async function finalizeOrder(paymentMethod) {
         
         console.log("Sipariş detayları:", orderDetails);
         
-        // Sipariş detaylarını ekle (order_details tablosuna)
+        // Sipariş detaylarını ekle (order_details tablosuna) - TEK SEFER
         const { error: detailsError } = await supabase
             .from('order_details')
             .insert(orderDetails);
         
         if (detailsError) {
             console.error('Sipariş detayları kaydetme hatası:', detailsError);
+            window.orderInProgress = false;
             
             // Order_details hatasını özel işle
             if (detailsError.code === '23503') {
@@ -2279,6 +2298,9 @@ async function finalizeOrder(paymentMethod) {
         updateCartUI();
         unlockSellerSelection();
         
+        // Sipariş işlemi tamamlandı
+        window.orderInProgress = false;
+        
         // 3 saniye sonra yeni sipariş için hazırlık mesajı
         setTimeout(() => {
             speakToUser("Yeni bir sipariş vermek için satıcı seçebilirsiniz.");
@@ -2286,10 +2308,10 @@ async function finalizeOrder(paymentMethod) {
         
     } catch (error) {
         console.error('Sipariş hatası:', error);
+        window.orderInProgress = false;
         speakToUser("Siparişiniz alınırken bir hata oluştu. Lütfen tekrar deneyin.");
     }
 }
-
 // Sayfa yüklendiğinde ödeme butonlarını sıfırla
 document.addEventListener('DOMContentLoaded', function() {
     resetPaymentButtons();
@@ -2399,6 +2421,7 @@ function findProductByName(productName) {
     </script>
 </body>
 </html>
+
 
 
 
