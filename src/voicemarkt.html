@@ -890,7 +890,32 @@
         initApp();
     });
 
-   
+   // DÜZELTİLMİŞ FONKSİYON: initApp - çift initVoiceAssistant çağrısını kaldır
+async function initApp() {
+    // Sayfa yüklendiğinde oturumu geri yükle
+    restoreSession(); 
+    
+    // Check for referral code in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    referralCode = urlParams.get('referral_code');
+    referralGroupCode = urlParams.get('referral_groups');
+    
+    if (referralCode && referralGroupCode) {
+        await processReferralCode(referralCode, referralGroupCode);
+    }
+    
+    setupEventHandlers();
+    
+    // Tüm satıcıları yükle
+    await loadAllSellers();
+    
+    // Sesli asistanı başlat (sadece bir kez)
+    initVoiceAssistant();
+    
+    // Sayfa kapanmadan önce oturumu kaydet
+    window.addEventListener('beforeunload', saveSession);
+}
+
        // DÜZELTİLMİŞ FONKSİYON: Telefon numarası ile kullanıcı kontrolü
 async function checkCustomerByPhone(phone) {
     try {
@@ -2090,7 +2115,11 @@ function updateCartItem(productId, quantity) {
         updateCartUI();
     }
 }
-       
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
+        });
+
         // Lokasyon kontrol timer'ını başlat
         function startLocationCheckTimer() {
             locationChecker.style.display = 'block';
@@ -2181,32 +2210,7 @@ function findProductByName(productName) {
                 break;
         }
     }
- // DÜZELTİLMİŞ FONKSİYON: initApp - çift initVoiceAssistant çağrısını kaldır
-async function initApp() {
-    // Sayfa yüklendiğinde oturumu geri yükle
-    restoreSession(); 
-    
-    // Check for referral code in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    referralCode = urlParams.get('referral_code');
-    referralGroupCode = urlParams.get('referral_groups');
-    
-    if (referralCode && referralGroupCode) {
-        await processReferralCode(referralCode, referralGroupCode);
-    }
-    
-    setupEventHandlers();
-    
-    // Tüm satıcıları yükle
-    await loadAllSellers();
-    
-    // Sesli asistanı başlat (sadece bir kez)
-    initVoiceAssistant();
-    
-    // Sayfa kapanmadan önce oturumu kaydet
-    window.addEventListener('beforeunload', saveSession);
-}
-
+ 
         function setupEventHandlers(){
             sellerSelect.addEventListener('change', e => {
                 if(e.target.value) loadSellerData(e.target.value);
@@ -2229,6 +2233,7 @@ async function initApp() {
     </script>
 </body>
 </html>
+
 
 
 
