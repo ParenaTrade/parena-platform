@@ -890,27 +890,31 @@
         initApp();
     });
 
-    async function initApp() {
-        // Sayfa yüklendiğinde oturumu geri yükle
-        restoreSession();
-        
-        // Check for referral code in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        referralCode = urlParams.get('referral_code');
-        referralGroupCode = urlParams.get('referral_groups');
-        
-        if (referralCode && referralGroupCode) {
-            await processReferralCode(referralCode, referralGroupCode);
-        }
-        
-        setupEventHandlers();
-        
-        // Sesli asistanı başlat
-        initVoiceAssistant();
-        
-        // Sayfa kapanmadan önce oturumu kaydet
-        window.addEventListener('beforeunload', saveSession);
+    // DÜZELTİLMİŞ FONKSİYON: initApp - çift initVoiceAssistant çağrısını kaldır
+async function initApp() {
+    // Sayfa yüklendiğinde oturumu geri yükle
+    restoreSession(); 
+    
+    // Check for referral code in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    referralCode = urlParams.get('referral_code');
+    referralGroupCode = urlParams.get('referral_groups');
+    
+    if (referralCode && referralGroupCode) {
+        await processReferralCode(referralCode, referralGroupCode);
     }
+    
+    setupEventHandlers();
+    
+    // Tüm satıcıları yükle
+    await loadAllSellers();
+    
+    // Sesli asistanı başlat (sadece bir kez)
+    initVoiceAssistant();
+    
+    // Sayfa kapanmadan önce oturumu kaydet
+    window.addEventListener('beforeunload', saveSession);
+}
 
        // DÜZELTİLMİŞ FONKSİYON: Telefon numarası ile kullanıcı kontrolü
 async function checkCustomerByPhone(phone) {
@@ -1256,7 +1260,7 @@ async function checkCustomerByPhone(phone) {
         }
 
 		
-// DÜZELTİLMİŞ FONKSİYON: Satıcı verilerini yükle (product_price_id olmadan)
+// DÜZELTİLMİŞ FONKSİYON: Satıcı verilerini yükle (product_price_id ile)
 async function loadSellerData(sellerId) {
     try {
         const selectedSeller = sellers.find(s => s.id === sellerId);
@@ -1293,10 +1297,11 @@ async function loadSellerData(sellerId) {
             console.error('Ürün yükleme hatası:', productError);
             products = [];
         } else {
-            // Verileri doğru şekilde birleştir (product_price_id olmadan)
+            // Verileri doğru şekilde birleştir (product_price_id ile)
             products = productPricesData.map(item => {
                 return {
                     id: item.products.id, // products tablosundaki id
+                    product_price_id: item.id, // product_prices tablosundaki id (EKSİK EKLENDİ)
                     name: item.products.name,
                     description: item.products.description,
                     price: item.price,
@@ -1324,6 +1329,38 @@ async function loadSellerData(sellerId) {
         speakToUser("Satıcı verileri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
     }
 }
+
+// EKSİK FONKSİYON: Tüm satıcıları yükle (dropdown için)
+async function loadAllSellers() {
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, city, address')
+            .eq('role', 'seller')
+            .order('full_name');
+        
+        if (error) {
+            console.error('Satıcı listesi yükleme hatası:', error);
+            return;
+        }
+        
+        // Dropdown'u güncelle
+        sellerSelect.innerHTML = '<option value="">-- Satıcı seçin --</option>';
+        
+        if (data && data.length > 0) {
+            data.forEach(seller => {
+                const option = document.createElement('option');
+                option.value = seller.id;
+                option.textContent = `${seller.full_name} - ${seller.city}`;
+                sellerSelect.appendChild(option);
+            });
+        }
+        
+    } catch (error) {
+        console.error('Satıcı listesi yükleme hatası:', error);
+    }
+}
+
 		
 		// Sesli asistanı başlat
         function initVoiceAssistant() {
@@ -1891,8 +1928,9 @@ function updateCartUI() {
 }
 
 	// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (foreign key hatası düzeltildi)
+// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (order_details hatası düzeltildi)
 async function finalizeOrder(paymentMethod) {
-        try {
+    try {
         // Ön kontroller
         if (cart.length === 0) {
             speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
@@ -1914,19 +1952,20 @@ async function finalizeOrder(paymentMethod) {
         if (!constraintsValid) {
             return;
         }    
-			
-        if (!currentCustomer) {
-            speakToUser("Lütfen önce giriş yapın.");
-            return;
-        }
         
         speakToUser("Siparişiniz alınıyor, lütfen bekleyin...");
+        
+        // Toplam tutarı hesapla
+        const subtotal = calculateSubtotal();
+        const discount = calculateDiscount();
+        const vatAmount = calculateVAT(subtotal - discount);
+        const total = subtotal - discount + vatAmount;
         
         // Sipariş verisini hazırla - orders tablosu
         const orderData = {
             customer_id: currentCustomer.id,
-            seller_id: selectedSellerId, // Bu, profiles tablosundaki bir ID olmalı
-            total_amount: calculateSubtotal() - calculateDiscount() + calculateVAT(calculateSubtotal() - calculateDiscount()),
+            seller_id: selectedSellerId,
+            total_amount: total,
             payment_method: paymentMethod,
             status: 'pending',
             created_at: new Date().toISOString()
@@ -1944,10 +1983,11 @@ async function finalizeOrder(paymentMethod) {
         if (orderError) {
             console.error('Sipariş kaydetme hatası:', orderError);
             
-            // Foreign key hatasını özel olarak ele al
             if (orderError.code === '23503') {
-                if (orderError.message.includes('seller_id') && orderError.message.includes('products')) {
-                    speakToUser("Satıcı bilgisi hatası. Lütfen farklı bir satıcı seçin veya sistem yöneticisiyle iletişime geçin.");
+                if (orderError.message.includes('seller_id')) {
+                    speakToUser("Satıcı bilgisi hatası. Lütfen farklı bir satıcı seçin.");
+                } else if (orderError.message.includes('customer_id')) {
+                    speakToUser("Müşteri bilgisi hatası. Lütfen tekrar giriş yapın.");
                 } else {
                     speakToUser("Veritabanı hatası. Lütfen daha sonra tekrar deneyin.");
                 }
@@ -1960,13 +2000,15 @@ async function finalizeOrder(paymentMethod) {
         // Sipariş detaylarını hazırla - order_details tablosuna
         const orderDetails = cart.map(item => ({
             order_id: order.id,
-            product_id: item.id,
+            product_id: item.id, // products tablosundaki ID
             quantity: item.quantity,
             unit_price: item.price,
             discount: item.discount_price ? (item.price - item.discount_price) * item.quantity : 0,
             tax_rate: 18,
             created_at: new Date().toISOString()
         }));
+        
+        console.log("Sipariş detayları:", orderDetails);
         
         // Sipariş detaylarını ekle (order_details tablosuna)
         const { error: detailsError } = await supabase
@@ -1975,7 +2017,17 @@ async function finalizeOrder(paymentMethod) {
         
         if (detailsError) {
             console.error('Sipariş detayları kaydetme hatası:', detailsError);
-            speakToUser("Sipariş detayları kaydedilirken bir hata oluştu.");
+            
+            // Order_details hatasını özel işle
+            if (detailsError.code === '23503') {
+                if (detailsError.message.includes('product_id')) {
+                    speakToUser("Ürün bilgisi hatası. Lütfen sepetteki ürünleri kontrol edin.");
+                } else {
+                    speakToUser("Sipariş detaylarında hata oluştu.");
+                }
+            } else {
+                speakToUser("Sipariş detayları kaydedilirken bir hata oluştu.");
+            }
             return;
         }
         
@@ -2001,6 +2053,7 @@ async function finalizeOrder(paymentMethod) {
         speakToUser("Siparişiniz alınırken bir hata oluştu. Lütfen tekrar deneyin.");
     }
 }
+
 // Sayfa yüklendiğinde ödeme butonlarını sıfırla
 document.addEventListener('DOMContentLoaded', function() {
     resetPaymentButtons();
@@ -2021,7 +2074,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return amount * 0.18;
         }
 
-    // DÜZELTİLMİŞ FONKSİYON: Sepete ürün ekle (product_price_id olmadan)
+  // DÜZELTİLMİŞ FONKSİYON: Sepete ürün ekle (product_price_id ile)
 function addToCartByProduct(product, quantity, updateUI = false) {
     // Aynı product_id'ye sahip ürünü ara
     const existingItem = cart.find(item => item.id === product.id);
@@ -2031,6 +2084,7 @@ function addToCartByProduct(product, quantity, updateUI = false) {
     } else {
         cart.push({
             id: product.id, // products tablosu id
+            product_price_id: product.product_price_id, // product_prices tablosu id (EKSİK EKLENDİ)
             seller_id: product.seller_id, // Satıcı ID
             name: product.name,
             price: product.price,
@@ -2043,92 +2097,25 @@ function addToCartByProduct(product, quantity, updateUI = false) {
     
     if (updateUI) {
         updateCartUI();
-        // Ürün grid'ini de güncelle (miktar değişiklikleri için)
-        if (typeof displayProducts === 'function') {
-            displayProducts(products);
-        }
     }
 }
 
-			
-// DÜZELTİLMİŞ FONKSİYON: Sepet öğesini güncelle (ürün kartında)
-
-// DÜZELTİLMİŞ FONKSİYON: Sepet öğesini güncelle
-function updateCartItem(productPriceId, quantity) {
-    const existingItem = cart.find(item => item.product_price_id === productPriceId);
+// DÜZELTİLMİŞ FONKSİYON: Sepet öğesini güncelle (product_id ile)
+function updateCartItem(productId, quantity) {
+    const existingItem = cart.find(item => item.id === productId);
     
     if (existingItem) {
         if (quantity <= 0) {
             // Miktar 0 veya negatifse ürünü sepetten çıkar
-            cart = cart.filter(item => item.product_price_id !== productPriceId);
+            cart = cart.filter(item => item.id !== productId);
         } else {
             existingItem.quantity = quantity;
-            // İndirimi yeniden hesapla
-            existingItem.discount = existingItem.discount_price ? 
-                (existingItem.price - existingItem.discount_price) * quantity : 0;
         }
         
         updateCartUI();
-        displayProducts(products); // Grid'i güncelle
     }
-}        // Initialize the application
-        document.addEventListener('DOMContentLoaded', function() {
-            initApp();
-        });
-
-        async function initApp() {
-            setupEventHandlers();
-            initVoiceAssistant();
-			initVoiceAssistant();
-		await loadAllSellers();
-        }
-
-
-		   // Oturumu kaydet
-        function saveSession() {
-            if (currentCustomer) {
-                const sessionData = {
-                    customer: currentCustomer,
-                    cart: cart,
-                    selectedSellerId: selectedSellerId,
-                    timestamp: new Date().getTime()
-                };
-                localStorage.setItem('onurmarket_session', JSON.stringify(sessionData));
-                
-                // Kullanıcıya bildir
-                sessionSaver.style.display = 'block';
-                setTimeout(() => {
-                    sessionSaver.style.display = 'none';
-                }, 2000);
-            }
-        }
-
-        // Oturumu geri yükle
-        function restoreSession() {
-            const savedSession = localStorage.getItem('onurmarket_session');
-            if (savedSession) {
-                const sessionData = JSON.parse(savedSession);
-                
-                // Oturumun süresi dolmuş mu kontrol et (24 saat)
-                const now = new Date().getTime();
-                if (now - sessionData.timestamp < 24 * 60 * 60 * 1000) {
-                    currentCustomer = sessionData.customer;
-                    cart = sessionData.cart || [];
-                    selectedSellerId = sessionData.selectedSellerId;
-                    
-                    updateCustomerUI();
-                    updateCartUI();
-                    
-                    if (currentCustomer) {
-                        enableUI();
-                        startLocationCheckTimer();
-                    }
-                } else {
-                    localStorage.removeItem('onurmarket_session');
-                }
-            }
-        }
-
+}
+       
         // Lokasyon kontrol timer'ını başlat
         function startLocationCheckTimer() {
             locationChecker.style.display = 'block';
@@ -2242,6 +2229,7 @@ function findProductByName(productName) {
     </script>
 </body>
 </html>
+
 
 
 
