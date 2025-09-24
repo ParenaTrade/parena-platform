@@ -1254,52 +1254,61 @@ async function checkCustomerByPhone(phone) {
             });
         }
 
-		// Satıcı verilerini yükle
+		
         // DÜZELTİLMİŞ FONKSİYON: Satıcı verilerini yükle
+// DÜZELTİLMİŞ FONKSİYON: Satıcı verilerini yükle
 async function loadSellerData(sellerId) {
     try {
         const selectedSeller = sellers.find(s => s.id === sellerId);
         if (selectedSeller) {
             speakToUser(`${selectedSeller.full_name} satıcısının ürünleri yükleniyor.`);
         }
-
-        // Ürünleri product_prices tablosundan sube_id (sellerId) ile yükle
-        const { data: productData, error: productError } = await supabase
+        
+        // Ürünleri product_prices tablosundan sube_id (sellerId) ile yükle ve products tablosuna join yap
+        const { data: productPricesData, error: productError } = await supabase
             .from('product_prices')
             .select(`
-                id, price, stock, currency, discount_price, 
+                id, price, stock, currency, discount_price, product_id,
                 products (id, name, description, gtip_code, imgurl, unit_type, barcode, brand, category_id, reyon_id)
             `)
             .eq('sube_id', sellerId)
             .limit(50);
-
+        
         if (productError) {
             console.error('Ürün yükleme hatası:', productError);
             products = [];
         } else {
-            // productData'dan products dizisini oluştur
-            products = productData.map(item => {
+            // product_prices ve products tablolarını birleştir
+            products = productPricesData.map(item => {
                 return {
-                    ...item.products,
+                    id: item.products.id,
+                    product_price_id: item.id, // product_prices tablosundaki id
+                    name: item.products.name,
+                    description: item.products.description,
                     price: item.price,
                     stock: item.stock,
                     currency: item.currency,
-                    discount_price: item.discount_price,
-                    price_id: item.id
+                    gtip_code: item.products.gtip_code,
+                    imgurl: item.products.imgurl,
+                    unit_type: item.products.unit_type,
+                    barcode: item.products.barcode,
+                    brand: item.products.brand,
+                    category_id: item.products.category_id,
+                    reyon_id: item.products.reyon_id,
+                    discount_price: item.discount_price
                 };
             });
         }
-
+        
         displayProducts(products);
-
+        
         speakToUser(`${products.length} ürün yüklendi. Sesli olarak veya listeden ürün seçebilirsiniz.`);
-
+        
     } catch (error) {
         console.error('Satıcı verileri yüklenme hatası:', error);
         speakToUser("Satıcı verileri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
     }
-}        
-                
+}                
 
 		
 		// Sesli asistanı başlat
@@ -1595,17 +1604,16 @@ async function loadSellerData(sellerId) {
                 return;
             }
             
-            // Sepeti onaylama
-            if (message.includes('sepeti onayla') || message.includes('siparişi ver')) {
-                if (cart.length === 0) {
-                    speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
-                    return;
-                }
-                
-                speakToUser(`Sepetinizde ${cart.length} ürün bulunuyor. Toplam tutar ${totalAmountEl.textContent}. Nasıl ödemek istersiniz? Nakit, kart veya bonus?`);
-                return;
-            }
-
+            // Diğer komutlar...
+    if (message.includes('sepeti onayla') || message.includes('siparişi ver')) {
+        if (cart.length === 0) {
+            speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
+            return;
+        }
+        
+        speakToUser(`Sepetinizde ${cart.length} ürün bulunuyor. Toplam tutar ${totalAmountEl.textContent}. Nasıl ödemek istersiniz? Nakit, kart veya bonus?`);
+        return;
+    }
 
     // DÜZELTİLMİŞ FONKSİYON: Ödeme yöntemini seç
     function selectPaymentMethod(method) {
@@ -1671,26 +1679,29 @@ async function loadSellerData(sellerId) {
         }
 
         // Ürünü sepete ekle
-        function addToCartByProduct(product, quantity, updateUI = false) {
-            const existingItem = cart.find(item => item.id === product.id);
-            
-            if (existingItem) {
-                existingItem.quantity += quantity;
-            } else {
-                cart.push({
-                    id: product.id,
-                    name: product.name,
-                    price: product.price,
-                    discount: product.discount_price ? (product.price - product.discount_price) * quantity : 0,
-                    quantity: quantity
-                });
-            }
-            
-            if (updateUI) {
-                updateCartUI();
-            }
-        }
-
+      // DÜZELTİLMİŞ FONKSİYON: Sepete ürün ekle (product_prices tablosundaki id ile)
+function addToCartByProduct(product, quantity, updateUI = false) {
+    // Sepetteki ürünü product_price_id ile bul
+    const existingItem = cart.find(item => item.product_price_id === product.product_price_id);
+    
+    if (existingItem) {
+        existingItem.quantity += quantity;
+    } else {
+        cart.push({
+            id: product.id,
+            product_price_id: product.product_price_id, // product_prices tablosundaki id
+            name: product.name,
+            price: product.price,
+            discount: product.discount_price ? (product.price - product.discount_price) * quantity : 0,
+            quantity: quantity,
+            imgurl: product.imgurl
+        });
+    }
+    
+    if (updateUI) {
+        updateCartUI();
+    }
+}
         // Sepet UI güncelle
         function updateCartUI() {
             cartList.innerHTML = '';
@@ -1716,7 +1727,24 @@ async function loadSellerData(sellerId) {
                 `;
                 cartList.appendChild(cartItem);
             });
-            
+			
+// DÜZELTİLMİŞ FONKSİYON: Sepet öğesini güncelle (ürün kartında)
+function updateCartItem(productPriceId, quantity) {
+    const existingItem = cart.find(item => item.product_price_id === productPriceId);
+    
+    if (existingItem) {
+        if (quantity <= 0) {
+            // Miktar 0 veya negatifse ürünü sepetten çıkar
+            cart = cart.filter(item => item.product_price_id !== productPriceId);
+        } else {
+            existingItem.quantity = quantity;
+            existingItem.discount = existingItem.discount_price ? 
+                (existingItem.price - existingItem.discount_price) * quantity : 0;
+        }
+        
+        updateCartUI();
+    }
+}            
             const subtotal = calculateSubtotal();
             const discount = calculateDiscount();
             const vatAmount = calculateVAT(subtotal - discount);
@@ -1736,6 +1764,8 @@ async function loadSellerData(sellerId) {
         async function initApp() {
             setupEventHandlers();
             initVoiceAssistant();
+			initVoiceAssistant();
+			await loadAllSellers();
         }
 
 
@@ -1835,45 +1865,81 @@ async function loadSellerData(sellerId) {
             }
         }
 
-	// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla
-    async function finalizeOrder(paymentMethod) {
-        if (cart.length === 0) {
-            speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
-            return;
-        }
-        
-        try {
-            const orderData = {
-                customer_id: currentCustomer.id,
-                seller_id: selectedSellerId,
-                products: cart,
-                total_amount: calculateSubtotal() - calculateDiscount() + calculateVAT(calculateSubtotal() - calculateDiscount()),
-                payment_method: paymentMethod,
-                status: 'pending',
-                created_at: new Date().toISOString()
-            };
-            
-            const { data, error } = await supabase
-                .from('orders')
-                .insert([orderData])
-                .select();
-            
-            if (error) throw error;
-            
-            speakToUser(`Siparişiniz alındı! Sipariş numaranız: ${data[0].id}. Teşekkür ederiz.`);
-            
-            // Sepeti temizle
-            cart = [];
-            updateCartUI();
-            
-            // Sipariş durumunu güncelle
-            updateOrderStatus('completed');
-            
-        } catch (error) {
-            console.error('Sipariş hatası:', error);
-            speakToUser("Siparişiniz alınırken bir hata oluştu. Lütfen tekrar deneyin.");
-        }
+	// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (doğru veri yapısı ile)
+async function finalizeOrder(paymentMethod) {
+    if (cart.length === 0) {
+        speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
+        return;
     }
+    
+    if (!selectedSellerId) {
+        speakToUser("Lütfen önce bir satıcı seçin.");
+        return;
+    }
+    
+    try {
+        // Sipariş verisini hazırla
+        const orderData = {
+            customer_id: currentCustomer.id,
+            seller_id: selectedSellerId,
+            total_amount: calculateSubtotal() - calculateDiscount() + calculateVAT(calculateSubtotal() - calculateDiscount()),
+            payment_method: paymentMethod,
+            status: 'pending',
+            created_at: new Date().toISOString()
+        };
+        
+        // Siparişi veritabanına ekle
+        const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .insert([orderData])
+            .select()
+            .single();
+        
+        if (orderError) throw orderError;
+        
+        // Sipariş detaylarını ekle
+        const orderItems = cart.map(item => ({
+            order_id: order.id,
+            product_id: item.id,
+            product_price_id: item.product_price_id,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price: item.price * item.quantity
+        }));
+        
+        const { error: itemsError } = await supabase
+            .from('order_items')
+            .insert(orderItems);
+        
+        if (itemsError) throw itemsError;
+        
+        speakToUser(`Siparişiniz alındı! Sipariş numaranız: ${order.id}. Teşekkür ederiz.`);
+        
+        // Sepeti temizle
+        cart = [];
+        updateCartUI();
+        displayProducts(products);
+        
+        // Sipariş durumunu güncelle
+        updateOrderStatus('completed');
+        
+    } catch (error) {
+        console.error('Sipariş hatası:', error);
+        speakToUser("Siparişiniz alınırken bir hata oluştu. Lütfen tekrar deneyin.");
+    }
+}
+// YENİ FONKSİYON: Barkod ile ürün ara
+function findProductByBarcode(barcode) {
+    return products.find(product => product.barcode === barcode);
+}
+
+// YENİ FONKSİYON: Ürün ismi ile ara (bulanık arama)
+function findProductByName(productName) {
+    const searchTerm = productName.toLowerCase().trim();
+    return products.find(product => 
+        product.name.toLowerCase().includes(searchTerm)
+    );
+}
 
     // DÜZELTİLMİŞ FONKSİYON: Sipariş durumunu güncelle
     function updateOrderStatus(status) {
@@ -1922,6 +1988,7 @@ async function loadSellerData(sellerId) {
     </script>
 </body>
 </html>
+
 
 
 
