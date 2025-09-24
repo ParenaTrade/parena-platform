@@ -1890,10 +1890,10 @@ function updateCartUI() {
     }
 }
 
-		// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (hata yönetimi ile)
-// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (product_price_id olmadan)
+	// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (foreign key hatası düzeltildi)
 async function finalizeOrder(paymentMethod) {
-    try {
+        try {
+        // Ön kontroller
         if (cart.length === 0) {
             speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
             return;
@@ -1909,17 +1909,30 @@ async function finalizeOrder(paymentMethod) {
             return;
         }
         
+        // Veritabanı constraint'lerini kontrol et
+        const constraintsValid = await checkDatabaseConstraints();
+        if (!constraintsValid) {
+            return;
+        }    
+			
+        if (!currentCustomer) {
+            speakToUser("Lütfen önce giriş yapın.");
+            return;
+        }
+        
         speakToUser("Siparişiniz alınıyor, lütfen bekleyin...");
         
         // Sipariş verisini hazırla - orders tablosu
         const orderData = {
             customer_id: currentCustomer.id,
-            seller_id: selectedSellerId,
+            seller_id: selectedSellerId, // Bu, profiles tablosundaki bir ID olmalı
             total_amount: calculateSubtotal() - calculateDiscount() + calculateVAT(calculateSubtotal() - calculateDiscount()),
             payment_method: paymentMethod,
             status: 'pending',
             created_at: new Date().toISOString()
         };
+        
+        console.log("Sipariş verisi:", orderData);
         
         // Siparişi veritabanına ekle (orders tablosuna)
         const { data: order, error: orderError } = await supabase
@@ -1928,25 +1941,43 @@ async function finalizeOrder(paymentMethod) {
             .select()
             .single();
         
-        if (orderError) throw orderError;
+        if (orderError) {
+            console.error('Sipariş kaydetme hatası:', orderError);
+            
+            // Foreign key hatasını özel olarak ele al
+            if (orderError.code === '23503') {
+                if (orderError.message.includes('seller_id') && orderError.message.includes('products')) {
+                    speakToUser("Satıcı bilgisi hatası. Lütfen farklı bir satıcı seçin veya sistem yöneticisiyle iletişime geçin.");
+                } else {
+                    speakToUser("Veritabanı hatası. Lütfen daha sonra tekrar deneyin.");
+                }
+            } else {
+                speakToUser("Sipariş kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.");
+            }
+            return;
+        }
         
-        // Sipariş detaylarını hazırla - order_details tablosuna (product_price_id olmadan)
+        // Sipariş detaylarını hazırla - order_details tablosuna
         const orderDetails = cart.map(item => ({
             order_id: order.id,
-            product_id: item.id, // products tablosundaki ID
+            product_id: item.id,
             quantity: item.quantity,
             unit_price: item.price,
             discount: item.discount_price ? (item.price - item.discount_price) * item.quantity : 0,
-            tax_rate: 18, // %18 KDV
+            tax_rate: 18,
             created_at: new Date().toISOString()
         }));
         
         // Sipariş detaylarını ekle (order_details tablosuna)
         const { error: detailsError } = await supabase
-            .from('order_item')
-            .insert(order_Details);
+            .from('order_details')
+            .insert(orderDetails);
         
-        if (detailsError) throw detailsError;
+        if (detailsError) {
+            console.error('Sipariş detayları kaydetme hatası:', detailsError);
+            speakToUser("Sipariş detayları kaydedilirken bir hata oluştu.");
+            return;
+        }
         
         speakToUser(`Siparişiniz alındı! Sipariş numaranız: ${order.id}. Teşekkür ederiz.`);
         
@@ -1958,6 +1989,7 @@ async function finalizeOrder(paymentMethod) {
         currentPaymentMethod = null;
         resetPaymentButtons();
         updateCartUI();
+        unlockSellerSelection();
         
         // 3 saniye sonra yeni sipariş için hazırlık mesajı
         setTimeout(() => {
@@ -1969,7 +2001,6 @@ async function finalizeOrder(paymentMethod) {
         speakToUser("Siparişiniz alınırken bir hata oluştu. Lütfen tekrar deneyin.");
     }
 }
-
 // Sayfa yüklendiğinde ödeme butonlarını sıfırla
 document.addEventListener('DOMContentLoaded', function() {
     resetPaymentButtons();
@@ -2211,6 +2242,7 @@ function findProductByName(productName) {
     </script>
 </body>
 </html>
+
 
 
 
