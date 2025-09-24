@@ -843,6 +843,7 @@
     let referralGroupCode = null; // EKSİK EKLENDİ
     let locationCheckTimer = null; // EKSİK EKLENDİ
     let locationCheckAttempts = 0; // EKSİK EKLENDİ
+	let isSellerLocked = false;
     const MAX_LOCATION_CHECK_ATTEMPTS = 10; // EKSİK EKLENDİ
 
     // DOM Elements - EKSİK OLANLAR EKLENDİ
@@ -1580,88 +1581,333 @@ async function loadSellerData(sellerId) {
         }
 
 		
-        // Sipariş komutlarını işle
-        function processOrderCommand(message) {
-            // Ürün ekleme komutları
-            const productAddMatch = message.match(/(\d+)?\s*(kilo|gram|litre|adet|tane|paket)?\s*([a-zçğıöşü\s]+)/i);
-            
-            if (productAddMatch) {
-                const quantity = productAddMatch[1] ? parseInt(productAddMatch[1]) : 1;
-                const unit = productAddMatch[2] || 'adet';
-                const productName = productAddMatch[3].trim();
-                
-                // Ürünü bul
-                const product = products.find(p => 
-                    p.name.toLowerCase().includes(productName.toLowerCase())
-                );
-                
-                if (product) {
-                    addToCartByProduct(product, quantity, true);
-                    speakToUser(`${quantity} ${unit} ${product.name} sepete eklendi.`);
-                } else {
-                    speakToUser("Üzgünüm, istediğiniz ürünü bulamadım. Lütfen başka bir ürün söyleyin.");
-                }
-                return;
-            }
-            
-            // Diğer komutlar...
+        // DÜZELTİLMİŞ FONKSİYON: Sipariş komutlarını işle
+function processOrderCommand(message) {
+    // Ürün ekleme komutları
+    const productAddMatch = message.match(/(\d+)?\s*(kilo|gram|litre|adet|tane|paket)?\s*([a-zçğıöşü\s]+)/i);
+    
+    if (productAddMatch) {
+        const quantity = productAddMatch[1] ? parseInt(productAddMatch[1]) : 1;
+        const unit = productAddMatch[2] || 'adet';
+        const productName = productAddMatch[3].trim();
+        
+        // Ürünü bul
+        const product = products.find(p => 
+            p.name.toLowerCase().includes(productName.toLowerCase())
+        );
+        
+        if (product) {
+            addToCartByProduct(product, quantity, true);
+            speakToUser(`${quantity} ${unit} ${product.name} sepete eklendi.`);
+        } else {
+            speakToUser("Üzgünüm, istediğiniz ürünü bulamadım. Lütfen başka bir ürün söyleyin.");
+        }
+        return;
+    }
+    
+    // Sepeti onaylama
     if (message.includes('sepeti onayla') || message.includes('siparişi ver')) {
         if (cart.length === 0) {
             speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
             return;
         }
         
+        if (!selectedSellerId) {
+            speakToUser("Lütfen önce bir satıcı seçin.");
+            return;
+        }
+        
         speakToUser(`Sepetinizde ${cart.length} ürün bulunuyor. Toplam tutar ${totalAmountEl.textContent}. Nasıl ödemek istersiniz? Nakit, kart veya bonus?`);
         return;
     }
-
-    // DÜZELTİLMİŞ FONKSİYON: Ödeme yöntemini seç
-    function selectPaymentMethod(method) {
-        currentPaymentMethod = method;
-        // Ödeme butonlarının görünümünü güncelle
-        document.querySelectorAll('#payCash, #payCard, #payBonus').forEach(btn => {
-            btn.style.opacity = '0.7';
-        });
-        document.getElementById(`pay${method.charAt(0).toUpperCase() + method.slice(1)}`).style.opacity = '1';
+    
+    // Ödeme seçenekleri
+    if (message.includes('nakit')) {
+        selectPaymentMethod('nakit');
+        speakToUser("Nakit ödeme seçildi. Siparişinizi onaylıyor musunuz?");
+        return;
     }
-
-			
-            // Ödeme seçenekleri
-            if (message.includes('nakit')) {
-                selectPaymentMethod('nakit');
-                speakToUser("Nakit ödeme seçildi. Siparişinizi onaylıyor musunuz?");
-                return;
-            }
-            
-            if (message.includes('kart')) {
-                selectPaymentMethod('kart');
-                speakToUser("Kart ile ödeme seçildi. Siparişinizi onaylıyor musunuz?");
-                return;
-            }
-            
-            if (message.includes('bonus')) {
-                selectPaymentMethod('bonus');
-                speakToUser("Bonus ile ödeme seçildi. Siparişinizi onaylıyor musunuz?");
-                return;
-            }
-
-
-
-			
-            // Sipariş onayı
-            if (message.includes('evet') || message.includes('onaylıyorum')) {
-                if (!currentPaymentMethod) {
-                    speakToUser("Önce bir ödeme yöntemi seçmelisiniz.");
-                    return;
-                }
-                
-                finalizeOrder(currentPaymentMethod);
-                return;
-            }
-            
-            // Anlamayan yanıt
-            speakToUser("Üzgünüm, anlayamadım. Lütfen tekrar söyler misiniz?");
+    
+    if (message.includes('kart') || message.includes('kredi kartı') || message.includes('kredi kartı')) {
+        selectPaymentMethod('kart');
+        speakToUser("Kart ile ödeme seçildi. Siparişinizi onaylıyor musunuz?");
+        return;
+    }
+    
+    if (message.includes('bonus')) {
+        selectPaymentMethod('bonus');
+        speakToUser("Bonus ile ödeme seçildi. Siparişinizi onaylıyor musunuz?");
+        return;
+    }
+    
+    // Sipariş onayı
+    if (message.includes('evet') || message.includes('onaylıyorum') || message.includes('tamam')) {
+        if (!currentPaymentMethod) {
+            speakToUser("Önce bir ödeme yöntemi seçmelisiniz.");
+            return;
         }
+        
+        finalizeOrder(currentPaymentMethod);
+        return;
+    }
+    
+    // Sipariş iptali
+    if (message.includes('iptal') || message.includes('vazgeç') || message.includes('hayır')) {
+        speakToUser("Siparişiniz iptal edildi. Başka bir şey ister misiniz?");
+        currentPaymentMethod = null;
+        resetPaymentButtons();
+        return;
+    }
+    
+    // Anlamayan yanıt
+    speakToUser("Üzgünüm, anlayamadım. Lütfen tekrar söyler misiniz?");
+}
+
+// DÜZELTİLMİŞ FONKSİYON: Ödeme yöntemini seç
+function selectPaymentMethod(method) {
+    currentPaymentMethod = method;
+    resetPaymentButtons();
+    
+    const buttonId = `pay${method.charAt(0).toUpperCase() + method.slice(1)}`;
+    const selectedButton = document.getElementById(buttonId);
+    
+    if (selectedButton) {
+        selectedButton.style.opacity = '1';
+        selectedButton.style.border = '2px solid #10b981';
+    }
+}
+
+// DÜZELTİLMİŞ FONKSİYON: Ödeme butonlarını sıfırla
+function resetPaymentButtons() {
+    const paymentButtons = ['payCash', 'payCard', 'payBonus'];
+    paymentButtons.forEach(buttonId => {
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.style.opacity = '0.7';
+            button.style.border = '2px solid #e5e7eb';
+        }
+    });
+}
+
+// DÜZELTİLMİŞ FONKSİYON: Satıcı seçildiğinde diğerlerini kilitle
+function lockSellerSelection() {
+    isSellerLocked = true;
+    
+    // Satıcı grid'indeki tüm kartları kilitle
+    document.querySelectorAll('.seller-card').forEach(card => {
+        if (!card.classList.contains('selected')) {
+            card.style.opacity = '0.5';
+            card.style.pointerEvents = 'none';
+        }
+    });
+    
+    // Satıcı dropdown'unu kilitle
+    sellerSelect.disabled = true;
+    sellerSelect.style.opacity = '0.7';
+    
+    // Bilgi mesajı göster
+    speakToUser(`Satıcı seçildi. Sepetinize ürün eklemeye başlayabilirsiniz. Sepeti boşaltırsanız farklı bir satıcı seçebilirsiniz.`);
+}
+
+// DÜZELTİLMİŞ FONKSİYON: Satıcı kilidini kaldır
+function unlockSellerSelection() {
+    isSellerLocked = false;
+    
+    // Satıcı grid'indeki tüm kartların kilidini kaldır
+    document.querySelectorAll('.seller-card').forEach(card => {
+        card.style.opacity = '1';
+        card.style.pointerEvents = 'auto';
+    });
+    
+    // Satıcı dropdown'unun kilidini kaldır
+    sellerSelect.disabled = false;
+    sellerSelect.style.opacity = '1';
+}
+
+// DÜZELTİLMİŞ FONKSİYON: Satıcı grid'ini güncelle (kilitleme mekanizması ile)
+function updateSellersGrid() {
+    sellerGrid.innerHTML = '';
+    
+    if (sellers.length === 0) {
+        sellerGrid.innerHTML = '<div class="text-sm text-gray-500 text-center">Satıcı bulunamadı</div>';
+        return;
+    }
+    
+    sellers.forEach(seller => {
+        const sellerCard = document.createElement('div');
+        sellerCard.className = 'seller-card';
+        sellerCard.dataset.sellerId = seller.id;
+        
+        if (selectedSellerId === seller.id) {
+            sellerCard.classList.add('selected');
+        }
+        
+        // Eğer satıcı kilitliyse ve bu satıcı seçili değilse, opak yap
+        if (isSellerLocked && selectedSellerId !== seller.id) {
+            sellerCard.style.opacity = '0.5';
+            sellerCard.style.pointerEvents = 'none';
+        }
+        
+        sellerCard.innerHTML = `
+            <img src="${seller.imgurl || 'https://via.placeholder.com/50'}" alt="${seller.full_name}">
+            <div class="seller-name">${seller.full_name}</div>
+            <div class="seller-city text-xs text-gray-500">${seller.city}</div>
+        `;
+        
+        sellerCard.addEventListener('click', () => {
+            // Eğer satıcı kilitliyse ve bu satıcı seçili değilse, tıklamaya izin verme
+            if (isSellerLocked && selectedSellerId !== seller.id) {
+                speakToUser("Önce sepetinizi boşaltmalısınız farklı bir satıcı seçmek için.");
+                return;
+            }
+            
+            document.querySelectorAll('.seller-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            sellerCard.classList.add('selected');
+            selectedSellerId = seller.id;
+            
+            // Satıcıyı kilitle
+            lockSellerSelection();
+            
+            loadSellerData(seller.id);
+        });
+        
+        sellerGrid.appendChild(sellerCard);
+    });
+}
+
+// DÜZELTİLMİŞ FONKSİYON: Sepet UI güncelle (satıcı kilidi kontrolü ile)
+function updateCartUI() {
+    cartList.innerHTML = '';
+    
+    if (cart.length === 0) {
+        cartList.innerHTML = '<div class="text-sm text-gray-500">Sepete ürün ekleyin</div>';
+        subtotalEl.textContent = '0 ₺';
+        discountEl.textContent = '0 ₺';
+        vatAmountEl.textContent = '0 ₺';
+        totalAmountEl.textContent = '0 ₺';
+        
+        // Sepet boşsa satıcı kilidini kaldır
+        if (isSellerLocked) {
+            unlockSellerSelection();
+            selectedSellerId = null;
+        }
+        
+        return;
+    }
+    
+    cart.forEach(item => {
+        const cartItem = document.createElement('div');
+        cartItem.className = 'flex justify-between items-center py-2 border-b';
+        cartItem.innerHTML = `
+            <div class="flex-1">
+                <div class="font-medium">${item.name}</div>
+                <div class="text-sm text-gray-500">${item.quantity} adet x ${money(item.price)}</div>
+            </div>
+            <div class="font-semibold">${money(item.price * item.quantity)}</div>
+        `;
+        cartList.appendChild(cartItem);
+    });
+    
+    const subtotal = calculateSubtotal();
+    const discount = calculateDiscount();
+    const vatAmount = calculateVAT(subtotal - discount);
+    const total = subtotal - discount + vatAmount;
+    
+    subtotalEl.textContent = money(subtotal);
+    discountEl.textContent = money(discount);
+    vatAmountEl.textContent = money(vatAmount);
+    totalAmountEl.textContent = money(total);
+    
+    // Sepette ürün varsa ve satıcı kilitli değilse, kilitle
+    if (cart.length > 0 && !isSellerLocked && selectedSellerId) {
+        lockSellerSelection();
+    }
+}
+
+		// DÜZELTİLMİŞ FONKSİYON: Siparişi tamamla (hata yönetimi ile)
+async function finalizeOrder(paymentMethod) {
+    try {
+        if (cart.length === 0) {
+            speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
+            return;
+        }
+        
+        if (!selectedSellerId) {
+            speakToUser("Lütfen önce bir satıcı seçin.");
+            return;
+        }
+        
+        if (!currentCustomer) {
+            speakToUser("Lütfen önce giriş yapın.");
+            return;
+        }
+        
+        speakToUser("Siparişiniz alınıyor, lütfen bekleyin...");
+        
+        // Sipariş verisini hazırla
+        const orderData = {
+            customer_id: currentCustomer.id,
+            seller_id: selectedSellerId,
+            total_amount: calculateSubtotal() - calculateDiscount() + calculateVAT(calculateSubtotal() - calculateDiscount()),
+            payment_method: paymentMethod,
+            status: 'pending',
+            created_at: new Date().toISOString()
+        };
+        
+        // Siparişi veritabanına ekle
+        const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .insert([orderData])
+            .select()
+            .single();
+        
+        if (orderError) throw orderError;
+        
+        // Sipariş detaylarını ekle
+        const orderItems = cart.map(item => ({
+            order_id: order.id,
+            product_id: item.id,
+            product_price_id: item.product_price_id,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price: item.price * item.quantity
+        }));
+        
+        const { error: itemsError } = await supabase
+            .from('order_items')
+            .insert(orderItems);
+        
+        if (itemsError) throw itemsError;
+        
+        speakToUser(`Siparişiniz alındı! Sipariş numaranız: ${order.id}. Teşekkür ederiz.`);
+        
+        // Sipariş durumunu güncelle
+        updateOrderStatus('completed');
+        
+        // Sepeti temizle ve kilidi kaldır
+        cart = [];
+        currentPaymentMethod = null;
+        resetPaymentButtons();
+        updateCartUI();
+        
+        // 3 saniye sonra yeni sipariş için hazırlık mesajı
+        setTimeout(() => {
+            speakToUser("Yeni bir sipariş vermek için satıcı seçebilirsiniz.");
+        }, 3000);
+        
+    } catch (error) {
+        console.error('Sipariş hatası:', error);
+        speakToUser("Siparişiniz alınırken bir hata oluştu. Lütfen tekrar deneyin.");
+    }
+}
+
+// Sayfa yüklendiğinde ödeme butonlarını sıfırla
+document.addEventListener('DOMContentLoaded', function() {
+    resetPaymentButtons();
+});
 
         // Sepet toplamını hesapla
         function calculateSubtotal() {
@@ -1765,7 +2011,7 @@ function updateCartItem(productPriceId, quantity) {
             setupEventHandlers();
             initVoiceAssistant();
 			initVoiceAssistant();
-			await loadAllSellers();
+		await loadAllSellers();
         }
 
 
@@ -1988,6 +2234,7 @@ function findProductByName(productName) {
     </script>
 </body>
 </html>
+
 
 
 
