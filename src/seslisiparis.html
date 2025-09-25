@@ -2016,7 +2016,7 @@ async function load() {
 
         // Sunucudan yükle
         const { data, error } = await supabase
-            .from('vendors')
+            .from('seller_profiles')
             .select('*')
             .eq('is_active', true)
             .order('name');
@@ -2024,14 +2024,14 @@ async function load() {
         if (error) {
             console.error('❌ Vendors yükleme hatası:', error);
             
-            if (vendorsData.length === 0) {
+            if (Data.length === 0) {
                 await useFallbackVendors();
             }
             return;
         }
 
         if (data && data.length > 0) {
-            vendorsData = data;
+            Data = data;
             localStorage.setItem('vendors', JSON.stringify(vendorsData));
             debugLog('✅ Vendors sunucudan yüklendi', vendorsData.length);
         } else {
@@ -2177,7 +2177,7 @@ async function loadVendors() {
         
         // Sunucudan güncel veriyi al
         const { data, error } = await supabase
-            .from('vendors')
+            .from('seller_profiles')
             .select('*')
             .eq('is_active', true)
             .order('name');
@@ -2522,11 +2522,10 @@ function debugLocationMatch(vendorLocation, userLocation) {
                 const customerCity = currentCustomer?.city || 'İstanbul';
                 
                 const { data, error } = await supabase
-                    .from('profiles')
+                    .from('seller_profiles')
                     .select('*')
-                    .eq('role', 'seller')
                     .eq('status', 'Active')
-                    .eq('seller_type', storeTypeId) // seller_type = store_type_id
+                    .eq('store_type_id', storeTypeId) // seller_type = store_type_id
                     .ilike('city', `%${customerCity}%`);
 
                 if (error) throw error;
