@@ -1370,41 +1370,60 @@
     // initApp fonksiyonunu güncelle
 async function initApp() {
     try {
-        // Mikrofon butonuna event listener ekle
+
+		  // DOM elementlerinin yüklenmesini bekle
+        await waitForDOMElements();
+        
+          // Mikrofon butonuna event listener ekle
         microphoneToggle.addEventListener('click', toggleMicrophone);
         
-        // Önce oturumu geri yükle
+       // Önce oturumu geri yükle
         await restoreSession();
         
         // Store type'ları yükle
         await loadStoreTypes();
         
-        // Giriş yapılmamışsa banner göster
+         // Giriş yapılmamışsa banner göster
         if (!currentCustomer) {
             showHowItWorksBanner();
-            // Giriş yapılmamışsa konum modalını gösterme
-            // Doğrudan asistanı başlat
             setTimeout(() => {
                 enableMicrophone();
             }, 1000);
         } else {
             hideHowItWorksBanner();
             
-            // Önce localStorage'da kayıtlı konumu kontrol et
             const savedLocation = localStorage.getItem('selectedLocation');
             if (savedLocation) {
-                // Kayıtlı konum varsa, modal göstermeden doğrudan kullan
                 selectedLocation = savedLocation;
                 console.log('Kayıtlı konum kullanılıyor:', selectedLocation);
                 initializeAssistant();
             } else {
-                // Konum seçilmemişse modal göster
-                showLocationModal();
+                // Modalı göstermeden önce küçük bir gecikme
+                setTimeout(() => {
+                    showLocationModal();
+                }, 500);
             }
         }
     } catch (error) {
         console.error('Uygulama başlatılırken hata oluştu:', error);
     }
+}
+
+		// DOM elementlerinin yüklenmesini bekleyen fonksiyon
+function waitForDOMElements() {
+    return new Promise((resolve) => {
+        const checkElements = () => {
+            const locationOptions = document.querySelector('.location-options');
+            const locationModal = document.getElementById('locationModal');
+            
+            if (locationOptions && locationModal) {
+                resolve();
+            } else {
+                setTimeout(checkElements, 100);
+            }
+        };
+        checkElements();
+    });
 }
 
 // Konum seçimini zorunlu kılmak için mikrofon kontrolü
@@ -1618,17 +1637,24 @@ async function processReferralCode(code, groupCode) {
             document.getElementById('orderSummary').style.display = 'flex';
         }
 
-       // Konum modalını göster
+// Basitleştirilmiş showLocationModal
 function showLocationModal() {
-    // Modalı göster
+    const locationModal = document.getElementById('locationModal');
+    const locationOptions = document.querySelector('.location-options');
+    
+    if (!locationModal || !locationOptions) {
+        console.error('Modal elementleri bulunamadı');
+        return;
+    }
+    
     locationModal.style.display = 'block';
     
     // Modal dışına tıklanınca kapanmasını sağla
-    locationModal.addEventListener('click', function(e) {
+    locationModal.onclick = function(e) {
         if (e.target === locationModal) {
             hideLocationModal();
         }
-    });
+    };
     
     // Konum seçeneklerine tıklama event'lerini ekle
     locationOptions.querySelectorAll('.location-option').forEach(option => {
@@ -1637,11 +1663,8 @@ function showLocationModal() {
         };
     });
     
-    // Sayfa yüklendiğinde otomatik seçim yapılmasını engelle
-    // Mikrofon ve diğer işlemleri modal kapanana kadar askıya al
     disableMicrophone();
 }
-
 // Konum modalını gizle
 function hideLocationModal() {
     locationModal.style.display = 'none';
