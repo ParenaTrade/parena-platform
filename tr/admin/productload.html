@@ -320,6 +320,12 @@
                                 </select>
                             </div>
                             <div class="col-md-3 mb-3">
+                                <label class="form-label">Mağaza Seçç</label>
+                                <select class="form-select" id="storeFilter">
+                                    <option value="">Tüm Mağazalarr</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
                                 <label class="form-label">Ürün Ara</label>
                                 <input type="text" class="form-control" id="searchInput" placeholder="Ürün adı veya barkod...">
                             </div>
@@ -350,6 +356,7 @@
                                         <span class="drag-item" data-field="brand">Marka <i class="fas fa-grip-vertical ms-1"></i></span>
                                         <span class="drag-item" data-field="category_name">Kategori <i class="fas fa-grip-vertical ms-1"></i></span>
                                         <span class="drag-item" data-field="reyon_name">Reyon <i class="fas fa-grip-vertical ms-1"></i></span>
+                                        <span class="drag-item" data-field="store_name">Mağaza <i class="fas fa-grip-vertical ms-1"></i></span>
                                     </div>
                                 </div>
                                 <div class="col-md-2 d-flex align-items-center justify-content-center">
@@ -444,6 +451,12 @@
                                 <label class="form-label">Reyon</label>
                                 <select class="form-select" name="reyon_id" id="reyonSelect" required>
                                     <option value="">Reyon Seçin</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Reyon</label>
+                                <select class="form-select" name="store_id" id="storeSelect" required>
+                                    <option value="">Mağaza Seçin</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
@@ -583,6 +596,11 @@
                                     <td>Reyon adı</td>
                                     <td>Hayır</td>
                                 </tr>
+                                 <tr>
+                                    <td>Mağaza</td>
+                                    <td>Mağaza adı</td>
+                                    <td>Hayır</td>
+                                </tr>
                             </tbody>
                         </table>
                         
@@ -608,6 +626,7 @@
         let sellers = [];
         let categories = [];
         let reyons = [];
+        let stores = [];
         let selectedColumns = ['name', 'price', 'discount_price', 'stock', 'barcode'];
         let currentProductId = null;
 
@@ -722,6 +741,7 @@
                     loadSellers(),
                     loadCategories(),
                     loadReyons(),
+                    loadStores(),
                     loadProducts()
                 ]);
                 
@@ -890,6 +910,46 @@
             }
         }
 
+        // Mağazaları yükle
+        async function loadStores() {
+            try {
+                const { data, error } = await supabase
+                    .from('store_type')
+                    .select('id, name')
+                    .order('name');
+                
+                if (error) throw error;
+                
+                reyons = data;
+                
+                // Mağaza filtreleme seçeneğini doldur
+                const storeFilter = document.getElementById('storeFilter');
+                storeFilter.innerHTML = '<option value="">Tüm Mağazalar</option>';
+                
+                data.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store.id;
+                    option.textContent = store.name;
+                    storeFilter.appendChild(option);
+                });
+                
+                // Modal için reyon seçeneğini doldur
+                const storeSelect = document.getElementById('storeSelect');
+                reyonSelect.innerHTML = '<option value="">Mağaza Seçin</option>';
+                
+                data.forEach(reyon => {
+                    const option = document.createElement('option');
+                    option.value = storeid;
+                    option.textContent = store.name;
+                    storeSelect.appendChild(option);
+                });
+                
+            } catch (error) {
+                console.error('Mağazalar yüklenirken hata oluştu:', error);
+                throw error;
+            }
+        }
+
         // Ürünleri yükle
         async function loadProducts() {
             try {
@@ -898,9 +958,10 @@
                     .select(`
                         id, name, description, price, stock, currency, 
                         gtip_code, created_at, updated_at, imgurl, 
-                        unit_type, barcode, brand, category_id, reyon_id,
+                        unit_type, barcode, brand, category_id, reyon_id, store_id,
                         categories (name),
                         reyon (name),
+                        store (name),
                         product_prices (id, price, discount_price, sube_id)
                     `)
                     .order('name');
@@ -938,6 +999,7 @@
                     case 'brand': th.textContent = 'Marka'; break;
                     case 'category_name': th.textContent = 'Kategori'; break;
                     case 'reyon_name': th.textContent = 'Reyon'; break;
+                    case 'store_name': th.textContent = 'Mağaza'; break;
                     default: th.textContent = col;
                 }
                 
@@ -989,6 +1051,9 @@
                             break;
                         case 'reyon_name':
                             cell.textContent = product.reyon ? product.reyon.name : '-';
+                            break;
+                        case 'store_name':
+                            cell.textContent = product.store ? product.store.name : '-';
                             break;
                         default:
                             cell.textContent = product[col] || '-';
@@ -1224,6 +1289,7 @@
             const seller = document.getElementById('sellerFilter').value;
             const category = document.getElementById('categoryFilter').value;
             const reyon = document.getElementById('reyonFilter').value;
+            const store = document.getElementById('storeFilter').value;
             const searchText = document.getElementById('searchInput').value.toLowerCase();
             
             // Filtreleme işlemi - allProducts üzerinden filtrele
@@ -1242,6 +1308,9 @@
                 
                 // Reyon filtresi
                 if (reyon && product.reyon_id !== reyon) match = false;
+
+                 // Mağaza filtresi
+                if (store && product.store_id !== store) match = false;
                 
                 // Arama metni filtresi
                 if (searchText && 
@@ -1258,7 +1327,7 @@
             updateProductsTable();
             
             // Filtre uygulandığına dair bilgi ver
-            if (seller || category || reyon || searchText) {
+            if (seller || category || reyon || store || searchText) {
                 showStatus('Filtreleme uygulandı. ' + filteredProducts.length + ' ürün bulundu.');
             } else {
                 showStatus('Tüm filtreler temizlendi. ' + filteredProducts.length + ' ürün gösteriliyor.');
@@ -1270,6 +1339,7 @@
             document.getElementById('sellerFilter').value = '';
             document.getElementById('categoryFilter').value = '';
             document.getElementById('reyonFilter').value = '';
+            document.getElementById('storeFilter').value = '';
             document.getElementById('searchInput').value = '';
             
             // Tüm ürünleri göster
@@ -1298,6 +1368,7 @@
                     // Select'leri doldur
                     document.getElementById('categorySelect').value = product.category_id || '';
                     document.getElementById('reyonSelect').value = product.reyon_id || '';
+                    document.getElementById('storeSelect').value = product.store_id || '';
                     document.querySelector('select[name="unit_type"]').value = product.unit_type || 'Kilo';
                     document.querySelector('select[name="currency"]').value = product.currency || 'TRY';
                     
@@ -1371,6 +1442,7 @@
                     description: document.querySelector('textarea[name="description"]').value,
                     category_id: document.getElementById('categorySelect').value,
                     reyon_id: document.getElementById('reyonSelect').value,
+                    store_id: document.getElementById('storeSelect').value,
                     unit_type: document.querySelector('select[name="unit_type"]').value,
                     currency: document.querySelector('select[name="currency"]').value,
                     updated_at: new Date().toISOString()
@@ -1473,6 +1545,7 @@
                     'Birim Tipi': product.unit_type,
                     'Kategori': product.categories ? product.categories.name : '',
                     'Reyon': product.reyon ? product.reyon.name : '',
+                    'Mağaza': product.store ? product.store.name : '',
                     'GTIP Kodu': product.gtip_code || ''
                 }));
                 
@@ -1539,6 +1612,13 @@
                             const reyon = reyons.find(r => r.name === row['Reyon']);
                             if (reyon) reyon_id = reyon.id;
                         }
+
+                        // Mağaza ID'sini bul
+                        let store_id = null;
+                        if (row['Mağaza']) {
+                            const store = stores.find(r => r.name === row['Mağaza']);
+                            if (store) store_id = store.id;
+                        }
                         
                         // Barkoda göre ürünü kontrol et
                         const existingProduct = allProducts.find(p => p.barcode === row['Barkod']);
@@ -1552,6 +1632,7 @@
                                 brand: row['Marka'] || '',
                                 category_id: category_id,
                                 reyon_id: reyon_id,
+                                store_id: store_id,
                                 updated_at: new Date().toISOString()
                             };
                             
@@ -1619,6 +1700,7 @@
                                 brand: row['Marka'] || '',
                                 category_id: category_id,
                                 reyon_id: reyon_id,
+                                store_id: store_id:, 
                                 currency: 'TRY',
                                 unit_type: 'Adet',
                                 created_at: new Date().toISOString(),
