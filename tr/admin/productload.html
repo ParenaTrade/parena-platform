@@ -468,7 +468,7 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Satıcı</label>
-                                <select class="form-select" name="sube_id" id="sellerSelect" required>
+                                <select class="form-select" name="seller_id" id="sellerSelect" required>
                                     <option value="">Satıcı Seçin</option>
                                 </select>
                             </div>
@@ -962,7 +962,7 @@
                         categories (name),
                         reyon (name),
                         store (name),
-                        product_prices (id, price, discount_price, sube_id)
+                        product_prices (id, price, discount_price, seller_id)
                     `)
                     .order('name');
                 
@@ -1299,7 +1299,7 @@
                 // Satıcı filtresi
                 if (seller) {
                     const hasSeller = product.product_prices && 
-                        product.product_prices.some(pp => pp.sube_id === seller);
+                        product.product_prices.some(pp => pp.seller_id === seller);
                     if (!hasSeller) match = false;
                 }
                 
@@ -1374,7 +1374,7 @@
                     
                     // Satıcıyı doldur (product_prices'dan)
                     if (product.product_prices && product.product_prices.length > 0) {
-                        document.getElementById('sellerSelect').value = product.product_prices[0].sube_id || '';
+                        document.getElementById('sellerSelect').value = product.product_prices[0].seller_id || '';
                     }
                     
                     // İndirimli fiyatı doldur
@@ -1449,7 +1449,7 @@
                 };
                 
                 // Satıcı ve indirimli fiyat - HATA DÜZELTİLMİŞ
-                const sube_id = document.getElementById('sellerSelect').value;
+                const seller_id = document.getElementById('sellerSelect').value;
                 const discount_price_input = document.querySelector('input[name="discount_price"]');
                 const discount_price = discount_price_input.value ? parseFloat(discount_price_input.value) : null;
                 
@@ -1479,19 +1479,19 @@
                 }
                 
                 // Product_prices kaydını güncelle
-                if (currentProductId && sube_id) {
+                if (currentProductId && seller_id) {
                     // Önce mevcut kaydı kontrol et
                     const { data: existingPrices, error: checkError } = await supabase
                         .from('product_prices')
                         .select('id')
                         .eq('product_id', currentProductId)
-                        .eq('sube_id', sube_id);
+                        .eq('seller_id', seller_id);
                     
                     if (checkError) throw checkError;
                     
                     const priceData = {
                         product_id: currentProductId,
-                        sube_id: sube_id,
+                        seller_id: seller_id,
                         price: formData.price,
                         discount_price: discount_price,
                         updated: new Date().toISOString()
@@ -1656,13 +1656,13 @@
                                         .from('product_prices')
                                         .select('id')
                                         .eq('product_id', existingProduct.id)
-                                        .eq('sube_id', defaultSeller);
+                                        .eq('seller_id', defaultSeller);
                                     
                                     if (checkError) throw checkError;
                                     
                                     const priceData = {
                                         product_id: existingProduct.id,
-                                        sube_id: defaultSeller,
+                                        seller_id: defaultSeller,
                                         price: parseFloat(row['Fiyat']),
                                         discount_price: discount_price,
                                         updated: new Date().toISOString()
@@ -1724,7 +1724,7 @@
                                 if (defaultSeller) {
                                     const priceData = {
                                         product_id: insertedProduct[0].id,
-                                        sube_id: defaultSeller,
+                                        seller_id: defaultSeller,
                                         price: parseFloat(row['Fiyat']),
                                         discount_price: discount_price,
                                         created: new Date().toISOString(),
