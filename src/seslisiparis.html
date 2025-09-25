@@ -1051,7 +1051,9 @@
                         </button>
                     </div>
                 </div>
-                <!-- Çıkış butonu örneği -->
+             <button id="logoutButton" style="display: none; position: fixed; top: 10px; right: 10px; z-index: 1000; padding: 8px 16px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
+    <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+</button>
 
 
                 <button id="microphoneToggle" class="microphone-toggle">
@@ -1252,14 +1254,12 @@
         <div class="footer-bottom">
             <p>&copy; 2023 Sesli Sipariş Sistemi. Tüm hakları saklıdır.</p>
         </div>
-		<!-- HTML içine debug butonu ekleyebilirsiniz -->
-<button onclick="debugStorage()" style="position: fixed; bottom: 10px; right: 10px; z-index: 10000;">
-    Debug Storage
-</button>
-
-<button onclick="debugLog('Manual debug')" style="position: fixed; bottom: 50px; right: 10px; z-index: 10000;">
-    Debug Log
-</button>
+	<!-- Sayfanın en altına veya üstüne ekleyin -->
+<div style="position: fixed; bottom: 10px; left: 10px; z-index: 10000; background: white; padding: 10px; border-radius: 5px;">
+    <button onclick="window.debugApp.storage()">Storage Durumu</button>
+    <button onclick="window.debugApp.elements()">Elementleri Kontrol Et</button>
+    <button onclick="window.debugApp.reload()">Sayfayı Temizle ve Yenile</button>
+</div>
     </footer>
 
     <!-- Voice Assistant -->
@@ -1377,50 +1377,49 @@
             return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; 
         }
 
-    // initApp fonksiyonunu güncelle
-// Uygulama başlatma (sıralama düzeltilmiş)
+   // Düzeltilmiş initApp sıralaması
 async function initApp() {
     try {
         debugLog('=== UYGULAMA BAŞLATILIYOR ===');
         debugStorage();
         
-        // 1. DOM elementlerini bekle
+        // 1. DOM elementlerini bekle (düzeltilmiş)
         await waitForDOMElements();
-        debugLog('DOM elementleri hazır');
         
-        // 2. Çıkış butonunu ayarla (erken aşamada)
+        // 2. Oturumu geri yükle (İLK SIRADA)
+        await restoreSession();
+        debugLog('Oturum yüklendi', { 
+            currentCustomer: currentCustomer ? 'Var' : 'Yok',
+            selectedLocation: selectedLocation 
+        });
+        
+        // 3. Çıkış butonunu ayarla
         setupLogoutButton();
         
-        // 3. Mikrofon kontrollerini ayarla
+        // 4. StoreTypes ve satıcıları yükle
+        await loadStoreTypes();
+        
+        // 5. Mikrofon kontrollerini ayarla
         if (microphoneToggle) {
             microphoneToggle.addEventListener('click', handleMicrophoneToggle);
             debugLog('Mikrofon butonu ayarlandı');
         }
         
-        // 4. Oturumu geri yükle
-        await restoreSession();
-        debugLog('Oturum geri yüklendi', { currentCustomer: !!currentCustomer });
-        
-        // 5. Çıkış butonunu güncelle (oturum yüklendikten sonra)
-        setupLogoutButton();
-        
-        // 6. Store type'ları yükle
-        await loadStoreTypes();
-        debugLog('Store type lar yüklendi');
-        
-        // 7. Banner ve konum kontrolü
+        // 6. Banner ve konum kontrolü
         if (!currentCustomer) {
             showHowItWorksBanner();
-            debugLog('Misafir kullanıcı, banner gösterildi');
+            debugLog('Misafir kullanıcı - banner gösterildi');
             
-            // Misafir kullanıcı için mikrofonu aç
+            // Misafir için mikrofonu aç
             setTimeout(() => {
-                enableMicrophone();
-                debugLog('Misafir kullanıcı için mikrofon açıldı');
+                if (!currentCustomer) {
+                    enableMicrophone();
+                    debugLog('Misafir kullanıcı için mikrofon açıldı');
+                }
             }, 1000);
         } else {
             hideHowItWorksBanner();
-            debugLog('Giriş yapılmış, banner gizlendi');
+            debugLog('Giriş yapılmış - banner gizlendi');
             
             // Konum kontrolü
             const savedLocation = localStorage.getItem('selectedLocation');
@@ -1429,51 +1428,75 @@ async function initApp() {
                 debugLog('Kayıtlı konum kullanılıyor:', selectedLocation);
                 initializeAssistant();
             } else {
-                debugLog('Konum seçilmemiş, modal gösterilecek');
-                setTimeout(() => showLocationModal(), 500);
+                debugLog('Konum seçilmemiş - modal gösterilecek');
+                setTimeout(() => showLocationModal(), 300);
             }
         }
         
         debugLog('=== UYGULAMA BAŞLATMA TAMAMLANDI ===');
         
     } catch (error) {
-        console.error('Uygulama başlatılırken hata oluştu:', error);
-        debugLog('InitApp hatası:', error);
+        console.error('Uygulama başlatma hatası:', error);
+        // Hata durumunda bile temel işlevselliği sağla
+        emergencyFallback();
     }
 }
-		// DOM elementlerinin yüklenmesini bekleyen fonksiyon
-// DOM elementlerinin yüklenmesini bekle
+
+// Acil durum fallback'i
+function emergencyFallback() {
+    debugLog('Acil durum modu aktif');
+    
+    // Mikrofonu etkinleştir
+    setTimeout(() => {
+        enableMicrophone();
+    }, 1000);
+    
+    // Çıkış butonunu oluştur
+    setupLogoutButton();
+}
+     
+// DOM elementlerinin yüklenmesini bekleyen fonksiyon
+// Düzeltilmiş DOM bekleme fonksiyonu
 function waitForDOMElements() {
     return new Promise((resolve) => {
-        const elementsToCheck = [
-            'logoutButton',
-            'locationModal',
-            'microphoneToggle',
-            'vendorsContainer'
-        ];
+        let attempts = 0;
+        const maxAttempts = 50; // Maksimum 5 saniye bekleyelim
         
         const checkElements = () => {
-            const allLoaded = elementsToCheck.every(id => {
-                const element = document.getElementById(id) || document.querySelector('.' + id);
-                if (!element) {
-                    debugLog(`Element henüz yüklenmedi: ${id}`);
-                }
-                return !!element;
-            });
+            attempts++;
             
-            if (allLoaded) {
-                debugLog('Tüm DOM elementleri yüklendi');
+            // Sadece kritik elementleri kontrol et
+            const criticalElements = {
+                'microphoneToggle': document.getElementById('microphoneToggle'),
+                'locationModal': document.getElementById('locationModal')
+            };
+            
+            const allCriticalLoaded = Object.values(criticalElements).every(element => element !== null);
+            
+            if (allCriticalLoaded) {
+                debugLog('Kritik DOM elementleri yüklendi', criticalElements);
                 resolve();
-            } else {
-                setTimeout(checkElements, 100);
+                return;
             }
+            
+            // logoutButton gibi opsiyonel elementleri kontrol et
+            const logoutBtn = document.getElementById('logoutButton');
+            if (!logoutBtn) {
+                debugLog(`Deneme ${attempts}: logoutButton henüz bulunamadı`);
+            }
+            
+            if (attempts >= maxAttempts) {
+                console.warn('Bazı elementler yüklenemedi, uygulamayı başlatıyoruz...');
+                resolve(); // Yine de devam et
+                return;
+            }
+            
+            setTimeout(checkElements, 100);
         };
         
-        // İlk kontrolü 100ms sonra yap
-        setTimeout(checkElements, 100);
+        checkElements();
     });
 }
-
 // Her 10 saniyede bir debug çıktısı (isteğe bağlı)
 setInterval(() => {
     if (DEBUG_MODE) {
@@ -1695,35 +1718,63 @@ function handleMicrophoneToggle() {
 
 
 // Çıkış butonunu ayarla
+// Geliştirilmiş logout buton yönetimi
 function setupLogoutButton() {
-    const logoutBtn = document.getElementById('logoutButton');
-    const userProfile = document.getElementById('userProfile');
+    let logoutBtn = document.getElementById('logoutButton');
     
-    if (logoutBtn) {
-        // Mevcut event listener'ları temizle ve yeniden ekle
-        logoutBtn.replaceWith(logoutBtn.cloneNode(false));
-        const newLogoutBtn = document.getElementById('logoutButton');
-        
-        newLogoutBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Çıkış butonuna tıklandı');
-            logout();
-        });
-        
-        // Kullanıcı durumuna göre görünürlüğü ayarla
-        if (currentCustomer) {
-            newLogoutBtn.style.display = 'block';
-            if (userProfile) userProfile.style.display = 'none';
-        } else {
-            newLogoutBtn.style.display = 'none';
-            if (userProfile) userProfile.style.display = 'block';
-        }
+    // Eğer element yoksa, oluştur
+    if (!logoutBtn) {
+        logoutBtn = createLogoutButton();
+        debugLog('logoutButton oluşturuldu');
     } else {
-        console.warn('Çıkış butonu bulunamadı');
+        debugLog('logoutButton mevcut, ayarlanıyor');
     }
+    
+    // Event listener'ı temizle ve yeniden ekle
+    logoutBtn.onclick = null;
+    logoutBtn.removeEventListener('click', handleLogout);
+    logoutBtn.addEventListener('click', handleLogout);
+    
+    // Görünürlüğü güncelle
+    updateLogoutButtonVisibility();
 }
-		
+
+// Logout butonu oluştur
+function createLogoutButton() {
+    const logoutBtn = document.createElement('button');
+    logoutBtn.id = 'logoutButton';
+    logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Çıkış Yap';
+    logoutBtn.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        padding: 8px 16px;
+        background: #ff4444;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        display: none;
+    `;
+    
+    document.body.appendChild(logoutBtn);
+    return logoutBtn;
+}
+
+// Logout buton görünürlüğünü güncelle
+function updateLogoutButtonVisibility() {
+    const logoutBtn = document.getElementById('logoutButton');
+    if (!logoutBtn) return;
+    
+    if (currentCustomer) {
+        logoutBtn.style.display = 'block';
+        debugLog('Çıkış butonu görünür yapıldı - Kullanıcı giriş yapmış');
+    } else {
+        logoutBtn.style.display = 'none';
+        debugLog('Çıkış butonu gizlendi - Kullanıcı giriş yapmamış');
+    }
+}		
 // Debug için: LocalStorage durumunu göster
 function showStorageStatus() {
     console.log('=== LOCALSTORAGE DURUMU ===');
@@ -1855,66 +1906,186 @@ function initializeAssistant() {
 
 		
         // Store type'ları yükle (düzeltilmiş versiyon)
+// StoreTypes yükleme fonksiyonunu düzeltelim
 async function loadStoreTypes() {
     try {
-        debugLog('Store type lar yükleniyor...');
+        debugLog('StoreTypes yükleniyor...');
         
-        const { data, error } = await supabase
-            .from('store_types')
-            .select('*')
-            .order('name');
+        // Önce cache'den dene
+        const cachedStoreTypes = localStorage.getItem('storeTypes');
+        if (cachedStoreTypes) {
+            storeTypes = JSON.parse(cachedStoreTypes);
+            debugLog('StoreTypes cache den yüklendi:', storeTypes.length);
             
-        if (error) {
-            console.error('Store type yükleme hatası:', error);
-            // Fallback: Local storage'dan yükle
-            const cached = localStorage.getItem('storeTypes');
-            if (cached) {
-                storeTypes = JSON.parse(cached);
-                debugLog('Store type lar cache den yüklendi:', storeTypes);
-                return;
-            }
-            throw error;
+            // Yine de sunucudan güncel veriyi al (arka planda)
+            loadStoreTypesFromServer();
+            return;
         }
         
-        storeTypes = data || [];
-        localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
-        debugLog('Store type lar yüklendi:', storeTypes);
-        
-        // Satıcıları yükle
-        await loadVendors();
+        // Cache yoksa sunucudan yükle
+        await loadStoreTypesFromServer();
         
     } catch (error) {
-        console.error('Store type yükleme hatası:', error);
-        storeTypes = [];
+        console.error('StoreTypes yükleme hatası:', error);
+        // Fallback data kullan
+        await useFallbackStoreTypes();
     }
 }
 
+// Sunucudan StoreTypes yükle
+async function loadStoreTypesFromServer() {
+    const { data, error } = await supabase
+        .from('store_types')
+        .select('*')
+        .order('name');
+    
+    if (error) {
+        console.error('StoreTypes sunucu hatası:', error);
+        throw error;
+    }
+    
+    storeTypes = data || [];
+    localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
+    debugLog('StoreTypes sunucudan yüklendi:', storeTypes.length);
+    
+    // Satıcıları yükle
+    await loadVendors();
+}
+
+// Fallback StoreTypes kullan
+async function useFallbackStoreTypes() {
+    storeTypes = [
+        { id: 1, name: 'Restoran', code: 'restaurant' },
+        { id: 2, name: 'Kafe', code: 'cafe' },
+        { id: 3, name: 'Market', code: 'market' }
+    ];
+    
+    debugLog('Fallback StoreTypes kullanılıyor:', storeTypes);
+    
+    // Satıcıları yükle
+    await loadVendors();
+}
+function getFallbackStoreTypes() {
+    return [
+        { id: 1, name: 'Restoran', code: 'restaurant' },
+        { id: 2, name: 'Kafe', code: 'cafe' },
+        { id: 3, name: 'Market', code: 'market' }
+    ];
+}
 // Satıcıları yükle
+// Satıcı yükleme ve konum eşleştirme
 async function loadVendors() {
     try {
-        debugLog('Satıcılar yükleniyor...');
+        debugLog('Satıcılar yükleniyor, konum:', selectedLocation);
         
+        let vendorsData = [];
+        
+        // Önce cache'den dene
+        const cachedVendors = localStorage.getItem('vendors');
+        if (cachedVendors) {
+            vendorsData = JSON.parse(cachedVendors);
+            debugLog('Satıcılar cache den yüklendi:', vendorsData.length);
+        }
+        
+        // Sunucudan güncel veriyi al
         const { data, error } = await supabase
             .from('vendors')
             .select('*')
             .eq('is_active', true)
             .order('name');
-            
-        if (error) {
-            console.error('Satıcı yükleme hatası:', error);
-            throw error;
+        
+        if (!error && data) {
+            vendorsData = data;
+            localStorage.setItem('vendors', JSON.stringify(vendorsData));
+            debugLog('Satıcılar sunucudan yüklendi:', vendorsData.length);
         }
         
-        vendors = data || [];
-        debugLog('Satıcılar yüklendi:', vendors.length);
+        vendors = vendorsData;
         
         // Konuma göre filtrele
-        filterVendorsByLocation();
+        filterAndDisplayVendors();
         
     } catch (error) {
         console.error('Satıcı yükleme hatası:', error);
         vendors = [];
     }
+}
+
+// Satıcıları filtrele ve göster
+// Satıcı yükleme ve konum eşleştirme
+async function loadVendors() {
+    try {
+        debugLog('Satıcılar yükleniyor, konum:', selectedLocation);
+        
+        let vendorsData = [];
+        
+        // Önce cache'den dene
+        const cachedVendors = localStorage.getItem('vendors');
+        if (cachedVendors) {
+            vendorsData = JSON.parse(cachedVendors);
+            debugLog('Satıcılar cache den yüklendi:', vendorsData.length);
+        }
+        
+        // Sunucudan güncel veriyi al
+        const { data, error } = await supabase
+            .from('vendors')
+            .select('*')
+            .eq('is_active', true)
+            .order('name');
+        
+        if (!error && data) {
+            vendorsData = data;
+            localStorage.setItem('vendors', JSON.stringify(vendorsData));
+            debugLog('Satıcılar sunucudan yüklendi:', vendorsData.length);
+        }
+        
+        vendors = vendorsData;
+        
+        // Konuma göre filtrele
+        filterAndDisplayVendors();
+        
+    } catch (error) {
+        console.error('Satıcı yükleme hatası:', error);
+        vendors = [];
+    }
+}
+
+// Satıcıları filtrele ve göster
+function filterAndDisplayVendors() {
+    if (!selectedLocation) {
+        debugLog('Konum seçilmediği için tüm satıcılar gösteriliyor');
+        displayVendors(vendors);
+        return;
+    }
+    
+    const filteredVendors = vendors.filter(vendor => {
+        // Vendor'ın locations alanını kontrol et
+        let vendorLocations = [];
+        
+        if (vendor.locations) {
+            if (typeof vendor.locations === 'string') {
+                vendorLocations = vendor.locations.split(',').map(loc => loc.trim());
+            } else if (Array.isArray(vendor.locations)) {
+                vendorLocations = vendor.locations;
+            }
+        }
+        
+        // Konum eşleşmesini kontrol et ve debug et
+        const matches = vendorLocations.length === 0 || 
+                       vendorLocations.includes('all') || 
+                       vendorLocations.includes(selectedLocation);
+        
+        debugLog(`Satıcı: ${vendor.name}`, {
+            'Satıcı Konumları': vendorLocations,
+            'Kullanıcı Konumu': selectedLocation,
+            'Eşleşme': matches
+        });
+        
+        return matches;
+    });
+    
+    debugLog(`Filtrelenmiş satıcılar: ${filteredVendors.length}/${vendors.length}`);
+    displayVendors(filteredVendors);
 }
 // Store type'ları ekranda göster
         function displayStoreTypes(types) {
@@ -2088,19 +2259,46 @@ function debugLog(message, data = null) {
     }
 }
 
-// Storage durumunu göster
+// Geliştirilmiş debug fonksiyonları
 function debugStorage() {
-    if (!DEBUG_MODE) return;
-    
-    console.group('=== DEBUG: STORAGE DURUMU ===');
+    console.group('🔍 DEBUG: STORAGE DURUMU');
     console.log('currentCustomer:', localStorage.getItem('currentCustomer'));
     console.log('selectedLocation:', localStorage.getItem('selectedLocation'));
-    console.log('storeTypes:', localStorage.getItem('storeTypes'));
+    console.log('storeTypes:', localStorage.getItem('storeTypes') ? '✓ Yüklü' : '✗ Yok');
+    console.log('vendors:', localStorage.getItem('vendors') ? '✓ Yüklü' : '✗ Yok');
     console.log('referral_code:', localStorage.getItem('referral_code'));
     console.log('referral_group_code:', localStorage.getItem('referral_group_code'));
     console.groupEnd();
 }
 
+// Sayfa yüklendiğinde
+document.addEventListener('DOMContentLoaded', function() {
+    debugLog('🏁 DOM Content Loaded');
+    
+    // Hemen logout butonunu oluştur
+    setupLogoutButton();
+    
+    // 300ms sonra initApp'i başlat
+    setTimeout(() => {
+        initApp();
+    }, 300);
+});
+
+// Manuel test için global fonksiyonlar
+window.debugApp = {
+    storage: debugStorage,
+    elements: function() {
+        console.log('🔍 Element Kontrolü:');
+        console.log('logoutButton:', document.getElementById('logoutButton'));
+        console.log('microphoneToggle:', document.getElementById('microphoneToggle'));
+        console.log('locationModal:', document.getElementById('locationModal'));
+    },
+    reload: function() {
+        localStorage.removeItem('storeTypes');
+        localStorage.removeItem('vendors');
+        location.reload();
+    }
+};
 // Konum eşleşme kontrolü
 function debugLocationMatch(vendorLocation, userLocation) {
     if (!DEBUG_MODE) return;
@@ -2780,6 +2978,12 @@ function setupLogoutButton() {
         currentCustomer: !!currentCustomer
     });
     
+    // Eğer logoutBtn yoksa ve currentCustomer varsa, fallback buton oluştur
+    if (!logoutBtn && currentCustomer) {
+        createFallbackLogoutButton();
+        return;
+    }
+    
     if (logoutBtn) {
         // Event listener'ı temizle ve yeniden ekle
         logoutBtn.onclick = null;
@@ -2795,41 +2999,35 @@ function setupLogoutButton() {
             if (userProfile) userProfile.style.display = 'none';
             debugLog('Çıkış butonu gizlendi');
         }
-    } else {
-        console.warn('Çıkış butonu element bulunamadı. Element ID: logoutButton');
-        // Alternatif olarak buton oluştur
-        createFallbackLogoutButton();
     }
 }
-
 // Fallback çıkış butonu oluştur
 function createFallbackLogoutButton() {
-    let logoutBtn = document.getElementById('logoutButton');
-    
-    if (!logoutBtn) {
-        logoutBtn = document.createElement('button');
-        logoutBtn.id = 'logoutButton';
-        logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Çıkış Yap';
-        logoutBtn.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 1000;
-            padding: 8px 16px;
-            background: #ff4444;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        `;
-        
-        document.body.appendChild(logoutBtn);
-        debugLog('Fallback çıkış butonu oluşturuldu');
+    // Eğer fallback buton zaten varsa, işlem yapma
+    if (document.getElementById('fallbackLogoutButton')) {
+        return;
     }
     
+    const logoutBtn = document.createElement('button');
+    logoutBtn.id = 'fallbackLogoutButton';
+    logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Çıkış Yap';
+    logoutBtn.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        padding: 8px 16px;
+        background: #ff4444;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    `;
+    
+    document.body.appendChild(logoutBtn);
     logoutBtn.addEventListener('click', handleLogout);
+    debugLog('Fallback çıkış butonu oluşturuldu');
 }
-
 // Çıkış işlemini yönet
 function handleLogout(e) {
     e.preventDefault();
