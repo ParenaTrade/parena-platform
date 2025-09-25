@@ -1051,7 +1051,11 @@
                         </button>
                     </div>
                 </div>
-                
+                <!-- Çıkış butonu örneği -->
+<button id="logoutButton" style="display: none;" onclick="logout()">
+    <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+</button>
+
                 <button id="microphoneToggle" class="microphone-toggle">
                     <i class="fas fa-microphone-slash"></i>
                     <span>Mikrofon (Kapalı)</span>
@@ -1370,40 +1374,43 @@
     // initApp fonksiyonunu güncelle
 async function initApp() {
     try {
-
-		  // DOM elementlerinin yüklenmesini bekle
+        console.log('Uygulama başlatılıyor...');
+        
+        // Önce DOM elementlerinin yüklenmesini bekle
         await waitForDOMElements();
         
-          // Mikrofon butonuna event listener ekle
-        microphoneToggle.addEventListener('click', toggleMicrophone);
+        // Mikrofon butonuna event listener ekle
+        if (microphoneToggle) {
+            microphoneToggle.addEventListener('click', handleMicrophoneToggle);
+        }
         
-       // Önce oturumu geri yükle
+        // Sayfa yüklendiğinde mikrofonu otomatik aç (1 saniye gecikmeyle)
+        setTimeout(() => {
+            if (!currentCustomer) {
+                enableMicrophone();
+            }
+        }, 1000);
+        
+        // Çıkış butonunu kontrol et ve event listener ekle
+        setupLogoutButton();
+        
+        // Önce oturumu geri yükle
         await restoreSession();
+        console.log('Oturum durumu:', currentCustomer ? 'Giriş yapılmış' : 'Misafir');
         
         // Store type'ları yükle
         await loadStoreTypes();
         
-         // Giriş yapılmamışsa banner göster
+        // Banner kontrolü
         if (!currentCustomer) {
             showHowItWorksBanner();
-            setTimeout(() => {
-                enableMicrophone();
-            }, 1000);
         } else {
             hideHowItWorksBanner();
-            
-            const savedLocation = localStorage.getItem('selectedLocation');
-            if (savedLocation) {
-                selectedLocation = savedLocation;
-                console.log('Kayıtlı konum kullanılıyor:', selectedLocation);
-                initializeAssistant();
-            } else {
-                // Modalı göstermeden önce küçük bir gecikme
-                setTimeout(() => {
-                    showLocationModal();
-                }, 500);
-            }
         }
+        
+        // Konum kontrolü ve asistan başlatma
+        checkLocationAndInitialize();
+        
     } catch (error) {
         console.error('Uygulama başlatılırken hata oluştu:', error);
     }
@@ -1465,11 +1472,43 @@ function showNotification(message) {
     }, 3000);
 }
 
+		// Geliştirilmiş konum kontrol fonksiyonu
+function checkLocationAndInitialize() {
+    const savedLocation = localStorage.getItem('selectedLocation');
+    
+    // Eğer kullanıcı giriş yapmışsa ve konum seçilmemişse modal göster
+    if (currentCustomer && !savedLocation) {
+        console.log('Kullanıcı giriş yapmış ama konum seçmemiş, modal gösteriliyor...');
+        showLocationModal();
+        return false; // Konum seçilene kadar devam etme
+    }
+    
+    // Eğer konum seçilmişse asistanı başlat
+    if (savedLocation) {
+        selectedLocation = savedLocation;
+        console.log('Kayıtlı konum kullanılıyor:', selectedLocation);
+        initializeAssistant();
+        return true;
+    }
+    
+    // Giriş yapmamış kullanıcılar için doğrudan asistanı başlat
+    if (!currentCustomer) {
+        console.log('Misafir kullanıcı, konum seçimi olmadan asistan başlatılıyor...');
+        setTimeout(() => {
+            enableMicrophone();
+        }, 1000);
+        return true;
+    }
+    
+    return false;
+}
+		
 // Sayfa yüklendiğinde initApp'i çalıştır
 document.addEventListener('DOMContentLoaded', function() {
     initApp();
 });
 
+		
 async function processReferralCode(code, groupCode) {
     try {
         console.log('Referans kodu işleniyor:', code, groupCode);
@@ -1586,6 +1625,77 @@ async function processReferralCode(code, groupCode) {
             });
         }
 
+function handleMicrophoneToggle() {
+    // Konum kontrolü - eğer kullanıcı giriş yapmışsa ve konum seçmemişse
+    if (currentCustomer && !localStorage.getItem('selectedLocation')) {
+        showLocationModal();
+        showNotification('Lütfen önce bir konum seçiniz.');
+        return;
+    }
+    
+    // Normal mikrofon açma/kapama işlemi
+    if (isListening) {
+        disableMicrophone();
+    } else {
+        enableMicrophone();
+    }
+}
+
+
+
+
+// Çıkış butonunu ayarla
+function setupLogoutButton() {
+    const logoutBtn = document.getElementById('logoutButton');
+    const userProfile = document.getElementById('userProfile');
+    
+    if (logoutBtn) {
+        // Mevcut event listener'ları temizle ve yeniden ekle
+        logoutBtn.replaceWith(logoutBtn.cloneNode(true));
+        const newLogoutBtn = document.getElementById('logoutButton');
+        
+        newLogoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Çıkış butonuna tıklandı');
+            logout();
+        });
+        
+        // Kullanıcı durumuna göre görünürlüğü ayarla
+        if (currentCustomer) {
+            newLogoutBtn.style.display = 'block';
+            if (userProfile) userProfile.style.display = 'block';
+        } else {
+            newLogoutBtn.style.display = 'none';
+            if (userProfile) userProfile.style.display = 'none';
+        }
+    } else {
+        console.warn('Çıkış butonu bulunamadı');
+    }
+}
+		
+// Debug için: LocalStorage durumunu göster
+function showStorageStatus() {
+    console.log('=== LOCALSTORAGE DURUMU ===');
+    console.log('currentCustomer:', localStorage.getItem('currentCustomer'));
+    console.log('selectedLocation:', localStorage.getItem('selectedLocation'));
+    console.log('referral_code:', localStorage.getItem('referral_code'));
+    console.log('referral_group_code:', localStorage.getItem('referral_group_code'));
+    console.log('==========================');
+}
+
+// Sayfa yüklendiğinde storage durumunu göster
+document.addEventListener('DOMContentLoaded', function() {
+    showStorageStatus();
+    
+    // Her 5 saniyede bir storage durumunu logla (debug için)
+    setInterval(showStorageStatus, 5000);
+});
+8. HTML'de çıkış butonu kontrolü:
+html
+<!-
+
+		
         function scrollElement(element, amount) {
             element.scrollBy({ left: amount, behavior: 'smooth' });
         }
@@ -2502,52 +2612,53 @@ function initVoiceAssistant() {
             }
         }
 
-        function logout() {
-            currentCustomer = null;
-            cart = [];
-            selectedSellerId = null;
-            selectedSellerType = null;
-            selectedCategoryId = null;
-            selectedLocation = null;
-            isSellerLocked = false;
-            conversationStep = 0;
-            
-            localStorage.removeItem('onurmarket_session');
-            
-            updateCustomerUI();
-            updateCartUI();
-            updateSellersGrid();
-            
-            productsGrid.innerHTML = `
-                <div class="text-center" style="grid-column: 1 / -1; padding: 40px; color: #6c757d;">
-                    <i class="fas fa-box-open fa-3x mb-3"></i>
-                    <p>Lütfen bir satıcı seçin</p>
-                </div>
-            `;
-            
-            selectedSellerInfo.textContent = "Satıcı seçilmedi";
-            orderSummary.style.display = 'none';
-            locationText.textContent = "Konumunuzu işaretleyin";
-            
-            document.querySelectorAll('.seller-type-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            
-            document.querySelectorAll('.category-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            
-            // Bölümleri gizle
+        
+// Çıkış yap fonksiyonu
+function logout() {
+    try {
+        // Mevcut müşteriyi temizle
+        currentCustomer = null;
+        
+        // LocalStorage'dan tüm kullanıcı verilerini temizle
+        localStorage.removeItem('currentCustomer');
+        localStorage.removeItem('userToken');
+        localStorage.removeItem('session');
+        localStorage.removeItem('selectedLocation');
+        localStorage.removeItem('referral_code');
+        localStorage.removeItem('referral_group_code');
+        
+        // SessionStorage'ı da temizle
+        sessionStorage.clear();
+        
+        // Supabase oturumunu sonlandır
+        if (supabase) {
+            supabase.auth.signOut();
+        }
+        
+        console.log('Çıkış yapıldı, tüm veriler temizlendi.');
+
+		
+        // Sayfayı yenile veya giriş sayfasına yönlendir
+        setTimeout(() => {
+            window.location.href = window.location.pathname; // Aynı sayfaya yönlendir
+        }, 500);
+
+		 // Bölümleri gizle
             categoriesSection.style.display = 'none';
             sellersSection.style.display = 'none';
             productsSection.style.display = 'none';
-            
-            // Banner'ı göster
+		
+		// Banner'ı göster
             showHowItWorksBanner();
             
             speakToUser("Çıkış yapıldı. Tekrar giriş yapmak için mikrofonu açıp 'giriş yap' diyebilirsiniz.");
-        }
+		
+    } catch (error) {
+        console.error('Çıkış yapılırken hata oluştu:', error);
+    }
+}
 
+		
         function generateReferralLink() {
             if (!currentCustomer) {
                 alert('Önce giriş yapmalısınız');
