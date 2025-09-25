@@ -1367,43 +1367,89 @@
             return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; 
         }
 
-    // Sayfa yüklendiğinde çalışacak fonksiyon
-function initApp() {
-    // Mikrofon butonuna event listener ekle
-    microphoneToggle.addEventListener('click', toggleMicrophone);
-    
-    // Sayfa yüklendiğinde mikrofonu otomatik aç
-    setTimeout(() => {
-        enableMicrophone();
-    }, 1000);
-    
-    // Async işlemleri sırayla çalıştır
-    initializeAppAsync();
-}
-
-// Async işlemleri yöneten fonksiyon
-async function initializeAppAsync() {
+    // initApp fonksiyonunu güncelle
+async function initApp() {
     try {
+        // Mikrofon butonuna event listener ekle
+        microphoneToggle.addEventListener('click', toggleMicrophone);
+        
+        // Önce oturumu geri yükle
         await restoreSession();
+        
+        // Store type'ları yükle
         await loadStoreTypes();
         
         // Giriş yapılmamışsa banner göster
         if (!currentCustomer) {
             showHowItWorksBanner();
+            // Giriş yapılmamışsa konum modalını gösterme
+            // Doğrudan asistanı başlat
+            setTimeout(() => {
+                enableMicrophone();
+            }, 1000);
         } else {
             hideHowItWorksBanner();
-            showLocationModal();
+            
+            // Önce localStorage'da kayıtlı konumu kontrol et
+            const savedLocation = localStorage.getItem('selectedLocation');
+            if (savedLocation) {
+                // Kayıtlı konum varsa, modal göstermeden doğrudan kullan
+                selectedLocation = savedLocation;
+                console.log('Kayıtlı konum kullanılıyor:', selectedLocation);
+                initializeAssistant();
+            } else {
+                // Konum seçilmemişse modal göster
+                showLocationModal();
+            }
         }
     } catch (error) {
-        console.error('Async işlemlerde hata:', error);
+        console.error('Uygulama başlatılırken hata oluştu:', error);
     }
+}
+
+// Konum seçimini zorunlu kılmak için mikrofon kontrolü
+function toggleMicrophone() {
+    // Konum seçilmemişse mikrofonu açmaya izin verme
+    if (!selectedLocation) {
+        showLocationModal();
+        showNotification('Lütfen önce bir konum seçiniz.');
+        return;
+    }
+    
+    // Normal mikrofon açma/kapama işlemi
+    if (isListening) {
+        disableMicrophone();
+    } else {
+        enableMicrophone();
+    }
+}
+
+// Bildirim göster
+function showNotification(message) {
+    // Basit bir bildirim sistemi
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ff4444;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        z-index: 10000;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        document.body.removeChild(notification);
+    }, 3000);
 }
 
 // Sayfa yüklendiğinde initApp'i çalıştır
 document.addEventListener('DOMContentLoaded', function() {
     initApp();
 });
-
 
 async function processReferralCode(code, groupCode) {
     try {
@@ -1572,70 +1618,61 @@ async function processReferralCode(code, groupCode) {
             document.getElementById('orderSummary').style.display = 'flex';
         }
 
-        function showLocationModal() {
-            if (currentCustomer) {
-                currentAddressText.textContent = currentCustomer.address || 'Adres bilgisi bulunamadı';
-            }
-            locationModal.style.display = 'flex';
-        }
-
-        function hideLocationModal() {
-            locationModal.style.display = 'none';
-        }
-
-        async function saveNewLocation() {
-            const newAddress = newAddressInput.value.trim();
-            if (!newAddress) {
-                alert('Lütfen bir adres girin');
-                return;
-            }
-            
-            if (currentCustomer) {
-                try {
-                    const { error } = await supabase
-                        .from('customers')
-                        .update({ 
-                            address: newAddress,
-                            location: newAddress
-                        })
-                        .eq('id', currentCustomer.id);
-                    
-                    if (error) throw error;
-                    
-                    currentCustomer.address = newAddress;
-                    currentCustomer.location = newAddress;
-                    updateCustomerUI();
-                    
-                    alert('Yeni adres kaydedildi');
-                } catch (error) {
-                    console.error('Adres kaydetme hatası:', error);
-                    alert('Adres kaydedilirken bir hata oluştu');
-                }
-            }
-        }
-
-        function confirmSelectedLocation() {
-            const selectedOption = locationOptions.querySelector('.location-option.selected');
-            if (!selectedOption) {
-                alert('Lütfen bir konum seçin');
-                return;
-            }
-            
-            if (selectedOption.dataset.type === 'current') {
-                selectedLocation = currentCustomer.address;
-            } else {
-                selectedLocation = newAddressInput.value.trim();
-                if (!selectedLocation) {
-                    alert('Lütfen yeni adresi girin');
-                    return;
-                }
-            }
-            
-            locationText.textContent = selectedLocation;
+       // Konum modalını göster
+function showLocationModal() {
+    // Modalı göster
+    locationModal.style.display = 'block';
+    
+    // Modal dışına tıklanınca kapanmasını sağla
+    locationModal.addEventListener('click', function(e) {
+        if (e.target === locationModal) {
             hideLocationModal();
-            speakToUser(`Teslimat adresiniz ${selectedLocation} olarak ayarlandı.`);
         }
+    });
+    
+    // Konum seçeneklerine tıklama event'lerini ekle
+    locationOptions.querySelectorAll('.location-option').forEach(option => {
+        option.onclick = function() {
+            selectLocation(this.getAttribute('data-location'));
+        };
+    });
+    
+    // Sayfa yüklendiğinde otomatik seçim yapılmasını engelle
+    // Mikrofon ve diğer işlemleri modal kapanana kadar askıya al
+    disableMicrophone();
+}
 
+// Konum modalını gizle
+function hideLocationModal() {
+    locationModal.style.display = 'none';
+    // Modal kapandığında mikrofonu etkinleştir
+    enableMicrophone();
+}
+
+// Konum seçildiğinde çalışacak fonksiyon
+function selectLocation(locationType) {
+    console.log('Seçilen konum:', locationType);
+    
+    // Seçilen konumu sakla
+    selectedLocation = locationType;
+    localStorage.setItem('selectedLocation', locationType);
+    
+    // Modalı kapat
+    hideLocationModal();
+    
+    // Konum seçildikten sonra asistanı aktif et
+    initializeAssistant();
+}
+// Asistanı başlat
+function initializeAssistant() {
+    // Mikrofonu etkinleştir
+    enableMicrophone();
+    
+    // Gerekli diğer başlatma işlemleri
+    console.log('Asistan aktif, konum:', selectedLocation);
+}
+
+		
          // Store type'ları yükle
         async function loadStoreTypes() {
             try {
