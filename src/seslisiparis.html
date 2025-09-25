@@ -1531,42 +1531,57 @@
             speakToUser(`Teslimat adresiniz ${selectedLocation} olarak ayarlandı.`);
         }
 
+         // Store type'ları yükle
         async function loadStoreTypes() {
             try {
+                console.log("Store type'lar yükleniyor...");
+                
                 const { data, error } = await supabase
                     .from('store_type')
                     .select('*')
                     .eq('status', 'Active')
                     .order('sort_code');
-                
+
                 if (error) throw error;
-                
+
                 storeTypes = data || [];
-                displayStoreTypes(storeTypes);
+                console.log("Store type'lar:", storeTypes);
                 
+                displayStoreTypes(storeTypes);
+
             } catch (error) {
                 console.error('Store type yükleme hatası:', error);
+                
                 // Demo veriler
                 storeTypes = [
                     { id: '1', name: 'Market', sort_code: 1 },
                     { id: '2', name: 'Restoran', sort_code: 2 },
                     { id: '3', name: 'Eczane', sort_code: 3 },
-                    { id: '4', name: 'Fırın', sort_code: 4 },
-                    { id: '5', name: 'Kafe', sort_code: 5 }
+                    { id: '4', name: 'Fırın', sort_code: 4 }
                 ];
                 displayStoreTypes(storeTypes);
             }
         }
-
+         // Store type'ları ekranda göster
         function displayStoreTypes(types) {
+            const sellerTypeGrid = document.getElementById('sellerTypeGrid');
             sellerTypeGrid.innerHTML = '';
+            
+            if (types.length === 0) {
+                sellerTypeGrid.innerHTML = `
+                    <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
+                        <i class="fas fa-store fa-3x mb-3"></i>
+                        <p>Store type bulunamadı</p>
+                    </div>
+                `;
+                return;
+            }
             
             const iconMap = {
                 'Market': 'fas fa-store',
                 'Restoran': 'fas fa-utensils',
                 'Eczane': 'fas fa-prescription-bottle',
-                'Fırın': 'fas fa-bread-slice',
-                'Kafe': 'fas fa-coffee'
+                'Fırın': 'fas fa-bread-slice'
             };
             
             types.forEach(type => {
@@ -1582,86 +1597,148 @@
                     <div class="seller-type-name">${type.name}</div>
                 `;
                 
-                typeCard.addEventListener('click', function() {
-                    document.querySelectorAll('.seller-type-card').forEach(c => {
-                        c.classList.remove('selected');
-                    });
-                    this.classList.add('selected');
-                    
-                    selectedSellerType = type.name;
-                    loadSellersByType(type.id);
-                    
-                    // Kategori/reyon bölümünü göster
-                    categoriesSection.style.display = 'block';
-                    sellersSection.style.display = 'block';
-                    
-                    // Kategori başlığını güncelle
-                    if (type.name === 'Market') {
-                        categoriesTitle.textContent = 'Reyonlar';
-                        loadReyonsByStoreType(type.id);
-                    } else {
-                        categoriesTitle.textContent = 'Menü Kategorileri';
-                        loadCategoriesByStoreType(type.id);
-                    }
+                typeCard.addEventListener('click', () => {
+                    onStoreTypeSelected(type.id, type.name);
                 });
                 
                 sellerTypeGrid.appendChild(typeCard);
             });
+            
+            console.log("Store type'lar başarıyla yüklendi");
         }
 
+        // Store type seçildiğinde
+        async function onStoreTypeSelected(storeTypeId, storeTypeName) {
+            console.log("Store type seçildi:", storeTypeName, "ID:", storeTypeId);
+            
+            selectedSellerType = storeTypeName;
+            
+            // Reyonları yükle
+            await loadReyonsByStoreType(storeTypeId);
+            
+            // Satıcıları yükle
+            await loadSellersByStoreType(storeTypeId);
+            
+            // Kategori/reyon başlığını güncelle
+            const categoriesTitle = document.getElementById('categoriesTitle');
+            categoriesTitle.textContent = storeTypeName === 'Market' ? 'Reyonlar' : 'Menü Kategorileri';
+            
+            // İlgili bölümleri göster
+            document.getElementById('categoriesSection').style.display = 'block';
+            document.getElementById('sellersSection').style.display = 'block';
+            
+            // "Nasıl Çalışır" banner'ını gizle
+            hideHowItWorksBanner();
+        }
+
+        // Store type'a göre reyonları yükle
         async function loadReyonsByStoreType(storeTypeId) {
             try {
+                console.log("Reyonlar yükleniyor, storeTypeId:", storeTypeId);
+                
                 const { data, error } = await supabase
                     .from('reyon')
                     .select('*')
                     .eq('store_type_id', storeTypeId);
-                
+
                 if (error) throw error;
-                
+
                 categories = data || [];
-                displayCategories(categories, 'reyon');
+                console.log("Reyonlar:", categories);
                 
+                displayCategories(categories, 'reyon');
+
             } catch (error) {
                 console.error('Reyon yükleme hatası:', error);
+                
                 // Demo veriler
-                categories = [
-                    { id: '1', name: 'Meyve & Sebze', image_url: '' },
-                    { id: '2', name: 'Süt Ürünleri', image_url: '' },
-                    { id: '3', name: 'Et & Tavuk', image_url: '' },
-                    { id: '4', name: 'Temel Gıda', image_url: '' },
-                    { id: '5', name: 'İçecekler', image_url: '' }
-                ];
+                const demoReyons = {
+                    '1': [ // Market reyonları
+                        { id: '1', name: 'Meyve & Sebze', image_url: '' },
+                        { id: '2', name: 'Süt Ürünleri', image_url: '' },
+                        { id: '3', name: 'Et & Tavuk', image_url: '' }
+                    ],
+                    '2': [ // Restoran kategorileri
+                        { id: '4', name: 'Ana Yemekler' },
+                        { id: '5', name: 'Çorbalar' },
+                        { id: '6', name: 'Tatlılar' }
+                    ],
+                    '3': [ // Eczane kategorileri
+                        { id: '7', name: 'Ağrı Kesiciler' },
+                        { id: '8', name: 'Vitaminler' }
+                    ],
+                    '4': [ // Fırın kategorileri
+                        { id: '9', name: 'Ekmekler' },
+                        { id: '10', name: 'Pastalar' }
+                    ]
+                };
+                
+                categories = demoReyons[storeTypeId] || [];
                 displayCategories(categories, 'reyon');
             }
         }
 
-        async function loadCategoriesByStoreType(storeTypeId) {
+        // Store type'a göre satıcıları yükle
+        async function loadSellersByStoreType(storeTypeId) {
             try {
+                console.log("Satıcılar yükleniyor, storeTypeId:", storeTypeId);
+                
+                // Müşterinin konumunu al
+                const customerCity = currentCustomer?.city || 'İstanbul';
+                
                 const { data, error } = await supabase
-                    .from('categories')
-                    .select('*');
-                
+                    .from('profiles')
+                    .select('*')
+                    .eq('role', 'seller')
+                    .eq('status', 'Active')
+                    .eq('seller_type', storeTypeId) // seller_type = store_type_id
+                    .ilike('city', `%${customerCity}%`);
+
                 if (error) throw error;
+
+                sellers = data || [];
+                console.log("Satıcılar:", sellers);
                 
-                categories = data || [];
-                displayCategories(categories, 'category');
-                
+                updateSellersGrid();
+
             } catch (error) {
-                console.error('Kategori yükleme hatası:', error);
+                console.error('Satıcı yükleme hatası:', error);
+                
                 // Demo veriler
-                categories = [
-                    { id: '1', name: 'Ana Yemekler' },
-                    { id: '2', name: 'Çorbalar' },
-                    { id: '3', name: 'Salatalar' },
-                    { id: '4', name: 'Tatlılar' },
-                    { id: '5', name: 'İçecekler' }
+                sellers = [
+                    { 
+                        id: '1', 
+                        full_name: "Migros", 
+                        city: "İstanbul", 
+                        imgurl: "https://via.placeholder.com/200x120?text=Migros",
+                        address: "Kadıköy, İstanbul"
+                    },
+                    { 
+                        id: '2', 
+                        full_name: "CarrefourSA", 
+                        city: "İstanbul", 
+                        imgurl: "https://via.placeholder.com/200x120?text=Carrefour",
+                        address: "Beşiktaş, İstanbul"
+                    }
                 ];
-                displayCategories(categories, 'category');
+                updateSellersGrid();
             }
         }
 
+        // Kategorileri/reyonları göster
         function displayCategories(categoriesToShow, type) {
+            const categoriesGrid = document.getElementById('categoriesGrid');
             categoriesGrid.innerHTML = '';
+            
+            if (categoriesToShow.length === 0) {
+                categoriesGrid.innerHTML = `
+                    <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
+                        <i class="fas fa-box-open fa-3x mb-3"></i>
+                        <p>Kategori bulunamadı</p>
+                    </div>
+                `;
+                return;
+            }
             
             categoriesToShow.forEach(category => {
                 const categoryCard = document.createElement('div');
@@ -1677,7 +1754,11 @@
                     'Ana Yemekler': 'fas fa-utensils',
                     'Çorbalar': 'fas fa-bowl-food',
                     'Salatalar': 'fas fa-leaf',
-                    'Tatlılar': 'fas fa-ice-cream'
+                    'Tatlılar': 'fas fa-ice-cream',
+                    'Ağrı Kesiciler': 'fas fa-pills',
+                    'Vitaminler': 'fas fa-capsules',
+                    'Ekmekler': 'fas fa-bread-slice',
+                    'Pastalar': 'fas fa-birthday-cake'
                 };
                 
                 categoryCard.innerHTML = `
@@ -1695,9 +1776,9 @@
                     
                     selectedCategoryId = category.id;
                     if (type === 'reyon') {
-                        loadProductsByReyon(selectedCategoryId);
+                        filterProductsByReyon(selectedCategoryId);
                     } else {
-                        loadProductsByCategory(selectedCategoryId);
+                        filterProductsByCategory(selectedCategoryId);
                     }
                 });
                 
@@ -1705,33 +1786,9 @@
             });
         }
 
-        async function loadSellersByType(storeTypeId) {
-            try {
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('role', 'seller')
-                    .eq('seller_type', storeTypeId)
-                    .eq('status', 'Active');
-                
-                if (error) throw error;
-                
-                sellers = data || [];
-                updateSellersGrid();
-                
-            } catch (error) {
-                console.error('Satıcı yükleme hatası:', error);
-                // Demo veriler
-                sellers = [
-                    { id: '1', full_name: "Migros", city: "İstanbul", imgurl: "https://via.placeholder.com/200x120?text=Migros" },
-                    { id: '2', full_name: "CarrefourSA", city: "İstanbul", imgurl: "https://via.placeholder.com/200x120?text=Carrefour" },
-                    { id: '3', full_name: "Şok", city: "İstanbul", imgurl: "https://via.placeholder.com/200x120?text=Şok" }
-                ];
-                updateSellersGrid();
-            }
-        }
-
+        // Satıcı grid'ini güncelle
         function updateSellersGrid() {
+            const sellerGrid = document.getElementById('sellerGrid');
             sellerGrid.innerHTML = '';
             
             if (sellers.length === 0) {
@@ -1776,13 +1833,10 @@
                     
                     sellerCard.classList.add('selected');
                     selectedSellerId = seller.id;
-                    selectedSellerInfo.textContent = seller.full_name;
+                    document.getElementById('selectedSellerInfo').textContent = seller.full_name;
                     
                     // Ürünler bölümünü göster
-                    productsSection.style.display = 'block';
-                    
-                    // "Nasıl Çalışır" banner'ını gizle
-                    hideHowItWorksBanner();
+                    document.getElementById('productsSection').style.display = 'block';
                     
                     loadSellerProducts(seller.id);
                 });
@@ -1791,8 +1845,12 @@
             });
         }
 
+        // Satıcının ürünlerini yükle
         async function loadSellerProducts(sellerId) {
             try {
+                console.log("Ürünler yükleniyor, sellerId:", sellerId);
+                
+                // product_prices ve products tablolarını join ederek ürünleri getir
                 const { data, error } = await supabase
                     .from('product_prices')
                     .select(`
@@ -1800,9 +1858,10 @@
                         products (*)
                     `)
                     .eq('sube_id', sellerId);
-                
+
                 if (error) throw error;
-                
+
+                // Veriyi işle
                 products = data.map(item => ({
                     id: item.products.id,
                     product_price_id: item.id,
@@ -1818,10 +1877,12 @@
                     seller_id: sellerId
                 }));
                 
+                console.log("Ürünler:", products);
                 displayProducts(products);
-                
+
             } catch (error) {
                 console.error('Ürün yükleme hatası:', error);
+                
                 // Demo veriler
                 products = [
                     { id: '1', name: "Süt 1L", price: 15.90, imgurl: "https://via.placeholder.com/150x100?text=Süt", discount_price: 12.90 },
@@ -1831,21 +1892,16 @@
                 displayProducts(products);
             }
         }
-
-        async function loadProductsByReyon(reyonId) {
-            // Reyon'a göre ürünleri filtrele
-            if (products.length > 0) {
-                const filteredProducts = products.filter(p => p.reyon_id === reyonId);
-                displayProducts(filteredProducts.length > 0 ? filteredProducts : products);
-            }
+        // Reyon'a göre ürünleri filtrele
+        function filterProductsByReyon(reyonId) {
+            const filteredProducts = products.filter(p => p.reyon_id === reyonId);
+            displayProducts(filteredProducts.length > 0 ? filteredProducts : products);
         }
 
-        async function loadProductsByCategory(categoryId) {
-            // Kategoriye göre ürünleri filtrele
-            if (products.length > 0) {
-                const filteredProducts = products.filter(p => p.category_id === categoryId);
-                displayProducts(filteredProducts.length > 0 ? filteredProducts : products);
-            }
+       // Kategoriye göre ürünleri filtrele
+        function filterProductsByCategory(categoryId) {
+            const filteredProducts = products.filter(p => p.category_id === categoryId);
+            displayProducts(filteredProducts.length > 0 ? filteredProducts : products);
         }
 
         // Ürünleri göster
