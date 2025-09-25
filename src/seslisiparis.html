@@ -1353,70 +1353,61 @@ document.addEventListener('DOMContentLoaded', function() {
     initApp();
 });
 
-		
 
-		
-		async function confirmOrder() {
-    // Sipariş onaylama işlemleri...
-    
-    // Referans tracking kaydı oluştur
-    const referralCode = localStorage.getItem('referral_code');
-    const groupCode = localStorage.getItem('referral_group_code');
-    
-    if (referralCode && groupCode && currentCustomer) {
-        await createReferralTracking(referralCode, groupCode, currentCustomer.id);
-    }
-}
-
-async function createReferralTracking(code, groupCode, newUserId) {
+async function processReferralCode(code, groupCode) {
     try {
-        const { data, error } = await supabase
-            .from('referral_tracking')
-            .insert([
-                { 
-                    referral_code: code, 
-                    group_code: groupCode, 
-                    new_user_id: newUserId,
-                    created_at: new Date().toISOString()
-                }
-            ]);
-
-        if (error) throw error;
-        console.log('Referral tracking kaydı oluşturuldu:', data);
+        console.log('Referans kodu işleniyor:', code, groupCode);
         
-        // Local storage'ı temizle
-        localStorage.removeItem('referral_code');
-        localStorage.removeItem('referral_group_code');
+        // Önce bu referral kodunun var olup olmadığını kontrol et
+        const { data: existingLink, error: checkError } = await supabase
+            .from('referral_links')
+            .select('*')
+            .eq('referral_code', code)
+            .maybeSingle(); // single() yerine maybeSingle() kullanıyoruz
+
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116: no rows returned hatası
+            console.error('Kontrol hatası:', checkError);
+            throw checkError;
+        }
+
+        // Eğer referral link yoksa, yeni bir tane oluştur
+        if (!existingLink) {
+            const referrerUserId = "e70fbcb9-ea86-4479-9c0a-39957283c38f"; // Varsayılan admin user ID
+            
+            const { data: newLink, error: insertError } = await supabase
+                .from('referral_links')
+                .insert([
+                    { 
+                        owner_user_id: referrerUserId,
+                        referral_code: code,
+                        group_code: groupCode,
+                        created_at: new Date().toISOString()
+                    }
+                ])
+                .select();
+
+            if (insertError) {
+                console.error('Referral link ekleme hatası:', insertError);
+                throw insertError;
+            }
+            
+            console.log('Yeni referral link oluşturuldu:', newLink);
+        } else {
+            console.log('Referral link zaten mevcut:', existingLink);
+        }
+
+        // Local storage'a kaydet (sonradan kullanmak için)
+        localStorage.setItem('referral_code', code);
+        localStorage.setItem('referral_group_code', groupCode);
+        
+        console.log('Referans kodu başarıyla işlendi ve kaydedildi');
         
     } catch (error) {
-        console.error('Referral tracking hatası:', error);
+        console.error('Referans kodu işleme hatası:', error);
+        // Hata olsa bile uygulamanın çalışmasına devam etmesi için hatayı fırlatmıyoruz
     }
 }
-// Yardımcı fonksiyonlar
-function isUserLoggedIn() {
-    // Session kontrolü - örnek implementasyon
-    return localStorage.getItem('userToken') !== null;
-}
 
-async function generateReferralCode() {
-    // Rastgele 8 karakterlik kod üret
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 8; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-}
-
-// Sayfa yüklendiğinde çalıştır
-document.addEventListener('DOMContentLoaded', function() {
-    checkReferralAndProcess();
-});
-
-
-
-
-		
 		
         function setupEventHandlers() {
             // Profil dropdown
@@ -2811,7 +2802,46 @@ function initVoiceAssistant() {
             }
         }
 		
+        async function checkReferralAndProcess() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        let referralCode = urlParams.get('referral_code');
+        let referralGroupCode = urlParams.get('referral_groups');
         
+        console.log('URL parametreleri:', { referralCode, referralGroupCode });
+        
+        // Kullanıcı giriş yapmamışsa ve URL'de referans kodu yoksa
+        if (!isUserLoggedIn() && !referralCode) {
+            console.log('Otomatik referans kodu oluşturuluyor...');
+            referralGroupCode = "07KR5DSD"; // Varsayılan grup kodu
+            referralCode = generateReferralCode(); // Yeni referans kodu oluştur
+        }
+
+        if (referralCode && referralGroupCode) {
+            console.log('Referans kodu işleme başlıyor:', referralCode, referralGroupCode);
+            await processReferralCode(referralCode, referralGroupCode);
+        } else {
+            console.log('Referans kodu veya grup kodu bulunamadı');
+        }
+    } catch (error) {
+        console.error('Referans kontrolü sırasında hata:', error);
+    }
+}
+
+// Rastgele referans kodu oluşturma (sync versiyonu)
+function generateReferralCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// Kullanıcı giriş kontrolü
+function isUserLoggedIn() {
+    return currentCustomer !== null && currentCustomer !== undefined;
+}
 
  // Ödeme yöntemini seç
         function selectPaymentMethod(method) {
