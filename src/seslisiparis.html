@@ -2579,46 +2579,40 @@ function initVoiceAssistant() {
         }
 
         // Sesli komutları işle
-        function processVoiceCommand(transcript) {
+       function processVoiceCommand(transcript) {
             const message = transcript.toLowerCase();
-            
-            // Giriş süreci
-            if (conversationStep === 0) {
-                if (message.includes('evet') || message.includes('isterim') || message.includes('tabi') || message.includes('olur')) {
-                    speakToUser("Harika! Telefon numaranızı söyler misiniz?");
-                    conversationStep = 1;
-                } else if (message.includes('hayır') || message.includes('istemiyorum')) {
-                    speakToUser("Peki, giriş yapmak istediğiniz zaman bana 'Evet' deyin.");
-                } else {
-                    speakToUser("Giriş yapmak istiyor musunuz? Lütfen 'Evet' veya 'Hayır' diyerek yanıt verin.");
-                }
-                return;
-            }
-            
-            if (conversationStep === 1) {
-                const phoneMatch = message.match(/\d+/g);
-                if (phoneMatch) {
-                    const phone = phoneMatch.join('');
-                    checkCustomerByPhone(phone);
-                } else {
-                    speakToUser("Telefon numaranızı anlayamadım. Lütfen numaranızı söyler misiniz?");
-                }
-                return;
-            }
             
             // Satıcı tipi seçimi
             if (message.includes('market')) {
-                selectSellerTypeByName('Market');
+                selectSellerType('market');
                 speakToUser("Market seçildi. Size en yakın marketler listeleniyor.");
             } else if (message.includes('restoran') || message.includes('lokanta')) {
-                selectSellerTypeByName('Restoran');
+                selectSellerType('restaurant');
                 speakToUser("Restoran seçildi. Size en yakın restoranlar listeleniyor.");
             } else if (message.includes('eczane')) {
-                selectSellerTypeByName('Eczane');
+                selectSellerType('pharmacy');
                 speakToUser("Eczane seçildi. Size en yakın eczaneler listeleniyor.");
             } else if (message.includes('fırın')) {
-                selectSellerTypeByName('Fırın');
+                selectSellerType('bakery');
                 speakToUser("Fırın seçildi. Size en yakın fırınlar listeleniyor.");
+            }
+            
+            // Kategori seçimi
+            else if (message.includes('meyve') || message.includes('sebze')) {
+                selectCategory(1);
+                speakToUser("Meyve ve sebze reyonu seçildi.");
+            } else if (message.includes('süt') || message.includes('peynir') || message.includes('yoğurt')) {
+                selectCategory(2);
+                speakToUser("Süt ürünleri reyonu seçildi.");
+            } else if (message.includes('et') || message.includes('tavuk') || message.includes('balık')) {
+                selectCategory(3);
+                speakToUser("Et ve tavuk reyonu seçildi.");
+            } else if (message.includes('ana yemek') || message.includes('yemek')) {
+                selectCategory(7);
+                speakToUser("Ana yemekler kategorisi seçildi.");
+            } else if (message.includes('tatlı') || message.includes('pasta')) {
+                selectCategory(10);
+                speakToUser("Tatlılar kategorisi seçildi.");
             }
             
             // Ürün ekleme
@@ -2636,7 +2630,51 @@ function initVoiceAssistant() {
                     if (product) {
                         addToCart(product, quantity);
                     } else {
-                        speakToUser("Üzgünüm, istediğiniz ürünü bulamadım. Lütfen başka bir ürün söyleyin.");
+                        speakToUser("Üzgünüm, istediğiniz ürünü bulamadım.");
+                    }
+                }
+            }
+            
+            // Kampanya ve indirim sorguları
+            else if (message.includes('kampanya') || message.includes('indirim') || message.includes('promosyon')) {
+                const discountedProducts = products.filter(p => p.discount);
+                if (discountedProducts.length > 0) {
+                    speakToUser(`Şu anda ${discountedProducts.length} indirimli ürün bulunuyor. İndirimli ürünleri gösteriyorum.`);
+                    // İndirimli ürünleri filtrele ve göster
+                    displayProducts(discountedProducts);
+                } else {
+                    speakToUser("Şu anda aktif kampanya bulunmuyor.");
+                }
+            }
+            
+            // Öneri sorguları
+            else if (message.includes('öner') || message.includes('tavsiye') || message.includes('ne alayım')) {
+                const popularProducts = products.filter(p => p.badge === 'Popüler' || p.badge === 'Önerilen');
+                if (popularProducts.length > 0) {
+                    const productNames = popularProducts.map(p => p.name).join(', ');
+                    speakToUser(`Size önerebileceğim popüler ürünler: ${productNames}. Bunlardan birini denemek ister misiniz?`);
+                } else {
+                    speakToUser("Şu anda öneri için yeterli veri bulunmuyor. En çok satılan ürünlere göz atabilirsiniz.");
+                }
+            }
+            
+            // Fiyat sorguları
+            else if (message.includes('kaç para') || message.includes('fiyat') || message.includes('ne kadar')) {
+                const productMatch = message.match(/([a-zçğıöşü\s]+)\s+(kaç\s+para|fiyat|ne\s+kadar)/i);
+                if (productMatch) {
+                    const productName = productMatch[1].trim();
+                    const product = products.find(p => 
+                        p.name.toLowerCase().includes(productName.toLowerCase())
+                    );
+                    
+                    if (product) {
+                        if (product.discount) {
+                            speakToUser(`${product.name} ürününün indirimli fiyatı ${money(product.discount)}, normal fiyatı ${money(product.price)}.`);
+                        } else {
+                            speakToUser(`${product.name} ürünü ${money(product.price)}.`);
+                        }
+                    } else {
+                        speakToUser("Üzgünüm, bu ürünü bulamadım.");
                     }
                 }
             }
@@ -2648,42 +2686,36 @@ function initVoiceAssistant() {
                     return;
                 }
                 
-                if (!selectedSellerId) {
-                    speakToUser("Lütfen önce bir satıcı seçin.");
-                    return;
-                }
-                
-                speakToUser(`Sepetinizde ${cart.length} ürün bulunuyor. Toplam tutar ${totalAmountEl.textContent}. Nasıl ödemek istersiniz? Nakit, kart veya bonus?`);
+                speakToUser(`Sepetinizde ${cart.length} ürün bulunuyor. Nasıl ödemek istersiniz? Nakit, kart veya bonus?`);
             }
             
             // Ödeme seçenekleri
             else if (message.includes('nakit')) {
-                selectPaymentMethod('nakit');
-                speakToUser("Nakit ödeme seçildi. Siparişinizi onaylıyor musunuz?");
+                speakToUser("Nakit ödeme seçildi. Siparişiniz hazırlanıyor.");
+                finalizeOrder('nakit');
             } else if (message.includes('kart') || message.includes('kredi kartı')) {
-                selectPaymentMethod('kart');
-                speakToUser("Kart ile ödeme seçildi. Siparişinizi onaylıyor musunuz?");
+                speakToUser("Kart ile ödeme seçildi. Siparişiniz hazırlanıyor.");
+                finalizeOrder('kart');
             } else if (message.includes('bonus')) {
-                selectPaymentMethod('bonus');
-                speakToUser("Bonus ile ödeme seçildi. Siparişinizi onaylıyor musunuz?");
+                speakToUser("Bonus ile ödeme seçildi. Siparişiniz hazırlanıyor.");
+                finalizeOrder('bonus');
             }
             
-            // Sipariş onayı
-            else if (message.includes('evet') || message.includes('onaylıyorum') || message.includes('tamam')) {
-                if (!currentPaymentMethod) {
-                    speakToUser("Önce bir ödeme yöntemi seçmelisiniz.");
-                    return;
-                }
-                
-                finalizeOrder(currentPaymentMethod);
+            // Çıkış
+            else if (message.includes('çıkış') || message.includes('çıkış yap')) {
+                logout();
             }
             
-            // Diğer komutlar
+            // Yardım
+            else if (message.includes('yardım') || message.includes('nasıl')) {
+                speakToUser("Sipariş vermek için önce bir satıcı tipi seçin, sonra satıcıyı seçin, ardından ürünleri sepete ekleyin. Sesli komutlarla 'market seç', 'süt ekle', 'sepeti onayla' diyebilirsiniz.");
+            }
+            
+            // Anlamayan yanıt
             else {
-                speakToUser("Üzgünüm, anlayamadım. Lütfen tekrar söyler misiniz?");
+                speakToUser("Üzgünüm, anlayamadım. Lütfen tekrar söyler misiniz? Yardım için 'yardım' diyebilirsiniz.");
             }
         }
-
 // Kullanıcıya sesli yanıt ver
         function speakToUser(message) {
             assistantMessage.textContent = message;
