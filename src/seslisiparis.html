@@ -1316,44 +1316,44 @@
             return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; 
         }
 
-        // Initialize the application
-        document.addEventListener('DOMContentLoaded', function() {
-            initApp();
-        });
+    // Sayfa yüklendiğinde çalışacak fonksiyon
+function initApp() {
+    // Mikrofon butonuna event listener ekle
+    microphoneToggle.addEventListener('click', toggleMicrophone);
+    
+    // Sayfa yüklendiğinde mikrofonu otomatik aç
+    setTimeout(() => {
+        enableMicrophone();
+    }, 1000);
+    
+    // Async işlemleri sırayla çalıştır
+    initializeAppAsync();
+}
 
-        // Sayfa yüklendiğinde çalışacak fonksiyon
-        function initApp() {
-            // Mikrofon butonuna event listener ekle
-            microphoneToggle.addEventListener('click', toggleMicrophone);
-            
-            // Sayfa yüklendiğinde mikrofonu otomatik aç
-            setTimeout(() => {
-                enableMicrophone();
-            }, 1000);
-			
-            
-           
-            
-            // Store type'ları yükle
-            await loadStoreTypes();
-            
-            // Giriş yapılmamışsa banner göster
-            if (!currentCustomer) {
-                showHowItWorksBanner();
-            } else {
-                hideHowItWorksBanner();
-                // Konum modalını göster
-                showLocationModal();
-            }
-       
+// Async işlemleri yöneten fonksiyon
+async function initializeAppAsync() {
+    try {
+        await restoreSession();
+        await loadStoreTypes();
+        
+        // Giriş yapılmamışsa banner göster
+        if (!currentCustomer) {
+            showHowItWorksBanner();
+        } else {
+            hideHowItWorksBanner();
+            showLocationModal();
+        }
+    } catch (error) {
+        console.error('Async işlemlerde hata:', error);
+    }
+}
 
+// Sayfa yüklendiğinde initApp'i çalıştır
+document.addEventListener('DOMContentLoaded', function() {
+    initApp();
+});
 
 		
- // Sayfa yüklendiğinde initApp'i çalıştır
-        document.addEventListener('DOMContentLoaded', function() {
-            initApp();
-        });
-
 		// URL parametrelerini kontrol et (referans kodu)
 async function checkReferralAndProcess() {
     const urlParams = new URLSearchParams(window.location.search);
