@@ -2115,43 +2115,51 @@ function getFallbackStoreTypes() {
 }
 		
 // Satıcıları yükle
+// Satıcıları yükleme fonksiyonunu düzelt
 async function loadVendors() {
     try {
-        debugLog('Satıcılar yükleniyor, konum:', selectedLocation);
+        debugLog('🔧 Satıcılar yükleniyor...');
         
         let vendorsData = [];
-        
-        // Önce cache'den dene
-        const cachedVendors = localStorage.getItem('vendors');
-        if (cachedVendors) {
-            vendorsData = JSON.parse(cachedVendors);
-            debugLog('Satıcılar cache den yüklendi:', vendorsData.length);
-        }
-        
-        // Sunucudan güncel veriyi al
+
+        // Seller_profiles tablosunu kullan
         const { data, error } = await supabase
-            .from('vendors')
+            .from('seller_profiles')  // ✅ Doğru tablo
             .select('*')
             .eq('is_active', true)
-            .order('name');
-        
-        if (!error && data) {
-            vendorsData = data;
-            localStorage.setItem('vendors', JSON.stringify(vendorsData));
-            debugLog('Satıcılar sunucudan yüklendi:', vendorsData.length);
+            .order('seller_name');
+
+        if (error) {
+            console.error('❌ Satıcı yükleme hatası:', error);
+            await useFallbackVendors();
+            return;
         }
-        
-        vendors = vendorsData;
-        
+
+        if (data && data.length > 0) {
+            vendorsData = data.map(seller => ({
+                id: seller.id,
+                name: seller.business_name || seller.full_name,
+                description: seller.business_description,
+                locations: seller.service_locations || 'inside,takeaway,delivery',
+                is_active: seller.is_active,
+                image_url: seller.business_logo
+            }));
+            
+            vendors = vendorsData;
+            localStorage.setItem('vendors', JSON.stringify(vendors));
+            debugLog('✅ Satıcılar yüklendi:', vendors.length);
+        } else {
+            await useFallbackVendors();
+        }
+
         // Konuma göre filtrele
         filterAndDisplayVendors();
-        
+
     } catch (error) {
-        console.error('Satıcı yükleme hatası:', error);
-        vendors = [];
+        console.error('❌ Satıcı yükleme hatası:', error);
+        await useFallbackVendors();
     }
 }
-
 // Satıcıları filtrele ve göster
 // Satıcı yükleme ve konum eşleştirme
 async function loadVendors() {
