@@ -1356,11 +1356,51 @@
             }
         }
 
+
+		
  // Sayfa yüklendiğinde initApp'i çalıştır
         document.addEventListener('DOMContentLoaded', function() {
             initApp();
         });
 
+		// URL parametrelerini kontrol et (referans kodu)
+async function checkReferralAndProcess() {
+    const urlParams = new URLSearchParams(window.location.search);
+    let referralCode = urlParams.get('referral_code');
+    let referralGroupCode = urlParams.get('referral_groups');
+    
+    // Kullanıcı giriş yapmamışsa ve URL'de referans kodu yoksa
+    if (!isUserLoggedIn() && !referralCode) {
+        referralGroupCode = "07KR5DSD"; // Varsayılan grup kodu
+        referralCode = await generateReferralCode(); // Yeni referans kodu oluştur
+    }
+
+    if (referralCode && referralGroupCode) {
+        await processReferralCode(referralCode, referralGroupCode);
+    }
+}
+
+// Yardımcı fonksiyonlar
+function isUserLoggedIn() {
+    // Session kontrolü - örnek implementasyon
+    return localStorage.getItem('userToken') !== null;
+}
+
+async function generateReferralCode() {
+    // Rastgele 8 karakterlik kod üret
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// Sayfa yüklendiğinde çalıştır
+document.addEventListener('DOMContentLoaded', function() {
+    checkReferralAndProcess();
+});
+		
         function setupEventHandlers() {
             // Profil dropdown
             profileBtn.addEventListener('click', function() {
