@@ -3483,6 +3483,68 @@ function initVoiceAssistant() {
             }
         }
 
+// GELİŞTİRİLMİŞ ÇIKIŞ FONKSİYONU
+async function logout() {
+    try {
+        // 1. Önce kullanıcıya bilgi ver
+        speakToUser("Oturumunuz kapatılıyor, lütfen bekleyin...");
+        
+        // 2. Görsel geri bildirim göster
+        showLogoutNotification();
+        
+        // 3. Kısa bir gecikme ile işlemi gerçekleştir
+        setTimeout(() => {
+            performLogout();
+        }, 1500);
+        
+    } catch (error) {
+        console.error('Çıkış işlemi sırasında hata:', error);
+        // Hata durumunda bile temizlik yap
+        performEmergencyLogout();
+    }
+}
+
+// ASIL ÇIKIŞ İŞLEMLERİ
+function performLogout() {
+    // 1. Önce kullanıcı bilgilerini temizle
+    currentCustomer = null;
+    
+    // 2. Sepeti temizle
+    cart = [];
+    
+    // 3. LocalStorage'ı temizle (aşamalı olarak)
+    clearUserDataFromStorage();
+    
+    // 4. UI'ı güncelle
+    updateUIAfterLogout();
+    
+    // 5. Kullanıcıya bilgi ver
+    speakToUser("Oturumunuz başarıyla kapatıldı. Yeni bir alışverişe başlayabilirsiniz.");
+    
+    // 6. Sayfayı yenile (isteğe bağlı)
+    setTimeout(() => {
+        window.location.reload();
+    }, 2000);
+}
+
+// ACİL DURUM ÇIKIŞI
+function performEmergencyLogout() {
+    // Mümkün olduğunca çok veriyi temizle
+    localStorage.clear();
+    sessionStorage.clear();
+    currentCustomer = null;
+    cart = [];
+    
+    // UI'ı güncelle
+    updateUIAfterLogout();
+    speakToUser("Oturumunuz kapatıldı.");
+    
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
+
+		
 // Çıkış butonunu kontrol et (geliştirilmiş)
 function setupLogoutButton() {
     const logoutBtn = document.getElementById('logoutButton');
@@ -3499,130 +3561,8 @@ function setupLogoutButton() {
         createFallbackLogoutButton();
         return;
     }
-    
-    if (logoutBtn) {
-        // Event listener'ı temizle ve yeniden ekle
-        logoutBtn.onclick = null;
-        logoutBtn.addEventListener('click', handleLogout);
-        
-        // Görünürlüğü ayarla
-        if (currentCustomer) {
-            logoutBtn.style.display = 'block';
-            if (userProfile) userProfile.style.display = 'block';
-            debugLog('Çıkış butonu görünür yapıldı');
-        } else {
-            logoutBtn.style.display = 'none';
-            if (userProfile) userProfile.style.display = 'block';
-            debugLog('Çıkış butonu gizlendi');
-        }
-    }
-}
-// Fallback çıkış butonu oluştur
-function createFallbackLogoutButton() {
-    // Eğer fallback buton zaten varsa, işlem yapma
-    if (document.getElementById('fallbackLogoutButton')) {
-        return;
-    }
-    
-    const logoutBtn = document.createElement('button');
-    logoutBtn.id = 'fallbackLogoutButton';
-    logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Çıkış Yap';
-    logoutBtn.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        z-index: 1000;
-        padding: 8px 16px;
-        background: #ff4444;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-    `;
-    
-    document.body.appendChild(logoutBtn);
-    logoutBtn.addEventListener('click', handleLogout);
-    debugLog('Fallback çıkış butonu oluşturuldu');
-}
-// Çıkış işlemini yönet
-function handleLogout(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    debugLog('Çıkış butonuna tıklandı');
-    logout();
-}
 
-// Fallback çıkış butonu oluştur
-function createFallbackLogoutButton() {
-    let logoutBtn = document.getElementById('logoutButton');
-    
-    if (!logoutBtn) {
-        logoutBtn = document.createElement('button');
-        logoutBtn.id = 'logoutButton';
-        logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Çıkış Yap';
-        logoutBtn.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 1000;
-            padding: 8px 16px;
-            background: #ff4444;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        `;
-        
-        document.body.appendChild(logoutBtn);
-        debugLog('Fallback çıkış butonu oluşturuldu');
-    }
-    
-    logoutBtn.addEventListener('click', handleLogout);
-}
 
-// Çıkış işlemini yönet
-function handleLogout(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    debugLog('Çıkış butonuna tıklandı');
-    logout();
-}
-
-		
-// Çıkış yap fonksiyonu
-function logout() {
-    try {
-        // Mevcut müşteriyi temizle
-        currentCustomer = null;
-        
-        // LocalStorage'dan tüm kullanıcı verilerini temizle
-        localStorage.removeItem('currentCustomer');
-        localStorage.removeItem('userToken');
-        localStorage.removeItem('session');
-        localStorage.removeItem('selectedLocation');
-        localStorage.removeItem('referral_code');
-        localStorage.removeItem('referral_group_code');
-        
-        // SessionStorage'ı da temizle
-        sessionStorage.clear();
-        
-        // Supabase oturumunu sonlandır
-        if (supabase) {
-            supabase.auth.signOut();
-        }
-        
-        console.log('Çıkış yapıldı, tüm veriler temizlendi.');
-		
-		
-        // Sayfayı yenile veya giriş sayfasına yönlendir
-        setTimeout(() => {
-            window.location.href = window.location.pathname; // Aynı sayfaya yönlendir
-        }, 500);
-			
-    } catch (error) {
-        console.error('Çıkış yapılırken hata oluştu:', error);
-    }
-}
 	
         function generateReferralLink() {
             if (!currentCustomer) {
