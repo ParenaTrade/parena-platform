@@ -910,45 +910,47 @@
             }
         }
 
-        // Mağazaları yükle
-        async function loadStores() {
-            try {
-                const { data, error } = await supabase
-                    .from('store_type')
-                    .select('id, name')
-                    .order('name');
-                
-                if (error) throw error;
-                
-                stores = data;
-                
-                // Mağaza filtreleme seçeneğini doldur
-                const storeFilter = document.getElementById('storeFilter');
-                storeFilter.innerHTML = '<option value="">Tüm Mağazalar</option>';
-                
-                data.forEach(store => {
-                    const option = document.createElement('option');
-                    option.value = store.id;
-                    option.textContent = store.name;
-                    storeFilter.appendChild(option);
-                });
-                
-                // Modal için maüaza seçeneğini doldur
-                const storeSelect = document.getElementById('storeSelect');
-                storeSelect.innerHTML = '<option value="">Mağaza Seçin</option>';
-                
-                data.forEach(store => {
-                    const option = document.createElement('option');
-                    option.value = store.id;
-                    option.textContent = store.name;
-                    storeSelect.appendChild(option);
-                });
-                
-            } catch (error) {
-                console.error('Mağazalar yüklenirken hata oluştu:', error);
-                throw error;
-            }
+
+        // Mağazaları yükle (debug versiyonu)
+async function loadStores() {
+    try {
+        console.log('🔧 Mağazalar yükleniyor...');
+        
+        const { data, error } = await supabase
+            .from('store_type')
+            .select('id, name, code, description, is_active')
+            .order('name');
+        
+        if (error) {
+            console.error('❌ Mağaza yükleme hatası:', error);
+            throw error;
         }
+        
+        console.log('✅ Mağaza verileri:', data);
+        
+        stores = data || [];
+        
+        // Select box'ları doldur
+        populateStoreSelects();
+        
+        return data;
+        
+    } catch (error) {
+        console.error('❌ Mağazalar yüklenirken hata oluştu:', error);
+        
+        // Fallback: Demo veriler
+        const fallbackStores = [
+            { id: 1, name: 'Market', code: 'market' },
+            { id: 2, name: 'Restoran', code: 'restaurant' },
+            { id: 3, name: 'Kafe', code: 'cafe' }
+        ];
+        
+        stores = fallbackStores;
+        populateStoreSelects();
+        
+        return fallbackStores;
+    }
+}
 
         // Ürünleri yükle
         async function loadProducts() {
