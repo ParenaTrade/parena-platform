@@ -1385,52 +1385,45 @@ document.addEventListener('DOMContentLoaded', function() {
     initApp();
 });
 
-// DÜZELTİLMİŞ initApp
 async function initApp() {
     try {
         debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
         debugStorage();
 
-        // 1. StoreTypes ve Vendors yükle (OTURUMDAN BAĞIMSIZ)
+        // 1. DOM hazır olana kadar bekle
+        await waitForDOMElements();
+        debugLog('✅ DOM hazır');
+
+        // 2. StoreTypes yükle (oturumdan bağımsız)
         await loadStoreTypes();
         debugLog('✅ StoreTypes yüklendi');
 
-        // 2. Oturumu geri yükle
+        // 3. Oturumu geri yükle
         await restoreSession();
-        debugLog('✅ Oturum yüklendi');
+        debugLog('✅ Oturum yüklendi', { 
+            user: currentCustomer ? 'Giriş yapılmış' : 'Misafir',
+            location: selectedLocation 
+        });
 
-        // 3. Banner gösterimi
-        if (currentCustomer) {
-            hideHowItWorksBanner();
-            debugLog('✅ Giriş yapılmış - banner gizlendi');
-        } else {
-            showHowItWorksBanner();
-            debugLog('✅ Misafir - banner gösterildi');
-        }
-
-        // 4. Konum yönetimi
-        initializeLocation();
-        debugLog('✅ Konum yönetimi tamamlandı');
+        // 4. UI elementlerini ayarla
+        updateUIAfterLogin();
+        debugLog('✅ UI güncellendi');
 
         // 5. Event handler'ları ayarla
         setupEventHandlers();
-        debugLog('✅ Setup Event handlerlar ayarlandı');
+        debugLog('✅ Event handlerlar ayarlandı');
 
-		// 6. Konum modal event'lerini hazırla
-        setupLocationModalEvents();
-		debugLog('✅ Setup Location Event handlerlar ayarlandı');
-
-        // 7. Profil dropdown'ı ayarla
+        // 6. Profil dropdown'ı ayarla
         setupProfileDropdown();
         debugLog('✅ Profil dropdown ayarlandı');
 
-        // 8. Mikrofonu başlat (misafir kullanıcı için)
-        if (!currentCustomer) {
-            setTimeout(() => {
-                enableMicrophone();
-                debugLog('🎤 Misafir için mikrofon açıldı');
-            }, 2000);
-        }
+        // 7. Konum yönetimi
+        initializeLocation();
+        debugLog('✅ Konum yönetimi tamamlandı');
+
+        // 8. Mikrofon kontrolleri
+        setupMicrophoneControls();
+        debugLog('✅ Mikrofon kontrolleri ayarlandı');
 
         debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
 
@@ -1440,6 +1433,37 @@ async function initApp() {
     }
 }
 
+// YENİ: UI güncelleme fonksiyonu
+function updateUIAfterLogin() {
+    // Çıkış butonu görünürlüğü
+    updateLogoutButtonVisibility();
+    
+    // Banner kontrolü
+    if (currentCustomer) {
+        hideHowItWorksBanner();
+    } else {
+        showHowItWorksBanner();
+    }
+    
+    // Profil bilgilerini güncelle
+    updateCustomerUI();
+    
+    // Konum metnini güncelle
+    updateLocationText();
+}
+
+// YENİ: Konum metnini güncelle
+function updateLocationText() {
+    const locationText = document.getElementById('locationText');
+    if (locationText && selectedLocation) {
+        const locationNames = {
+            'inside': 'Restoran içinde',
+            'takeaway': 'Paket servis', 
+            'delivery': 'Adrese teslim'
+        };
+        locationText.textContent = locationNames[selectedLocation] || selectedLocation;
+    }
+}
 // Mikrofon kontrolleri
 function setupMicrophoneControls() {
     if (microphoneToggle) {
@@ -1881,12 +1905,27 @@ function setupLocationModalEvents() {
     debugLog('✅ Konum modal eventleri ayarlandı');
 }	
        
+// ÇÖZÜM: Mikrofon toggle'ını güçlendir
 function handleMicrophoneToggle() {
-    // Konum kontrolü - eğer kullanıcı giriş yapmışsa ve konum seçmemişse
-    if (currentCustomer && !localStorage.getItem('selectedLocation')) {
+    console.log('🎤 Mikrofon toggle çağrıldı', {
+        selectedLocation: selectedLocation,
+        currentCustomer: currentCustomer
+    });
+    
+    // Kullanıcı giriş yapmışsa ve konum seçmemişse
+    if (currentCustomer && !selectedLocation) {
+        console.log('📍 Giriş yapılmış ama konum seçilmemiş');
         showLocationModal();
-        showNotification('Lütfen önce bir konum seçiniz.');
+        speakToUser("Lütfen önce bir konum seçiniz.");
         return;
+    }
+    
+    // Misafir kullanıcı için konum zorunluluğu
+    if (!currentCustomer && !selectedLocation) {
+        console.log('📍 Misafir kullanıcı için konum seçilmemiş');
+        // Misafir kullanıcılar için konum seçmeden devam edebilir
+        // Sadece uyarı verelim
+        speakToUser("Misafir olarak devam ediyorsunuz. Konum seçmek için sağ üstten konum butonuna tıklayabilirsiniz.");
     }
     
     // Normal mikrofon açma/kapama işlemi
@@ -1897,6 +1936,21 @@ function handleMicrophoneToggle() {
     }
 }
 
+		/ ÇÖZÜM: initApp içinde doğru sırayla çağrılacak
+function updateUIAfterLogin() {
+    // Çıkış butonunu güncelle
+    updateLogoutButtonVisibility();
+    
+    // Banner'ı kontrol et
+    if (currentCustomer) {
+        hideHowItWorksBanner();
+    } else {
+        showHowItWorksBanner();
+    }
+    
+    // Profil bilgilerini güncelle
+    updateCustomerUI();
+}
 // Çıkış butonunu ayarla
 // Geliştirilmiş logout buton yönetimi
 function setupLogoutButton() {
@@ -2632,7 +2686,54 @@ window.debugApp = {
         });
         console.groupEnd();
     }
-};// Konum eşleşme kontrolü
+};
+
+	  // YENİ: Profil dropdown testi
+    testProfileDropdown: function() {
+        console.group('🔍 PROFİL DROPDOWN TESTİ');
+        console.log('currentCustomer:', currentCustomer);
+        console.log('profileBtn:', document.getElementById('profileBtn'));
+        console.log('profileDropdown:', document.getElementById('profileDropdown'));
+        console.log('dropdown display:', document.getElementById('profileDropdown').style.display);
+        console.groupEnd();
+        
+        // Manuel olarak dropdown'ı aç
+        const dropdown = document.getElementById('profileDropdown');
+        dropdown.style.display = 'block';
+        dropdown.classList.add('show');
+    },
+    
+    // YENİ: Banner durumu testi
+    testBanner: function() {
+        console.group('🔍 BANNER TESTİ');
+        console.log('Banner display:', document.getElementById('howItWorks').style.display);
+        console.log('Kullanıcı durumu:', currentCustomer ? 'Girişli' : 'Misafir');
+        console.groupEnd();
+    },
+    
+    // YENİ: Konum durumu testi
+    testLocation: function() {
+        console.group('🔍 KONUM TESTİ');
+        console.log('selectedLocation:', selectedLocation);
+        console.log('localStorage location:', localStorage.getItem('selectedLocation'));
+        console.groupEnd();
+    }
+};
+
+// Test butonlarını güncelle
+document.addEventListener('DOMContentLoaded', function() {
+    // Mevcut debug container'ı bul
+    const debugContainer = document.querySelector('[style*="position: fixed; bottom: 10px; left: 10px"]');
+    if (debugContainer) {
+        // Yeni test butonlarını ekle
+        debugContainer.innerHTML += `
+            <br><button onclick="debugApp.testProfileDropdown()">Profil Dropdown Test</button>
+            <button onclick="debugApp.testBanner()">Banner Test</button>
+            <button onclick="debugApp.testLocation()">Konum Test</button>
+        `;
+    }
+});	
+		// Konum eşleşme kontrolü
 function debugLocationMatch(vendorLocation, userLocation) {
     if (!DEBUG_MODE) return;
     
@@ -2643,46 +2744,51 @@ function debugLocationMatch(vendorLocation, userLocation) {
     console.groupEnd();
 }
 
-		// DÜZELTİLMİŞ PROFİL DROPDOWN
+		// ÇÖZÜM: Profil dropdown'ı tamamen yeniden yazalım
 function setupProfileDropdown() {
     const profileBtn = document.getElementById('profileBtn');
     const profileDropdown = document.getElementById('profileDropdown');
-    const logoutBtn = document.getElementById('logoutBtn');
-
+    
     if (!profileBtn || !profileDropdown) {
         console.error('❌ Profil elementleri bulunamadı');
         return;
     }
 
-    // Profil butonu event listener
-    profileBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        profileDropdown.classList.toggle('show');
-    });
-
-    // Dropdown dışına tıklanınca kapat
-    document.addEventListener('click', function() {
-        profileDropdown.classList.remove('show');
-    });
-
-    // Çıkış butonu event listener
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            logout();
-        });
-    }
-
-    // Kullanıcı bilgilerini güncelle
-    updateCustomerUI();
+    // Mevcut event listener'ları temizle
+    profileBtn.replaceWith(profileBtn.cloneNode(true));
+    const newProfileBtn = document.getElementById('profileBtn');
     
-    // Çıkış butonunu ayarla
-    setupLogoutButton();
+    // Yeni event listener ekle
+    newProfileBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        console.log('🔘 Profil butonuna tıklandı');
+        
+        // Dropdown durumunu toggle et
+        const isVisible = profileDropdown.style.display === 'block';
+        profileDropdown.style.display = isVisible ? 'none' : 'block';
+        profileDropdown.classList.toggle('show');
+        
+        console.log('📂 Dropdown durumu:', profileDropdown.style.display);
+    });
+
+    // Document click event'i - dropdown dışına tıklanınca kapat
+    document.addEventListener('click', function(e) {
+        if (!profileDropdown.contains(e.target) && !newProfileBtn.contains(e.target)) {
+            profileDropdown.style.display = 'none';
+            profileDropdown.classList.remove('show');
+        }
+    });
+
+    // ESC tuşu ile kapat
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            profileDropdown.style.display = 'none';
+            profileDropdown.classList.remove('show');
+        }
+    });
 
     debugLog('✅ Profil dropdown ayarlandı');
 }
-
 // DÜZELTİLMİŞ ÇIKIŞ BUTONU
 function setupLogoutButton() {
     let logoutBtn = document.getElementById('logoutButton');
