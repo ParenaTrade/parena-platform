@@ -1426,6 +1426,7 @@ async function initApp() {
         emergencyFallback();
     }
 }
+
 // YENİ: UI güncelleme fonksiyonu
 function updateUIAfterLogin() {
     // Çıkış butonu görünürlüğü
@@ -1457,6 +1458,7 @@ function updateLocationText() {
         locationText.textContent = locationNames[selectedLocation] || selectedLocation;
     }
 }
+
 // Mikrofon kontrolleri
 function setupMicrophoneControls() {
     const microphoneToggle = document.getElementById('microphoneToggle');
@@ -1494,8 +1496,9 @@ function handleMicrophoneToggle() {
     } else {
         enableMicrophone();
     }
+}
 
-}// DOM elementlerinin yüklenmesini bekleyen fonksiyon
+// DOM elementlerinin yüklenmesini bekleyen fonksiyon
 function waitForDOMElements() {
     return new Promise((resolve) => {
         const elements = {
@@ -1528,46 +1531,6 @@ function waitForDOMElements() {
     });
 }
 
-		
-// Konum seçimini zorunlu kılmak için mikrofon kontrolü
-function toggleMicrophone() {
-    // Konum seçilmemişse mikrofonu açmaya izin verme
-    if (!selectedLocation) {
-        showLocationModal();
-        showNotification('Lütfen önce bir konum seçiniz.');
-        return;
-    }
-    
-    // Normal mikrofon açma/kapama işlemi
-    if (isListening) {
-        disableMicrophone();
-    } else {
-        enableMicrophone();
-    }
-}
-
-// Bildirim göster
-function showNotification(message) {
-    // Basit bir bildirim sistemi
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #ff4444;
-        color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        z-index: 10000;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        document.body.removeChild(notification);
-    }, 3000);
-}
-
 // Konum yönetimi
 function initializeLocation() {
     // Önce kayıtlı konumu kontrol et
@@ -1585,6 +1548,7 @@ function initializeLocation() {
         }, 1000);
     }
 }
+
 // DÜZELTİLMİŞ KONUM MODAL
 function showLocationModal() {
     const modal = document.getElementById('locationModal');
@@ -1602,8 +1566,8 @@ function showLocationModal() {
         }
     });
 
-    // Kapatma butonu
-    const closeBtn = document.getElementById('closeLocationModal');
+    // Kapatma butonu - HTML'de ID eklenmeli: id="closeLocationModal"
+    const closeBtn = document.querySelector('.close-modal');
     if (closeBtn) {
         closeBtn.onclick = hideLocationModal;
     }
@@ -1644,32 +1608,20 @@ function selectLocation(locationType) {
     enableMicrophone();
     
     debugLog('📍 Konum seçildi:', locationType);
-}
-
-// Konum metnini güncelle
-function updateLocationText() {
-    const locationText = document.getElementById('locationText');
-    if (locationText && selectedLocation) {
-        const locationNames = {
-            'inside': 'Restoran içinde',
-            'takeaway': 'Paket servis', 
-            'delivery': 'Adrese teslim'
-        };
-        locationText.textContent = locationNames[selectedLocation] || selectedLocation;
+    
+    // Sesli asistanı başlat (eğer bu fonksiyon tanımlıysa)
+    if (typeof initializeVoiceAssistant === 'function') {
+        initializeVoiceAssistant();
+    }
+    
+    // Satıcıları konuma göre filtrele (eğer bu fonksiyon tanımlıysa)
+    if (typeof filterAndDisplayVendors === 'function') {
+        filterAndDisplayVendors();
     }
 }
-    
-    // Modalı kapat
-    hideLocationModal();
-    
-    // Sesli asistanı başlat
-    initializeVoiceAssistant();
-    
-    // Satıcıları konuma göre filtrele
-    filterAndDisplayVendors();
-    
-    debugLog('📍 Konum seçildi ve asistan başlatıldı:', locationType);
-}
+
+// HTML'de close butonuna ID eklemek için:
+// <span class="close-modal" id="closeLocationModal">&times;</span>
 
 function initializeVoiceAssistant() {
     // Mikrofonu etkinleştir
