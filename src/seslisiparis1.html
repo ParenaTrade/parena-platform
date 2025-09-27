@@ -1679,80 +1679,88 @@ function initializeVoiceAssistant() {
         }
     }, 1000);
 }
-       function speakToUser(message) {
-            if (assistantMessage) {
-                assistantMessage.textContent = message;
-            }
-            
-            if ('speechSynthesis' in window) {
-                const speech = new SpeechSynthesisUtterance(message);
-                speech.lang = 'tr-TR';
-                speech.volume = 1;
-                speech.rate = 1;
-                speech.pitch = 1;
-                window.speechSynthesis.speak(speech);
-            }
+
+function speakToUser(message) {
+    if (assistantMessage) {
+        assistantMessage.textContent = message;
+    }
+    
+    if ('speechSynthesis' in window) {
+        const speech = new SpeechSynthesisUtterance(message);
+        speech.lang = 'tr-TR';
+        speech.volume = 1;
+        speech.rate = 1;
+        speech.pitch = 1;
+        window.speechSynthesis.speak(speech);
+    }
+}
+
+// SESLİ KOMUT İŞLEME FONKSİYONU
+function processVoiceCommand(transcript) {
+    const message = transcript.toLowerCase();
+    if (userMessage) {
+        userMessage.textContent = transcript;
+    }
+
+    // Store type seçimi
+    if (message.includes('market')) {
+        selectStoreTypeByName('Market');
+        speakToUser("Market seçildi. Size en yakın marketler listeleniyor.");
+        return true;
+    } else if (message.includes('restoran') || message.includes('lokanta')) {
+        selectStoreTypeByName('Restoran');
+        speakToUser("Restoran seçildi. Size en yakın restoranlar listeleniyor.");
+        return true;
+    } else if (message.includes('eczane')) {
+        selectStoreTypeByName('Eczane');
+        speakToUser("Eczane seçildi. Size en yakın eczaneler listeleniyor.");
+        return true;
+    } else if (message.includes('fırın')) {
+        selectStoreTypeByName('Fırın');
+        speakToUser("Fırın seçildi. Size en yakın fırınlar listeleniyor.");
+        return true;
+    }
+    
+    // Giriş süreci
+    if (conversationStep === 0) {
+        if (message.includes('evet') || message.includes('isterim') || message.includes('tabi') || message.includes('olur')) {
+            speakToUser("Harika! Telefon numaranızı söyler misiniz?");
+            conversationStep = 1;
+            return true;
+        } else if (message.includes('hayır') || message.includes('istemiyorum')) {
+            speakToUser("Peki, giriş yapmak istediğiniz zaman bana 'Evet' deyin.");
+            return true;
+        } else {
+            speakToUser("Giriş yapmak istiyor musunuz? Lütfen 'Evet' veya 'Hayır' diyerek yanıt verin.");
+            return true;
         }
-
-        {
-            const message = transcript.toLowerCase();
-            if (userMessage) {
-                userMessage.textContent = transcript;
-            }
-
-            // Store type seçimi
-            if (message.includes('market')) {
-                selectStoreTypeByName('Market');
-                speakToUser("Market seçildi. Size en yakın marketler listeleniyor.");
-            } else if (message.includes('restoran') || message.includes('lokanta')) {
-                selectStoreTypeByName('Restoran');
-                speakToUser("Restoran seçildi. Size en yakın restoranlar listeleniyor.");
-            } else if (message.includes('eczane')) {
-                selectStoreTypeByName('Eczane');
-                speakToUser("Eczane seçildi. Size en yakın eczaneler listeleniyor.");
-            } else if (message.includes('fırın')) {
-                selectStoreTypeByName('Fırın');
-                speakToUser("Fırın seçildi. Size en yakın fırınlar listeleniyor.");
-            }
-            
-            // Giriş süreci
-            if (conversationStep === 0) {
-                if (message.includes('evet') || message.includes('isterim') || message.includes('tabi') || message.includes('olur')) {
-                    speakToUser("Harika! Telefon numaranızı söyler misiniz?");
-                    conversationStep = 1;
-                } else if (message.includes('hayır') || message.includes('istemiyorum')) {
-                    speakToUser("Peki, giriş yapmak istediğiniz zaman bana 'Evet' deyin.");
-                } else {
-                    speakToUser("Giriş yapmak istiyor musunuz? Lütfen 'Evet' veya 'Hayır' diyerek yanıt verin.");
-                }
-              return; 
-            }
-            
-            if (conversationStep === 1) {
-                const phoneMatch = message.match(/\d+/g);
-                if (phoneMatch) {
-                    const phone = phoneMatch.join('');
-                    checkCustomerByPhone(phone);
-                } else {
-                    speakToUser("Telefon numaranızı anlayamadım. Lütfen numaranızı söyler misiniz?");
-                }
-               return; 
-            }
-            
-            // Diğer komutlar için buraya eklemeler yapılacak
+    }
+    
+    if (conversationStep === 1) {
+        const phoneMatch = message.match(/\d+/g);
+        if (phoneMatch) {
+            const phone = phoneMatch.join('');
+            checkCustomerByPhone(phone);
+            return true;
+        } else {
+            speakToUser("Telefon numaranızı anlayamadım. Lütfen numaranızı söyler misiniz?");
+            return true;
         }
+    }
+    
+    return false; // Hiçbir komut işlenmezse
+}
 
-        function selectStoreTypeByName(typeName) {
-            const typeCard = Array.from(document.querySelectorAll('.seller-type-card')).find(card => 
-                card.dataset.typeName === typeName
-            );
-            
-            if (typeCard) {
-                typeCard.click();
-            }
-        }
-
-        // =============================================
+function selectStoreTypeByName(typeName) {
+    const typeCard = Array.from(document.querySelectorAll('.seller-type-card')).find(card => 
+        card.dataset.typeName === typeName
+    );
+    
+    if (typeCard) {
+        typeCard.click();
+    }
+}     
+	// =============================================
         // SAYFA YÜKLEME SÜRECİ
         // =============================================
 
@@ -3638,6 +3646,7 @@ function getDemoProducts() {
 	
 </body>
 </html>
+
 
 
 
