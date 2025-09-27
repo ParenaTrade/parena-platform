@@ -1493,100 +1493,102 @@ body.modal-open {
             }
         }
 
-        // =============================================
-        // MİKROFON VE SESLİ ASİSTAN SİSTEMİ
-        // =============================================
+       // =============================================
+// MİKROFON VE SESLİ ASİSTAN SİSTEMİ (DÜZELTİLMİŞ)
+// =============================================
 
-        function handleMicrophoneToggle() {
-            console.log('🎤 Mikrofon toggle çağrıldı', { 
-                selectedLocation: selectedLocation, 
-                currentCustomer: currentCustomer 
-            });
-            
-            if (!selectedLocation) {
-                console.log('📍 Konum seçilmemiş');
-                showLocationModal();
-                speakToUser("Lütfen önce bir konum seçiniz.");
-                return;
-            }
-            
-            if (isListening) {
-                disableMicrophone();
-            } else {
-                enableMicrophone();
-            }
+function handleMicrophoneToggle() {
+    console.log('🎤 Mikrofon toggle çağrıldı', { 
+        selectedLocation: selectedLocation, 
+        currentCustomer: currentCustomer 
+    });
+    
+    if (!selectedLocation) {
+        console.log('📍 Konum seçilmemiş');
+        showLocationModal();
+        speakToUser("Lütfen önce bir konum seçiniz.");
+        return;
+    }
+    
+    if (isListening) {
+        disableMicrophone();
+    } else {
+        enableMicrophone();
+    }
+}
+
+async function enableMicrophone() {
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("Mikrofon erişimi desteklenmiyor");
         }
 
-        async function enableMicrophone() {
-            try {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("Mikrofon erişimi desteklenmiyor");
-                }
-
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                isMicrophoneEnabled = true;
-                microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (Açık)</span>';
-                microphoneToggle.classList.add('listening');
-                
-                initializeSpeechRecognition();
-                
-                if (assistantMessage) {
-                    assistantMessage.textContent = "Mikrofon açıldı. Konuşmaya başlayabilirsiniz.";
-                }
-                
-                // Sesli karşılama mesajı
-                setTimeout(() => {
-                    initializeVoiceAssistant();
-                }, 1000);
-                
-                stream.getTracks().forEach(track => track.stop());
-                
-            } catch (error) {
-                console.error("Mikrofon erişim hatası:", error);
-                let errorMessage = "Mikrofon erişimi sağlanamadı. ";
-                
-                if (error.name === "NotAllowedError") {
-                    errorMessage += "Lütfen tarayıcı ayarlarınızdan mikrofon erişimine izin verin.";
-                } else if (error.name === "NotFoundError") {
-                    errorMessage += "Mikrofon cihazı bulunamadı.";
-                } else {
-                    errorMessage += "Beklenmeyen bir hata oluştu: " + error.message;
-                }
-                
-                if (assistantMessage) {
-                    assistantMessage.textContent = errorMessage;
-                }
-                disableMicrophone();
-            }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        isMicrophoneEnabled = true;
+        microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (Açık)</span>';
+        microphoneToggle.classList.add('listening');
+        
+        initializeSpeechRecognition();
+        
+        if (assistantMessage) {
+            assistantMessage.textContent = "Mikrofon açıldı. Konuşmaya başlayabilirsiniz.";
         }
-
-        function disableMicrophone() {
-            isMicrophoneEnabled = false;
-            microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon (Kapalı)</span>';
-            microphoneToggle.classList.remove('listening');
-            
-            if (recognition) {
-                recognition.stop();
-            }
-            
-            if (voiceIndicator) {
-                voiceIndicator.classList.remove('listening');
-            }
-            
-            if (assistantMessage) {
-                assistantMessage.textContent = "Mikrofon kapalı. Sesli sipariş için lütfen mikrofonu açın.";
-            }
+        
+        // Sesli karşılama mesajı
+        setTimeout(() => {
+            initializeVoiceAssistant();
+        }, 1000);
+        
+        stream.getTracks().forEach(track => track.stop());
+        
+    } catch (error) {
+        console.error("Mikrofon erişim hatası:", error);
+        let errorMessage = "Mikrofon erişimi sağlanamadı. ";
+        
+        if (error.name === "NotAllowedError") {
+            errorMessage += "Lütfen tarayıcı ayarlarınızdan mikrofon erişimine izin verin.";
+        } else if (error.name === "NotFoundError") {
+            errorMessage += "Mikrofon cihazı bulunamadı.";
+        } else {
+            errorMessage += "Beklenmeyen bir hata oluştu: " + error.message;
         }
+        
+        if (assistantMessage) {
+            assistantMessage.textContent = errorMessage;
+        }
+        disableMicrophone();
+    }
+}
 
-         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+function disableMicrophone() {
+    isMicrophoneEnabled = false;
+    microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon (Kapalı)</span>';
+    microphoneToggle.classList.remove('listening');
+    
+    if (recognition) {
+        recognition.stop();
+    }
+    
+    if (voiceIndicator) {
+        voiceIndicator.classList.remove('listening');
+    }
+    
+    if (assistantMessage) {
+        assistantMessage.textContent = "Mikrofon kapalı. Sesli sipariş için lütfen mikrofonu açın.";
+    }
+}
+
+// SES TANIMA FONKSİYONU - HATALI KISIM DÜZELTİLDİ
+function initializeSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
         if (assistantMessage) {
             assistantMessage.textContent = "Tarayıcınız ses tanıma özelliğini desteklemiyor";
         }
         disableMicrophone();
-        return;
+        return; // ✅ Bu return artık fonksiyon içinde
     }
     
     recognition = new SpeechRecognition();
@@ -1649,7 +1651,7 @@ body.modal-open {
     startRecognitionSafely();
 }
 
-// Güvenli ses tanıma başlatma
+// EKSİK FONKSİYONU EKLEYELİM
 function startRecognitionSafely() {
     if (!isListening && isMicrophoneEnabled) {
         setTimeout(() => {
@@ -1666,17 +1668,17 @@ function startRecognitionSafely() {
         }, 500);
     }
 }
-        function initializeVoiceAssistant() {
-            setTimeout(() => {
-                if (!currentCustomer) {
-                    speakToUser("Merhaba! Sesli sipariş sistemine hoş geldiniz. Telefon numaranızı söyleyerek giriş yapabilir veya misafir olarak devam edebilirsiniz.");
-                    conversationStep = 0;
-                } else {
-                    speakToUser(`Hoş geldiniz ${currentCustomer.name}! Ne satın almak istersiniz?`);
-                }
-            }, 1000);
-        }
 
+// SESLİ ASİSTAN BAŞLATMA
+function initializeVoiceAssistant() {
+    setTimeout(() => {
+        if (!currentCustomer) {
+            speakToUser("Merhaba! Sesli sipariş sistemine hoş geldiniz. Telefon numaranızı söyleyerek giriş yapabilir veya misafir olarak devam edebilirsiniz.");
+        } else {
+            speakToUser(`Hoş geldiniz ${currentCustomer.name}! Ne satın almak istersiniz?`);
+        }
+    }, 1000);
+}
         function speakToUser(message) {
             if (assistantMessage) {
                 assistantMessage.textContent = message;
@@ -3822,6 +3824,7 @@ function getDemoProducts() {
 	
 </body>
 </html>
+
 
 
 
