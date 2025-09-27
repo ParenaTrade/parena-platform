@@ -1929,26 +1929,49 @@ function initializeVoiceAssistant() {
 // =============================================
 // EKSİK FONKSİYONLARI TAMAMLAYALIM
 // =============================================
+// =============================================
+// VERİTABANI ve AI ODAKLI SADELEŞTİRİLMİŞ SİSTEM
+// =============================================
 
-// EKSİK FONKSİYON 1: loadCommandRules
+// Global değişkenler
+let commandRoot = "0:0";
+let pendingResponse = null;
+let commandRules = new Map();
+
+// =============================================
+// TEK FONKSİYON: loadCommandRules
+// =============================================
 async function loadCommandRules() {
     try {
         debugLog('🔧 Komut kuralları yükleniyor...');
         
-        // Geçici olarak sabit kurallar kullanacağız
+        // Önce veritabanından dene
+        const { data, error } = await supabase
+            .from('voice_command_rules')
+            .select('*')
+            .eq('is_active', true)
+            .order('priority');
+
+        if (!error && data && data.length > 0) {
+            // Veritabanından kuralları yükle
+            commandRules.clear();
+            data.forEach(rule => {
+                if (!commandRules.has(rule.root_code)) {
+                    commandRules.set(rule.root_code, []);
+                }
+                commandRules.get(rule.root_code).push(rule);
+            });
+            debugLog(`✅ Veritabanından ${data.length} kural yüklendi`);
+            return data;
+        }
+
+        // Fallback: Varsayılan kurallar
         const defaultRules = [
             {
                 root_code: '0:0',
-                input_patterns: 'merhaba|selam|hello|hi',
-                output_text: 'Merhaba! Sesli sipariş sistemine hoş geldiniz. Giriş yapmak için telefon numaranızı söyleyin.',
+                input_patterns: 'merhaba|selam',
+                output_text: 'Merhaba! Sesli sipariş sistemine hoş geldiniz.',
                 next_root: '1:1',
-                action_name: null
-            },
-            {
-                root_code: '0:0', 
-                input_patterns: 'yardım|help|ne yapabilirim',
-                output_text: 'Ana menüdeysiniz. Telefon numaranızı söyleyerek giriş yapabilirsiniz.',
-                next_root: '0:0',
                 action_name: null
             },
             {
@@ -1957,20 +1980,6 @@ async function loadCommandRules() {
                 output_text: 'Telefon numaranız: {phone}. Doğru mu?',
                 next_root: '1:2',
                 action_name: 'set_phone'
-            },
-            {
-                root_code: '1:2',
-                input_patterns: 'evet|doğru|onay|tabi',
-                output_text: 'Numaranız kontrol ediliyor...',
-                next_root: '1:3', 
-                action_name: 'check_phone'
-            },
-            {
-                root_code: '1:2',
-                input_patterns: 'hayır|yanlış|değil',
-                output_text: 'Özür dilerim. Lütfen telefon numaranızı tekrar söyleyin.',
-                next_root: '1:1',
-                action_name: null
             }
         ];
 
@@ -1983,25 +1992,24 @@ async function loadCommandRules() {
     }
 }
 
-// EKSİK FONKSİYON 2: findRuleInDatabase
+// =============================================
+// TEK FONKSİYON: findRuleInDatabase
+// =============================================
 async function findRuleInDatabase(message, root) {
     try {
         const rules = await loadCommandRules();
-        const rootRules = rules.filter(rule => rule.root_code === root);
+        const rootRules = Array.isArray(rules) ? rules.filter(rule => rule.root_code === root) : [];
         
         for (const rule of rootRules) {
             const patterns = rule.input_patterns.split('|');
             for (const pattern of patterns) {
                 if (pattern.startsWith('regex:')) {
                     const regexPattern = pattern.replace('regex:', '');
-                    const regex = new RegExp(regexPattern);
-                    if (regex.test(message)) {
+                    if (new RegExp(regexPattern).test(message)) {
                         return rule;
                     }
-                } else {
-                    if (message.includes(pattern)) {
-                        return rule;
-                    }
+                } else if (message.includes(pattern)) {
+                    return rule;
                 }
             }
         }
@@ -2012,115 +2020,191 @@ async function findRuleInDatabase(message, root) {
     }
 }
 
-// EKSİK FONKSİYON 3: executeDatabaseRule
+// =============================================
+// TEK FONKSİYON: executeDatabaseRule
+// =============================================
 async function executeDatabaseRule(rule, message) {
     try {
         let output = rule.output_text;
         
-        // Telefon numarasını çıkar ve yerine koy
+        // Dinamik veri ekle
         const phoneMatch = message.match(/(\d{10,})/);
-        if (phoneMatch && output.includes('{phone}')) {
-            output = output.replace('{phone}', phoneMatch[1]);
-        }
+        if (phoneMatch) output = output.replace('{phone}', phoneMatch[1]);
         
         speakToUser(output);
         
         if (rule.action_name) {
-            await executeAction(rule.action_name, { phone: phoneMatch ? phoneMatch[1] : null });
+            await executeAction(rule.action_name, { phone: phoneMatch?.[1] });
         }
         
         if (rule.next_root) {
             commandRoot = rule.next_root;
-            debugLog(`🔀 Kök güncellendi: ${rule.next_root}`);
         }
     } catch (error) {
         console.error('Kural çalıştırma hatası:', error);
     }
 }
 
-// EKSİK FONKSİYON 4: handleAIRequest
-async function handleAIRequest(message, root, pendingContext = null) {
+// =============================================
+// TEK FONKSİYON: handleAIRequest
+// =============================================
+async function handleAIRequest(message, root) {
     try {
-        speakToUser("Anlıyorum...");
-        
-        // Basit AI mantığı - gerçek AI entegrasyonu için hazır
-        let response = "Üzgünüm, tam anlayamadım. Lütfen tekrar söyler misiniz?";
-        let nextRoot = root;
-        let confidence = 0.3;
-        
-        // Basit pattern matching ile AI benzeri davranış
-        if (message.includes('market') || message.includes('restoran')) {
-            response = "Hangi tür satıcıdan alışveriş yapmak istersiniz? Market veya restoran?";
-            nextRoot = '2:1';
-            confidence = 0.8;
-        } else if (message.includes('ödeme') || message.includes('sipariş')) {
-            response = "Ödeme işlemi için önce giriş yapmalısınız.";
-            nextRoot = '1:1';
-            confidence = 0.7;
+        // Önce veritabanında AI önbelleğini kontrol et
+        const cached = await checkAICache(message, root);
+        if (cached) {
+            speakToUser(cached.response);
+            commandRoot = cached.next_root;
+            return;
         }
+
+        // AI analizi yap
+        const aiResult = await analyzeWithAI(message, root);
         
-        if (confidence > 0.6) {
-            speakToUser(response);
-            commandRoot = nextRoot;
+        if (aiResult.confidence > 0.6) {
+            speakToUser(aiResult.response);
+            commandRoot = aiResult.next_root;
+            await saveAILearning(message, root, aiResult);
         } else {
-            speakToUser(response);
+            speakToUser("Anlayamadım, lütfen tekrar söyler misiniz?");
         }
-        
     } catch (error) {
         console.error('AI isteği hatası:', error);
         speakToUser("Sistem geçici olarak hizmet veremiyor.");
     }
 }
 
-// EKSİK FONKSİYON 5: executeAction
+// =============================================
+// TEK FONKSİYON: executeAction
+// =============================================
 async function executeAction(actionName, data) {
-    debugLog(`⚡ Aksiyon çalıştırılıyor: ${actionName}`, data);
+    debugLog(`⚡ Aksiyon: ${actionName}`, data);
     
     try {
         switch(actionName) {
             case 'set_phone':
                 if (!currentCustomer) currentCustomer = {};
                 currentCustomer.phone = data.phone;
-                
                 break;
                 
             case 'check_phone':
                 await checkCustomerByPhone(data.phone);
                 break;
                 
+            case 'select_market':
+                await selectStoreTypeByName('Market');
+                break;
+                
             default:
-                debugLog(`⚠️ Bilinmeyen aksiyon: ${actionName}`);
+                debugLog(`Bilinmeyen aksiyon: ${actionName}`);
         }
     } catch (error) {
-        console.error('Aksiyon çalıştırma hatası:', error);
+        console.error('Aksiyon hatası:', error);
     }
 }
 
-// EKSİK FONKSİYON 6: checkCustomerByPhone (basit versiyon)
+// =============================================
+// TEK FONKSİYON: processVoiceCommand
+// =============================================
+async function processVoiceCommand(transcript) {
+    const message = transcript.toLowerCase().trim();
+    if (userMessage) userMessage.textContent = transcript;
+
+    debugLog(`🔊 Komut: "${message}" | Kök: ${commandRoot}`);
+
+    try {
+        // 1. Askıda cevap varsa AI'ya yönlendir
+        if (pendingResponse) {
+            await handleAIRequest(message, commandRoot);
+            pendingResponse = null;
+            return;
+        }
+
+        // 2. Veritabanından kural ara
+        const rule = await findRuleInDatabase(message, commandRoot);
+        
+        if (rule) {
+            await executeDatabaseRule(rule, message);
+        } else {
+            // 3. Kural yoksa AI'ya yönlendir
+            pendingResponse = { message, root: commandRoot };
+            await handleAIRequest(message, commandRoot);
+        }
+    } catch (error) {
+        console.error('Sesli komut hatası:', error);
+        speakToUser("Komut işlenirken hata oluştu.");
+    }
+}
+
+// =============================================
+// AI YARDIMCI FONKSİYONLAR (SADECE 3 TANE)
+// =============================================
+
+async function checkAICache(message, root) {
+    // Veritabanında önbellek kontrolü
+    const { data } = await supabase
+        .from('ai_learning_cache')
+        .select('*')
+        .eq('original_message', message)
+        .eq('original_root', root)
+        .single();
+    
+    return data;
+}
+
+async function analyzeWithAI(message, root) {
+    // Basit AI analizi - gerçek API için hazır
+    let response = "Anladım, devam ediyorum...";
+    let nextRoot = root;
+    let confidence = 0.7;
+
+    if (message.includes('market')) {
+        response = "Market seçildi.";
+        nextRoot = '2:1';
+    } else if (message.includes('ödeme')) {
+        response = "Ödeme işlemi başlatılıyor.";
+        nextRoot = '5:1';
+    }
+
+    return { response, nextRoot, confidence };
+}
+
+async function saveAILearning(message, root, aiResult) {
+    // AI öğrenmesini veritabanına kaydet
+    await supabase.from('ai_learning_cache').insert([{
+        original_message: message,
+        original_root: root,
+        ai_response: aiResult.response,
+        next_root: aiResult.nextRoot,
+        confidence: aiResult.confidence,
+        created_at: new Date().toISOString()
+    }]);
+}
+
+// =============================================
+// MÜŞTERİ İŞLEMLERİ (SADECE 1 FONKSİYON)
+// =============================================
+
 async function checkCustomerByPhone(phone) {
     try {
-        debugLog(`📞 Telefon kontrol ediliyor: ${phone}`);
-        
-        // Geçici demo müşteri
-        currentCustomer = {
-            id: 1,
-            name: "Demo Kullanıcı",
-            phone: phone,
-            city: "İstanbul",
-            address: "Demo Adres"
-        };
-        
-        updateCustomerUI();
-        hideHowItWorksBanner();
-        
-        speakToUser(`Hoş geldiniz ${currentCustomer.name}!`);
-        commandRoot = '2:1'; // Satıcı seçimine git
-        
-        debugLog('✅ Müşteri girişi başarılı');
-        
+        const { data } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('phone', phone)
+            .single();
+
+        if (data) {
+            currentCustomer = data;
+            updateCustomerUI();
+            speakToUser(`Hoş geldiniz ${data.name}!`);
+            commandRoot = '2:1';
+        } else {
+            speakToUser("Kayıtlı değilsiniz. Lütfen adınızı söyleyin.");
+            commandRoot = '1:3';
+        }
     } catch (error) {
         console.error('Müşteri kontrol hatası:', error);
-        speakToUser("Giriş işlemi sırasında bir hata oluştu.");
+        speakToUser("Giriş işleminde hata oluştu.");
     }
 }
 
@@ -2264,8 +2348,12 @@ async function initApp() {
         debugLog('✅ DOM hazır');
 
         // 2. Komut kurallarını yükle (DÜZELTİLDİ)
-        await loadCommandRules();
-        debugLog('✅ Komut kuralları yüklendi');
+          await loadCommandRules();
+        debugLog('✅ Sistem başlatıldı');
+    } catch (error) {
+        console.error('Başlangıç hatası:', error);
+    }
+}
 
         // 3. Konum event'lerini ayarla
         setupLocationEvents();
@@ -3550,6 +3638,7 @@ function getDemoProducts() {
 	
 </body>
 </html>
+
 
 
 
