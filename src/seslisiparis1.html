@@ -2346,7 +2346,6 @@ async function processVoiceCommand(transcript) {
 // =============================================
 // GÜNCELLENMİŞ initApp
 // =============================================
-
 async function initApp() {
     try {
         debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
@@ -2355,41 +2354,37 @@ async function initApp() {
         await waitForDOMElements();
         debugLog('✅ DOM hazır');
 
-        // 2. Komut kurallarını yükle (DÜZELTİLDİ)
-          await loadCommandRules();
-        debugLog('✅ Sistem başlatıldı');
-    } catch (error) {
-        console.error('Başlangıç hatası:', error);
-    }
-}
+        // 2. Komut kurallarını yükle
+        await loadCommandRules();
+        debugLog('✅ Komut kuralları yüklendi');
 
         // 3. Konum event'lerini ayarla
         setupLocationEvents();
         debugLog('✅ Konum eventleri ayarlandı');
 
-        // 4. StoreTypes yükle (varsa)
+        // 4. StoreTypes yükle (varsa) - ASENKRON İŞLEM
         if (typeof loadStoreTypes === 'function') {
             await loadStoreTypes();
             debugLog('✅ StoreTypes yüklendi');
         }
 
-        // 5. Oturumu geri yükle (varsa)
+        // 5. Oturumu geri yükle (varsa) - ASENKRON İŞLEM
         if (typeof restoreSession === 'function') {
             await restoreSession();
             debugLog('✅ Oturum yüklendi');
         }
 
-        // 6. Konum yönetimi
+        // 6. Konum yönetimi - SENKRON İŞLEM
         initializeLocation();
         debugLog('✅ Konum yönetimi tamamlandı');
 
-        // 7. UI elementlerini ayarla
+        // 7. UI elementlerini ayarla - SENKRON İŞLEM
         if (typeof updateUIAfterLogin === 'function') {
             updateUIAfterLogin();
             debugLog('✅ UI güncellendi');
         }
 
-        // 8. Event handler'ları ayarla
+        // 8. Event handler'ları ayarla - SENKRON İŞLEM
         if (typeof setupEventHandlers === 'function') {
             setupEventHandlers();
             debugLog('✅ Event handlerlar ayarlandı');
@@ -2399,8 +2394,42 @@ async function initApp() {
 
     } catch (error) {
         console.error('💥 Uygulama başlatma hatası:', error);
-        emergencyFallback();
+        if (typeof emergencyFallback === 'function') {
+            emergencyFallback();
+        }
     }
+}
+
+// Yardımcı fonksiyonlar
+function waitForDOMElements() {
+    return new Promise((resolve) => {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', resolve);
+        } else {
+            resolve();
+        }
+    });
+}
+
+function debugLog(message) {
+    console.log(`[DEBUG] ${new Date().toISOString()}: ${message}`);
+}
+
+// Eksik fonksiyonları tanımlayın (eğer yoksa)
+// Bu fonksiyonların gerçek implementasyonlarını eklemelisiniz
+async function loadCommandRules() {
+    // Komut kurallarını yükleme işlemi
+    console.log('Komut kuralları yükleniyor...');
+}
+
+function setupLocationEvents() {
+    // Konum event'lerini ayarla
+    console.log('Konum eventleri ayarlanıyor...');
+}
+
+function initializeLocation() {
+    // Konum yönetimini başlat
+    console.log('Konum yönetimi başlatılıyor...');
 }
 
 // =============================================
@@ -2425,7 +2454,22 @@ function emergencyFallback() {
         }, 2000);
     }
 }
-        // Yardımcı fonksiyonlar
+
+// Yardımcı fonksiyonlar
+function waitForDOMElements() {
+    return new Promise((resolve) => {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', resolve);
+        } else {
+            resolve();
+        }
+    });
+}
+
+function debugLog(message) {
+    console.log(`[DEBUG] ${new Date().toISOString()}: ${message}`);
+}	
+	// Yardımcı fonksiyonlar
         function scrollElement(element, amount) {
             if (element) {
                 element.scrollBy({ left: amount, behavior: 'smooth' });
@@ -3638,6 +3682,7 @@ function getDemoProducts() {
 	
 </body>
 </html>
+
 
 
 
