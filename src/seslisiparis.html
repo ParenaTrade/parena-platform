@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-          :root {
+           :root {
             --primary: #003dff;
             --secondary: #00c2ff;
             --accent: #ff5c00;
@@ -1063,32 +1063,33 @@ body.modal-open {
         </div>
     </header>
 
-<!-- Konum Seçim Modal'ı -->
-<div id="locationModal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Konum Seçiniz</h3>
-            <span class="close-modal" id="closeLocationModal">&times;</span>
-        </div>
-        <div class="modal-body">
-            <p>Lütfen sipariş vermek istediğiniz konumu seçin:</p>
-            <div class="location-options">
-                <div class="location-option" data-location="inside">
-                    <i class="fas fa-utensils"></i>
-                    <span>Restoran içinde</span>
-                </div>
-                <div class="location-option" data-location="takeaway">
-                    <i class="fas fa-utensils"></i>
-                    <span>Paket servis</span>
-                </div>
-                <div class="location-option" data-location="delivery">
-                    <i class="fas fa-motorcycle"></i>
-                    <span>Adrese teslim</span>
+    <!-- Konum Seçim Modal'ı -->
+    <div id="locationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Konum Seçiniz</h3>
+                <span class="close-modal" id="closeLocationModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Lütfen sipariş vermek istediğiniz konumu seçin:</p>
+                <div class="location-options">
+                    <div class="location-option" data-location="inside">
+                        <i class="fas fa-utensils"></i>
+                        <span>Restoran içinde</span>
+                    </div>
+                    <div class="location-option" data-location="takeaway">
+                        <i class="fas fa-utensils"></i>
+                        <span>Paket servis</span>
+                    </div>
+                    <div class="location-option" data-location="delivery">
+                        <i class="fas fa-motorcycle"></i>
+                        <span>Adrese teslim</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+
 	<!-- Main Content -->
     <div class="main-container">
         <!-- How it works banner -->
@@ -1282,7 +1283,6 @@ body.modal-open {
     </div>
 
     <script>
-
         // Supabase configuration
         const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
@@ -1359,100 +1359,271 @@ body.modal-open {
         const locationMarker = document.getElementById('locationMarker');
         const locationText = document.getElementById('locationText');
         const locationModal = document.getElementById('locationModal');
-        const locationOptions = document.getElementById('locationOptions');
-        const currentAddressText = document.getElementById('currentAddressText');
-        const newAddressForm = document.getElementById('newAddressForm');
-        const newAddressInput = document.getElementById('newAddressInput');
-        const saveNewAddress = document.getElementById('saveNewAddress');
-        const confirmLocation = document.getElementById('confirmLocation');
         const referralLink = document.getElementById('referralLink');
         const whatsappOrder = document.getElementById('whatsappOrder');
 
-       
         // Utility functions
         function money(n) { 
             return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; 
         }
 
-// initApp içinde location events'ı ayarla
-async function initApp() {
-    try {
-        debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
+        // Debug modu
+        const DEBUG_MODE = true;
 
-        // 1. DOM hazır olana kadar bekle
-        await waitForDOMElements();
-        debugLog('✅ DOM hazır');
+        // Debug fonksiyonu
+        function debugLog(message, data = null) {
+            if (DEBUG_MODE) {
+                console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
+            }
+        }
 
-        // 2. Konum event'lerini ayarla (EN ÖNEMLİ ADIM)
-        setupLocationEvents();
-        
-        // 3. StoreTypes yükle
-        await loadStoreTypes();
-        debugLog('✅ StoreTypes yüklendi');
+        // YENİ VE DÜZELTİLMİŞ KONUM FONKSİYONLARI
+        function showLocationModal() {
+            const modal = document.getElementById('locationModal');
+            if (!modal) {
+                console.error('❌ Location modal bulunamadı');
+                return;
+            }
 
-        // 4. Oturumu geri yükle
-        await restoreSession();
-        debugLog('✅ Oturum yüklendi');
+            // Body'ye class ekle
+            document.body.classList.add('modal-open');
+            
+            // Modalı göster
+            modal.style.display = 'flex';
+            
+            // Z-index ayarla
+            modal.style.zIndex = '10000';
+            
+            debugLog('📍 Konum modalı gösterildi');
+            
+            // Modal dışına tıklanınca kapanmasını sağla
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    hideLocationModal();
+                }
+            };
 
-        // 5. Konum yönetimi
-        initializeLocation();
-        debugLog('✅ Konum yönetimi tamamlandı');
+            // Kapatma butonu
+            const closeBtn = document.getElementById('closeLocationModal');
+            if (closeBtn) {
+                closeBtn.onclick = hideLocationModal;
+            }
 
-        // 6. UI elementlerini ayarla
-        updateUIAfterLogin();
-        debugLog('✅ UI güncellendi');
+            // Konum seçeneklerine event listener ekle
+            const options = modal.querySelectorAll('.location-option');
+            options.forEach(option => {
+                // Önceki event listener'ları temizle
+                option.onclick = null;
+                
+                // Yeni event listener ekle
+                option.addEventListener('click', function() {
+                    const location = this.getAttribute('data-location');
+                    console.log('Konum seçildi:', location);
+                    selectLocation(location);
+                });
+            });
+        }
 
-        // 7. Event handler'ları ayarla
-        setupEventHandlers();
-        debugLog('✅ Event handlerlar ayarlandı');
+        function hideLocationModal() {
+            const modal = document.getElementById('locationModal');
+            if (modal) {
+                modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+            }
+        }
 
-        debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
+        function selectLocation(locationType) {
+            console.log('📍 Seçilen konum:', locationType);
+            
+            if (!locationType) {
+                console.error('❌ Konum tipi belirtilmedi');
+                return;
+            }
+            
+            // Seçilen konumu sakla
+            selectedLocation = locationType;
+            localStorage.setItem('selectedLocation', locationType);
+            
+            // Konum metnini güncelle
+            updateLocationText();
+            
+            // Modalı kapat
+            hideLocationModal();
+            
+            // Mikrofonu etkinleştir
+            setTimeout(() => {
+                enableMicrophone();
+            }, 500);
+            
+            debugLog('📍 Konum seçildi:', locationType);
+        }
 
-    } catch (error) {
-        console.error('💥 Uygulama başlatma hatası:', error);
-        emergencyFallback();
-    }
-}
+        // Konum metnini güncelle
+        function updateLocationText() {
+            if (locationText && selectedLocation) {
+                const locationNames = {
+                    'inside': 'Restoran içinde',
+                    'takeaway': 'Paket servis', 
+                    'delivery': 'Adrese teslim'
+                };
+                locationText.textContent = locationNames[selectedLocation] || selectedLocation;
+            }
+        }
 
+        // Konum marker event'lerini ayarla
+        function setupLocationEvents() {
+            const locationMarker = document.getElementById('locationMarker');
+            if (locationMarker) {
+                // Önceki event'i temizle
+                locationMarker.onclick = null;
+                
+                // Yeni event ekle
+                locationMarker.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('📍 Konum marker tıklandı');
+                    showLocationModal();
+                });
+                
+                locationMarker.style.cursor = 'pointer';
+                debugLog('✅ Konum marker eventleri ayarlandı');
+            } else {
+                console.error('❌ Konum marker bulunamadı');
+            }
+        }
 
-		
- // DÜZELTİLMİŞ SAYFA BAŞLATMA
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
-    initApp();
-});
+        // DOM elementlerinin yüklenmesini bekleyen fonksiyon
+        function waitForDOMElements() {
+            return new Promise((resolve) => {
+                const elements = {
+                    'microphoneToggle': document.getElementById('microphoneToggle'),
+                    'locationModal': document.getElementById('locationModal'),
+                    'locationMarker': document.getElementById('locationMarker'),
+                    'profileBtn': document.getElementById('profileBtn'),
+                    'logoutBtn': document.getElementById('logoutBtn')
+                };
 
-// YENİ: UI güncelleme fonksiyonu
-function updateUIAfterLogin() {
-    // Çıkış butonu görünürlüğü
-    updateLogoutButtonVisibility();
-    
-    // Banner kontrolü
-    if (currentCustomer) {
-        hideHowItWorksBanner();
-    } else {
-        showHowItWorksBanner();
-    }
-    
-    // Profil bilgilerini güncelle
-    updateCustomerUI();
-    
-    // Konum metnini güncelle
-    updateLocationText();
-}
+                let attempts = 0;
+                const maxAttempts = 50; // 5 saniye
 
-// YENİ: Konum metnini güncelle
-function updateLocationText() {
-    const locationText = document.getElementById('locationText');
-    if (locationText && selectedLocation) {
-        const locationNames = {
-            'inside': 'Restoran içinde',
-            'takeaway': 'Paket servis', 
-            'delivery': 'Adrese teslim'
-        };
-        locationText.textContent = locationNames[selectedLocation] || selectedLocation;
-    }
-}
+                const checkElements = () => {
+                    attempts++;
+                    const loaded = Object.values(elements).filter(el => el !== null).length;
+                    const total = Object.keys(elements).length;
+
+                    debugLog(`DOM yükleme: ${loaded}/${total} (deneme ${attempts})`);
+
+                    if (loaded >= 3 || attempts >= maxAttempts) { // En az 3 kritik element
+                        debugLog('✅ Minimum DOM elementleri yüklendi');
+                        resolve();
+                        return;
+                    }
+
+                    setTimeout(checkElements, 100);
+                };
+
+                checkElements();
+            });
+        }
+
+        // Ana uygulama başlatma fonksiyonu
+        async function initApp() {
+            try {
+                debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
+
+                // 1. DOM hazır olana kadar bekle
+                await waitForDOMElements();
+                debugLog('✅ DOM hazır');
+
+                // 2. Konum event'lerini ayarla (EN ÖNEMLİ ADIM)
+                setupLocationEvents();
+                
+                // 3. StoreTypes yükle
+                await loadStoreTypes();
+                debugLog('✅ StoreTypes yüklendi');
+
+                // 4. Oturumu geri yükle
+                await restoreSession();
+                debugLog('✅ Oturum yüklendi');
+
+                // 5. Konum yönetimi
+                initializeLocation();
+                debugLog('✅ Konum yönetimi tamamlandı');
+
+                // 6. UI elementlerini ayarla
+                updateUIAfterLogin();
+                debugLog('✅ UI güncellendi');
+
+                // 7. Event handler'ları ayarla
+                setupEventHandlers();
+                debugLog('✅ Event handlerlar ayarlandı');
+
+                debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
+
+            } catch (error) {
+                console.error('💥 Uygulama başlatma hatası:', error);
+                emergencyFallback();
+            }
+        }
+
+        // Konum yönetimi
+        function initializeLocation() {
+            // Önce kayıtlı konumu kontrol et
+            const savedLocation = localStorage.getItem('selectedLocation');
+            
+            if (savedLocation) {
+                selectedLocation = savedLocation;
+                updateLocationText();
+                debugLog('📍 Kayıtlı konum kullanılıyor:', selectedLocation);
+            } else {
+                // Konum yoksa modal göster
+                debugLog('📍 Konum seçilmemiş, modal gösterilecek');
+                setTimeout(() => {
+                    showLocationModal();
+                }, 1500);
+            }
+        }
+
+        // Acil durum fallback'i
+        function emergencyFallback() {
+            debugLog('🆘 Acil durum modu aktif');
+            
+            // Manuel olarak konum event'lerini ayarla
+            setupLocationEvents();
+            
+            // Konum seçilmemişse modal göster
+            if (!selectedLocation) {
+                setTimeout(() => {
+                    showLocationModal();
+                }, 2000);
+            }
+        }
+
+        // YENİ: UI güncelleme fonksiyonu
+        function updateUIAfterLogin() {
+            // Çıkış butonu görünürlüğü
+            updateLogoutButtonVisibility();
+            
+            // Banner kontrolü
+            if (currentCustomer) {
+                hideHowItWorksBanner();
+            } else {
+                showHowItWorksBanner();
+            }
+            
+            // Profil bilgilerini güncelle
+            updateCustomerUI();
+            
+            // Konum metnini güncelle
+            updateLocationText();
+        }
+
+        // Sayfa yüklendiğinde initApp'i çalıştır
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
+            initApp();
+        });
+
 
 // Mikrofon kontrolleri
 function setupMicrophoneControls() {
@@ -1471,27 +1642,28 @@ function setupMicrophoneControls() {
 }
 
 // Mikrofon toggle'ını güçlendir
-function handleMicrophoneToggle() {
-    console.log('🎤 Mikrofon toggle çağrıldı', { 
-        selectedLocation: selectedLocation, 
-        currentCustomer: currentCustomer 
-    });
-    
-    // Konum seçilmemişse
-    if (!selectedLocation) {
-        console.log('📍 Konum seçilmemiş');
-        showLocationModal();
-        speakToUser("Lütfen önce bir konum seçiniz.");
-        return;
-    }
-    
-    // Normal mikrofon açma/kapama işlemi
-    if (isListening) {
-        disableMicrophone();
-    } else {
-        enableMicrophone();
-    }
-}
+// Mikrofon toggle'ını güçlendir
+        function handleMicrophoneToggle() {
+            console.log('🎤 Mikrofon toggle çağrıldı', { 
+                selectedLocation: selectedLocation, 
+                currentCustomer: currentCustomer 
+            });
+            
+            // Konum seçilmemişse
+            if (!selectedLocation) {
+                console.log('📍 Konum seçilmemiş');
+                showLocationModal();
+                speakToUser("Lütfen önce bir konum seçiniz.");
+                return;
+            }
+            
+            // Normal mikrofon açma/kapama işlemi
+            if (isListening) {
+                disableMicrophone();
+            } else {
+                enableMicrophone();
+            }
+        }
 
 // DOM elementlerinin yüklenmesini bekleyen fonksiyon
 function waitForDOMElements() {
@@ -1815,120 +1987,75 @@ async function processReferralCode(code, groupCode) {
 }
 
 	// DÜZELTİLMİŞ VE TAMAMLANMIŞ EVENT HANDLER'LAR
-function setupEventHandlers() {
-    try {
-        debugLog('🔧 Event handlerlar ayarlanıyor...');
+// Event handler'ları ayarla
+        function setupEventHandlers() {
+            try {
+                debugLog('🔧 Event handlerlar ayarlanıyor...');
 
-        // 1. KONUM İŞLEMLERİ - DÜZELTİLMİŞ
-        const locationMarker = document.getElementById('locationMarker');
-        if (locationMarker) {
-            locationMarker.addEventListener('click', showLocationModal);
-        }
+                // 1. KONUM İŞLEMLERİ - DÜZELTİLMİŞ
+                setupLocationEvents();
 
-        // 2. MİKROFON TOGGLE
-        const microphoneToggle = document.getElementById('microphoneToggle');
-        if (microphoneToggle) {
-            microphoneToggle.addEventListener('click', handleMicrophoneToggle);
-        }
+                // 2. MİKROFON TOGGLE
+                if (microphoneToggle) {
+                    microphoneToggle.addEventListener('click', handleMicrophoneToggle);
+                }
 
-        // 3. PROFİL DROPDOWN (Hata düzeltmeli)
-        if (profileBtn && profileDropdown) {
-            profileBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                profileDropdown.classList.toggle('show');
+                // 3. PROFİL DROPDOWN
+                setupProfileDropdown();
+
+                // 4. ÇIKIŞ BUTONU
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        logout();
+                    });
+                }
+
+                // 5. KAYDIRMA BUTONLARI
+                if (scrollSellerTypesLeft && sellerTypeGrid) {
+                    scrollSellerTypesLeft.addEventListener('click', () => scrollElement(sellerTypeGrid, -200));
+                    scrollSellerTypesRight.addEventListener('click', () => scrollElement(sellerTypeGrid, 200));
+                }
                 
-                // 10 saniye sonra dropdown'u kapat
-                setTimeout(() => {
-                    profileDropdown.classList.remove('show');
-                }, 10000);
-            });
-            
-            // Dropdown dışına tıklanınca kapat
-            document.addEventListener('click', function() {
-                profileDropdown.classList.remove('show');
-            });
-        } else {
-            console.error('❌ Profil elementleri bulunamadı');
+                if (scrollCategoriesLeft && categoriesGrid) {
+                    scrollCategoriesLeft.addEventListener('click', () => scrollElement(categoriesGrid, -200));
+                    scrollCategoriesRight.addEventListener('click', () => scrollElement(categoriesGrid, 200));
+                }
+                
+                if (scrollSellersLeft && sellerGrid) {
+                    scrollSellersLeft.addEventListener('click', () => scrollElement(sellerGrid, -200));
+                    scrollSellersRight.addEventListener('click', () => scrollElement(sellerGrid, 200));
+                }
+
+                // 6. SEPET İŞLEMLERİ
+                if (cartClose) {
+                    cartClose.addEventListener('click', closeCart);
+                }
+                
+                if (orderSummary) {
+                    orderSummary.addEventListener('click', toggleCart);
+                }
+
+                // 7. ÖDEME BUTONLARI
+                if (payCashBtn) {
+                    payCashBtn.addEventListener('click', () => finalizeOrder('nakit'));
+                }
+                if (payCardBtn) {
+                    payCardBtn.addEventListener('click', () => finalizeOrder('kart'));
+                }
+                if (payBonusBtn) {
+                    payBonusBtn.addEventListener('click', () => finalizeOrder('bonus'));
+                }
+
+                debugLog('✅ Tüm event handlerlar başarıyla ayarlandı');
+
+            } catch (error) {
+                console.error('❌ Event handler ayarlama hatası:', error);
+            }
         }
 
-        // 4. ÇIKIŞ BUTONU (Güvenli versiyon)
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                logout();
-            });
-        }
-
-        // 5. MİKROFON TOGGLE (Kritik düzeltme)
-        if (microphoneToggle) {
-            microphoneToggle.addEventListener('click', handleMicrophoneToggle);
-        }
-
-        // 6. KAYDIRMA BUTONLARI (Mevcut kod)
-        if (scrollSellerTypesLeft && sellerTypeGrid) {
-            scrollSellerTypesLeft.addEventListener('click', () => scrollElement(sellerTypeGrid, -200));
-            scrollSellerTypesRight.addEventListener('click', () => scrollElement(sellerTypeGrid, 200));
-        }
-        
-        if (scrollCategoriesLeft && categoriesGrid) {
-            scrollCategoriesLeft.addEventListener('click', () => scrollElement(categoriesGrid, -200));
-            scrollCategoriesRight.addEventListener('click', () => scrollElement(categoriesGrid, 200));
-        }
-        
-        if (scrollSellersLeft && sellerGrid) {
-            scrollSellersLeft.addEventListener('click', () => scrollElement(sellerGrid, -200));
-            scrollSellersRight.addEventListener('click', () => scrollElement(sellerGrid, 200));
-        }
-
-        // 7. SEPET İŞLEMLERİ (Mevcut kod + güvenlik)
-        if (cartClose) {
-            cartClose.addEventListener('click', closeCart);
-        }
-        
-        if (orderSummary) {
-            orderSummary.addEventListener('click', toggleCart);
-        }
-
-        // 8. ÖDEME BUTONLARI (Mevcut kod)
-        if (payCashBtn) {
-            payCashBtn.addEventListener('click', () => finalizeOrder('nakit'));
-        }
-        if (payCardBtn) {
-            payCardBtn.addEventListener('click', () => finalizeOrder('kart'));
-        }
-        if (payBonusBtn) {
-            payBonusBtn.addEventListener('click', () => finalizeOrder('bonus'));
-        }
-
-        
-        // 9. FOOTER LİNKLERİ (Mevcut kod)
-        if (referralLink) {
-            referralLink.addEventListener('click', generateReferralLink);
-        }
-        
-        if (whatsappOrder) {
-            whatsappOrder.addEventListener('click', shareOnWhatsApp);
-        }
-
-        // 10. SESLİ ASİSTAN KAPATMA (Mevcut kod)
-        if (closeVoiceStatus && voiceStatusPanel) {
-            closeVoiceStatus.addEventListener('click', function() {
-                voiceStatusPanel.style.display = 'none';
-            });
-        }
-
-        // 11. EKSİK OLAN DİĞER EVENT'LER
-        setupAdditionalEventHandlers();
-
-        debugLog('✅ Tüm event handlerlar başarıyla ayarlandı');
-
-    } catch (error) {
-        console.error('❌ Event handler ayarlama hatası:', error);
-    }
-}
-
-// EKSİK EVENT'LERİ TAMAMLAYAN FONKSİYON
+		// EKSİK EVENT'LERİ TAMAMLAYAN FONKSİYON
 function setupAdditionalEventHandlers() {
     // Sayfa yenileme koruması
     window.addEventListener('beforeunload', function(e) {
@@ -2169,41 +2296,50 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
        // "Nasıl Çalışır" banner'ını göster
-       // ÇÖZÜM: Banner kontrolünü düzelt
-function showHowItWorksBanner() {
-    const banner = document.getElementById('howItWorks');
-    if (banner) {
-        banner.style.display = 'block';
-    }
-    
-    // Diğer bölümleri gizle
-    document.getElementById('categoriesSection').style.display = 'none';
-    document.getElementById('sellersSection').style.display = 'none';
-    document.getElementById('productsSection').style.display = 'none';
-    
-    // Sipariş özetini gizle (misafir kullanıcı için)
-    const orderSummary = document.getElementById('orderSummary');
-    if (orderSummary) {
-        orderSummary.style.display = 'none';
-    }
-}
+        function showHowItWorksBanner() {
+            const banner = document.getElementById('howItWorks');
+            if (banner) {
+                banner.style.display = 'block';
+            }
+            
+            // Diğer bölümleri gizle
+            if (document.getElementById('categoriesSection')) {
+                document.getElementById('categoriesSection').style.display = 'none';
+            }
+            if (document.getElementById('sellersSection')) {
+                document.getElementById('sellersSection').style.display = 'none';
+            }
+            if (document.getElementById('productsSection')) {
+                document.getElementById('productsSection').style.display = 'none';
+            }
+            
+            // Sipariş özetini gizle (misafir kullanıcı için)
+            const orderSummary = document.getElementById('orderSummary');
+            if (orderSummary) {
+                orderSummary.style.display = 'none';
+            }
+        }
 
-function hideHowItWorksBanner() {
-    const banner = document.getElementById('howItWorks');
-    if (banner) {
-        banner.style.display = 'none';
-    }
-    
-    // Diğer bölümleri göster
-    document.getElementById('categoriesSection').style.display = 'block';
-    document.getElementById('sellersSection').style.display = 'block';
-    
-    // Sipariş özetini göster (giriş yapmış kullanıcı için)
-    const orderSummary = document.getElementById('orderSummary');
-    if (orderSummary) {
-        orderSummary.style.display = 'flex';
-    }
-}
+ function hideHowItWorksBanner() {
+            const banner = document.getElementById('howItWorks');
+            if (banner) {
+                banner.style.display = 'none';
+            }
+            
+            // Diğer bölümleri göster
+            if (document.getElementById('categoriesSection')) {
+                document.getElementById('categoriesSection').style.display = 'block';
+            }
+            if (document.getElementById('sellersSection')) {
+                document.getElementById('sellersSection').style.display = 'block';
+            }
+            
+            // Sipariş özetini göster (giriş yapmış kullanıcı için)
+            const orderSummary = document.getElementById('orderSummary');
+            if (orderSummary) {
+                orderSummary.style.display = 'flex';
+            }
+        }
 
   // DÜZELTİLMİŞ KONUM FONKSİYONLARI
         function showLocationModal() {
@@ -2265,110 +2401,124 @@ function initializeAssistant() {
 
 		
         // Store type'ları yükle (düzeltilmiş versiyon)
-// StoreTypes yükleme (yeniden düzenlenmiş)
-async function loadStoreTypes() {
-    try {
-        debugLog('🔧 StoreTypes yükleniyor...');
-        
-        // 1. Önce cache kontrolü
-        const cached = localStorage.getItem('storeTypes');
-        if (cached) {
-            storeTypes = JSON.parse(cached);
-            debugLog('✅ StoreTypes cache den yüklendi', storeTypes.length);
-        }
-        
-        // 2. Sunucudan yükle (cache olsa bile güncelle)
-        const { data, error } = await supabase
-            .from('store_type')
-            .select('*')
-            .order('name');
+// Store type'ları yükle
+        async function loadStoreTypes() {
+            try {
+                debugLog('🔧 StoreTypes yükleniyor...');
+                
+                // 1. Önce cache kontrolü
+                const cached = localStorage.getItem('storeTypes');
+                if (cached) {
+                    storeTypes = JSON.parse(cached);
+                    debugLog('✅ StoreTypes cache den yüklendi', storeTypes.length);
+                }
+                
+                // 2. Sunucudan yükle (cache olsa bile güncelle)
+                const { data, error } = await supabase
+                    .from('store_type')
+                    .select('*')
+                    .order('name');
 
-        if (error) {
-            console.error('❌ StoreTypes yükleme hatası:', error);
-            
-            // Cache'de veri yoksa fallback kullan
-            if (!storeTypes || storeTypes.length === 0) {
+                if (error) {
+                    console.error('❌ StoreTypes yükleme hatası:', error);
+                    
+                    // Cache'de veri yoksa fallback kullan
+                    if (!storeTypes || storeTypes.length === 0) {
+                        await useFallbackStoreTypes();
+                    }
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    storeTypes = data;
+                    localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
+                    debugLog('✅ StoreTypes sunucudan yüklendi', storeTypes.length);
+                    
+                    // Store type'ları göster
+                    displayStoreTypes(storeTypes);
+                } else {
+                    debugLog('⚠️ StoreTypes verisi boş');
+                    await useFallbackStoreTypes();
+                }
+
+            } catch (error) {
+                console.error('❌ StoreTypes yükleme hatası:', error);
                 await useFallbackStoreTypes();
             }
-            return;
         }
 
-        if (data && data.length > 0) {
-            storeTypes = data;
-            localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
-            debugLog('✅ StoreTypes sunucudan yüklendi', storeTypes.length);
-        } else {
-            debugLog('⚠️ StoreTypes verisi boş');
-            await useFallbackStoreTypes();
-        }
-
-        // 3. Vendors yükle
-        await loadVendors();
-
-    } catch (error) {
-        console.error('❌ StoreTypes yükleme hatası:', error);
-        await useFallbackStoreTypes();
-    }
-}
-
-//  yükleme
-async function load() {
-    try {
-        debugLog('🔧  yükleniyor...');
-        
-        let Data = [];
-
-        // Cache kontrolü
-        const cached = localStorage.getItem('');
-        if (cached) {
-            vendorsData = JSON.parse(cached);
-            debugLog('✅ Vendors cache den yüklendi', vendorsData.length);
-        }
-
-        // Sunucudan yükle
-        const { data, error } = await supabase
-            .from('seller_profiles')
-            .select('*')
-            .eq('is_active', true)
-            .order('name');
-
-        if (error) {
-            console.error('❌ Vendors yükleme hatası:', error);
-            
-            if (Data.length === 0) {
-                await useFallbackVendors();
+        // Store type'ları ekranda göster
+        function displayStoreTypes(types) {
+            const sellerTypeGrid = document.getElementById('sellerTypeGrid');
+            if (!sellerTypeGrid) {
+                console.error('❌ SellerTypeGrid bulunamadı');
+                return;
             }
-            return;
+            
+            sellerTypeGrid.innerHTML = '';
+            
+            if (!types || types.length === 0) {
+                sellerTypeGrid.innerHTML = `
+                    <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
+                        <i class="fas fa-store fa-3x mb-3"></i>
+                        <p>Mağaza tipi bulunamadı</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const iconMap = {
+                'Market': 'fas fa-store',
+                'Restoran': 'fas fa-utensils',
+                'Eczane': 'fas fa-prescription-bottle',
+                'Fırın': 'fas fa-bread-slice',
+                'Kafe': 'fas fa-coffee'
+            };
+            
+            types.forEach(type => {
+                const typeCard = document.createElement('div');
+                typeCard.className = 'seller-type-card';
+                typeCard.dataset.typeId = type.id;
+                typeCard.dataset.typeName = type.name;
+                
+                typeCard.innerHTML = `
+                    <div class="seller-type-icon">
+                        <i class="${iconMap[type.name] || 'fas fa-store'}"></i>
+                    </div>
+                    <div class="seller-type-name">${type.name}</div>
+                `;
+                
+                typeCard.addEventListener('click', () => {
+                    // Tüm kartlardan seçimi kaldır
+                    document.querySelectorAll('.seller-type-card').forEach(card => {
+                        card.classList.remove('selected');
+                    });
+                    
+                    // Bu kartı seçili yap
+                    typeCard.classList.add('selected');
+                    
+                    onStoreTypeSelected(type.id, type.name);
+                });
+                
+                sellerTypeGrid.appendChild(typeCard);
+            });
+            
+            console.log("✅ Store type'lar başarıyla yüklendi");
         }
 
-        if (data && data.length > 0) {
-            Data = data;
-            localStorage.setItem('vendors', JSON.stringify(vendorsData));
-            debugLog('✅ Vendors sunucudan yüklendi', vendorsData.length);
-        } else {
-            debugLog('⚠️ Vendors verisi boş');
-            await useFallbackVendors();
+        // Fallback veriler
+        async function useFallbackStoreTypes() {
+            storeTypes = [
+                { id: 1, name: 'Restoran', code: 'restaurant', description: 'Yemek restoranları' },
+                { id: 2, name: 'Kafe', code: 'cafe', description: 'Kafe ve pastaneler' },
+                { id: 3, name: 'Market', code: 'market', description: 'Market ve bakkallar' }
+            ];
+            localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
+            debugLog('🔄 Fallback StoreTypes kullanılıyor');
+            
+            // Store type'ları göster
+            displayStoreTypes(storeTypes);
         }
-
-        vendors = vendorsData;
-        filterAndDisplayVendors();
-
-    } catch (error) {
-        console.error('❌ Vendors yükleme hatası:', error);
-        await useFallbackVendors();
-    }
-}
-
-// Fallback veriler
-async function useFallbackStoreTypes() {
-    storeTypes = [
-        { id: 1, name: 'Restoran', code: 'restaurant', description: 'Yemek restoranları' },
-        { id: 2, name: 'Kafe', code: 'cafe', description: 'Kafe ve pastaneler' },
-        { id: 3, name: 'Market', code: 'market', description: 'Market ve bakkallar' }
-    ];
-    localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
-    debugLog('🔄 Fallback StoreTypes kullanılıyor');
-}
 
 async function useFallbackVendors() {
     vendors = [
@@ -2834,48 +2984,20 @@ function debugLocationMatch(vendorLocation, userLocation) {
     console.log('Eşleşme Durumu:', vendorLocation === userLocation ? 'EŞLEŞİYOR' : 'EŞLEŞMİYOR');
     console.groupEnd();
 }
-	// ÇÖZÜM: Profil dropdown'ı tamamen yeniden yazalım
-function setupProfileDropdown() {
-    const profileBtn = document.getElementById('profileBtn');
-    const profileDropdown = document.getElementById('profileDropdown');
-    
-    if (!profileBtn || !profileDropdown) {
-        console.error('❌ Profil elementleri bulunamadı');
-        return;
-    }
-
-    // Mevcut event listener'ları temizle
-    profileBtn.replaceWith(profileBtn.cloneNode(true));
-    const newProfileBtn = document.getElementById('profileBtn');
-    
-    // Yeni event listener ekle
-    newProfileBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        console.log('🔘 Profil butonuna tıklandı');
-        
-        // Dropdown durumunu toggle et
-        const isVisible = profileDropdown.style.display === 'block';
-        profileDropdown.style.display = isVisible ? 'none' : 'block';
-        profileDropdown.classList.toggle('show');
-        
-        console.log('📂 Dropdown durumu:', profileDropdown.style.display);
-    });
-
-    // Document click event'i - dropdown dışına tıklanınca kapat
-    document.addEventListener('click', function(e) {
-        if (!profileDropdown.contains(e.target) && !newProfileBtn.contains(e.target)) {
-            profileDropdown.style.display = 'none';
-            profileDropdown.classList.remove('show');
+	// Profil dropdown'ı ayarla
+        function setupProfileDropdown() {
+            if (profileBtn && profileDropdown) {
+                profileBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    profileDropdown.classList.toggle('show');
+                });
+                
+                // Dropdown dışına tıklanınca kapat
+                document.addEventListener('click', function() {
+                    profileDropdown.classList.remove('show');
+                });
+            }
         }
-    });
-
-    // ESC tuşu ile kapat
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            profileDropdown.style.display = 'none';
-            profileDropdown.classList.remove('show');
-        }
-    });
 
     debugLog('✅ Profil dropdown ayarlandı');
 }
@@ -2916,12 +3038,13 @@ function setupLogoutButton() {
     updateLogoutButtonVisibility();
 }
 
-function updateLogoutButtonVisibility() {
-    const logoutBtn = document.getElementById('logoutButton');
-    if (!logoutBtn) return;
-    
-    logoutBtn.style.display = currentCustomer ? 'block' : 'none';
-}
+ // Çıkış butonunu güncelle
+        function updateLogoutButtonVisibility() {
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.style.display = currentCustomer ? 'block' : 'none';
+            }
+        }
 		
 		// Store type'a göre satıcıları yükle
         async function loadSellersByStoreType(storeTypeId) {
@@ -3523,23 +3646,18 @@ function initVoiceAssistant() {
             }
         }
 
+        // Profil bilgilerini güncelle
         function updateCustomerUI() {
             if (currentCustomer) {
-                userName.textContent = currentCustomer.name || 'Profilim';
-                profileName.textContent = currentCustomer.name || '-';
-                profilePhone.textContent = currentCustomer.phone || '-';
-                profileCity.textContent = currentCustomer.city || '-';
-                profileAddress.textContent = currentCustomer.address || '-';
-                profileBonus.textContent = money(currentCustomer.bonus_amount || 0);
-                profileAvatar.textContent = (currentCustomer.name || 'P').charAt(0).toUpperCase();
-                
-                if (currentCustomer.address) {
-                    locationText.textContent = currentCustomer.address;
-                    selectedLocation = currentCustomer.address;
-                }
+                if (userName) userName.textContent = currentCustomer.name || 'Profilim';
+                if (profileName) profileName.textContent = currentCustomer.name || '-';
+                if (profilePhone) profilePhone.textContent = currentCustomer.phone || '-';
+                if (profileCity) profileCity.textContent = currentCustomer.city || '-';
+                if (profileAddress) profileAddress.textContent = currentCustomer.address || '-';
+                if (profileBonus) profileBonus.textContent = money(currentCustomer.bonus_amount || 0);
+                if (profileAvatar) profileAvatar.textContent = (currentCustomer.name || 'P').charAt(0).toUpperCase();
             }
         }
-
 // GELİŞTİRİLMİŞ ÇIKIŞ FONKSİYONU
 async function logout() {
     try {
