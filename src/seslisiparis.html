@@ -90,7 +90,7 @@
             justify-content: center;
             font-weight: bold;
         }
-        .modal {
+.modal {
     position: fixed;
     top: 0;
     left: 0;
@@ -109,6 +109,7 @@
     border-radius: 10px;
     max-width: 400px;
     width: 90%;
+    z-index: 1001;
 }
 
 .modal-header {
@@ -124,12 +125,6 @@
     font-size: 24px;
 }
 
-.location-options {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
 .location-option {
     padding: 15px;
     border: 2px solid #ddd;
@@ -137,12 +132,14 @@
     cursor: pointer;
     text-align: center;
     transition: all 0.3s;
+    pointer-events: auto !important; /* Bu satırı ekleyin */
 }
 
 .location-option:hover {
     border-color: #007bff;
     background: #f8f9fa;
 }
+
         .profile-info {
             position: relative;
         }
@@ -1002,7 +999,12 @@
                 display: none;
             }
         }
-      </style>
+/* Modal görünürken body'nin scrollunu engelle */
+body.modal-open {
+    overflow: hidden;
+}
+	
+	</style>
 </head>
 <body>
     <!-- Header -->
@@ -1061,7 +1063,7 @@
         </div>
     </header>
 
-  <!-- Konum Seçim Modal'ı -->
+<!-- Konum Seçim Modal'ı -->
 <div id="locationModal" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
@@ -1087,7 +1089,6 @@
         </div>
     </div>
 </div>
-
 	<!-- Main Content -->
     <div class="main-container">
         <!-- How it works banner -->
@@ -1379,54 +1380,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initApp();
 });
 
-async function initApp() {
-    try {
-        debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
-        debugStorage();
-
-        // 1. DOM hazır olana kadar bekle
-        await waitForDOMElements();
-        debugLog('✅ DOM hazır');
-
-        // 2. StoreTypes yükle (oturumdan bağımsız)
-        await loadStoreTypes();
-        debugLog('✅ StoreTypes yüklendi');
-
-        // 3. Oturumu geri yükle
-        await restoreSession();
-        debugLog('✅ Oturum yüklendi', {  
-            user: currentCustomer ? 'Giriş yapılmış' : 'Misafir', 
-            location: selectedLocation 
-        });
-
-        // 4. Konum yönetimi - ÖNCE KONUM!
-        initializeLocation();
-        debugLog('✅ Konum yönetimi tamamlandı');
-
-        // 5. UI elementlerini ayarla
-        updateUIAfterLogin();
-        debugLog('✅ UI güncellendi');
-
-        // 6. Event handler'ları ayarla
-        setupEventHandlers();
-        debugLog('✅ Event handlerlar ayarlandı');
-
-        // 7. Profil dropdown'ı ayarla
-        setupProfileDropdown();
-        debugLog('✅ Profil dropdown ayarlandı');
-
-        // 8. Mikrofon kontrolleri
-        setupMicrophoneControls();
-        debugLog('✅ Mikrofon kontrolleri ayarlandı');
-
-        debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
-
-    } catch (error) {
-        console.error('💥 Uygulama başlatma hatası:', error);
-        emergencyFallback();
-    }
-}
-
 // YENİ: UI güncelleme fonksiyonu
 function updateUIAfterLogin() {
     // Çıkış butonu görünürlüğü
@@ -1549,7 +1502,7 @@ function initializeLocation() {
     }
 }
 
-// DÜZELTİLMİŞ KONUM MODAL
+// GÜNCELLENMİŞ KONUM MODAL FONKSİYONLARI
 function showLocationModal() {
     const modal = document.getElementById('locationModal');
     if (!modal) {
@@ -1557,33 +1510,169 @@ function showLocationModal() {
         return;
     }
 
+    // Body'ye class ekle
+    document.body.classList.add('modal-open');
+    
+    // Modalı göster
     modal.style.display = 'flex';
     
+    // Z-index ayarla
+    modal.style.zIndex = '10000';
+    
+    // Kısa bir gecikmeyle pointer events'ı etkinleştir
+    setTimeout(() => {
+        modal.style.pointerEvents = 'auto';
+        
+        const options = modal.querySelectorAll('.location-option');
+        options.forEach(option => {
+            option.style.pointerEvents = 'auto';
+            option.style.cursor = 'pointer';
+        });
+    }, 100);
+
     // Modal dışına tıklayınca kapat
-    modal.addEventListener('click', function(e) {
+    modal.onclick = function(e) {
         if (e.target === modal) {
             hideLocationModal();
         }
-    });
+    };
 
-    // Kapatma butonu - HTML'de ID eklenmeli: id="closeLocationModal"
-    const closeBtn = document.querySelector('.close-modal');
+    // Kapatma butonu
+    const closeBtn = document.getElementById('closeLocationModal');
     if (closeBtn) {
         closeBtn.onclick = hideLocationModal;
+        closeBtn.style.pointerEvents = 'auto';
+        closeBtn.style.cursor = 'pointer';
     }
 
     // Konum seçeneklerine event listener ekle
     const options = modal.querySelectorAll('.location-option');
     options.forEach(option => {
-        option.onclick = function() {
+        // Önceki event listener'ları temizle
+        option.onclick = null;
+        
+        // Yeni event listener ekle
+        option.addEventListener('click', function() {
             const location = this.getAttribute('data-location');
+            console.log('Konum seçildi:', location);
             selectLocation(location);
-        };
+        });
+        
+        // Stilleri ayarla
+        option.style.pointerEvents = 'auto';
+        option.style.cursor = 'pointer';
     });
 
     debugLog('📍 Konum modalı gösterildi');
 }
 
+function hideLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+}
+
+function selectLocation(locationType) {
+    console.log('📍 Seçilen konum:', locationType);
+    
+    if (!locationType) {
+        console.error('❌ Konum tipi belirtilmedi');
+        return;
+    }
+    
+    // Seçilen konumu sakla
+    selectedLocation = locationType;
+    localStorage.setItem('selectedLocation', locationType);
+    
+    // Konum metnini güncelle
+    updateLocationText();
+    
+    // Modalı kapat
+    hideLocationModal();
+    
+    // Mikrofonu etkinleştir
+    setTimeout(() => {
+        enableMicrophone();
+    }, 500);
+    
+    debugLog('📍 Konum seçildi:', locationType);
+}
+
+// Konum marker'a tıklama event'i
+function setupLocationEvents() {
+    const locationMarker = document.getElementById('locationMarker');
+    if (locationMarker) {
+        // Önceki event'i temizle
+        locationMarker.onclick = null;
+        
+        // Yeni event ekle
+        locationMarker.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('📍 Konum marker tıklandı');
+            showLocationModal();
+        });
+        
+        locationMarker.style.cursor = 'pointer';
+    }
+}
+
+// initApp içinde location events'ı ayarla
+async function initApp() {
+    try {
+        debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
+
+        // 1. DOM hazır olana kadar bekle
+        await waitForDOMElements();
+        debugLog('✅ DOM hazır');
+
+        // 2. Konum event'lerini ayarla (EN ÖNEMLİ ADIM)
+        setupLocationEvents();
+        
+        // 3. StoreTypes yükle
+        await loadStoreTypes();
+        debugLog('✅ StoreTypes yüklendi');
+
+        // 4. Oturumu geri yükle
+        await restoreSession();
+        debugLog('✅ Oturum yüklendi');
+
+        // 5. Konum yönetimi
+        initializeLocation();
+        debugLog('✅ Konum yönetimi tamamlandı');
+
+        // 6. UI elementlerini ayarla
+        updateUIAfterLogin();
+        debugLog('✅ UI güncellendi');
+
+        // 7. Event handler'ları ayarla
+        setupEventHandlers();
+        debugLog('✅ Event handlerlar ayarlandı');
+
+        debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
+
+    } catch (error) {
+        console.error('💥 Uygulama başlatma hatası:', error);
+        emergencyFallback();
+    }
+}
+
+// Acil durum fallback'i
+function emergencyFallback() {
+    debugLog('🆘 Acil durum modu aktif');
+    
+    // Manuel olarak konum event'lerini ayarla
+    setupLocationEvents();
+    
+    // Konum seçilmemişse modal göster
+    if (!selectedLocation) {
+        setTimeout(() => {
+            showLocationModal();
+        }, 2000);
+    }
+}
 function hideLocationModal() {
     const modal = document.getElementById('locationModal');
     if (modal) {
@@ -1978,7 +2067,37 @@ function showStorageStatus() {
     console.log('==========================');
 }
 
+// Debug için: Konum sistemini test et
+function testLocationSystem() {
+    console.log('=== KONUM SİSTEMİ TESTİ ===');
+    console.log('selectedLocation:', selectedLocation);
+    console.log('locationModal element:', document.getElementById('locationModal'));
+    console.log('locationMarker element:', document.getElementById('locationMarker'));
+    
+    const options = document.querySelectorAll('.location-option');
+    console.log('location-option elements:', options.length);
+    
+    options.forEach((option, index) => {
+        console.log(`Option ${index}:`, option);
+        console.log(`Option ${index} onclick:`, option.onclick);
+        console.log(`Option ${index} pointerEvents:`, option.style.pointerEvents);
+    });
+    
+    // Manuel olarak modalı açmayı dene
+    showLocationModal();
+}
 
+// Sayfa yüklendiğinde test butonu ekle (isteğe bağlı)
+document.addEventListener('DOMContentLoaded', function() {
+    // Test butonu ekle (sadece development için)
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        const testBtn = document.createElement('button');
+        testBtn.textContent = 'Test Konum';
+        testBtn.style.cssText = 'position:fixed; top:10px; left:10px; z-index:10000; padding:10px; background:red; color:white;';
+        testBtn.onclick = testLocationSystem;
+        document.body.appendChild(testBtn);
+    }
+});
 		
 // Sayfa yüklendiğinde storage durumunu göster
 document.addEventListener('DOMContentLoaded', function() {
