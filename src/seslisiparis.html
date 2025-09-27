@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root {
+          :root {
             --primary: #003dff;
             --secondary: #00c2ff;
             --accent: #ff5c00;
@@ -118,6 +118,7 @@
     margin-bottom: 20px;
 }
 
+		
 .close-modal {
     cursor: pointer;
     font-size: 24px;
@@ -1001,7 +1002,7 @@
                 display: none;
             }
         }
-    </style>
+      </style>
 </head>
 <body>
     <!-- Header -->
@@ -1051,10 +1052,6 @@
                         </button>
                     </div>
                 </div>
-             <button id="logoutButton" style="display: none; position: fixed; top: 10px; right: 10px; z-index: 1000; padding: 8px 16px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
-    <i class="fas fa-sign-out-alt"></i> Çıkış Yap
-</button>
-
 
                 <button id="microphoneToggle" class="microphone-toggle">
                     <i class="fas fa-microphone-slash"></i>
@@ -1063,12 +1060,13 @@
             </div>
         </div>
     </header>
-    <!-- Konum Seçim Modal'ı -->
+
+  <!-- Konum Seçim Modal'ı -->
 <div id="locationModal" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
             <h3>Konum Seçiniz</h3>
-            <span class="close-modal" onclick="hideLocationModal()">&times;</span>
+            <span class="close-modal" id="closeLocationModal">&times;</span>
         </div>
         <div class="modal-body">
             <p>Lütfen sipariş vermek istediğiniz konumu seçin:</p>
@@ -1089,7 +1087,8 @@
         </div>
     </div>
 </div>
-    <!-- Main Content -->
+
+	<!-- Main Content -->
     <div class="main-container">
         <!-- How it works banner -->
         <section class="how-it-works" id="howItWorks">
@@ -1368,12 +1367,13 @@
         const referralLink = document.getElementById('referralLink');
         const whatsappOrder = document.getElementById('whatsappOrder');
 
-         // Utility functions
+       
+        // Utility functions
         function money(n) { 
             return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; 
         }
 
-   // DÜZELTİLMİŞ SAYFA BAŞLATMA
+ // DÜZELTİLMİŞ SAYFA BAŞLATMA
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
     initApp();
@@ -1394,24 +1394,26 @@ async function initApp() {
 
         // 3. Oturumu geri yükle
         await restoreSession();
-        debugLog('✅ Oturum yüklendi', {  user: currentCustomer ? 'Giriş yapılmış' : 'Misafir', location: selectedLocation 
+        debugLog('✅ Oturum yüklendi', {  
+            user: currentCustomer ? 'Giriş yapılmış' : 'Misafir', 
+            location: selectedLocation 
         });
 
-        // 4. UI elementlerini ayarla
+        // 4. Konum yönetimi - ÖNCE KONUM!
+        initializeLocation();
+        debugLog('✅ Konum yönetimi tamamlandı');
+
+        // 5. UI elementlerini ayarla
         updateUIAfterLogin();
         debugLog('✅ UI güncellendi');
 
-        // 5. Event handler'ları ayarla
+        // 6. Event handler'ları ayarla
         setupEventHandlers();
         debugLog('✅ Event handlerlar ayarlandı');
 
-        // 6. Profil dropdown'ı ayarla
+        // 7. Profil dropdown'ı ayarla
         setupProfileDropdown();
         debugLog('✅ Profil dropdown ayarlandı');
-
-        // 7. Konum yönetimi
-        initializeLocation();
-        debugLog('✅ Konum yönetimi tamamlandı');
 
         // 8. Mikrofon kontrolleri
         setupMicrophoneControls();
@@ -1424,7 +1426,6 @@ async function initApp() {
         emergencyFallback();
     }
 }
-
 // YENİ: UI güncelleme fonksiyonu
 function updateUIAfterLogin() {
     // Çıkış butonu görünürlüğü
@@ -1458,47 +1459,43 @@ function updateLocationText() {
 }
 // Mikrofon kontrolleri
 function setupMicrophoneControls() {
+    const microphoneToggle = document.getElementById('microphoneToggle');
     if (microphoneToggle) {
         microphoneToggle.addEventListener('click', handleMicrophoneToggle);
         
-        // Misafir kullanıcı için mikrofonu otomatik aç
-        if (!currentCustomer) {
+        // Sadece konum seçilmişse mikrofonu aktif et
+        if (selectedLocation) {
             setTimeout(() => {
                 enableMicrophone();
-                debugLog('🎤 Misafir için mikrofon açıldı');
+                debugLog('🎤 Konum seçildiği için mikrofon açıldı');
             }, 1500);
         }
     }
 }
-// Acil durum fallback'i
-function emergencyFallback() {
-    debugLog('🆘 Acil durum modu aktif');
+
+// Mikrofon toggle'ını güçlendir
+function handleMicrophoneToggle() {
+    console.log('🎤 Mikrofon toggle çağrıldı', { 
+        selectedLocation: selectedLocation, 
+        currentCustomer: currentCustomer 
+    });
     
-    // Kritik verileri kontrol et ve fallback uygula
-    if (!storeTypes || storeTypes.length === 0) {
-        useFallbackStoreTypes();
-    }
-    
-    if (!vendors || vendors.length === 0) {
-        useFallbackVendors();
-    }
-    
+    // Konum seçilmemişse
     if (!selectedLocation) {
-        selectedLocation = 'inside';
-        localStorage.setItem('selectedLocation', selectedLocation);
+        console.log('📍 Konum seçilmemiş');
+        showLocationModal();
+        speakToUser("Lütfen önce bir konum seçiniz.");
+        return;
     }
     
-    // Mikrofonu etkinleştir
-    setTimeout(() => {
+    // Normal mikrofon açma/kapama işlemi
+    if (isListening) {
+        disableMicrophone();
+    } else {
         enableMicrophone();
-    }, 1000);
-    
-    // Çıkış butonunu oluştur
-    setupProfileDropdown();
-    
-    debugLog('🆘 Acil durum modu tamamlandı');
-}     
-// DOM elementlerinin yüklenmesini bekleyen fonksiyon
+    }
+
+}// DOM elementlerinin yüklenmesini bekleyen fonksiyon
 function waitForDOMElements() {
     return new Promise((resolve) => {
         const elements = {
@@ -1578,16 +1575,16 @@ function initializeLocation() {
     
     if (savedLocation) {
         selectedLocation = savedLocation;
+        updateLocationText();
         debugLog('📍 Kayıtlı konum kullanılıyor:', selectedLocation);
-        return true;
+    } else {
+        // Konum yoksa modal göster
+        debugLog('📍 Konum seçilmemiş, modal gösterilecek');
+        setTimeout(() => {
+            showLocationModal();
+        }, 1000);
     }
-    
-    // Konum yoksa modal göster
-    debugLog('📍 Konum seçilmemiş, modal gösterilecek');
-    showLocationModal();
-    return false;
 }
-
 // DÜZELTİLMİŞ KONUM MODAL
 function showLocationModal() {
     const modal = document.getElementById('locationModal');
@@ -1598,9 +1595,19 @@ function showLocationModal() {
 
     modal.style.display = 'flex';
     
-    // Mikrofonu geçici olarak kapat
-    disableMicrophone();
-    
+    // Modal dışına tıklayınca kapat
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            hideLocationModal();
+        }
+    });
+
+    // Kapatma butonu
+    const closeBtn = document.getElementById('closeLocationModal');
+    if (closeBtn) {
+        closeBtn.onclick = hideLocationModal;
+    }
+
     // Konum seçeneklerine event listener ekle
     const options = modal.querySelectorAll('.location-option');
     options.forEach(option => {
@@ -1628,15 +1635,29 @@ function selectLocation(locationType) {
     localStorage.setItem('selectedLocation', locationType);
     
     // Konum metnini güncelle
+    updateLocationText();
+    
+    // Modalı kapat
+    hideLocationModal();
+    
+    // Mikrofonu etkinleştir
+    enableMicrophone();
+    
+    debugLog('📍 Konum seçildi:', locationType);
+}
+
+// Konum metnini güncelle
+function updateLocationText() {
     const locationText = document.getElementById('locationText');
-    if (locationText) {
+    if (locationText && selectedLocation) {
         const locationNames = {
             'inside': 'Restoran içinde',
             'takeaway': 'Paket servis', 
             'delivery': 'Adrese teslim'
         };
-        locationText.textContent = locationNames[locationType] || locationType;
+        locationText.textContent = locationNames[selectedLocation] || selectedLocation;
     }
+}
     
     // Modalı kapat
     hideLocationModal();
@@ -1729,7 +1750,19 @@ function setupEventHandlers() {
     try {
         debugLog('🔧 Event handlerlar ayarlanıyor...');
 
-        // 1. PROFİL DROPDOWN (Hata düzeltmeli)
+        // 1. KONUM İŞLEMLERİ - DÜZELTİLMİŞ
+        const locationMarker = document.getElementById('locationMarker');
+        if (locationMarker) {
+            locationMarker.addEventListener('click', showLocationModal);
+        }
+
+        // 2. MİKROFON TOGGLE
+        const microphoneToggle = document.getElementById('microphoneToggle');
+        if (microphoneToggle) {
+            microphoneToggle.addEventListener('click', handleMicrophoneToggle);
+        }
+
+        // 3. PROFİL DROPDOWN (Hata düzeltmeli)
         if (profileBtn && profileDropdown) {
             profileBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -1749,7 +1782,7 @@ function setupEventHandlers() {
             console.error('❌ Profil elementleri bulunamadı');
         }
 
-        // 2. ÇIKIŞ BUTONU (Güvenli versiyon)
+        // 4. ÇIKIŞ BUTONU (Güvenli versiyon)
         if (logoutBtn) {
             logoutBtn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -1758,12 +1791,12 @@ function setupEventHandlers() {
             });
         }
 
-        // 3. MİKROFON TOGGLE (Kritik düzeltme)
+        // 5. MİKROFON TOGGLE (Kritik düzeltme)
         if (microphoneToggle) {
             microphoneToggle.addEventListener('click', handleMicrophoneToggle);
         }
 
-        // 4. KAYDIRMA BUTONLARI (Mevcut kod)
+        // 6. KAYDIRMA BUTONLARI (Mevcut kod)
         if (scrollSellerTypesLeft && sellerTypeGrid) {
             scrollSellerTypesLeft.addEventListener('click', () => scrollElement(sellerTypeGrid, -200));
             scrollSellerTypesRight.addEventListener('click', () => scrollElement(sellerTypeGrid, 200));
@@ -1779,7 +1812,7 @@ function setupEventHandlers() {
             scrollSellersRight.addEventListener('click', () => scrollElement(sellerGrid, 200));
         }
 
-        // 5. SEPET İŞLEMLERİ (Mevcut kod + güvenlik)
+        // 7. SEPET İŞLEMLERİ (Mevcut kod + güvenlik)
         if (cartClose) {
             cartClose.addEventListener('click', closeCart);
         }
@@ -1788,7 +1821,7 @@ function setupEventHandlers() {
             orderSummary.addEventListener('click', toggleCart);
         }
 
-        // 6. ÖDEME BUTONLARI (Mevcut kod)
+        // 8. ÖDEME BUTONLARI (Mevcut kod)
         if (payCashBtn) {
             payCashBtn.addEventListener('click', () => finalizeOrder('nakit'));
         }
@@ -1799,23 +1832,7 @@ function setupEventHandlers() {
             payBonusBtn.addEventListener('click', () => finalizeOrder('bonus'));
         }
 
-        // 7. KONUM İŞLEMLERİ (DÜZELTİLMİŞ VERSİYON)
-        if (locationMarker) {
-            locationMarker.addEventListener('click', showLocationModal);
-        }
-
-        // Konum seçenekleri event'leri - MODAL İÇİNDE YÖNETİLECEK
-        // Bu kısmı showLocationModal fonksiyonuna taşıdık
-
-        // 8. YENİ ADRES FORM (Element kontrolü eklenmiş)
-        if (saveNewAddress && newAddressForm && newAddressInput) {
-            saveNewAddress.addEventListener('click', saveNewLocation);
-        }
         
-        if (confirmLocation) {
-            confirmLocation.addEventListener('click', confirmSelectedLocation);
-        }
-
         // 9. FOOTER LİNKLERİ (Mevcut kod)
         if (referralLink) {
             referralLink.addEventListener('click', generateReferralLink);
@@ -2089,18 +2106,18 @@ function hideHowItWorksBanner() {
     }
 }
 
-// Basitleştirilmiş showLocationModal
-function showLocationModal() {
-    const locationModal = document.getElementById('locationModal');
-    const locationOptions = document.querySelector('.location-options');
-    
-    if (!locationModal || !locationOptions) {
-        console.error('Modal elementleri bulunamadı');
-        return;
-    }
-    
-    locationModal.style.display = 'block';
-    
+  // DÜZELTİLMİŞ KONUM FONKSİYONLARI
+        function showLocationModal() {
+            const modal = document.getElementById('locationModal');
+            if (!modal) {
+                console.error('❌ Location modal bulunamadı');
+                return;
+            }
+
+            modal.style.display = 'flex';
+            debugLog('📍 Konum modalı gösterildi');
+        }
+	
     // Modal dışına tıklanınca kapanmasını sağla
     locationModal.onclick = function(e) {
         if (e.target === locationModal) {
@@ -2607,10 +2624,8 @@ const DEBUG_MODE = true;
 
 // Debug fonksiyonu
 function debugLog(message, data = null) {
-    if (DEBUG_MODE) {
-        console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
-    }
-}
+            console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
+        }
 
 // Geliştirilmiş debug fonksiyonları
 function debugStorage() {
