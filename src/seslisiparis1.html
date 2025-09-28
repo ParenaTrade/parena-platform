@@ -7,6 +7,99 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+		/* ============================================= */
+/* YENİ KONUM SİSTEMİ CSS - locations kullanarak */
+/* ============================================= */
+
+/* Locations marker */
+.locations-marker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #e3f2fd;
+    padding: 12px 18px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    border: 2px solid #2196f3;
+    color: #1976d2;
+    transition: all 0.3s ease;
+    user-select: none;
+}
+
+.locations-marker:hover {
+    background: #bbdefb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.locations-marker:active {
+    transform: translateY(0);
+}
+
+/* Locations modal'ı */
+.locations-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.locations-modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 400px;
+    width: 90%;
+    z-index: 10001;
+}
+
+.locations-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.locations-close-modal {
+    cursor: pointer;
+    font-size: 24px;
+}
+
+/* Locations seçenekleri */
+.locations-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.locations-option {
+    padding: 15px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.3s;
+    background: white;
+}
+
+.locations-option:hover {
+    background: #f0f7ff;
+    border-color: #2196f3;
+    transform: translateY(-2px);
+}
+
+.locations-option:active {
+    transform: translateY(0);
+}
            :root {
             --primary: #003dff;
             --secondary: #00c2ff;
@@ -1446,10 +1539,64 @@ body.modal-open {
 // YENİ KONUM SİSTEMİ - SADE VE ETKİLİ
 // =============================================
 
+// DOM yüklendiğinde - YENİ locations SİSTEMİ
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM yüklendi, YENİ locations SİSTEMİ başlatılıyor...');
+    
+    // ÖNCE locations sistemini başlat
+    setTimeout(() => {
+        initializeLocationsSystem();
+    }, 100);
+    
+    // SONRA uygulamayı başlat
+    setTimeout(() => {
+        initApp();
+    }, 500);
+});
 
+// Locations sistemini test et
+function testLocationsSystem() {
+    console.log('🧪 LOCATIONS SİSTEMİ TESTİ');
+    
+    const marker = document.getElementById('locationsMarker');
+    const modal = document.getElementById('locationsModal');
+    const options = document.querySelectorAll('.locations-option');
+    
+    console.log('📍 Locations Marker:', marker ? 'BULUNDU ✅' : 'BULUNAMADI ❌');
+    console.log('📍 Locations Modal:', modal ? 'BULUNDU ✅' : 'BULUNAMADI ❌');
+    console.log('📍 Locations Seçenekleri:', options.length + ' adet');
+    
+    if (marker) {
+        // Test görünümü - yeşil border
+        marker.style.border = '3px solid #4CAF50';
+        setTimeout(() => {
+            marker.style.border = '2px solid #2196f3';
+        }, 3000);
+        
+        console.log('📍 Marker Event Listeners:');
+        console.log('- click event:', 'EKLI ✅');
+    }
+    
+    // Manuel test için global fonksiyonlar
+    window.testLocations = function() {
+        console.log('🎯 MANUEL TEST: Locations marker tıklanıyor...');
+        if (marker) {
+            marker.click();
+        } else {
+            console.error('❌ Locations marker bulunamadı');
+        }
+    };
+    
+    window.showLocations = function() {
+        console.log('🎯 MANUEL TEST: Locations modal gösteriliyor...');
+        showLocationsModal();
+    };
+    
+    console.log('✅ Test için konsola "testLocations()" veya "showLocations()" yazın');
+}
 
-
-
+// Testi başlat
+setTimeout(testLocationsSystem, 2000);
 
 
 
@@ -2452,41 +2599,7 @@ function waitForDOMElements() {
 }
 
 	
-function debugLog(message) {
-    console.log(`[DEBUG] ${new Date().toISOString()}: ${message}`);
-}
 
-// Eksik fonksiyonları tanımlayın (eğer yoksa)
-// Bu fonksiyonların gerçek implementasyonlarını eklemelisiniz
-async function loadCommandRules() {
-    // Komut kurallarını yükleme işlemi
-    console.log('Komut kuralları yükleniyor...');
-}
-
-function setupLocationEvents() {
-    // Konum event'lerini ayarla
-    console.log('Konum eventleri ayarlanıyor...');
-}
-
-// Konum yönetimini başlat - TAMİR EDİLMİŞ
-function initializeLocation() {
-    debugLog('📍 Konum yönetimi başlatılıyor...');
-    
-    // Kayıtlı konumu yükle
-    const savedLocation = localStorage.getItem('selectedLocation');
-    
-    if (savedLocation) {
-        selectedLocation = savedLocation;
-        updateLocationText();
-        debugLog(`📍 Kayıtlı konum kullanılıyor: ${selectedLocation}`);
-    } else {
-        debugLog('📍 Konum seçilmemiş, modal gösterilecek');
-        // Konum modal'ını göster (kısa bir gecikmeyle)
-        setTimeout(() => {
-            showLocationModal();
-        }, 1000);
-    }
-}
 // =============================================
 // ACİL DURUM FALLBACK'İ GÜNCELLE
 // =============================================
@@ -3897,11 +4010,214 @@ function getDemoProducts() {
         { id: '1', name: "Demo Ürün", price: 10.00, seller_id: '1', product_price_id: '1' }
     ];
 }
+
+
+// =============================================
+// YENİ KONUM SİSTEMİ - locations kullanarak
+// =============================================
+
+// Global değişken
+let selectedLocation = localStorage.getItem('selectedLocation') || null;
+
+// Konum sistemini başlat
+function initializeLocationsSystem() {
+    console.log('📍 YENİ KONUM SİSTEMİ BAŞLATILIYOR (locations)');
+    
+    setupLocationsMarker();
+    setupLocationsModal();
+    updateLocationsDisplay();
+    
+    // Eğer konum seçilmemişse, modal'ı göster
+    if (!selectedLocation) {
+        setTimeout(() => {
+            showLocationsModal();
+        }, 1500);
+    }
+}
+
+// Konum marker'ını ayarla
+function setupLocationsMarker() {
+    const locationsMarker = document.getElementById('locationsMarker');
+    if (!locationsMarker) {
+        console.error('❌ Locations marker bulunamadı');
+        return;
+    }
+    
+    // Stilleri uygula
+    locationsMarker.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #e3f2fd;
+        padding: 12px 18px;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        border: 2px solid #2196f3;
+        color: #1976d2;
+        transition: all 0.3s ease;
+        user-select: none;
+    `;
+    
+    // Hover efektleri
+    locationsMarker.addEventListener('mouseover', function() {
+        this.style.background = '#bbdefb';
+        this.style.transform = 'translateY(-2px)';
+        this.style.boxShadow = '0 4px 12px rgba(33, 150, 243, 0.3)';
+    });
+    
+    locationsMarker.addEventListener('mouseout', function() {
+        this.style.background = '#e3f2fd';
+        this.style.transform = 'translateY(0)';
+        this.style.boxShadow = 'none';
+    });
+    
+    // Tıklama event'ini EKLE
+    locationsMarker.addEventListener('click', handleLocationsClick);
+    
+    console.log('✅ Locations marker ayarlandı');
+}
+
+// Konum modal'ını ayarla
+function setupLocationsModal() {
+    const modal = document.getElementById('locationsModal');
+    if (!modal) {
+        console.error('❌ Locations modalı bulunamadı');
+        return;
+    }
+    
+    // Modal kapatma butonunu ayarla
+    const closeBtn = document.getElementById('closeLocationsModal');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideLocationsModal);
+    }
+    
+    // Konum seçeneklerini ayarla
+    setupLocationsOptions();
+    
+    // Modal dışına tıklama
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            hideLocationsModal();
+        }
+    });
+    
+    console.log('✅ Locations modalı ayarlandı');
+}
+
+// Konum seçeneklerini ayarla
+function setupLocationsOptions() {
+    const options = document.querySelectorAll('.locations-option');
+    
+    options.forEach(option => {
+        // Mevcut event listener'ları temizle
+        const newOption = option.cloneNode(true);
+        option.parentNode.replaceChild(newOption, option);
+    });
+    
+    // Yeni event listener'ları ekle
+    document.querySelectorAll('.locations-option').forEach(option => {
+        option.addEventListener('click', function() {
+            const location = this.getAttribute('data-location');
+            selectLocationsOption(location);
+        });
+        
+        // Hover efektleri
+        option.addEventListener('mouseover', function() {
+            this.style.background = '#f0f7ff';
+            this.style.borderColor = '#2196f3';
+            this.style.transform = 'translateY(-2px)';
+        });
+        
+        option.addEventListener('mouseout', function() {
+            this.style.background = 'white';
+            this.style.borderColor = '#ddd';
+            this.style.transform = 'translateY(0)';
+        });
+    });
+    
+    console.log('✅ Locations seçenekleri ayarlandı');
+}
+
+// Konum tıklama handler'ı
+function handleLocationsClick(e) {
+    console.log('🎯 Locations marker tıklandı!');
+    e.preventDefault();
+    e.stopPropagation();
+    showLocationsModal();
+}
+
+// Modal göster
+function showLocationsModal() {
+    const modal = document.getElementById('locationsModal');
+    if (modal) {
+        console.log('📍 Locations modal gösteriliyor');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+// Modal gizle
+function hideLocationsModal() {
+    const modal = document.getElementById('locationsModal');
+    if (modal) {
+        console.log('📍 Locations modal gizleniyor');
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+}
+
+// Konum seç
+function selectLocationsOption(locationType) {
+    console.log('📍 Locations seçildi:', locationType);
+    
+    selectedLocation = locationType;
+    localStorage.setItem('selectedLocation', locationType);
+    
+    // UI'ı güncelle
+    updateLocationsDisplay();
+    
+    // Modal'ı kapat
+    hideLocationsModal();
+    
+    // Müşteri şehir bilgisini güncelle
+    if (!currentCustomer) currentCustomer = {};
+    if (!currentCustomer.city) currentCustomer.city = "Bandırma";
+    
+    speakToUser(`Konumunuz ${getLocationsName(locationType)} olarak ayarlandı`);
+    
+    console.log('✅ Locations başarıyla seçildi');
+}
+
+// Konum görüntüsünü güncelle
+function updateLocationsDisplay() {
+    const locationsText = document.getElementById('locationsText');
+    if (locationsText) {
+        locationsText.textContent = getLocationsName(selectedLocation) || 'Konumunuzu seçin';
+        
+        if (selectedLocation) {
+            locationsText.style.fontWeight = '600';
+            locationsText.style.color = '#1976d2';
+        }
+    }
+}
+
+// Konum adını getir
+function getLocationsName(locationType) {
+    const names = {
+        'inside': '📍 Restoran içinde',
+        'takeaway': '📦 Paket servis', 
+        'delivery': '🚚 Adrese teslim'
+    };
+    return names[locationType] || locationType;
+}
 	
 </script>	
 
 </body>
 </html>
+
 
 
 
