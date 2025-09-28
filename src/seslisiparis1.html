@@ -98,6 +98,7 @@
     height: 100%;
     background: rgba(0,0,0,0.5);
     z-index: 10000 !important;
+    pointer-events: auto !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -110,6 +111,7 @@
     max-width: 400px;
     width: 90%;
     z-index: 10001 !important;
+    pointer-events: auto !important;
     position: relative;
 }
 
@@ -137,6 +139,7 @@
     text-align: center;
     transition: all 0.3s;
     pointer-events: auto !important;
+    cursor: pointer !important;
     user-select: none;
 }
 .location-option:hover {
@@ -265,23 +268,25 @@
             background: #dc2626;
         }
         
-        /* Location Marker */
-        .location-marker {
-    display: flex;
+        /* Konum marker stil iyileştirmesi */
+.location-marker {
+    display: flex !important;
     align-items: center;
     gap: 8px;
-    background: #e3f2fd;
-    padding: 10px 15px;
-    border-radius: 25px;
-    cursor: pointer;
+    background: #e3f2fd !important;
+    padding: 10px 15px !important;
+    border-radius: 25px !important;
+    cursor: pointer !important;
     font-size: 14px;
     font-weight: 500;
-    border: 2px solid #2196f3;
+    border: 2px solid #2196f3 !important;
     transition: all 0.3s ease;
+    pointer-events: auto !important;
 }
-       .location-marker:hover {
-    background: #bbdefb;
+.location-marker:hover {
+    background: #bbdefb !important;
     transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
 } 
         .location-modal {
             position: fixed;
@@ -489,7 +494,7 @@
             min-width: 150px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
             border: 2px solid transparent;
             flex-shrink: 0;
@@ -515,6 +520,10 @@
             font-weight: 600;
             font-size: 16px;
         }
+		.category-card:hover:not([style*="cursor: not-allowed"]) {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
         
         /* Seller Grid */
         .sellers-container {
@@ -541,7 +550,7 @@
             border-radius: 12px;
             overflow: hidden;
             cursor: pointer;
-            transition: all 0.3s;
+           transition: all 0.3s ease;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
             border: 2px solid transparent;
             min-width: 200px;
@@ -552,7 +561,11 @@
             transform: translateY(-5px);
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
         }
-        
+
+		.seller-card:hover:not(.disabled) {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
         .seller-card.selected {
             border-color: var(--success);
             background: #f0fff4;
@@ -612,14 +625,14 @@
             border-radius: 8px;
             overflow: hidden;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             position: relative;
         }
         
         .product-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
         
         .product-badge {
             position: absolute;
@@ -1402,7 +1415,7 @@ body.modal-open {
         // =============================================
 
         // Konum modal'ını göster
-// Konum modal'ını düzgün göster
+// Konum modal'ını göster - TAMİR EDİLMİŞ
 function showLocationModal() {
     const modal = document.getElementById('locationModal');
     if (!modal) {
@@ -1412,7 +1425,7 @@ function showLocationModal() {
 
     debugLog('📍 Konum modalı gösteriliyor...');
     
-    // Modal'ı göster ve body scroll'unu engelle
+    // Modal'ı göster
     modal.style.display = 'flex';
     document.body.classList.add('modal-open');
     
@@ -1423,8 +1436,8 @@ function showLocationModal() {
     setTimeout(() => {
         setupLocationOptions();
     }, 100);
-}
-        // Konum modal'ını gizle
+}      
+	// Konum modal'ını gizle
 function hideLocationModal() {
     const modal = document.getElementById('locationModal');
     if (modal) {
@@ -1434,15 +1447,11 @@ function hideLocationModal() {
     }
 }
 
-   // Konum seçildiğinde
+// Konum seç - TAMİR EDİLMİŞ
 function selectLocation(locationType) {
-    if (!locationType) {
-        console.error('❌ Konum tipi belirtilmedi');
-        return;
-    }
+    if (!locationType) return;
     
     debugLog(`📍 Konum seçiliyor: ${locationType}`);
-    
     selectedLocation = locationType;
     localStorage.setItem('selectedLocation', locationType);
     
@@ -1452,12 +1461,24 @@ function selectLocation(locationType) {
     // Modal'ı kapat
     hideLocationModal();
     
-    // Müşteri bilgilerini güncelle (şehir bilgisi için)
-    updateCustomerCityFromLocation();
+    // Müşteri şehir bilgisini güncelle
+    if (!currentCustomer) {
+        currentCustomer = {};
+    }
+    if (!currentCustomer.city) {
+        currentCustomer.city = "Bandırma"; // Varsayılan şehir
+    }
     
-    debugLog(`✅ Konum seçildi: ${locationType}`);
+    debugLog(`✅ Konum seçildi: ${locationType}, Şehir: ${currentCustomer.city}`);
+    
+    // Mikrofonu etkinleştir
+    setTimeout(() => {
+        if (!isMicrophoneEnabled) {
+            enableMicrophone();
+        }
+    }, 500);
 }
-// Konumdan şehir bilgisini güncelle
+	// Konumdan şehir bilgisini güncelle
 function updateCustomerCityFromLocation() {
     if (!currentCustomer) {
         currentCustomer = {};
@@ -1472,7 +1493,7 @@ function updateCustomerCityFromLocation() {
     updateCustomerUI();
 }
 
-// Konum metnini güncelle
+// Konum metnini güncelle - TAMİR EDİLMİŞ
 function updateLocationText() {
     const locationText = document.getElementById('locationText');
     if (locationText && selectedLocation) {
@@ -1484,12 +1505,13 @@ function updateLocationText() {
         locationText.textContent = locationNames[selectedLocation] || selectedLocation;
         locationText.style.fontWeight = '600';
         locationText.style.color = 'var(--primary)';
-        debugLog(`📍 Konum metni güncellendi: ${locationText.textContent}`);
     }
-}        function setupLocationEvents() {
+}   
+	
+	// Konum event'lerini ayarla - TAMİR EDİLMİŞ
+function setupLocationEvents() {
     try {
         const locationMarker = document.getElementById('locationMarker');
-        const locationModal = document.getElementById('locationModal');
         const closeLocationModal = document.getElementById('closeLocationModal');
         
         if (!locationMarker) {
@@ -1500,15 +1522,17 @@ function updateLocationText() {
         debugLog('📍 Konum eventleri ayarlanıyor...');
 
         // Önceki event listener'ları temizle
-        locationMarker.removeEventListener('click', handleLocationClick);
-        document.removeEventListener('click', handleOutsideLocationModalClick);
-        if (closeLocationModal) {
-            closeLocationModal.removeEventListener('click', hideLocationModal);
-        }
+        locationMarker.replaceWith(locationMarker.cloneNode(true));
+        const newLocationMarker = document.getElementById('locationMarker');
 
         // Konum marker'a tıklama eventi
-        locationMarker.addEventListener('click', handleLocationClick);
-        locationMarker.style.cursor = 'pointer';
+        newLocationMarker.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            debugLog('📍 Konum marker tıklandı');
+            showLocationModal();
+        });
+        newLocationMarker.style.cursor = 'pointer';
 
         // Modal kapatma butonu
         if (closeLocationModal) {
@@ -1516,10 +1540,12 @@ function updateLocationText() {
         }
 
         // Modal dışına tıklama eventi
-        document.addEventListener('click', handleOutsideLocationModalClick);
-
-        // Konum seçeneklerine event listener ekle
-        setupLocationOptions();
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('locationModal');
+            if (modal && modal.style.display === 'flex' && e.target === modal) {
+                hideLocationModal();
+            }
+        });
 
         debugLog('✅ Konum eventleri başarıyla ayarlandı');
 
@@ -1527,7 +1553,6 @@ function updateLocationText() {
         console.error('❌ Konum event ayarlama hatası:', error);
     }
 }
-
 	// Konum marker tıklama handler'ı
 function handleLocationClick(e) {
     e.preventDefault();
@@ -1544,18 +1569,20 @@ function handleOutsideLocationModalClick(e) {
     }
 }
 
-// Konum seçeneklerini ayarla
+// Konum seçeneklerini ayarla - TAMİR EDİLMİŞ
 function setupLocationOptions() {
     const locationOptions = document.querySelectorAll('.location-option');
     
     locationOptions.forEach(option => {
         // Önceki event listener'ları temizle
-        option.replaceWith(option.cloneNode(true));
+        const newOption = option.cloneNode(true);
+        option.parentNode.replaceChild(newOption, option);
     });
-
-    // Yeni event listener'lar ekle
+	
+  // Yeni event listener'ları ekle
     document.querySelectorAll('.location-option').forEach(option => {
-        option.addEventListener('click', function() {
+        option.addEventListener('click', function(e) {
+            e.stopPropagation();
             const location = this.getAttribute('data-location');
             debugLog(`📍 Konum seçildi: ${location}`);
             selectLocation(location);
@@ -2578,7 +2605,7 @@ function setupLocationEvents() {
     console.log('Konum eventleri ayarlanıyor...');
 }
 
-// Konum yönetimini başlat
+// Konum yönetimini başlat - TAMİR EDİLMİŞ
 function initializeLocation() {
     debugLog('📍 Konum yönetimi başlatılıyor...');
     
@@ -2600,34 +2627,37 @@ function initializeLocation() {
 // =============================================
 // ACİL DURUM FALLBACK'İ GÜNCELLE
 // =============================================
+// Acil durum konum sistemi - TAMİR EDİLMİŞ
 function emergencyLocationSetup() {
     debugLog('🆘 Acil durum konum sistemi aktif');
     
     // Manuel olarak konum event'lerini ayarla
     const locationMarker = document.getElementById('locationMarker');
     if (locationMarker) {
-        locationMarker.onclick = function() {
+        locationMarker.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             showLocationModal();
         };
+        locationMarker.style.cursor = 'pointer';
     }
     
     // Konum seçeneklerini manuel ayarla
     const options = document.querySelectorAll('.location-option');
     options.forEach(option => {
-        option.onclick = function() {
+        option.onclick = function(e) {
+            e.stopPropagation();
             const location = this.getAttribute('data-location');
             selectLocation(location);
         };
+        option.style.pointerEvents = 'auto';
+        option.style.cursor = 'pointer';
     });
     
     // Eğer konum seçilmemişse modal göster
     if (!selectedLocation) {
         setTimeout(() => {
-            const modal = document.getElementById('locationModal');
-            if (modal) {
-                modal.style.display = 'flex';
-                document.body.classList.add('modal-open');
-            }
+            showLocationModal();
         }, 1500);
     }
 }	
@@ -2690,9 +2720,21 @@ function debugLog(message) {
             }
         }
 
-	// Mevcut DOMContentLoaded listener'larını kaldır ve tek bir tane kullan
+// DOM yüklendiğinde - TAMİR EDİLMİŞ
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
+    
+    // Hemen konum sistemini başlat
+    setTimeout(() => {
+        setupLocationEvents();
+        initializeLocation();
+        
+        // initApp'i başlat
+        setTimeout(() => {
+            initApp();
+        }, 500);
+    }, 100);
+});
     
     // Konum elementlerinin yüklenmesini bekle
     setTimeout(() => {
@@ -3212,68 +3254,83 @@ function displayStoreTypes(types) {
     debugLog("✅ Store type'lar başarıyla yüklendi");
 }
 
-// Store type seçildiğinde - GÜNCELLENMİŞ
+// Store type seçildiğinde - TAMİR EDİLMİŞ
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
     
     selectedSellerType = storeTypeName;
-    
-    // Önce reyonları yükle ve göster
-    await loadReyonsByStoreType(storeTypeId);
-    
-    // Sonra satıcıları yükle
-    await loadSellersByStoreType(storeTypeId);
+    selectedSellerId = null; // Yeni store type seçildiğinde satıcıyı sıfırla
     
     // Kategori/reyon başlığını güncelle
     if (categoriesTitle) {
         categoriesTitle.textContent = storeTypeName === 'Market' ? '🛒 Reyonlar' : '📋 Menü Kategorileri';
-        categoriesTitle.style.display = 'block';
     }
     
-    // İlgili bölümleri göster
+    // İlgili bölümleri sıfırla
+    resetSections();
+    
+    // Reyonları yükle
+    await loadReyonsByStoreType(storeTypeId);
+    
+    // Satıcıları yükle
+    await loadSellersByStoreType(storeTypeId);
+    
+    speakToUser(`${storeTypeName} seçildi. Size en yakın ${storeTypeName.toLowerCase()}lar listeleniyor.`);
+}
+	// Bölümleri sıfırla
+function resetSections() {
     if (categoriesSection) {
         categoriesSection.style.display = 'block';
-        categoriesSection.style.opacity = '1';
+        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
     }
     if (sellersSection) {
         sellersSection.style.display = 'block';
-        sellersSection.style.opacity = '1';
+        sellerGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
     }
-    
-    // Banner'ı gizle
-    hideHowItWorksBanner();
-    
-    speakToUser(`${storeTypeName} seçildi. Size en yakın ${storeTypeName.toLowerCase()}lar listeleniyor.`);
+    if (productsSection) {
+        productsSection.style.display = 'none';
+        productsGrid.innerHTML = '';
+    }
+    if (selectedSellerInfo) {
+        selectedSellerInfo.textContent = 'Satıcı seçilmedi';
+    }
 }
 // =============================================
 // 2. BÖLÜM VERİTABANI EKSİKLERİNİ TAMAMLAMA - REYON/SATICILAR
 // =============================================
 
-// Reyon yükleme - TAM GERÇEK SORGULAR
+// Reyon yükleme - TAMİR EDİLMİŞ
 async function loadReyonsByStoreType(storeTypeId) {
     try {
+        debugLog(`🛒 Reyonlar yükleniyor, StoreType: ${storeTypeId}`);
+        
         const { data, error } = await supabase
             .from('reyon')
             .select('*')
             .eq('store_type_id', storeTypeId)
             .order('name');
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Reyon yükleme hatası:', error);
+            throw error;
+        }
 
         categories = data || [];
         displayCategories(categories, 'reyon');
+        debugLog(`✅ Reyonlar yüklendi: ${categories.length} adet`);
 
     } catch (error) {
-        console.error('Reyon yükleme hatası:', error);
-        // Fallback demo veriler
+        console.error('❌ Reyon yükleme hatası:', error);
+        // Fallback demo reyonlar
         categories = getDemoReyons(storeTypeId);
         displayCategories(categories, 'reyon');
+        debugLog('🔄 Demo reyonlar kullanılıyor');
     }
 }
 
-// Satıcı yükleme - GÜÇLENDİRİLMİŞ
+	// Satıcı yükleme - GÜÇLENDİRİLMİŞ
 loadSellersByStoreType
-	// Kategorileri/reyonları göster
+// Kategorileri göster - TAMİR EDİLMİŞ
 function displayCategories(categoriesToShow, type) {
     const categoriesGrid = document.getElementById('categoriesGrid');
     if (!categoriesGrid) return;
@@ -3310,6 +3367,7 @@ function displayCategories(categoriesToShow, type) {
         const categoryCard = document.createElement('div');
         categoryCard.className = 'category-card';
         categoryCard.dataset.categoryId = category.id;
+        categoryCard.dataset.categoryName = category.name;
         
         categoryCard.innerHTML = `
             <div class="category-icon">
@@ -3319,33 +3377,40 @@ function displayCategories(categoriesToShow, type) {
         `;
         
         categoryCard.addEventListener('click', function() {
+            if (!selectedSellerId) {
+                speakToUser("Önce bir satıcı seçmelisiniz.");
+                return;
+            }
+            
+            // Tüm kartlardan seçimi kaldır
             document.querySelectorAll('.category-card').forEach(c => {
                 c.classList.remove('selected');
             });
+            
+            // Bu kartı seçili yap
             this.classList.add('selected');
             
             selectedCategoryId = category.id;
-            if (type === 'reyon') {
-                filterProductsByReyon(selectedCategoryId);
-            } else {
-                filterProductsByCategory(selectedCategoryId);
-            }
+            
+            // Reyon seçildiğinde ürünleri filtrele
+            filterProductsByReyon(category.id);
+            
+            debugLog(`🛒 Reyon seçildi: ${category.name}`);
+            speakToUser(`${category.name} reyonundaki ürünler listeleniyor.`);
         });
         
         categoriesGrid.appendChild(categoryCard);
     });
 }
-
-// Satıcıları yükle - GÜNCELLENMİŞ
+// Satıcı yükleme - TAMİR EDİLMİŞ
 async function loadSellersByStoreType(storeTypeId) {
     try {
-        // Müşteri şehir bilgisini al (varsayılan: Bandırma)
+        // Müşteri şehir bilgisini al
         const customerCity = currentCustomer?.city || 'Bandırma';
         
         debugLog(`🔍 Satıcılar yükleniyor: ${storeTypeId}, Şehir: ${customerCity}`);
         
-        // Önce şehir filtresi ile dene
-        let { data, error } = await supabase
+        const { data, error } = await supabase
             .from('seller_profiles')
             .select('*')
             .eq('status', 'True')
@@ -3358,49 +3423,25 @@ async function loadSellersByStoreType(storeTypeId) {
             throw error;
         }
 
-        // Eğer şehir ile satıcı bulunamazsa, tüm satıcıları getir
-        if (!data || data.length === 0) {
-            debugLog('⚠️ Şehir ile satıcı bulunamadı, tüm satıcılar getiriliyor...');
-            
-            let { data: dataAll, error: errorAll } = await supabase
-                .from('seller_profiles')
-                .select('*')
-                .eq('status', 'True')
-                .eq('store_type_id', storeTypeId)
-                .order('business_name');
-
-            if (errorAll) {
-                throw errorAll;
-            }
-            data = dataAll;
-        }
-
         if (data && data.length > 0) {
             sellers = data;
             debugLog(`✅ Satıcılar yüklendi: ${data.length} adet`);
             updateSellersGrid();
-            
-            // Otomatik olarak ilk satıcıyı seç
-            if (data.length > 0 && !selectedSellerId) {
-                setTimeout(() => {
-                    selectFirstSeller(data[0].id);
-                }, 500);
-            }
         } else {
             debugLog('⚠️ Bu kategoride satıcı bulunamadı');
             sellers = [];
             updateSellersGrid();
+            speakToUser("Bu kategoride size yakın satıcı bulunamadı. Lütfen başka bir kategori seçin.");
         }
 
     } catch (error) {
         console.error('❌ Satıcı yükleme hatası:', error);
-        // Fallback olarak demo satıcılar
+        // Fallback demo satıcılar
         sellers = getDemoSellers();
         updateSellersGrid();
         debugLog('🔄 Demo satıcılar kullanılıyor');
     }
 }
-
 	// İlk satıcıyı otomatik seç
 function selectFirstSeller(sellerId) {
     const sellerCard = document.querySelector(`[data-seller-id="${sellerId}"]`);
@@ -3410,7 +3451,7 @@ function selectFirstSeller(sellerId) {
     }
 }
 	
-// Satıcı grid'ini güncelle - GÜNCELLENMİŞ
+// Satıcı grid'ini güncelle - TAMİR EDİLMİŞ
 function updateSellersGrid() {
     const sellerGrid = document.getElementById('sellerGrid');
     if (!sellerGrid) return;
@@ -3441,7 +3482,10 @@ function updateSellersGrid() {
         }
         
         sellerCard.innerHTML = `
-            <img src="${seller.imgurl || 'https://via.placeholder.com/200x120?text=Satıcı'}" alt="${seller.business_name || seller.full_name}" class="seller-image">
+            <img src="${seller.imgurl || 'https://via.placeholder.com/200x120?text=Satıcı'}" 
+                 alt="${seller.business_name || seller.full_name}" 
+                 class="seller-image"
+                 onerror="this.src='https://via.placeholder.com/200x120?text=Satıcı'">
             <div class="seller-info">
                 <div class="seller-name">${seller.business_name || seller.full_name}</div>
                 <div class="seller-details">
@@ -3457,31 +3501,148 @@ function updateSellersGrid() {
                 return;
             }
             
-            document.querySelectorAll('.seller-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            
-            sellerCard.classList.add('selected');
-            selectedSellerId = seller.id;
-            if (selectedSellerInfo) {
-                selectedSellerInfo.textContent = seller.business_name || seller.full_name;
-                selectedSellerInfo.innerHTML = `<i class="fas fa-store"></i> ${seller.business_name || seller.full_name} - ${seller.city || ''}`;
-            }
-            
-            // Ürünler bölümünü göster
-            if (productsSection) productsSection.style.display = 'block';
-            
-            // Reyonları yükle
-            loadReyonsByStoreType(selectedSellerType);
-            
-            // Satıcının ürünlerini yükle
-            loadSellerProducts(seller.id);
+            selectSeller(seller);
         });
         
         sellerGrid.appendChild(sellerCard);
     });
 }
-// Fallback veriler
+// Satıcı seç - TAMİR EDİLMİŞ
+async function selectSeller(seller) {
+    // Tüm satıcı kartlarından seçimi kaldır
+    document.querySelectorAll('.seller-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Bu satıcıyı seçili yap
+    const sellerCard = document.querySelector(`[data-seller-id="${seller.id}"]`);
+    if (sellerCard) {
+        sellerCard.classList.add('selected');
+    }
+    
+    selectedSellerId = seller.id;
+    
+    // Satıcı bilgisini güncelle
+    if (selectedSellerInfo) {
+        selectedSellerInfo.innerHTML = `
+            <i class="fas fa-store"></i> ${seller.business_name || seller.full_name} 
+            <small style="color: var(--gray);">- ${seller.city || ''}</small>
+        `;
+    }
+    
+    // Ürünler bölümünü göster
+    if (productsSection) {
+        productsSection.style.display = 'block';
+        productsGrid.innerHTML = '<div class="text-center">Ürünler yükleniyor...</div>';
+    }
+    
+    debugLog(`✅ Satıcı seçildi: ${seller.business_name || seller.full_name}`);
+    speakToUser(`${seller.business_name || seller.full_name} seçildi. Ürünler yükleniyor.`);
+    
+    // Satıcının ürünlerini yükle
+    await loadSellerProducts(seller.id);
+}
+
+// Satıcı ürünlerini yükle - TAMİR EDİLMİŞ
+async function loadSellerProducts(sellerId) {
+    try {
+        debugLog(`📦 Satıcı ürünleri yükleniyor: ${sellerId}`);
+        
+        const { data, error } = await supabase
+            .from('product_prices')
+            .select(`
+                *,
+                products (
+                    id, name, imgurl, reyon_id, category_id, is_active
+                )
+            `)
+            .eq('sube_id', sellerId)
+            .eq('products.is_active', true);
+
+        if (error) {
+            console.error('❌ Ürün yükleme hatası:', error);
+            throw error;
+        }
+
+        // Veriyi işle
+        products = data
+            .filter(item => item.products) // products null olmayanları filtrele
+            .map(item => ({
+                id: item.products.id,
+                product_price_id: item.id,
+                name: item.products.name,
+                price: item.price,
+                discount_price: item.discount_price,
+                imgurl: item.products.imgurl,
+                reyon_id: item.products.reyon_id,
+                category_id: item.products.category_id,
+                seller_id: sellerId
+            }));
+
+        debugLog(`✅ Ürünler yüklendi: ${products.length} adet`);
+        
+        // Reyona göre ürünleri grupla ve göster
+        displayProductsByReyon(products);
+        
+        // Reyonları güncelle (mevcut reyonlarla eşleşen)
+        updateReyonsWithProducts(products);
+
+    } catch (error) {
+        console.error('❌ Ürün yükleme hatası:', error);
+        products = getDemoProducts();
+        displayProducts(products);
+        debugLog('🔄 Demo ürünler kullanılıyor');
+    }
+}
+// Reyona göre ürünleri grupla
+function displayProductsByReyon(productsToShow) {
+    if (!productsToShow || productsToShow.length === 0) {
+        productsGrid.innerHTML = `
+            <div class="text-center" style="grid-column: 1 / -1; padding: 40px; color: #6c757d;">
+                <i class="fas fa-box-open fa-3x mb-3"></i>
+                <p>Bu satıcıda ürün bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Reyona göre grupla
+    const productsByReyon = {};
+    productsToShow.forEach(product => {
+        const reyonId = product.reyon_id || 'other';
+        if (!productsByReyon[reyonId]) {
+            productsByReyon[reyonId] = [];
+        }
+        productsByReyon[reyonId].push(product);
+    });
+    
+    // Ürünleri göster
+    displayProducts(productsToShow);
+}
+	
+// Reyonaları ürünlerle güncelle
+function updateReyonsWithProducts(products) {
+    if (!categories || categories.length === 0) return;
+    
+    // Ürünlerin reyon ID'lerini topla
+    const productReyonIds = [...new Set(products.map(p => p.reyon_id).filter(id => id))];
+    
+    // Reyon kartlarını güncelle
+    const categoryCards = document.querySelectorAll('.category-card');
+    categoryCards.forEach(card => {
+        const categoryId = card.dataset.categoryId;
+        const hasProducts = productReyonIds.includes(categoryId);
+        
+        if (hasProducts) {
+            card.style.opacity = '1';
+            card.style.cursor = 'pointer';
+        } else {
+            card.style.opacity = '0.5';
+            card.style.cursor = 'not-allowed';
+        }
+    });
+}	
+	// Fallback veriler
 async function useFallbackStoreTypes() {
     // Manuel olarak tüm store type'ları tanımlayın
     storeTypes = [
@@ -3911,17 +4072,23 @@ function closeCart() {
     cartContainer.classList.remove('open');
 }
 
-// Reyon seçildiğinde ürünleri filtrele
+// Reyon'a göre ürünleri filtrele - TAMİR EDİLMİŞ
 function filterProductsByReyon(reyonId) {
     if (!products || products.length === 0) {
         debugLog('⚠️ Filtrelenecek ürün bulunamadı');
         return;
     }
     
-    // Burada reyon ID'sine göre filtreleme yapılacak
-    // Geçici: Tüm ürünleri göster
-    displayProducts(products);
-    debugLog(`🛒 Reyon filtreleme: ${reyonId}`);
+    const filteredProducts = products.filter(product => product.reyon_id === reyonId);
+    
+    if (filteredProducts.length > 0) {
+        displayProducts(filteredProducts);
+        debugLog(`✅ Reyon filtreleme: ${filteredProducts.length} ürün bulundu`);
+    } else {
+        // Bu reyonda ürün yoksa tüm ürünleri göster
+        displayProducts(products);
+        speakToUser("Bu reyonda ürün bulunamadı. Tüm ürünler gösteriliyor.");
+    }
 }
 	// Kategoriye göre ürünleri filtrele
 function filterProductsByCategory(categoryId) {
@@ -4034,6 +4201,7 @@ function getDemoProducts() {
 	
 </body>
 </html>
+
 
 
 
