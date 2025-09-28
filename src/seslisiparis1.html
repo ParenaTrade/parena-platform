@@ -3046,15 +3046,27 @@ async function loadStoreTypes() {
     try {
         debugLog('🔧 StoreTypes yükleniyor...');
         
-        // ÖNCE VERİTABANINDAN DENE
-        const { data, error } = await supabase
+        // DETAYLI SORGULAMA
+        const { data, error, count } = await supabase
             .from('store_type')
-            .select('*')
+            .select('*', { count: 'exact' }) // Kayıt sayısını da al
             .order('name');
+
+        debugLog('🔍 StoreTypes sorgu sonucu:', { 
+            dataLength: data?.length, 
+            error: error,
+            count: count 
+        });
 
         if (error) {
             console.error('❌ StoreTypes yükleme hatası:', error);
-            throw error; // Fallback'e git
+            console.error('❌ Hata detayları:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code
+            });
+            throw error;
         }
 
         if (data && data.length > 0) {
@@ -3066,23 +3078,29 @@ async function loadStoreTypes() {
         }
 
         // VERİ YOKSA FALLBACK
+        console.warn('⚠️ StoreTypes verisi boş, fallback kullanılıyor. Count:', count);
         throw new Error('StoreTypes verisi boş');
         
     } catch (error) {
         console.error('❌ StoreTypes yükleme hatası:', error);
+        
         // Cache'den dene
         const cached = localStorage.getItem('storeTypes');
         if (cached) {
-            storeTypes = JSON.parse(cached);
-            debugLog('✅ StoreTypes cache den yüklendi');
-            displayStoreTypes(storeTypes);
+            try {
+                storeTypes = JSON.parse(cached);
+                debugLog('✅ StoreTypes cache\'den yüklendi');
+                displayStoreTypes(storeTypes);
+            } catch (parseError) {
+                console.error('❌ Cache parse hatası:', parseError);
+                await useFallbackStoreTypes();
+            }
         } else {
             // Son çare: demo veriler
             await useFallbackStoreTypes();
         }
     }
-}
-	
+}	
 // Store type'ları ekranda göster
 function displayStoreTypes(types) {
     const sellerTypeGrid = document.getElementById('sellerTypeGrid');
@@ -3357,15 +3375,26 @@ function updateSellersGrid() {
 
 // Fallback veriler
 async function useFallbackStoreTypes() {
+    // Manuel olarak tüm store type'ları tanımlayın
     storeTypes = [
-        { id: 1, name: 'Restoran', code: 'restaurant', description: 'Yemek restoranları' },
-        { id: 2, name: 'Kafe', code: 'cafe', description: 'Kafe ve pastaneler' },
-        { id: 3, name: 'Market', code: 'market', description: 'Market ve bakkallar' }
+        { id: '1', name: 'Market', code: 'market', description: 'Market ve bakkallar' },
+        { id: '2', name: 'Restoran', code: 'restaurant', description: 'Yemek restoranları' },
+        { id: '3', name: 'Kafe', code: 'cafe', description: 'Kafe ve pastaneler' },
+        { id: '4', name: 'Fırın', code: 'bakery', description: 'Fırın ve unlu mamüller' },
+        { id: '5', name: 'Eczane', code: 'pharmacy', description: 'Eczane ve ilaçlar' },
+        { id: '6', name: 'Teknoloji', code: 'technology', description: 'Elektronik ürünler' },
+        { id: '7', name: 'Giyim', code: 'clothing', description: 'Giyim mağazaları' },
+        { id: '8', name: 'Kitap', code: 'bookstore', description: 'Kitapçılar' },
+        { id: '9', name: 'Spor', code: 'sports', description: 'Spor malzemeleri' },
+        { id: '10', name: 'Kozmetik', code: 'cosmetics', description: 'Kozmetik ürünler' },
+        { id: '11', name: 'Ev Eşyası', code: 'home', description: 'Ev eşyaları' },
+        { id: '12', name: 'Oyuncak', code: 'toys', description: 'Oyuncak mağazaları' }
     ];
+    
     localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
-    debugLog('🔄 Fallback StoreTypes kullanılıyor');
+    displayStoreTypes(storeTypes);
+    debugLog('🔄 Manuel StoreTypes kullanılıyor');
 }
-
 function getDemoReyons(storeTypeId) {
     const demoReyons = {
         '1': [ // Market reyonları
@@ -3890,6 +3919,7 @@ function getDemoProducts() {
 	
 </body>
 </html>
+
 
 
 
