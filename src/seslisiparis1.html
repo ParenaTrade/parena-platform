@@ -268,26 +268,50 @@
             background: #dc2626;
         }
         
-        /* Konum marker stil iyileştirmesi */
+/* Konum marker */
 .location-marker {
-    display: flex !important;
+    display: flex;
     align-items: center;
     gap: 8px;
-    background: #e3f2fd !important;
-    padding: 10px 15px !important;
-    border-radius: 25px !important;
-    cursor: pointer !important;
+    background: #e3f2fd;
+    padding: 10px 15px;
+    border-radius: 25px;
+    cursor: pointer;
     font-size: 14px;
     font-weight: 500;
-    border: 2px solid #2196f3 !important;
+    border: 2px solid #2196f3;
     transition: all 0.3s ease;
-    pointer-events: auto !important;
+    user-select: none;
 }
 .location-marker:hover {
-    background: #bbdefb !important;
+    background: #bbdefb;
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
-} 
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+.location-marker:active {
+    transform: translateY(0);
+}
+		/* Konum modal'ı */
+#locationModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+		#locationModal .modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 400px;
+    width: 90%;
+    z-index: 10001;
+}
         .location-modal {
             position: fixed;
             top: 0;
@@ -310,12 +334,17 @@
             max-width: 500px;
         }
         
-        .location-options {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-top: 20px;
-        }
+/* Konum seçenekleri */
+.location-option {
+    padding: 15px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.3s;
+    background: white;
+    margin: 10px 0;
+}
         
         .location-option {
             padding: 15px;
@@ -325,10 +354,11 @@
             transition: all 0.3s;
         }
         
-        .location-option:hover {
-            border-color: var(--primary);
-            background: #f0f7ff;
-        }
+       .location-option:hover {
+    border-color: var(--primary);
+    background: #f0f7ff;
+    transform: translateY(-2px);
+}
         
         .location-option.selected {
             border-color: var(--primary);
@@ -1025,7 +1055,7 @@
                 display: none;
             }
         }
-/* Modal görünürken body'nin scrollunu engelle */
+/* Modal açıkken body */
 body.modal-open {
     overflow: hidden;
 }
@@ -3864,111 +3894,190 @@ function getDemoProducts() {
     ];
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</script>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// =============================================
+// YENİ KONUM SİSTEMİ - SADE VE ETKİLİ
+// =============================================
+
+// Global değişken
+let selectedLocation = localStorage.getItem('selectedLocation') || null;
+
+// Konum sistemini başlat
+function initializeNewLocationSystem() {
+    console.log('📍 YENİ KONUM SİSTEMİ BAŞLATILIYOR...');
+    
+    setupLocationMarker();
+    setupLocationModal();
+    updateLocationDisplay();
+    
+    // Eğer konum seçilmemişse, modal'ı göster
+    if (!selectedLocation) {
+        setTimeout(() => {
+            showLocationModal();
+        }, 1000);
+    }
+}
+
+// Konum marker'ını ayarla
+function setupLocationMarker() {
+    const locationMarker = document.getElementById('locationMarker');
+    if (!locationMarker) {
+        console.error('❌ Konum marker bulunamadı');
+        return;
+    }
+    
+    // Stilleri uygula
+    locationMarker.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #e3f2fd;
+        padding: 10px 15px;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        border: 2px solid #2196f3;
+        transition: all 0.3s ease;
+        user-select: none;
+    `;
+    
+    // Tıklama event'ini EKLE
+    locationMarker.addEventListener('click', handleLocationClick);
+    
+    console.log('✅ Konum marker ayarlandı');
+}
+
+// Konum modal'ını ayarla
+function setupLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (!modal) {
+        console.error('❌ Konum modalı bulunamadı');
+        return;
+    }
+    
+    // Modal kapatma butonunu ayarla
+    const closeBtn = document.getElementById('closeLocationModal');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideLocationModal);
+    }
+    
+    // Konum seçeneklerini ayarla
+    setupLocationOptions();
+    
+    // Modal dışına tıklama
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            hideLocationModal();
+        }
+    });
+    
+    console.log('✅ Konum modalı ayarlandı');
+}
+
+// Konum seçeneklerini ayarla
+function setupLocationOptions() {
+    const options = document.querySelectorAll('.location-option');
+    
+    options.forEach(option => {
+        // Mevcut event listener'ları temizle
+        option.replaceWith(option.cloneNode(true));
+    });
+    
+    // Yeni event listener'ları ekle
+    document.querySelectorAll('.location-option').forEach(option => {
+        option.addEventListener('click', function() {
+            const location = this.getAttribute('data-location');
+            selectLocation(location);
+        });
+        
+        // Stilleri uygula
+        option.style.cssText = `
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            background: white;
+        `;
+    });
+    
+    console.log('✅ Konum seçenekleri ayarlandı');
+}
+
+// Konum tıklama handler'ı
+function handleLocationClick(e) {
+    console.log('🎯 Konum marker tıklandı!');
+    e.preventDefault();
+    e.stopPropagation();
+    showLocationModal();
+}
+
+// Modal göster
+function showLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        console.log('📍 Modal gösteriliyor');
+        modal.style.display = 'flex';
+        document.body.classList.add('modal-open');
+    }
+}
+
+// Modal gizle
+function hideLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        console.log('📍 Modal gizleniyor');
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+}
+
+// Konum seç
+function selectLocation(locationType) {
+    console.log('📍 Konum seçildi:', locationType);
+    
+    selectedLocation = locationType;
+    localStorage.setItem('selectedLocation', locationType);
+    
+    // UI'ı güncelle
+    updateLocationDisplay();
+    
+    // Modal'ı kapat
+    hideLocationModal();
+    
+    // Müşteri şehir bilgisini güncelle
+    if (!currentCustomer) currentCustomer = {};
+    if (!currentCustomer.city) currentCustomer.city = "Bandırma";
+    
+    speakToUser(`Konumunuz ${getLocationName(locationType)} olarak ayarlandı`);
+    
+    console.log('✅ Konum başarıyla seçildi');
+}
+
+// Konum görüntüsünü güncelle
+function updateLocationDisplay() {
+    const locationText = document.getElementById('locationText');
+    if (locationText) {
+        locationText.textContent = getLocationName(selectedLocation) || 'Konumunuzu seçin';
+        
+        if (selectedLocation) {
+            locationText.style.fontWeight = '600';
+            locationText.style.color = 'var(--primary)';
+        }
+    }
+}
+
+// Konum adını getir
+function getLocationName(locationType) {
+    const names = {
+        'inside': '📍 Restoran içinde',
+        'takeaway': '📦 Paket servis', 
+        'delivery': '🚚 Adrese teslim'
+    };
+    return names[locationType] || locationType;
+}
 	
+</script>	
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
