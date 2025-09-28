@@ -2273,9 +2273,11 @@ window.addEventListener('load', function() {
 			// 1. KONUM SİSTEMİ FONKSİYONLARI
 function showLocationModal() {
     debugLog('📍 Konum modalı gösteriliyor...');
-    alert('📍 Konum Seçin:\n\n1. Restoran içinde\n2. Paket servis\n3. Adrese teslim');
+    alert('📍 Konum Seçin:\n\n1. Restoran içinde\n\n2. Paket servis\n\n3. Adrese teslim');
 }
-
+function debugLog(message, data = null) {
+    console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
+}
 function initializeLocationsSystem() {
     debugLog('📍 Konum sistemi başlatılıyor...');
     
@@ -2312,6 +2314,14 @@ function initializeDOMElements() {
     });
 }
 
+			function setupBasicEventListeners() {
+    debugLog('🔧 Temel event listenerlar kuruluyor...');
+    
+    const locationsMarker = document.getElementById('locationsMarker');
+    if (locationsMarker) {
+        // Now showLocationModal is defined and can be safely referenced
+        locationsMarker.addEventListener('click', showLocationModal);
+    }
 // 4. TEMEL EVENT LISTENER'LAR
 function setupBasicEventListeners() {
     debugLog('🔧 Temel event listenerlar kuruluyor...');
@@ -2369,22 +2379,30 @@ function simpleInit() {
     }
     simpleInitExecuted = true;
     
-    try {
-        debugLog('🚀 Basit init başlatılıyor...');
-        
-        initializeDOMElements();
-        initializeBannerSystem();
-        setupBasicEventListeners();
-        
-        debugLog('✅ Basit init tamamlandı');
-        
-        setTimeout(() => {
-            initApp();
-        }, 1000);
-        
-    } catch (error) {
-        console.error('❌ Basit init hatası:', error);
+    debugLog('🚀 Basit init başlatılıyor...');
+    initializeDOMElements();
+    setupBasicEventListeners();
+    debugLog('✅ Basit init tamamlandı');
+}
+let domLoaded = false;
+
+function handleDOMContentLoaded() {
+    if (domLoaded) {
+        debugLog('⚠️ DOMContentLoaded zaten çalıştı');
+        return;
     }
+    domLoaded = true;
+    
+    debugLog('📄 DOM yüklendi, sistem başlatılıyor...');
+    setTimeout(simpleInit, 500);
+}
+
+// Set up the event listener
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', handleDOMContentLoaded);
+} else {
+    // DOM is already ready, run the handler directly
+    handleDOMContentLoaded();
 }
 
 async function initApp() {
