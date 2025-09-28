@@ -3541,57 +3541,6 @@ async function selectSeller(seller) {
     await loadSellerProducts(seller.id);
 }
 
-// Satıcı ürünlerini yükle - TAMİR EDİLMİŞ
-async function loadSellerProducts(sellerId) {
-    try {
-        debugLog(`📦 Satıcı ürünleri yükleniyor: ${sellerId}`);
-        
-        const { data, error } = await supabase
-            .from('product_prices')
-            .select(`
-                *,
-                products (
-                    id, name, imgurl, reyon_id, category_id, is_active
-                )
-            `)
-            .eq('sube_id', sellerId)
-            .eq('products.is_active', true);
-
-        if (error) {
-            console.error('❌ Ürün yükleme hatası:', error);
-            throw error;
-        }
-
-        // Veriyi işle
-        products = data
-            .filter(item => item.products) // products null olmayanları filtrele
-            .map(item => ({
-                id: item.products.id,
-                product_price_id: item.id,
-                name: item.products.name,
-                price: item.price,
-                discount_price: item.discount_price,
-                imgurl: item.products.imgurl,
-                reyon_id: item.products.reyon_id,
-                category_id: item.products.category_id,
-                seller_id: sellerId
-            }));
-
-        debugLog(`✅ Ürünler yüklendi: ${products.length} adet`);
-        
-        // Reyona göre ürünleri grupla ve göster
-        displayProductsByReyon(products);
-        
-        // Reyonları güncelle (mevcut reyonlarla eşleşen)
-        updateReyonsWithProducts(products);
-
-    } catch (error) {
-        console.error('❌ Ürün yükleme hatası:', error);
-        products = getDemoProducts();
-        displayProducts(products);
-        debugLog('🔄 Demo ürünler kullanılıyor');
-    }
-}
 // Reyona göre ürünleri grupla
 function displayProductsByReyon(productsToShow) {
     if (!productsToShow || productsToShow.length === 0) {
@@ -3744,37 +3693,55 @@ function handleAddToCartCommand(message) {
 // 3. BÖLÜM: SEPET VE SİPARİŞ İŞLEMLERİ
 // =============================================
 
-// Ürün yükleme - TAM GERÇEK SORGULAR
+// Satıcı ürünlerini yükle - TAMİR EDİLMİŞ
 async function loadSellerProducts(sellerId) {
     try {
+        debugLog(`📦 Satıcı ürünleri yükleniyor: ${sellerId}`);
+        
         const { data, error } = await supabase
             .from('product_prices')
             .select(`
                 *,
-                products (*)
+                products (
+                    id, name, imgurl, reyon_id, category_id, is_active
+                )
             `)
             .eq('sube_id', sellerId)
             .eq('products.is_active', true);
-			.eq('products.reyon_id'=reyon.id);
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Ürün yükleme hatası:', error);
+            throw error;
+        }
 
-        products = data.map(item => ({
-            id: item.products.id,
-            product_price_id: item.id,
-            name: item.products.name,
-            price: item.price,
-            discount_price: item.discount_price,
-            imgurl: item.products.imgurl,
-            seller_id: sellerId
-        }));
+        // Veriyi işle
+        products = data
+            .filter(item => item.products) // products null olmayanları filtrele
+            .map(item => ({
+                id: item.products.id,
+                product_price_id: item.id,
+                name: item.products.name,
+                price: item.price,
+                discount_price: item.discount_price,
+                imgurl: item.products.imgurl,
+                reyon_id: item.products.reyon_id,
+                category_id: item.products.category_id,
+                seller_id: sellerId
+            }));
+
+        debugLog(`✅ Ürünler yüklendi: ${products.length} adet`);
         
-        displayProducts(products);
+        // Reyona göre ürünleri grupla ve göster
+        displayProductsByReyon(products);
+        
+        // Reyonları güncelle (mevcut reyonlarla eşleşen)
+        updateReyonsWithProducts(products);
 
     } catch (error) {
-        console.error('Ürün yükleme hatası:', error);
+        console.error('❌ Ürün yükleme hatası:', error);
         products = getDemoProducts();
         displayProducts(products);
+        debugLog('🔄 Demo ürünler kullanılıyor');
     }
 }
 
@@ -4199,6 +4166,7 @@ function getDemoProducts() {
 	
 </body>
 </html>
+
 
 
 
