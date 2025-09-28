@@ -1444,7 +1444,189 @@ body.modal-open {
         // =============================================
 
 
+// =============================================
+// YENİ KONUM SİSTEMİ - SADE VE ETKİLİ
+// =============================================
 
+// Global değişken
+let selectedLocation = localStorage.getItem('selectedLocation') || null;
+
+// Konum sistemini başlat
+function initializeNewLocationSystem() {
+    console.log('📍 YENİ KONUM SİSTEMİ BAŞLATILIYOR...');
+    
+    setupLocationMarker();
+    setupLocationModal();
+    updateLocationDisplay();
+    
+    // Eğer konum seçilmemişse, modal'ı göster
+    if (!selectedLocation) {
+        setTimeout(() => {
+            showLocationModal();
+        }, 1000);
+    }
+}
+
+// Konum marker'ını ayarla
+function setupLocationMarker() {
+    const locationMarker = document.getElementById('locationMarker');
+    if (!locationMarker) {
+        console.error('❌ Konum marker bulunamadı');
+        return;
+    }
+    
+    // Stilleri uygula
+    locationMarker.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #e3f2fd;
+        padding: 10px 15px;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        border: 2px solid #2196f3;
+        transition: all 0.3s ease;
+        user-select: none;
+    `;
+    
+    // Tıklama event'ini EKLE
+    locationMarker.addEventListener('click', handleLocationClick);
+    
+    console.log('✅ Konum marker ayarlandı');
+}
+
+// Konum modal'ını ayarla
+function setupLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (!modal) {
+        console.error('❌ Konum modalı bulunamadı');
+        return;
+    }
+    
+    // Modal kapatma butonunu ayarla
+    const closeBtn = document.getElementById('closeLocationModal');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideLocationModal);
+    }
+    
+    // Konum seçeneklerini ayarla
+    setupLocationOptions();
+    
+    // Modal dışına tıklama
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            hideLocationModal();
+        }
+    });
+    
+    console.log('✅ Konum modalı ayarlandı');
+}
+
+// Konum seçeneklerini ayarla
+function setupLocationOptions() {
+    const options = document.querySelectorAll('.location-option');
+    
+    options.forEach(option => {
+        // Mevcut event listener'ları temizle
+        option.replaceWith(option.cloneNode(true));
+    });
+    
+    // Yeni event listener'ları ekle
+    document.querySelectorAll('.location-option').forEach(option => {
+        option.addEventListener('click', function() {
+            const location = this.getAttribute('data-location');
+            selectLocation(location);
+        });
+        
+        // Stilleri uygula
+        option.style.cssText = `
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            background: white;
+        `;
+    });
+    
+    console.log('✅ Konum seçenekleri ayarlandı');
+}
+
+// Konum tıklama handler'ı
+function handleLocationClick(e) {
+    console.log('🎯 Konum marker tıklandı!');
+    e.preventDefault();
+    e.stopPropagation();
+    showLocationModal();
+}
+
+// Modal göster
+function showLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        console.log('📍 Modal gösteriliyor');
+        modal.style.display = 'flex';
+        document.body.classList.add('modal-open');
+    }
+}
+
+// Modal gizle
+function hideLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        console.log('📍 Modal gizleniyor');
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+}
+
+// Konum seç
+function selectLocation(locationType) {
+    console.log('📍 Konum seçildi:', locationType);
+    
+    selectedLocation = locationType;
+    localStorage.setItem('selectedLocation', locationType);
+    
+    // UI'ı güncelle
+    updateLocationDisplay();
+    
+    // Modal'ı kapat
+    hideLocationModal();
+    
+    // Müşteri şehir bilgisini güncelle
+    if (!currentCustomer) currentCustomer = {};
+    if (!currentCustomer.city) currentCustomer.city = "Bandırma";
+    
+    speakToUser(`Konumunuz ${getLocationName(locationType)} olarak ayarlandı`);
+    
+    console.log('✅ Konum başarıyla seçildi');
+}
+
+// Konum görüntüsünü güncelle
+function updateLocationDisplay() {
+    const locationText = document.getElementById('locationText');
+    if (locationText) {
+        locationText.textContent = getLocationName(selectedLocation) || 'Konumunuzu seçin';
+        
+        if (selectedLocation) {
+            locationText.style.fontWeight = '600';
+            locationText.style.color = 'var(--primary)';
+        }
+    }
+}
+
+// Konum adını getir
+function getLocationName(locationType) {
+    const names = {
+        'inside': '📍 Restoran içinde',
+        'takeaway': '📦 Paket servis', 
+        'delivery': '🚚 Adrese teslim'
+    };
+    return names[locationType] || locationType;
+}
 	
 // Konum modal'ını göster - TAMİR EDİLMİŞ
 function showLocationModal() {
@@ -3954,191 +4136,10 @@ function getDemoProducts() {
     ];
 }
 
-// =============================================
-// YENİ KONUM SİSTEMİ - SADE VE ETKİLİ
-// =============================================
 
-// Global değişken
-let selectedLocation = localStorage.getItem('selectedLocation') || null;
-
-// Konum sistemini başlat
-function initializeNewLocationSystem() {
-    console.log('📍 YENİ KONUM SİSTEMİ BAŞLATILIYOR...');
-    
-    setupLocationMarker();
-    setupLocationModal();
-    updateLocationDisplay();
-    
-    // Eğer konum seçilmemişse, modal'ı göster
-    if (!selectedLocation) {
-        setTimeout(() => {
-            showLocationModal();
-        }, 1000);
-    }
-}
-
-// Konum marker'ını ayarla
-function setupLocationMarker() {
-    const locationMarker = document.getElementById('locationMarker');
-    if (!locationMarker) {
-        console.error('❌ Konum marker bulunamadı');
-        return;
-    }
-    
-    // Stilleri uygula
-    locationMarker.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #e3f2fd;
-        padding: 10px 15px;
-        border-radius: 25px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        border: 2px solid #2196f3;
-        transition: all 0.3s ease;
-        user-select: none;
-    `;
-    
-    // Tıklama event'ini EKLE
-    locationMarker.addEventListener('click', handleLocationClick);
-    
-    console.log('✅ Konum marker ayarlandı');
-}
-
-// Konum modal'ını ayarla
-function setupLocationModal() {
-    const modal = document.getElementById('locationModal');
-    if (!modal) {
-        console.error('❌ Konum modalı bulunamadı');
-        return;
-    }
-    
-    // Modal kapatma butonunu ayarla
-    const closeBtn = document.getElementById('closeLocationModal');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', hideLocationModal);
-    }
-    
-    // Konum seçeneklerini ayarla
-    setupLocationOptions();
-    
-    // Modal dışına tıklama
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            hideLocationModal();
-        }
-    });
-    
-    console.log('✅ Konum modalı ayarlandı');
-}
-
-// Konum seçeneklerini ayarla
-function setupLocationOptions() {
-    const options = document.querySelectorAll('.location-option');
-    
-    options.forEach(option => {
-        // Mevcut event listener'ları temizle
-        option.replaceWith(option.cloneNode(true));
-    });
-    
-    // Yeni event listener'ları ekle
-    document.querySelectorAll('.location-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const location = this.getAttribute('data-location');
-            selectLocation(location);
-        });
-        
-        // Stilleri uygula
-        option.style.cssText = `
-            padding: 15px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.3s;
-            background: white;
-        `;
-    });
-    
-    console.log('✅ Konum seçenekleri ayarlandı');
-}
-
-// Konum tıklama handler'ı
-function handleLocationClick(e) {
-    console.log('🎯 Konum marker tıklandı!');
-    e.preventDefault();
-    e.stopPropagation();
-    showLocationModal();
-}
-
-// Modal göster
-function showLocationModal() {
-    const modal = document.getElementById('locationModal');
-    if (modal) {
-        console.log('📍 Modal gösteriliyor');
-        modal.style.display = 'flex';
-        document.body.classList.add('modal-open');
-    }
-}
-
-// Modal gizle
-function hideLocationModal() {
-    const modal = document.getElementById('locationModal');
-    if (modal) {
-        console.log('📍 Modal gizleniyor');
-        modal.style.display = 'none';
-        document.body.classList.remove('modal-open');
-    }
-}
-
-// Konum seç
-function selectLocation(locationType) {
-    console.log('📍 Konum seçildi:', locationType);
-    
-    selectedLocation = locationType;
-    localStorage.setItem('selectedLocation', locationType);
-    
-    // UI'ı güncelle
-    updateLocationDisplay();
-    
-    // Modal'ı kapat
-    hideLocationModal();
-    
-    // Müşteri şehir bilgisini güncelle
-    if (!currentCustomer) currentCustomer = {};
-    if (!currentCustomer.city) currentCustomer.city = "Bandırma";
-    
-    speakToUser(`Konumunuz ${getLocationName(locationType)} olarak ayarlandı`);
-    
-    console.log('✅ Konum başarıyla seçildi');
-}
-
-// Konum görüntüsünü güncelle
-function updateLocationDisplay() {
-    const locationText = document.getElementById('locationText');
-    if (locationText) {
-        locationText.textContent = getLocationName(selectedLocation) || 'Konumunuzu seçin';
-        
-        if (selectedLocation) {
-            locationText.style.fontWeight = '600';
-            locationText.style.color = 'var(--primary)';
-        }
-    }
-}
-
-// Konum adını getir
-function getLocationName(locationType) {
-    const names = {
-        'inside': '📍 Restoran içinde',
-        'takeaway': '📦 Paket servis', 
-        'delivery': '🚚 Adrese teslim'
-    };
-    return names[locationType] || locationType;
-}
 	
 </script>	
 </body>
 </html>
+
 
