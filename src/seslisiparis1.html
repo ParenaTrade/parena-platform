@@ -1810,17 +1810,16 @@ function selectStoreTypeByName(typeName) {
                     microphoneToggle.addEventListener('click', handleMicrophoneToggle);
                 }
 
-                // Profil dropdown
-                if (profileBtn && profileDropdown) {
-                    profileBtn.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        profileDropdown.classList.toggle('show');
-                    });
-                    
-                    document.addEventListener('click', function() {
-                        profileDropdown.classList.remove('show');
-                    });
-                }
+                 // Profil dropdown - DÜZELTİLMİŞ KISIM
+        if (profileBtn && profileDropdown) {
+            // Önceki event listener'ları temizle
+            profileBtn.removeEventListener('click', handleProfileToggle);
+            document.removeEventListener('click', closeProfileDropdown);
+            
+            // Yeni event listener'ları ekle
+            profileBtn.addEventListener('click', handleProfileToggle);
+            document.addEventListener('click', closeProfileDropdown);
+        }
 
                 // Çıkış butonu
                 if (logoutBtn) {
@@ -1873,6 +1872,19 @@ function selectStoreTypeByName(typeName) {
                 console.error('❌ Event handler ayarlama hatası:', error);
             }
         }
+
+	// Profil dropdown toggle fonksiyonu
+function handleProfileToggle(e) {
+    e.stopPropagation();
+    profileDropdown.classList.toggle('show');
+}
+
+// Profil dropdown kapatma
+function closeProfileDropdown(e) {
+    if (!profileDropdown.contains(e.target) && !profileBtn.contains(e.target)) {
+        profileDropdown.classList.remove('show');
+    }
+}
 
         function updateUIAfterLogin() {
             updateLogoutButtonVisibility();
@@ -2347,13 +2359,18 @@ async function processVoiceCommand(transcript) {
 // GÜNCELLENMİŞ initApp
 // =============================================
 async function initApp() {
-    try {
+     // Çift çalışmayı önle
+    if (appInitialized) {
+        debugLog('⚠️ initApp zaten çalıştı, ikinci çağrı engellendi');
+        return;
+    }
+    appInitialized = true;
+	try {
         debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
 
-        // 1. DOM hazır olana kadar bekle
-        await waitForDOMElements();
-        debugLog('✅ DOM hazır');
-
+        // 1. Önce storage temizliği kontrolü
+        await checkAndCleanStorage();
+        
         // 2. Komut kurallarını yükle
         await loadCommandRules();
         debugLog('✅ Komut kuralları yüklendi');
@@ -2362,44 +2379,54 @@ async function initApp() {
         setupLocationEvents();
         debugLog('✅ Konum eventleri ayarlandı');
 
-        // 4. StoreTypes yükle (varsa) - ASENKRON İŞLEM
-        if (typeof loadStoreTypes === 'function') {
-            await loadStoreTypes();
-            debugLog('✅ StoreTypes yüklendi');
-        }
+        // 4. StoreTypes yükle - VERİTABANINDAN GERÇEK VERİ
+        await loadStoreTypes();
+        debugLog('✅ StoreTypes yüklendi');
 
-        // 5. Oturumu geri yükle (varsa) - ASENKRON İŞLEM
-        if (typeof restoreSession === 'function') {
-            await restoreSession();
-            debugLog('✅ Oturum yüklendi');
-        }
+        // 5. Oturumu geri yükle
+        await restoreSession();
+        debugLog('✅ Oturum yüklendi');
 
-        // 6. Konum yönetimi - SENKRON İŞLEM
+        // 6. Konum yönetimi
         initializeLocation();
         debugLog('✅ Konum yönetimi tamamlandı');
 
-        // 7. UI elementlerini ayarla - SENKRON İŞLEM
-        if (typeof updateUIAfterLogin === 'function') {
-            updateUIAfterLogin();
-            debugLog('✅ UI güncellendi');
-        }
+        // 7. UI elementlerini ayarla
+        updateUIAfterLogin();
+        debugLog('✅ UI güncellendi');
 
-        // 8. Event handler'ları ayarla - SENKRON İŞLEM
-        if (typeof setupEventHandlers === 'function') {
-            setupEventHandlers();
-            debugLog('✅ Event handlerlar ayarlandı');
-        }
+        // 8. Event handler'ları ayarla
+        setupEventHandlers();
+        debugLog('✅ Event handlerlar ayarlandı');
 
         debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
 
     } catch (error) {
         console.error('💥 Uygulama başlatma hatası:', error);
-        if (typeof emergencyFallback === 'function') {
-            emergencyFallback();
-        }
+        emergencyFallback();
     }
 }
 
+// Storage temizlik kontrolü
+async function checkAndCleanStorage() {
+    const session = localStorage.getItem('onurmarket_session');
+    if (session) {
+        try {
+            const sessionData = JSON.parse(session);
+            // 24 saatten eski oturumları temizle
+            const now = new Date().getTime();
+            if (now - sessionData.timestamp > 24 * 60 * 60 * 1000) {
+                clearUserDataFromStorage();
+                debugLog('✅ Eski oturum temizlendi');
+            }
+        } catch (error) {
+            // Geçersiz JSON, temizle
+            clearUserDataFromStorage();
+            debugLog('✅ Geçersiz oturum temizlendi');
+        }
+    }
+}	
+	
 // Yardımcı fonksiyonlar
 function waitForDOMElements() {
     return new Promise((resolve) => {
@@ -2496,14 +2523,16 @@ function debugLog(message) {
             }
         }
 
-        // Sayfa yüklendiğinde initApp'i çalıştır
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
-            initApp();
-        });
-
-	document.addEventListener('DOMContentLoaded', initApp);
-
+	// Mevcut DOMContentLoaded listener'larını kaldır ve tek bir tane kullan
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
+    
+    // initApp'i setTimeout ile geciktirerek çakışmaları önle
+    setTimeout(() => {
+        initApp();
+    }, 100);
+});
+      
         // =============================================
         // GEÇİCİ FONKSİYONLAR (1. BÖLÜM'de tamamlanacak)
         // =============================================
@@ -2731,11 +2760,24 @@ async function logout() {
     try {
         speakToUser("Oturumunuz kapatılıyor...");
         
-        // Görsel geri bildirim
+        // 1. Önce görsel geri bildirim göster
         showNotification("Çıkış yapılıyor...", "info");
         
+        // 2. Tüm storage'ı temizle - ÖNCE BUNU YAP
+        clearUserDataFromStorage();
+        
+        // 3. Global değişkenleri sıfırla
+        resetAppState();
+        
+        // 4. Kısa bir gecikme
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 5. UI'ı güncelle
+        updateUIAfterLogout();
+        
+        // 6. Sayfayı yenile (yeniden başlat)
         setTimeout(() => {
-            performLogout();
+            window.location.reload();
         }, 1500);
         
     } catch (error) {
@@ -2743,7 +2785,7 @@ async function logout() {
         performEmergencyLogout();
     }
 }
-
+	
 // Asıl çıkış işlemleri
 function performLogout() {
     currentCustomer = null;
@@ -2758,6 +2800,31 @@ function performLogout() {
     }, 2000);
 }
 
+	// App state sıfırlama
+function resetAppState() {
+    currentCustomer = null;
+    sellers = [];
+    products = [];
+    categories = [];
+    storeTypes = [];
+    cart = [];
+    isListening = false;
+    isMicrophoneEnabled = false;
+    conversationStep = 0;
+    currentPaymentMethod = null;
+    selectedSellerId = null;
+    selectedSellerType = null;
+    selectedCategoryId = null;
+    isSellerLocked = false;
+    selectedLocation = null;
+    referralCode = null;
+    referralGroupCode = null;
+    commandRoot = "0:0";
+    pendingResponse = null;
+    
+    debugLog('✅ App state sıfırlandı');
+}
+	
 // Acil durum çıkışı
 function performEmergencyLogout() {
     localStorage.clear();
@@ -2771,10 +2838,13 @@ function performEmergencyLogout() {
     }, 1000);
 }
 
-// Kullanıcı verilerini temizle
+// Storage temizleme fonksiyonu
 function clearUserDataFromStorage() {
     localStorage.removeItem('onurmarket_session');
+    localStorage.removeItem('selectedLocation');
+    localStorage.removeItem('storeTypes');
     localStorage.removeItem('currentCustomer');
+    debugLog('✅ Tüm storage verileri temizlendi');
 }
 
 // Çıkış sonrası UI güncelleme
@@ -2844,19 +2914,11 @@ function showNotification(message, type = 'info') {
 // 2. BÖLÜM: REYONLARIN, SATICILARIN YÜKLENMESİ
 // =============================================
 
-// Store type'ları yükle
 async function loadStoreTypes() {
     try {
         debugLog('🔧 StoreTypes yükleniyor...');
         
-        // Önce cache kontrolü
-        const cached = localStorage.getItem('storeTypes');
-        if (cached) {
-            storeTypes = JSON.parse(cached);
-            debugLog('✅ StoreTypes cache den yüklendi', storeTypes.length);
-        }
-        
-        // Sunucudan yükle
+        // ÖNCE VERİTABANINDAN DENE
         const { data, error } = await supabase
             .from('store_type')
             .select('*')
@@ -2864,30 +2926,35 @@ async function loadStoreTypes() {
 
         if (error) {
             console.error('❌ StoreTypes yükleme hatası:', error);
-            if (!storeTypes || storeTypes.length === 0) {
-                await useFallbackStoreTypes();
-            }
-            return;
+            throw error; // Fallback'e git
         }
 
         if (data && data.length > 0) {
             storeTypes = data;
             localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
-            debugLog('✅ StoreTypes sunucudan yüklendi', storeTypes.length);
-        } else {
-            debugLog('⚠️ StoreTypes verisi boş');
-            await useFallbackStoreTypes();
+            debugLog(`✅ StoreTypes sunucudan yüklendi: ${data.length} adet`);
+            displayStoreTypes(storeTypes);
+            return;
         }
 
-        // Store type'ları göster
-        displayStoreTypes(storeTypes);
-
+        // VERİ YOKSA FALLBACK
+        throw new Error('StoreTypes verisi boş');
+        
     } catch (error) {
         console.error('❌ StoreTypes yükleme hatası:', error);
-        await useFallbackStoreTypes();
+        // Cache'den dene
+        const cached = localStorage.getItem('storeTypes');
+        if (cached) {
+            storeTypes = JSON.parse(cached);
+            debugLog('✅ StoreTypes cache den yüklendi');
+            displayStoreTypes(storeTypes);
+        } else {
+            // Son çare: demo veriler
+            await useFallbackStoreTypes();
+        }
     }
 }
-
+	
 // Store type'ları ekranda göster
 function displayStoreTypes(types) {
     const sellerTypeGrid = document.getElementById('sellerTypeGrid');
@@ -2998,10 +3065,12 @@ async function loadReyonsByStoreType(storeTypeId) {
     }
 }
 
-// Satıcı yükleme - TAM GERÇEK SORGULAR
+// Satıcı yükleme - GÜÇLENDİRİLMİŞ
 async function loadSellersByStoreType(storeTypeId) {
     try {
         const customerCity = currentCustomer?.city || 'Bandırma';
+        
+        debugLog(`🔍 Satıcılar yükleniyor: ${storeTypeId}, Şehir: ${customerCity}`);
         
         const { data, error } = await supabase
             .from('seller_profiles')
@@ -3011,18 +3080,29 @@ async function loadSellersByStoreType(storeTypeId) {
             .ilike('city', `%${customerCity}%`)
             .order('business_name');
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Satıcı yükleme hatası:', error);
+            throw error;
+        }
 
-        sellers = data || [];
-        updateSellersGrid();
+        if (data && data.length > 0) {
+            sellers = data;
+            debugLog(`✅ Satıcılar yüklendi: ${data.length} adet`);
+            updateSellersGrid();
+        } else {
+            debugLog('⚠️ Bu kategoride satıcı bulunamadı');
+            sellers = [];
+            updateSellersGrid();
+        }
 
     } catch (error) {
-        console.error('Satıcı yükleme hatası:', error);
+        console.error('❌ Satıcı yükleme hatası:', error);
+        // Fallback olarak demo satıcılar
         sellers = getDemoSellers();
         updateSellersGrid();
+        debugLog('🔄 Demo satıcılar kullanılıyor');
     }
 }
-
 // Kategorileri/reyonları göster
 function displayCategories(categoriesToShow, type) {
     const categoriesGrid = document.getElementById('categoriesGrid');
@@ -3682,6 +3762,7 @@ function getDemoProducts() {
 	
 </body>
 </html>
+
 
 
 
