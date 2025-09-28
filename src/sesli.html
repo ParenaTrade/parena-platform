@@ -1863,7 +1863,9 @@
         // ANA UYGULAMA BAŞLATMA
         // =============================================
 
-   function simpleInit() {
+   let simpleInitExecuted = false;
+
+function simpleInit() {
     if (simpleInitExecuted) {
         debugLog('⚠️ simpleInit zaten çalıştı, ikinci çağrı engellendi');
         return;
@@ -1875,6 +1877,9 @@
         
         // DOM elementlerini başlat
         initializeDOMElements();
+        
+        // Banner sistemini başlat
+        initializeBannerSystem();
         
         // Event listener'ları kur
         setupBasicEventListeners();
@@ -1888,7 +1893,8 @@
         
     } catch (error) {
         console.error('❌ Basit init hatası:', error);
-        alert('Basit init hatası: ' + error.message);
+        // Hata olsa bile executed değişkenini true yap
+        simpleInitExecuted = true;
     }
 }
 
@@ -1959,25 +1965,30 @@ async function initApp() {
         }
 
         function initializeDOMElements() {
-            debugLog('🔧 DOM elementleri tanımlanıyor...');
-            
-            // Sadece temel elementleri tanımla
-            const elements = [
-                'profileBtn', 'profileDropdown', 'microphoneToggle', 'orderSummary',
-                'locationsMarker', 'locationsText', 'testButton'
-            ];
-            
-            elements.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    window[id] = element;
-                    debugLog(`✅ ${id} element bulundu`);
-                } else {
-                    console.warn(`❌ ${id} element bulunamadı`);
-                }
-            });
-        }
-
+    debugLog('🔧 DOM elementleri tanımlanıyor...');
+    
+    try {
+        // Temel elementler
+        const elements = [
+            'profileBtn', 'profileDropdown', 'microphoneToggle', 'orderSummary',
+            'locationsMarker', 'locationsText', 'testButton', 'howItWorks'
+        ];
+        
+        elements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                debugLog(`✅ ${id} element bulundu`);
+            } else {
+                debugLog(`⚠️ ${id} element bulunamadı`);
+            }
+        });
+        
+        debugLog('✅ DOM elementleri başarıyla tanımlandı');
+        
+    } catch (error) {
+        console.error('❌ DOM element başlatma hatası:', error);
+    }
+}
         function setupBasicEventListeners() {
             debugLog('🔧 Temel event listenerlar kuruluyor...');
             
@@ -2039,10 +2050,25 @@ async function initApp() {
         }
 
         // Sayfa yüklendiğinde
-        document.addEventListener('DOMContentLoaded', function() {
-            debugLog('📄 DOM yüklendi, banner sistemi başlatılıyor...');
-            simpleInit();
-        });
+        let domLoaded = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (domLoaded) {
+        debugLog('⚠️ DOMContentLoaded zaten çalıştı');
+        return;
+    }
+    domLoaded = true;
+    
+    debugLog('📄 DOM yüklendi, sistem başlatılıyor...');
+    
+    // Sadece bir kez simpleInit çağır
+    setTimeout(simpleInit, 500);
+});
+
+// Sayfa tamamen yüklendiğinde
+window.addEventListener('load', function() {
+    debugLog('✅ Sayfa tamamen yüklendi');
+});
 
         // Debug fonksiyonu
         function debugLog(message, data = null) {
@@ -2258,9 +2284,22 @@ async function initApp() {
 		// =============================================
         // YENİ BANNER SİSTEMİ
         // =============================================
-
-
-
+		function initializeBannerSystem() {
+    debugLog('🎪 Banner sistemi başlatılıyor...');
+    
+    try {
+        const howItWorks = document.getElementById('howItWorks');
+        if (howItWorks) {
+            // Banner'ı göster/gizle kontrolü
+            setTimeout(() => {
+                howItWorks.style.display = 'block';
+                debugLog('✅ HowItWorks banner gösterildi');
+            }, 500);
+        }
+    } catch (error) {
+        console.error('❌ Banner sistemi hatası:', error);
+    }
+}
         function showLocationModal() {
             // Modal'ı göster
             const modal = document.getElementById('locationModal');
@@ -2286,13 +2325,14 @@ async function initApp() {
                 });
             });
         }
-function selectLocation(locationType) {
+		function selectLocation(locationType) {
             console.log('📍 Konum seçildi:', locationType);
             
             appState.selectedLocation = locationType;
             updateLocationDisplay(locationType);
             
-          
+          // Banner'ı kaldır, ana içeriği göster
+            hideBannerAndShowMain();
             
             // Asistanı başlat
             initializeAssistant();
