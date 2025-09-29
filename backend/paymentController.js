@@ -1,27 +1,99 @@
-// paymentController.js
-const getPaymentMethodsByCountry = async (countryCode) => {
-    const methods = await db.query(`
-        SELECT 
-            pm.name,
-            pm.type,
-            cpm.logo_url,
-            pm.is_global
-        FROM country_payment_methods cpm
-        JOIN payment_methods pm ON cpm.payment_method_id = pm.id
-        JOIN countries c ON cpm.country_id = c.id
-        WHERE c.code = ? OR pm.is_global = true
-        ORDER BY pm.is_global DESC, cpm.display_order ASC
-    `, [countryCode]);
-    
-    return methods;
+// paymentController.js - Basit versiyon
+const paymentMethods = {
+    TR: {
+        country: "Türkiye",
+        currency: "TRY",
+        methods: [
+            {
+                name: "Kredi Kartı",
+                type: "credit_card",
+                logo: "💳",
+                description: "Güvenli ödeme"
+            },
+            {
+                name: "Nakit (Kapıda)",
+                type: "cash",
+                logo: "💵", 
+                description: "Kapıda nakit ödeme"
+            },
+            {
+                name: "Yemek Kartları",
+                type: "food_cards",
+                logo: "🍽️",
+                description: "Setcard, Metropol, Sodexo",
+                cards: [
+                    { name: "Setcard", logo: "/logos/setcard.png" },
+                    { name: "Metropol", logo: "/logos/metropol.png" },
+                    { name: "Sodexo", logo: "/logos/sodexo.png" },
+                    { name: "Multinet", logo: "/logos/multinet.png" }
+                ]
+            }
+        ]
+    },
+    GE: {
+        country: "Gürcistan", 
+        currency: "GEL",
+        methods: [
+            {
+                name: "Credit Card",
+                type: "credit_card",
+                logo: "💳",
+                description: "Secure payment"
+            },
+            {
+                name: "Cash (On Delivery)",
+                type: "cash", 
+                logo: "💵",
+                description: "Pay with cash on delivery"
+            }
+            // Gürcistan'da yemek kartı yok
+        ]
+    },
+    US: {
+        country: "United States",
+        currency: "USD", 
+        methods: [
+            {
+                name: "Credit Card",
+                type: "credit_card",
+                logo: "💳",
+                description: "Secure payment"
+            },
+            {
+                name: "Cash on Delivery", 
+                type: "cash",
+                logo: "💵",
+                description: "Pay with cash on delivery"
+            },
+            {
+                name: "Meal Cards",
+                type: "food_cards",
+                logo: "🍽️",
+                description: "MealPal, Ticket Restaurant",
+                cards: [
+                    { name: "MealPal", logo: "/logos/mealpal.png" },
+                    { name: "Ticket Restaurant", logo: "/logos/ticket-restaurant.png" }
+                ]
+            }
+        ]
+    }
 };
 
-// API Route
-app.get('/api/payment-methods/:countryCode', async (req, res) => {
-    try {
-        const methods = await getPaymentMethodsByCountry(req.params.countryCode);
-        res.json(methods);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// Ödeme yöntemlerini getir
+const getPaymentMethods = (countryCode = 'TR') => {
+    return paymentMethods[countryCode] || paymentMethods.TR;
+};
+
+// Desteklenen ülkeleri getir
+const getSupportedCountries = () => {
+    return Object.keys(paymentMethods).map(code => ({
+        code,
+        name: paymentMethods[code].country,
+        currency: paymentMethods[code].currency
+    }));
+};
+
+module.exports = {
+    getPaymentMethods,
+    getSupportedCountries
+};
