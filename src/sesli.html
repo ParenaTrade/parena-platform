@@ -1752,7 +1752,7 @@
 
         // DOM Elements - tek seferde tanımlayalım
         let domElements = {};
-		let selectedLocation = null;
+		
 		let isListening = false;
 	
         function initializeDOMElements() {
@@ -1824,10 +1824,120 @@ function debugLog(message, data = null) {
 }
 
 // 2. KONUM FONKSİYONLARI
+// =============================================
+// KONUM MODAL SİSTEMİ
+// =============================================
+
+let selectedLocation = null;
+let selectedLocationElement = null;
+
 function showLocationModal() {
     debugLog('📍 Konum modalı gösteriliyor...');
-    alert('📍 Konum Seçin:\n\n1. Restoran içinde\n2. Paket servis\n3. Adrese teslim');
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Sayfa kaydırmayı engelle
+    }
 }
+
+function hideLocationModal() {
+    debugLog('📍 Konum modalı gizleniyor...');
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = ''; // Sayfa kaydırmayı geri aç
+    }
+}
+
+function selectLocation(locationType, element) {
+    // Önceki seçimi temizle
+    if (selectedLocationElement) {
+        selectedLocationElement.classList.remove('selected');
+    }
+    
+    // Yeni seçimi ayarla
+    selectedLocation = locationType;
+    selectedLocationElement = element;
+    element.classList.add('selected');
+    
+    debugLog(`📍 Konum seçildi: ${locationType}`);
+}
+
+function confirmLocation() {
+    if (!selectedLocation) {
+        alert('⚠️ Lütfen bir konum seçin!');
+        return;
+    }
+    
+    hideLocationModal();
+    
+    // Konum bilgisini kaydet ve göster
+    const locationNames = {
+        'inside': '📍 Restoran içinde',
+        'takeaway': '📦 Paket servis',
+        'delivery': '🚚 Adrese teslim'
+    };
+    
+    const locationsText = document.getElementById('locationsText');
+    if (locationsText) {
+        locationsText.textContent = locationNames[selectedLocation];
+    }
+    
+    speakToUser(`Konumunuz ${locationNames[selectedLocation]} olarak ayarlandı`);
+    debugLog(`✅ Konum onaylandı: ${selectedLocation}`);
+}
+
+// Modal event listener'larını ayarla
+function initializeLocationModal() {
+    const modal = document.getElementById('locationModal');
+    const closeModal = document.querySelector('.close-modal');
+    const cancelButton = document.getElementById('cancelLocation');
+    const confirmButton = document.getElementById('confirmLocation');
+    const locationOptions = document.querySelectorAll('.location-option');
+    
+    if (modal) {
+        // Modal dışına tıklama ile kapatma
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                hideLocationModal();
+            }
+        });
+        
+        // ESC tuşu ile kapatma
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && modal.classList.contains('active')) {
+                hideLocationModal();
+            }
+        });
+    }
+    
+    if (closeModal) {
+        closeModal.addEventListener('click', hideLocationModal);
+    }
+    
+    if (cancelButton) {
+        cancelButton.addEventListener('click', hideLocationModal);
+    }
+    
+    if (confirmButton) {
+        confirmButton.addEventListener('click', confirmLocation);
+    }
+    
+    // Konum seçeneklerine event listener ekle
+    locationOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            const locationType = this.getAttribute('data-location');
+            selectLocation(locationType, this);
+        });
+    });
+    
+    debugLog('✅ Konum modal sistemi başlatıldı');
+}
+
+// DOM yüklendiğinde modal sistemini başlat
+document.addEventListener('DOMContentLoaded', function() {
+    initializeLocationModal();
+});
 
 function initializeLocationsSystem() {
     debugLog('📍 Konum sistemi başlatılıyor...');
