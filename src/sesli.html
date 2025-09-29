@@ -1629,103 +1629,253 @@
         }
 
 
-     // =============================================
-        // KONUM SİSTEMİ - TÜM FONKSİYONLAR TANIMLI
-        // =============================================
+// =============================================
+// TÜM FONKSİYONLARI BAŞTA TANIMLA
+// =============================================
 
-        function testLocationSystem() {
-            console.log('🧪 LOCATIONS SİSTEMİ TESTİ - TANIMLANDI');
-            
-            const marker = document.getElementById('locationsMarker');
-            const modal = document.getElementById('locationsModal');
-            const options = document.querySelectorAll('.locations-option');
-            
-            console.log('📍 Locations Marker:', marker ? 'BULUNDU ✅' : 'BULUNAMADI ❌');
-            console.log('📍 Locations Modal:', modal ? 'BULUNDU ✅' : 'BULUNAMADI ❌');
-            console.log('📍 Locations Seçenekleri:', options.length + ' adet');
-            
-            if (marker) {
-                marker.style.border = '3px solid #4CAF50';
-                setTimeout(() => {
-                    marker.style.border = '2px solid #2196f3';
-                }, 3000);
-            }
+// 1. DEBUG FONKSİYONU
+function debugLog(message, data = null) {
+    console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
+}
+
+// 2. KONUM FONKSİYONLARI
+function showLocationModal() {
+    debugLog('📍 Konum modalı gösteriliyor...');
+    alert('📍 Konum Seçin:\n\n1. Restoran içinde\n2. Paket servis\n3. Adrese teslim');
+}
+
+function initializeLocationsSystem() {
+    debugLog('📍 Konum sistemi başlatılıyor...');
+    
+    const locationsMarker = document.getElementById('locationsMarker');
+    if (locationsMarker) {
+        locationsMarker.addEventListener('click', showLocationModal);
+        debugLog('✅ Konum marker event listener eklendi');
+    }
+}
+
+// 3. BANNER SİSTEMİ
+function initializeBannerSystem() {
+    debugLog('🎪 Banner sistemi başlatılıyor...');
+    
+    const howItWorks = document.getElementById('howItWorks');
+    if (howItWorks) {
+        howItWorks.style.display = 'block';
+        debugLog('✅ Banner gösterildi');
+    }
+}
+
+// 4. DOM ELEMENT BAŞLATMA
+function initializeDOMElements() {
+    debugLog('🔧 DOM elementleri tanımlanıyor...');
+    
+    const elements = [
+        'profileBtn', 'profileDropdown', 'microphoneToggle', 'orderSummary',
+        'locationsMarker', 'locationsText', 'testButton', 'howItWorks'
+    ];
+    
+    let foundCount = 0;
+    elements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            foundCount++;
+            debugLog(`✅ ${id} element bulundu`);
+        } else {
+            debugLog(`⚠️ ${id} element bulunamadı`);
         }
+    });
+    
+    debugLog(`✅ ${foundCount}/${elements.length} DOM elementi başarıyla tanımlandı`);
+    return foundCount > 0;
+}
 
-        function initializeLocationsSystem() {
-            console.log('📍 KONUM SİSTEMİ BAŞLATILIYOR');
-            
-            try {
-                setupLocationsMarker();
-                setupLocationsModal();
-                updateLocationsDisplay();
-                
-                debugLog('✅ Konum sistemi başlatıldı');
-                
-            } catch (error) {
-                console.error('❌ Konum sistemi başlatma hatası:', error);
-            }
+// 5. EVENT LISTENER'LAR
+function setupBasicEventListeners() {
+    debugLog('🔧 Temel event listenerlar kuruluyor...');
+    
+    let listenerCount = 0;
+    
+    // Test butonu
+    const testButton = document.getElementById('testButton');
+    if (testButton) {
+        testButton.addEventListener('click', function() {
+            alert('✅ JavaScript çalışıyor!\nSayfa bloke değil.');
+            debugLog('✅ Test butonu çalıştı');
+        });
+        listenerCount++;
+    }
+    
+    // Mikrofon butonu
+    const microphoneToggle = document.getElementById('microphoneToggle');
+    if (microphoneToggle) {
+        microphoneToggle.addEventListener('click', function() {
+            alert('🎤 Mikrofon butonu çalışıyor!');
+            debugLog('🎤 Mikrofon butonu tıklandı');
+        });
+        listenerCount++;
+    }
+    
+    // Sepet butonu
+    const orderSummary = document.getElementById('orderSummary');
+    if (orderSummary) {
+        orderSummary.addEventListener('click', function() {
+            alert('🛒 Sepet butonu çalışıyor!');
+            debugLog('🛒 Sepet butonu tıklandı');
+        });
+        listenerCount++;
+    }
+    
+    debugLog(`✅ ${listenerCount} event listener başarıyla eklendi`);
+}
+
+// =============================================
+// DEĞİŞKENLER
+// =============================================
+let appInitialized = false;
+let simpleInitExecuted = false;
+
+// =============================================
+// ANA FONKSİYONLAR - BASİT VE GÜVENLİ
+// =============================================
+
+function simpleInit() {
+    // Çift çalışmayı engelle
+    if (simpleInitExecuted) {
+        debugLog('⚠️ simpleInit zaten çalıştı, engellendi');
+        return;
+    }
+    simpleInitExecuted = true;
+    
+    debugLog('🚀 Basit init başlatılıyor...');
+    
+    try {
+        // 1. DOM elementlerini başlat
+        const domSuccess = initializeDOMElements();
+        
+        if (!domSuccess) {
+            debugLog('❌ DOM elementleri başlatılamadı');
+            return;
         }
+        
+        // 2. Banner sistemini başlat
+        initializeBannerSystem();
+        
+        // 3. Event listener'ları kur
+        setupBasicEventListeners();
+        
+        // 4. Konum sistemini başlat
+        initializeLocationsSystem();
+        
+        debugLog('✅ Basit init tamamlandı');
+        
+        // 5. Ana uygulamayı başlat
+        setTimeout(initApp, 1000);
+        
+    } catch (error) {
+        console.error('❌ Basit init hatası:', error);
+        debugLog('❌ Basit init hatası: ' + error.message);
+    }
+}
 
-        function setupLocationsMarker() {
-            const marker = document.getElementById('locationsMarker');
-            if (!marker) return;
-            
-            marker.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                showLocationsModal();
-            });
-        }
+function initApp() {
+    if (appInitialized) {
+        debugLog('⚠️ initApp zaten çalıştı');
+        return;
+    }
+    
+    appInitialized = true;
+    debugLog('🚀 Ana uygulama başlatılıyor...');
+    
+    try {
+        // Burada ek işlemler yapılabilir
+        debugLog('🎉 Uygulama başarıyla başlatıldı');
+        
+    } catch (error) {
+        console.error('❌ Uygulama başlatma hatası:', error);
+    }
+}
 
-        function setupLocationsModal() {
-            debugLog('🔧 Locations modal ayarlanıyor...');
-            // Modal henüz HTML'de yok
-        }
+// =============================================
+// SAYFA YÜKLEME - EN BASİT YÖNTEM
+// =============================================
 
-        function showLocationsModal() {
-            alert('📍 Konum Seçin:\n\n1. Restoran içinde\n2. Paket servis\n3. Adrese teslim');
-            debugLog('📍 Konum modal gösterildi (alert)');
-            
-            // Geçici olarak bir konum seç
-            setTimeout(() => {
-                selectLocationsOption('delivery');
-            }, 1000);
-        }
+debugLog('📄 Script yüklendi, DOM bekleniyor...');
 
-        function hideLocationsModal() {
-            debugLog('📍 Konum modal gizlendi');
-        }
+// SADECE BİR KEZ ÇALIŞACAK EVENT LISTENER
+if (document.readyState === 'loading') {
+    // DOM henüz yüklenmedi
+    document.addEventListener('DOMContentLoaded', function() {
+        debugLog('✅ DOMContentLoaded event tetiklendi');
+        simpleInit();
+    });
+} else {
+    // DOM zaten yüklendi
+    debugLog('✅ DOM zaten yüklü, direkt başlatılıyor');
+    simpleInit();
+}
 
-        function selectLocationsOption(locationType) {
-            console.log('📍 Konum seçildi:', locationType);
-            
-            selectedLocation = locationType;
-            const locationsText = document.getElementById('locationsText');
-            if (locationsText) {
-                locationsText.textContent = getLocationsName(locationType);
-            }
-            
-            debugLog('✅ Konum başarıyla seçildi: ' + locationType);
-            alert('✅ Konumunuz "' + getLocationsName(locationType) + '" olarak ayarlandı');
-        }
+// Sayfa tamamen yüklendiğinde
+window.addEventListener('load', function() {
+    debugLog('✅ Sayfa tamamen yüklendi (window.load)');
+});
 
-        function getLocationsName(locationType) {
-            const names = {
-                'inside': '📍 Restoran içinde',
-                'takeaway': '📦 Paket servis', 
-                'delivery': '🚚 Adrese teslim'
-            };
-            return names[locationType] || locationType;
-        }
+// =============================================
+// HATA YAKALAMA
+// =============================================
 
-        function updateLocationsDisplay() {
-            const locationsText = document.getElementById('locationsText');
-            if (locationsText) {
-                locationsText.textContent = getLocationsName(selectedLocation) || 'Konumunuzu seçin';
-            }
-        }
+window.addEventListener('error', function(e) {
+    console.error('❌ Global hata:', e.error);
+    debugLog('❌ Global hata: ' + (e.error?.message || 'Bilinmeyen hata'));
+});
 
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('❌ Promise hatası:', e.reason);
+    debugLog('❌ Promise hatası: ' + (e.reason?.message || 'Bilinmeyen promise hatası'));
+});
+
+	
+// =============================================
+// SAYFA YÜKLEME - EN BASİT YÖNTEM
+// =============================================
+
+debugLog('📄 Script yüklendi, DOM bekleniyor...');
+
+// SADECE BİR KEZ ÇALIŞACAK EVENT LISTENER
+if (document.readyState === 'loading') {
+    // DOM henüz yüklenmedi
+    document.addEventListener('DOMContentLoaded', function() {
+        debugLog('✅ DOMContentLoaded event tetiklendi');
+        simpleInit();
+    });
+} else {
+    // DOM zaten yüklendi
+    debugLog('✅ DOM zaten yüklü, direkt başlatılıyor');
+    simpleInit();
+}
+
+// Sayfa tamamen yüklendiğinde
+window.addEventListener('load', function() {
+    debugLog('✅ Sayfa tamamen yüklendi (window.load)');
+});
+
+// =============================================
+// HATA YAKALAMA
+// =============================================
+
+window.addEventListener('error', function(e) {
+    console.error('❌ Global hata:', e.error);
+    debugLog('❌ Global hata: ' + (e.error?.message || 'Bilinmeyen hata'));
+});
+
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('❌ Promise hatası:', e.reason);
+    debugLog('❌ Promise hatası: ' + (e.reason?.message || 'Bilinmeyen promise hatası'));
+});
+
+
+
+	
+    
         // =============================================
         // DOM ELEMENT YÖNETİMİ
         // =============================================
@@ -1846,70 +1996,6 @@
         // ANA UYGULAMA BAŞLATMA
         // =============================================
 
-   let simpleInitExecuted = false;
-
-function simpleInit() {
-    if (simpleInitExecuted) {
-        debugLog('⚠️ simpleInit zaten çalıştı, ikinci çağrı engellendi');
-        return;
-    }
-    simpleInitExecuted = true;
-    
-    try {
-        debugLog('🚀 Basit init başlatılıyor...');
-        
-        // DOM elementlerini başlat
-        initializeDOMElements();
-        
-        // Banner sistemini başlat
-        initializeBannerSystem();
-        
-        // Event listener'ları kur
-        setupBasicEventListeners();
-        
-        debugLog('✅ Basit init tamamlandı');
-        
-        // Ana uygulamayı başlat
-        setTimeout(() => {
-            initApp();
-        }, 1000);
-        
-    } catch (error) {
-        console.error('❌ Basit init hatası:', error);
-        // Hata olsa bile executed değişkenini true yap
-        simpleInitExecuted = true;
-    }
-}
-
-	async function initApp() {
-    if (appInitialized) {
-        debugLog('⚠️ initApp zaten çalıştı');
-        return;
-    }
-    
-    appInitialized = true;
-    
-    try {
-        debugLog('🚀 === ANA UYGULAMA BAŞLATILIYOR ===');
-        
-        // Test fonksiyonlarını çalıştır
-        testLocationSystem();
-        
-        // Konum sistemini başlat
-        initializeLocationsSystem();
-        
-        // Demo verileri yükle
-        await loadDemoData();
-        
-        debugLog('🎉 === ANA UYGULAMA BAŞLATMA TAMAMLANDI ===');
-        
-        alert('✅ Uygulama başarıyla başlatıldı!\nTüm sistemler çalışıyor.');
-        
-    } catch (error) {
-        console.error('💥 Uygulama başlatma hatası:', error);
-        alert('Uygulama başlatma hatası: ' + error.message);
-    }
-}
 
 
         // =============================================
@@ -1945,9 +2031,7 @@ function simpleInit() {
         // BASİT BAŞLATMA SİSTEMİ
         // =============================================
 
-        function debugLog(message, data = null) {
-            console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
-        }
+       
 
         function initializeDOMElements() {
     debugLog('🔧 DOM elementleri tanımlanıyor...');
@@ -2063,110 +2147,6 @@ window.addEventListener('load', function() {
         // ANA UYGULAMA BAŞLATMA
         // =============================================
 
-        async function initApp() {
-            if (appInitialized) {
-                debugLog('⚠️ initApp zaten çalıştı');
-                return;
-            }
-            
-            appInitialized = true;
-            
-            try {
-                debugLog('🚀 === ANA UYGULAMA BAŞLATILIYOR ===');
-                
-                // Test fonksiyonlarını çalıştır
-                testLocationSystem();
-                
-                // Konum sistemini başlat
-                initializeLocationsSystem();
-                
-                // Demo verileri yükle
-                await loadDemoData();
-                
-                debugLog('🎉 === ANA UYGULAMA BAŞLATMA TAMAMLANDI ===');
-                
-                alert('✅ Uygulama başarıyla başlatıldı!\nTüm sistemler çalışıyor.');
-                
-            } catch (error) {
-                console.error('💥 Uygulama başlatma hatası:', error);
-                alert('Uygulama başlatma hatası: ' + error.message);
-            }
-        }
-
-        // =============================================
-        // KONUM SİSTEMİ - DÜZELTİLMİŞ
-        // =============================================
-
-        function initializeLocationsSystem() {
-            console.log('📍 KONUM SİSTEMİ BAŞLATILIYOR');
-            
-            try {
-                setupLocationsMarker();
-                setupLocationsModal();
-                updateLocationsDisplay();
-                
-                debugLog('✅ Konum sistemi başlatıldı');
-                
-            } catch (error) {
-                console.error('❌ Konum sistemi başlatma hatası:', error);
-            }
-        }
-
-        function setupLocationsMarker() {
-            if (!window.locationsMarker) return;
-            
-            window.locationsMarker.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                showLocationsModal();
-            });
-        }
-
-        function setupLocationsModal() {
-            debugLog('🔧 Locations modal ayarlanıyor...');
-            // Modal henüz HTML'de yok, bu yüzden basit bir alert kullan
-        }
-
-        function showLocationsModal() {
-            alert('📍 Konum Seçin:\n\n1. Restoran içinde\n2. Paket servis\n3. Adrese teslim');
-            debugLog('📍 Konum modal gösterildi (alert)');
-            
-            // Geçici olarak bir konum seç
-            setTimeout(() => {
-                selectLocationsOption('delivery');
-            }, 1000);
-        }
-
-        function hideLocationsModal() {
-            debugLog('📍 Konum modal gizlendi');
-        }
-
-        function selectLocationsOption(locationType) {
-            console.log('📍 Konum seçildi:', locationType);
-            
-            selectedLocation = locationType;
-            if (window.locationsText) {
-                window.locationsText.textContent = getLocationsName(locationType);
-            }
-            
-            debugLog('✅ Konum başarıyla seçildi: ' + locationType);
-            alert('✅ Konumunuz "' + getLocationsName(locationType) + '" olarak ayarlandı');
-        }
-
-        function getLocationsName(locationType) {
-            const names = {
-                'inside': '📍 Restoran içinde',
-                'takeaway': '📦 Paket servis', 
-                'delivery': '🚚 Adrese teslim'
-            };
-            return names[locationType] || locationType;
-        }
-
-        function updateLocationsDisplay() {
-            if (window.locationsText) {
-                window.locationsText.textContent = getLocationsName(selectedLocation) || 'Konumunuzu seçin';
-            }
-        }
 
         // =============================================
         // DEMO VERİ YÜKLEME
@@ -2249,17 +2229,6 @@ window.addEventListener('load', function() {
             console.log('✅ Tüm kaynaklar yüklendi, sayfa hazır');
         });
 
-
-
-
-
-
-
-
-
-
-
-
 // Diğer fonksiyonlar buraya gelecek...
         // Utility functions
         function money(n) { 
@@ -2271,10 +2240,7 @@ window.addEventListener('load', function() {
         // =============================================
 
 			// 1. KONUM SİSTEMİ FONKSİYONLARI
-function showLocationModal() {
-    debugLog('📍 Konum modalı gösteriliyor...');
-    alert('📍 Konum Seçin:\n\n1. Restoran içinde\n\n2. Paket servis\n\n3. Adrese teslim');
-}
+
 function debugLog(message, data = null) {
     console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
 }
@@ -4700,307 +4666,11 @@ function getDemoProducts() {
 }
 
 
-// =============================================
-// YENİ KONUM SİSTEMİ - locations kullanarak
-// =============================================
+			
 
-// Global değişken
-//let selectedLocation = localStorage.getItem('selectedLocation') || null;
-
-// Konum sistemini başlat
-function initializeLocationsSystem() {
-    console.log('📍 YENİ KONUM SİSTEMİ BAŞLATILIYOR (locations)');
-    
-    setupLocationsMarker();
-    setupLocationsModal();
-    updateLocationsDisplay();
-    
-    // Eğer konum seçilmemişse, modal'ı göster
-    if (!selectedLocation) {
-        setTimeout(() => {
-            showLocationsModal();
-        }, 1500);
-    }
-}
-
-// Konum marker'ını ayarla
-function setupLocationsMarker() {
-    const locationsMarker = document.getElementById('locationsMarker');
-    if (!locationsMarker) {
-        console.error('❌ Locations marker bulunamadı');
-        return;
-    }
-    
-    // Stilleri uygula
-    locationsMarker.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #e3f2fd;
-        padding: 12px 18px;
-        border-radius: 25px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 600;
-        border: 2px solid #2196f3;
-        color: #1976d2;
-        transition: all 0.3s ease;
-        user-select: none;
-    `;
-    
-    // Hover efektleri
-    locationsMarker.addEventListener('mouseover', function() {
-        this.style.background = '#bbdefb';
-        this.style.transform = 'translateY(-2px)';
-        this.style.boxShadow = '0 4px 12px rgba(33, 150, 243, 0.3)';
-    });
-    
-    locationsMarker.addEventListener('mouseout', function() {
-        this.style.background = '#e3f2fd';
-        this.style.transform = 'translateY(0)';
-        this.style.boxShadow = 'none';
-    });
-    
-    // Tıklama event'ini EKLE
-    locationsMarker.addEventListener('click', handleLocationsClick);
-    
-    console.log('✅ Locations marker ayarlandı');
-}
-
-// Konum modal'ını ayarla
-function setupLocationsModal() {
-    const modal = document.getElementById('locationsModal');
-    if (!modal) {
-        console.error('❌ Locations modalı bulunamadı');
-        return;
-    }
-    
-    // Modal kapatma butonunu ayarla
-    const closeBtn = document.getElementById('closeLocationsModal');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', hideLocationsModal);
-    }
-    
-    // Konum seçeneklerini ayarla
-    setupLocationsOptions();
-    
-    // Modal dışına tıklama
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            hideLocationsModal();
-        }
-    });
-    
-    console.log('✅ Locations modalı ayarlandı');
-}
-
-// Konum seçeneklerini ayarla
-function setupLocationsOptions() {
-    const options = document.querySelectorAll('.locations-option');
-    
-    options.forEach(option => {
-        // Mevcut event listener'ları temizle
-        const newOption = option.cloneNode(true);
-        option.parentNode.replaceChild(newOption, option);
-    });
-    
-    // Yeni event listener'ları ekle
-    document.querySelectorAll('.locations-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const location = this.getAttribute('data-location');
-            selectLocationsOption(location);
-        });
-        
-        // Hover efektleri
-        option.addEventListener('mouseover', function() {
-            this.style.background = '#f0f7ff';
-            this.style.borderColor = '#2196f3';
-            this.style.transform = 'translateY(-2px)';
-        });
-        
-        option.addEventListener('mouseout', function() {
-            this.style.background = 'white';
-            this.style.borderColor = '#ddd';
-            this.style.transform = 'translateY(0)';
-        });
-    });
-    
-    console.log('✅ Locations seçenekleri ayarlandı');
-}
-
-// Konum tıklama handler'ı
-function handleLocationsClick(e) {
-    console.log('🎯 Locations marker tıklandı!');
-    e.preventDefault();
-    e.stopPropagation();
-    showLocationsModal();
-}
-
-// Modal göster
-function showLocationsModal() {
-    const modal = document.getElementById('locationsModal');
-    if (modal) {
-        console.log('📍 Locations modal gösteriliyor');
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-// Modal gizle
-function hideLocationsModal() {
-    const modal = document.getElementById('locationsModal');
-    if (modal) {
-        console.log('📍 Locations modal gizleniyor');
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-    }
-}
-
-// Konum seç
-function selectLocationsOption(locationType) {
-    console.log('📍 Locations seçildi:', locationType);
-    
-    selectedLocation = locationType;
-    localStorage.setItem('selectedLocation', locationType);
-    
-    // UI'ı güncelle
-    updateLocationsDisplay();
-    
-    // Modal'ı kapat
-    hideLocationsModal();
-    
-    // Müşteri şehir bilgisini güncelle
-    if (!currentCustomer) currentCustomer = {};
-    if (!currentCustomer.city) currentCustomer.city = "Bandırma";
-    
-    speakToUser(`Konumunuz ${getLocationsName(locationType)} olarak ayarlandı`);
-    
-    console.log('✅ Locations başarıyla seçildi');
-}
-
-// Konum görüntüsünü güncelle
-function updateLocationsDisplay() {
-    const locationsText = document.getElementById('locationsText');
-    if (locationsText) {
-        locationsText.textContent = getLocationsName(selectedLocation) || 'Konumunuzu seçin';
-        
-        if (selectedLocation) {
-            locationsText.style.fontWeight = '600';
-            locationsText.style.color = '#1976d2';
-        }
-    }
-}
-
-// Konum adını getir
-function getLocationsName(locationType) {
-    const names = {
-        'inside': '📍 Restoran içinde',
-        'takeaway': '📦 Paket servis', 
-        'delivery': '🚚 Adrese teslim'
-    };
-    return names[locationType] || locationType;
-}
-	
-
-
-
-        // Sadece değişken isimlerini appState kullanacak şekilde güncelleyin
-
-        // Örnek: loadStoreTypes fonksiyonu
-        async function loadStoreTypes() {
-            try {
-                debugLog('🔧 StoreTypes yükleniyor...');
-                
-                // Basit bir demo veri ile devam edelim
-                const demoStoreTypes = [
-                    { id: 1, name: 'Market', code: 'market' },
-                    { id: 2, name: 'Restoran', code: 'restaurant' },
-                    { id: 3, name: 'Eczane', code: 'pharmacy' },
-                    { id: 4, name: 'Fırın', code: 'bakery' }
-                ];
-                
-                appState.storeTypes = demoStoreTypes;
-                displayStoreTypes(demoStoreTypes);
-                
-                debugLog('✅ StoreTypes yüklendi (demo)');
-                
-            } catch (error) {
-                console.error('❌ StoreTypes yükleme hatası:', error);
-            }
-        }
-
-        function displayStoreTypes(types) {
-            if (!domElements.sellerTypeGrid) return;
-            
-            domElements.sellerTypeGrid.innerHTML = '';
-            
-            types.forEach(type => {
-                const typeCard = document.createElement('div');
-                typeCard.className = 'seller-type-card';
-                typeCard.innerHTML = `
-                    <div class="seller-type-icon">
-                        <i class="fas fa-store"></i>
-                    </div>
-                    <div class="seller-type-name">${type.name}</div>
-                `;
-                
-                typeCard.addEventListener('click', function() {
-                    alert(`${type.name} seçildi!`);
-                    debugLog(`🛍️ Store type seçildi: ${type.name}`);
-                });
-                
-                domElements.sellerTypeGrid.appendChild(typeCard);
-            });
-        }
-
-        // Diğer yardımcı fonksiyonlar
-        function checkAndCleanStorage() {
-            return new Promise(resolve => {
-                debugLog('🧹 Storage temizlik kontrolü...');
-                // Basit bir temizlik
-                setTimeout(resolve, 100);
-            });
-        }
-
-        async function loadCommandRules() {
-            debugLog('🔧 Komut kuralları yükleniyor...');
-            return new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        async function restoreSession() {
-            debugLog('🔐 Oturum geri yükleniyor...');
-            return new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        function initializeLocation() {
-            debugLog('📍 Konum yönetimi başlatılıyor...');
-        }
-
-        function updateUIAfterLogin() {
-            debugLog('🎨 UI güncelleniyor...');
-        }
-
-        function setupEventHandlers() {
-            debugLog('🔧 Event handlerlar ayarlanıyor...');
-        }
-
-        function emergencyFallback() {
-            debugLog('🆘 Acil durum modu aktif');
-            alert('Acil durum modu: Temel işlevler çalışıyor');
-        }
-
-        // Sayfa yüklendiğinde basit init'i başlat
-        document.addEventListener('DOMContentLoaded', function() {
-            debugLog('📄 DOM yüklendi, basit init başlatılıyor...');
-            setTimeout(simpleInit, 500);
-        });
-
-        // Hata yakalama
-        window.addEventListener('error', function(e) {
-            console.error('Global hata:', e.error);
-            debugLog('❌ Global hata yakalandı: ' + e.error.message);
-        });
-
+      
+       
+     
 </script>	
 
 </body>
