@@ -1567,7 +1567,9 @@
 
         // DOM Elements - tek seferde tanımlayalım
         let domElements = {};
-
+		let selectedLocation = null;
+		let isListening = false;
+	
         function initializeDOMElements() {
             domElements = {
                 profileBtn: document.getElementById('profileBtn'),
@@ -1872,55 +1874,64 @@ window.addEventListener('error', function(e) {
 window.addEventListener('unhandledrejection', function(e) {
     console.error('❌ Promise Hatası:', e.reason);
 });
+
+	// DOM yüklendiğinde bu kodu çalıştırın
+document.addEventListener('DOMContentLoaded', function() {
+    const microphoneToggle = document.getElementById('microphoneToggle');
+    if (microphoneToggle) {
+        microphoneToggle.addEventListener('click', handleMicrophoneToggle);
+        console.log('✅ Mikrofon butonu event listener eklendi');
+    }
+});
 // =============================================
 // MİKROFON VE SESLİ ASİSTAN SİSTEMİ (DÜZELTİLMİŞ)
 // =============================================
 
 function handleMicrophoneToggle() {
-            if (!appState.isMicrophoneEnabled) {
-                enableMicrophone();
-            } else {
-                disableMicrophone();
-            }
-        }
+    console.log('🎤 Mikrofon toggle çağrıldı', { 
+        selectedLocation: selectedLocation, 
+        isListening: isListening 
+    });
     
+    // Konum kontrolü
     if (!selectedLocation) {
         console.log('📍 Konum seçilmemiş');
         showLocationModal();
         speakToUser("Lütfen önce bir konum seçiniz.");
-        return;
+        return; // Bu return artık fonksiyon içinde, legal
     }
     
+    // Mikrofon durumuna göre işlem
     if (isListening) {
         disableMicrophone();
     } else {
         enableMicrophone();
     }
 }
-
+// Bu fonksiyonları kodunuza ekleyin
 function enableMicrophone() {
-            // Ses tanıma API'sini başlat
-            appState.isMicrophoneEnabled = true;
-            document.getElementById('microphoneToggle').innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (Açık)</span>';
-            document.getElementById('microphoneToggle').classList.add('listening');
-            
-            // Ses tanımayı başlat
-            initializeSpeechRecognition();
-            
-            speakToUser("Mikrofon açıldı. Konuşmaya başlayabilirsiniz.");
-        }
-
+    console.log('🎤 Mikrofon açılıyor...');
+    isListening = true;
+    // Mikrofon UI'ını güncelle
+    const microphoneToggle = document.getElementById('microphoneToggle');
+    if (microphoneToggle) {
+        microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (Açık)</span>';
+        microphoneToggle.classList.add('listening');
+    }
+    alert('🎤 Mikrofon açıldı! Konuşmaya başlayabilirsiniz.');
+}
+	
 function disableMicrophone() {
-            appState.isMicrophoneEnabled = false;
-            document.getElementById('microphoneToggle').innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon (Kapalı)</span>';
-            document.getElementById('microphoneToggle').classList.remove('listening');
-            
-            if (appState.recognition) {
-                appState.recognition.stop();
-            }
-            
-            speakToUser("Mikrofon kapatıldı.");
-        }
+    console.log('🔇 Mikrofon kapatılıyor...');
+    isListening = false;
+    // Mikrofon UI'ını güncelle
+    const microphoneToggle = document.getElementById('microphoneToggle');
+    if (microphoneToggle) {
+        microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon (Kapalı)</span>';
+        microphoneToggle.classList.remove('listening');
+    }
+    alert('🔇 Mikrofon kapatıldı.');
+}
 	
 // SES TANIMA FONKSİYONU - HATALI KISIM DÜZELTİLDİ
 function initializeSpeechRecognition() {
@@ -1977,6 +1988,14 @@ function initializeVoiceAssistant() {
 }
 
 function speakToUser(message) {
+    console.log('🗣️ Asistan:', message);
+    // Sesli asistan mesajını göster
+    const assistantMessage = document.getElementById('assistantMessage');
+    if (assistantMessage) {
+        assistantMessage.textContent = message;
+    }
+}
+
             // Basit bir ses sentezi (tarayıcı desteği varsa)
             if ('speechSynthesis' in window) {
                 const speech = new SpeechSynthesisUtterance(message);
