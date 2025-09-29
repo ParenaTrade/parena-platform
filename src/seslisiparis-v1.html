@@ -1134,6 +1134,21 @@ body.modal-open {
                 </button>
             </div>
         </section>
+	 <!-- Sellers Grid -->
+        <section id="sellersSection" style="display: none;">
+            <h2 class="section-title">Size En Yakın Yerler</h2>
+            <div class="sellers-container">
+                <button class="scroll-btn left" id="scrollSellersLeft">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="seller-grid" id="sellerGrid">
+                    <!-- Satıcılar buraya yüklenecek -->
+                </div>
+                <button class="scroll-btn right" id="scrollSellersRight">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </section>
 
         <!-- Categories/Reyons Grid -->
         <section id="categoriesSection" style="display: none;">
@@ -1146,22 +1161,6 @@ body.modal-open {
                     <!-- Kategoriler/Reyonlar buraya yüklenecek -->
                 </div>
                 <button class="scroll-btn right" id="scrollCategoriesRight">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        </section>
-
-        <!-- Sellers Grid -->
-        <section id="sellersSection" style="display: none;">
-            <h2 class="section-title">Size En Yakın Yerler</h2>
-            <div class="sellers-container">
-                <button class="scroll-btn left" id="scrollSellersLeft">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <div class="seller-grid" id="sellerGrid">
-                    <!-- Satıcılar buraya yüklenecek -->
-                </div>
-                <button class="scroll-btn right" id="scrollSellersRight">
                     <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
@@ -1909,6 +1908,110 @@ body.modal-open {
             }
         }
 
+
+ 	// Referans linki oluştur
+        async function generateReferralLink() {
+            if (!currentCustomer) {
+                alert('Önce giriş yapmalısınız');
+                return;
+            }
+            
+            try {
+                // Önce mevcut bir referans linki var mı kontrol et
+                const { data: existingLink, error: checkError } = await supabase
+                    .from('referral_links')
+                    .select('referral_code, group_code')
+                    .eq('owner_user_id', currentCustomer.id)
+                    .maybeSingle();
+                
+                let referralCode, groupCode;
+                
+                if (existingLink) {
+                    referralCode = existingLink.referral_code;
+                    groupCode = existingLink.group_code;
+                } else {
+                    // Yeni referans kodu oluştur
+                    referralCode = generateReferralCode();
+                    
+                    // Grup kodu oluştur veya mevcut kodu al
+                    const { data: groupData, error: groupError } = await supabase
+                        .from('referral_groups')
+                        .select('group_code')
+                        .eq('leader_user_id', currentCustomer.id)
+                        .maybeSingle();
+                    
+                    if (groupData) {
+                        groupCode = groupData.group_code;
+                    } else {
+                        groupCode = generateGroupCode();
+                        
+                        // Yeni grup oluştur
+                        const { error: groupCreateError } = await supabase
+                            .from('referral_groups')
+                            .insert([
+                                {
+                                    name: `${currentCustomer.name} Grubu`,
+                                    leader_user_id: currentCustomer.id,
+                                    group_code: groupCode,
+                                    created_at: new Date().toISOString()
+                                }
+                            ]);
+                        
+                        if (groupCreateError) throw groupCreateError;
+                    }
+                    
+                    // Yeni referans linki oluştur
+                    const { error: linkError } = await supabase
+                        .from('referral_links')
+                        .insert([
+                            {
+                                owner_user_id: currentCustomer.id,
+                                owner_phone: currentCustomer.phone,
+                                referral_code: referralCode,
+                                group_code: groupCode,
+                                created_at: new Date().toISOString()
+                            }
+                        ]);
+                    
+                    if (linkError) throw linkError;
+                }
+                
+                // Referans linkini paylaş
+                const referralLink = `${window.location.origin}${window.location.pathname}?referral_groups=${groupCode}&referral_code=${referralCode}`;
+                
+                if (navigator.share) {
+                    // Web Share API desteği varsa
+                    navigator.share({
+                        title: 'Onur Market Referans Linkim',
+                        text: 'Onur Market\'ten alışveriş yapmak için linkimi kullanabilirsiniz.',
+                        url: referralLink
+                    });
+                } else {
+                    // Web Share API desteklemiyorsa
+                    navigator.clipboard.writeText(referralLink).then(() => {
+                        alert('Referans linki panoya kopyalandı: ' + referralLink);
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Referans linki oluşturma hatası:', error);
+                alert('Referans linki oluşturulurken bir hata oluştu.');
+            }
+        }
+
+        // Benzersiz referans kodu oluştur
+        function generateReferralCode() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        // Benzersiz grup kodu oluştur
+        function generateGroupCode() {
+            return Math.random().toString(36).substring(2, 6).toUpperCase() + 
+                   Math.random().toString(36).substring(2, 6).toUpperCase();
+        }
+
+
+ 	
         function emergencyFallback() {
             debugLog('🆘 Acil durum modu aktif');
             setupLocationEvents();
@@ -1919,6 +2022,8 @@ body.modal-open {
                 }, 2000);
             }
         }
+
+
 
         // =============================================
         // ANA UYGULAMA BAŞLATMA
@@ -2101,6 +2206,44 @@ function saveSession() {
     }
 }
 
+
+// Referans kodu işleme
+        async function processReferralCode(code, groupCode) {
+            try {
+                const { data, error } = await supabase
+                    .from('referral_links')
+                    .select('owner_user_id, referral_code, group_code, is_used')
+                    .eq('referral_code', code)
+                    .eq('group_code', groupCode)
+                    .single();
+                
+                if (error) throw error;
+                
+                if (data) {
+                    if (data.is_used) {
+                        assistantMessage.textContent = "Bu referans linki daha önce kullanılmış.";
+                        return;
+                    }
+                    
+                    referralGroupCode = data.group_code;
+                    // Referans sahibinin bilgilerini al
+                    const { data: ownerData } = await supabase
+                        .from('profiles')
+                        .select('full_name')
+                        .eq('id', data.owner_user_id)
+                        .single();
+                    
+                    if (ownerData) {
+                        assistantMessage.textContent += ` Referans ile geldiniz: ${ownerData.full_name}`;
+                    }
+                }
+            } catch (error) {
+                console.error('Referans kodu işleme hatası:', error);
+            }
+        }
+
+
+
 // =============================================
 // 1. BÖLÜM EKSİKLERİNİ TAMAMLAMA - VERİTABANI BAĞLANTILARI
 // =============================================
@@ -2154,7 +2297,8 @@ async function checkCustomerByPhone(phone) {
         speakToUser("Sistemde geçici bir sorun oluştu. Lütfen daha sonra tekrar deneyiniz.");
     }
 }
-// Yeni müşteri kaydı - TAM GERÇEK SORGULAR
+
+    // Yeni müşteri kaydı - TAM GERÇEK SORGULAR
 async function createCustomerProfile(customerData) {
     try {
         const { data, error } = await supabase
@@ -2175,6 +2319,15 @@ async function createCustomerProfile(customerData) {
         
         currentCustomer = data;
         updateCustomerUI();
+	
+	// Referans bilgilerini ekle
+        if (referralGroupCode) {
+        customerData.group_code = referralGroupCode;
+        }
+        if (referralCode) {
+        customerData.referrer_id = await getReferrerId(referralCode);
+        }
+
         hideHowItWorksBanner();
         orderSummary.style.display = 'flex';
         
@@ -2182,7 +2335,12 @@ async function createCustomerProfile(customerData) {
         conversationStep = 10;
         
         saveSession();
-        
+       
+	// Referans kodu varsa işle
+        if (referralCode) {
+        await processReferralAfterSignup();
+        }
+ 
         if (!selectedLocation) {
             showLocationModal();
         }
@@ -2192,6 +2350,59 @@ async function createCustomerProfile(customerData) {
         speakToUser("Profil oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
     }
 }
+
+ // Referans kodundan referrer_id'yi al
+        async function getReferrerId(referralCode) {
+            try {
+                const { data, error } = await supabase
+                    .from('referral_links')
+                    .select('owner_user_id')
+                    .eq('referral_code', referralCode)
+                    .single();
+                
+                if (error) throw error;
+                
+                return data.owner_user_id;
+            } catch (error) {
+                console.error('Referrer ID alma hatası:', error);
+                return null;
+            }
+        }
+
+        // Üyelik sonrası referans işleme
+        async function processReferralAfterSignup() {
+            try {
+                // Referans linkini kullanılmış olarak işaretle
+                const { error: updateError } = await supabase
+                    .from('referral_links')
+                    .update({ is_used: true })
+                    .eq('referral_code', referralCode);
+                
+                if (updateError) throw updateError;
+                
+                // Referans takip kaydı oluştur
+                const { error: trackingError } = await supabase
+                    .from('referral_tracking')
+                    .insert([
+                        {
+                            referral_code: referralCode,
+                            group_code: referralGroupCode,
+                            referrer_user_id: await getReferrerId(referralCode),
+                            new_user_id: currentCustomer.id,
+                            created_at: new Date().toISOString()
+                        }
+                    ]);
+                
+                if (trackingError) throw trackingError;
+                
+                console.log('Referans kaydı başarılı');
+                
+            } catch (error) {
+                console.error('Referans işleme hatası:', error);
+            }
+        }
+
+ 
 // Kullanıcı arayüzünü güncelle
 function updateCustomerUI() {
     if (currentCustomer) {
@@ -3739,73 +3950,6 @@ function getDemoProducts() {
     ];
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</script>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	
+</script>	
 </body>
 </html>
-
