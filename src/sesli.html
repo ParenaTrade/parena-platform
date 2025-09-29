@@ -1819,8 +1819,49 @@ window.addEventListener('load', function() {
     debugLog('✅ Sayfa tamamen yüklendi (window.load)');
 });
 
+
 // =============================================
-// HATA YAKALAMA
+// BASİT VE TEMİZ SAYFA YÜKLEME SİSTEMİ
+// =============================================
+
+let domLoaded = false;
+let pageLoaded = false;
+
+// DOM yüklendiğinde - TEK SEFERLİK
+function handleDOMContentLoaded() {
+    if (domLoaded) return;
+    domLoaded = true;
+    
+    debugLog('📄 DOM yüklendi, sistem başlatılıyor...');
+    setTimeout(simpleInit, 500);
+}
+
+// Sayfa tamamen yüklendiğinde - TEK SEFERLİK  
+function handleWindowLoad() {
+    if (pageLoaded) return;
+    pageLoaded = true;
+    
+    debugLog('✅ Sayfa tamamen yüklendi');
+}
+
+// =============================================
+// EVENT LISTENER'LARI AYARLA - BASİT
+// =============================================
+
+// DOM durumunu kontrol et
+if (document.readyState === 'loading') {
+    // DOM henüz yüklenmedi, event listener ekle
+    document.addEventListener('DOMContentLoaded', handleDOMContentLoaded);
+} else {
+    // DOM zaten yüklendi, direkt çalıştır
+    handleDOMContentLoaded();
+}
+
+// Sayfa yükleme event'i
+window.addEventListener('load', handleWindowLoad);
+
+// =============================================
+// HATA YAKALAMA - AYNI KALABİLİR
 // =============================================
 
 window.addEventListener('error', function(e) {
@@ -1832,38 +1873,7 @@ window.addEventListener('unhandledrejection', function(e) {
     console.error('❌ Promise hatası:', e.reason);
     debugLog('❌ Promise hatası: ' + (e.reason?.message || 'Bilinmeyen promise hatası'));
 });
-
-
 	
-// ESKİ TÜM EVENT LISTENER'LARI TEMİZLE
-document.removeEventListener('DOMContentLoaded', arguments.callee);
-window.removeEventListener('load', arguments.callee);
-
-// YENİ TEK SEFERLİK EVENT LISTENER
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function onDOMLoaded() {
-        document.removeEventListener('DOMContentLoaded', onDOMLoaded);
-        
-        if (domLoaded) return;
-        domLoaded = true;
-        
-        debugLog('📄 DOM yüklendi, sistem başlatılıyor...');
-        setTimeout(simpleInit, 500);
-    });
-} else {
-    // DOM zaten yüklenmiş
-    if (!domLoaded) {
-        domLoaded = true;
-        debugLog('📄 DOM zaten yüklü, sistem başlatılıyor...');
-        setTimeout(simpleInit, 500);
-    }
-}
-
-window.addEventListener('load', function onWindowLoad() {
-    window.removeEventListener('load', onWindowLoad);
-    debugLog('✅ Sayfa tamamen yüklendi');
-});
-
 // =============================================
 // GLOBAL HATA YAKALAMA
 // =============================================
