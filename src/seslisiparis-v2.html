@@ -3150,7 +3150,7 @@ function displayStoreTypes(types) {
     debugLog("✅ Store type'lar başarıyla yüklendi");
 }
 
-// Store type seçildiğinde - SATICILARI FİLTRELE
+// Store type seçildiğinde - KATEGORİ ve ÜRÜNLERİ SIFIRLA
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
     
@@ -3160,6 +3160,23 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     
     // Satıcıları store type'a göre filtrele
     filterSellersByStoreType(storeTypeId);
+    
+    // Kategorileri ve ürünleri sıfırla
+    selectedCategoryId = null;
+    products = [];
+    
+    // Kategori grid'ini temizle
+    if (categoriesGrid) {
+        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
+    }
+    
+    // Ürünler grid'ini temizle
+    if (productsGrid) {
+        productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
+    }
+    
+    // Ürünler bölümünü gizle
+    if (productsSection) productsSection.style.display = 'none';
     
     debugLog(`✅ Satıcılar filtrelendi: ${storeTypeName}`);
     speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu.`);
@@ -3298,7 +3315,7 @@ async function loadReyonsByStoreType(storeTypeId) {
     }
 }
 
-// Kategorileri göster - AKIŞ DÜZELTMESİ
+// Kategorileri göster - ÜRÜN YÜKLEME DÜZELTMESİ
 function displayCategories(categoriesToShow, type) {
     const categoriesGrid = document.getElementById('categoriesGrid');
     if (!categoriesGrid) return;
@@ -3371,7 +3388,7 @@ function displayCategories(categoriesToShow, type) {
     });
 }
 
-// Reyona göre ürünleri yükle - YENİ FONKSİYON
+// Reyona göre ürünleri yükle - DEBUG EKLİ
 async function loadProductsByReyon(reyonId) {
     try {
         debugLog(`📦 Reyona göre ürünler yükleniyor: ${reyonId}, Satıcı: ${selectedSellerId}`);
@@ -3380,6 +3397,8 @@ async function loadProductsByReyon(reyonId) {
             speakToUser("Önce bir satıcı seçmelisiniz.");
             return;
         }
+        
+        debugLog(`🔍 SQL SORGUSU: product_prices WHERE sube_id='${selectedSellerId}' AND products.reyon_id='${reyonId}'`);
         
         const { data, error } = await supabase
             .from('product_prices')
@@ -3395,12 +3414,16 @@ async function loadProductsByReyon(reyonId) {
 
         if (error) {
             console.error('❌ Ürün yükleme hatası:', error);
+            debugLog(`❌ SQL HATASI: ${error.message}`);
             throw error;
         }
 
+        debugLog(`📊 SQL SONUCU: ${data?.length || 0} ürün bulundu`);
+        debugLog(`📦 VERİ:`, data);
+
         // Veriyi işle
         products = data
-            .filter(item => item.products)
+            .filter(item => item.products) // products null olmayanları filtrele
             .map(item => ({
                 id: item.products.id,
                 product_price_id: item.id,
@@ -3430,12 +3453,13 @@ async function loadProductsByReyon(reyonId) {
 
     } catch (error) {
         console.error('❌ Ürün yükleme hatası:', error);
+        debugLog('🔄 Hata oluştu, demo ürünler kullanılıyor');
         products = getDemoProducts();
         displayProducts(products);
         speakToUser("Ürünler yüklenirken hata oluştu. Demo ürünler gösteriliyor.");
-        debugLog('🔄 Demo ürünler kullanılıyor');
     }
 }
+
 // Satıcı yükleme fonksiyonunu güncelle - ILIKE SORGUSU
 async function loadSellersByStoreType(storeTypeId) {
     try {
@@ -3986,9 +4010,17 @@ function getDefaultSellerImage(seller) {
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGVlMmYzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY3Njc2NyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlNhdMSxY8SxPC90ZXh0Pjwvc3ZnPg==';
 }
 
-// Satıcı seç - AKIŞ DÜZELTMESİ
+// Satıcı seç - KATEGORİ ve ÜRÜNLERİ SIFIRLA
 async function selectSeller(seller) {
     debugLog(`🎯 Satıcı seçiliyor: ${seller.business_name || seller.full_name}`);
+    
+    // Teslimat kontrolü
+    if (selectedLocation === 'delivery' && seller.delivery_available === false) {
+        const confirmSelection = confirm("Bu satıcı konumunuza teslimat yapmıyor. Yine de seçmek istiyor musunuz?");
+        if (!confirmSelection) {
+            return;
+        }
+    }
     
     // Önceki seçimleri temizle
     document.querySelectorAll('.seller-card, .category-card').forEach(card => {
@@ -4002,8 +4034,18 @@ async function selectSeller(seller) {
     }
     
     selectedSellerId = seller.id;
-    selectedCategoryId = null;
+    selectedCategoryId = null; // Kategori seçimini sıfırla
     products = []; // Ürünleri temizle
+    
+    // Kategori grid'ini temizle
+    if (categoriesGrid) {
+        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
+    }
+    
+    // Ürünler grid'ini temizle
+    if (productsGrid) {
+        productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
+    }
     
     // Satıcı bilgisini güncelle
     if (selectedSellerInfo) {
@@ -4020,11 +4062,17 @@ async function selectSeller(seller) {
     if (categoriesSection) categoriesSection.style.display = 'block'; // Reyonları göster
     if (productsSection) productsSection.style.display = 'none'; // Ürünleri gizle
     
-    // Ürünler grid'ini temizle
-    if (productsGrid) productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
-    
     debugLog(`✅ Satıcı seçildi: ${seller.business_name || seller.full_name}`);
-    speakToUser(`${seller.business_name || seller.full_name} seçildi. Şimdi bir reyon seçin.`);
+    
+    // Teslimat durumuna göre mesaj
+    if (selectedLocation === 'delivery' && seller.delivery_available !== false) {
+        const deliveryMsg = seller.delivery_fee > 0 ? 
+            `Teslimat ücreti: ${money(seller.delivery_fee)}` : 
+            "Ücretsiz teslimat";
+        speakToUser(`${seller.business_name || seller.full_name} seçildi. ${deliveryMsg}. Şimdi bir reyon seçin.`);
+    } else {
+        speakToUser(`${seller.business_name || seller.full_name} seçildi. Şimdi bir reyon seçin.`);
+    }
 }
 
 // Reyonaları güncelle - YENİ FONKSİYON
@@ -5211,12 +5259,39 @@ function filterProductsByCategory(categoryId) {
     displayProducts(filteredProducts.length > 0 ? filteredProducts : products);
 }
 
-// Demo ürünler
+// Demo ürünler - GERÇEKÇİ
 function getDemoProducts() {
     return [
-        { id: '1', name: "Süt 1L", price: 15.90, imgurl: "https://via.placeholder.com/150x100?text=Süt", discount_price: 12.90 },
-        { id: '2', name: "Ekmek", price: 5.50, imgurl: "https://via.placeholder.com/150x100?text=Ekmek" },
-        { id: '3', name: "Yumurta 10'lu", price: 32.00, imgurl: "https://via.placeholder.com/150x100?text=Yumurta" }
+        { 
+            id: 'demo-1', 
+            name: "Süt 1L", 
+            price: 15.90, 
+            discount_price: 12.90,
+            imgurl: "https://via.placeholder.com/150x100?text=Süt", 
+            description: "Tam yağlı süt",
+            seller_id: selectedSellerId || 'demo-seller',
+            product_price_id: 'demo-price-1'
+        },
+        { 
+            id: 'demo-2', 
+            name: "Ekmek", 
+            price: 5.50, 
+            discount_price: null,
+            imgurl: "https://via.placeholder.com/150x100?text=Ekmek", 
+            description: "Taze ekmek",
+            seller_id: selectedSellerId || 'demo-seller',
+            product_price_id: 'demo-price-2'
+        },
+        { 
+            id: 'demo-3', 
+            name: "Yumurta 10'lu", 
+            price: 32.00, 
+            discount_price: 28.00,
+            imgurl: "https://via.placeholder.com/150x100?text=Yumurta", 
+            description: "Organik yumurta",
+            seller_id: selectedSellerId || 'demo-seller',
+            product_price_id: 'demo-price-3'
+        }
     ];
 }
 
