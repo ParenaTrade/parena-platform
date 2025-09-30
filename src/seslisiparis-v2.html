@@ -1502,10 +1502,13 @@ function showLocationModal() {
     // Modal içeriğini güncelle
     updateLocationModal();
     
+    // Modal kapatma event'lerini ayarla
+    setupModalCloseEvents();
+    
     debugLog('📍 Konum modalı gösterildi (zorunlu)');
 }
 
-// Konum seçimini güncelle - İl/ilçe zorunluluğu (GÜNCELLENMİŞ)
+// Konum seçimini güncelle - BASİTLEŞTİRİLMİŞ
 function selectLocation(locationType) {
     console.log('📍 Seçilen konum:', locationType);
     
@@ -1515,19 +1518,21 @@ function selectLocation(locationType) {
     }
     
     // Adrese teslim seçildiyse konum bilgisi kontrolü
-    if (locationType === 'delivery') {
-        if (!isLocationDetected) {
-            speakToUser("Adrese teslim için lütfen konumunuzu belirleyin.");
-            return;
-        }
+    if (locationType === 'delivery' && !isLocationDetected) {
+        speakToUser("Adrese teslim için lütfen önce konumunuzu tespit edin.");
+        return;
     }
     
     selectedLocation = locationType;
     localStorage.setItem('selectedLocation', locationType);
-    localStorage.setItem('userLocation', JSON.stringify(userLocation));
+    
+    // Konum bilgisini de kaydet
+    if (userLocation) {
+        localStorage.setItem('userLocation', JSON.stringify(userLocation));
+    }
     
     updateLocationText();
-    hideLocationModal();
+    hideLocationModal(); // Bu fonksiyon artık tanımlı
     
     // Store type seçilmişse işleme devam et
     if (selectedStoreTypeId) {
@@ -1535,9 +1540,13 @@ function selectLocation(locationType) {
     }
     
     debugLog('📍 Konum seçildi:', locationType);
-    speakToUser(`Konumunuz kaydedildi. ${locationType === 'delivery' ? 'Adrese teslim seçeneği aktif.' : ''}`);
+    
+    if (locationType === 'delivery') {
+        speakToUser(`Konumunuz kaydedildi: ${userLocation.district}, ${userLocation.city}. Adrese teslim seçeneği aktif.`);
+    } else {
+        speakToUser(`Konumunuz kaydedildi: ${locationType === 'inside' ? 'Restoran içinde' : 'Paket servis'}.`);
+    }
 }
-
 
 // Konum alma fonksiyonu
 function getCurrentLocation() {
@@ -1624,6 +1633,10 @@ function updateLocationModal() {
     if (!locationModal) return;
     
     locationModal.querySelector('.modal-body').innerHTML = `
+        <div class="modal-header">
+            <h3>Konum Seçiniz</h3>
+            <span class="close-modal" id="closeLocationModal">&times;</span>
+        </div>
         <p><strong>Siparişiniz için lütfen konumunuzu belirleyin:</strong></p>
         
         <div class="location-options">
@@ -1700,7 +1713,13 @@ function updateLocationModal() {
                         // Konum tespit edildiğinde, adrese teslim seçeneğini otomatik seç
                         const deliveryOption = document.querySelector('.location-option[data-location="delivery"]');
                         if (deliveryOption) {
+                            // Önce diğer seçeneklerden seçimi kaldır
+                            document.querySelectorAll('.location-option').forEach(opt => {
+                                opt.classList.remove('selected');
+                            });
+                            // Adrese teslimi seçili yap
                             deliveryOption.classList.add('selected');
+                            // Lokasyonu seç
                             selectLocation('delivery');
                         }
                     }
@@ -1708,8 +1727,45 @@ function updateLocationModal() {
             });
         }
         
+        // Modal kapatma event'ini ayarla
+        setupModalCloseEvents();
+        
     }, 100);
 }
+
+// Modal gizleme fonksiyonları
+function hideLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+    debugLog('📍 Konum modalı gizlendi');
+}
+
+// Modal kapatma event'ini ayarla
+function setupModalCloseEvents() {
+    // Konum modal kapatma
+    const closeLocationModal = document.getElementById('closeLocationModal');
+    if (closeLocationModal) {
+        closeLocationModal.addEventListener('click', function(e) {
+            e.stopPropagation();
+            hideLocationModal();
+        });
+    }
+    
+    // Modal dışına tıklayınca kapanmasını engelle (konum zorunlu)
+    const locationModal = document.getElementById('locationModal');
+    if (locationModal) {
+        locationModal.addEventListener('click', function(e) {
+            if (e.target === locationModal) {
+                // Modal dışına tıklanırsa sadece uyarı ver, kapatma
+                speakToUser("Lütfen bir konum seçiniz. Konum seçmeden devam edemezsiniz.");
+            }
+        });
+    }
+}
+
 
 //=====================================
 // KONUM ALMA FONKSİYONU
@@ -2491,46 +2547,48 @@ function saveManualAddress() {
         // =============================================
 
         async function initApp() {
-            try {
-                debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
-		// 1. VERİTABANI ODAKLI ASİSTAN SİSTEMİ		
-		await loadCommandRules();
+    try {
+        debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
+        // 1. VERİTABANI ODAKLI ASİSTAN SİSTEMİ		
+        await loadCommandRules();
 
-                // 2. DOM hazır olana kadar bekle
-                await waitForDOMElements();
-                debugLog('✅ DOM hazır');
+        // 2. DOM hazır olana kadar bekle
+        await waitForDOMElements();
+        debugLog('✅ DOM hazır');
 
-                // 3. Konum event'lerini ayarla
-                setupLocationEvents();
-                
-                // 4. StoreTypes yükle
-                await loadStoreTypes();
-                debugLog('✅ StoreTypes yüklendi');
+        // 3. Konum event'lerini ayarla
+        setupLocationEvents();
+        
+        // 3.5 Modal kapatma event'lerini ayarla
+        setupModalCloseEvents();
+        
+        // 4. StoreTypes yükle
+        await loadStoreTypes();
+        debugLog('✅ StoreTypes yüklendi');
 
-                // 5. Oturumu geri yükle
-                await restoreSession();
-                debugLog('✅ Oturum yüklendi');
+        // 5. Oturumu geri yükle
+        await restoreSession();
+        debugLog('✅ Oturum yüklendi');
 
-                // 6. Konum yönetimi
-                initializeLocation();
-                debugLog('✅ Konum yönetimi tamamlandı');
+        // 6. Konum yönetimi
+        initializeLocation();
+        debugLog('✅ Konum yönetimi tamamlandı');
 
-                // 7. UI elementlerini ayarla
-                updateUIAfterLogin();
-                debugLog('✅ UI güncellendi');
+        // 7. UI elementlerini ayarla
+        updateUIAfterLogin();
+        debugLog('✅ UI güncellendi');
 
-                // 8. Event handler'ları ayarla
-                setupEventHandlers();
-                debugLog('✅ Event handlerlar ayarlandı');
+        // 8. Event handler'ları ayarla
+        setupEventHandlers();
+        debugLog('✅ Event handlerlar ayarlandı');
 
-                debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
+        debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
 
-            } catch (error) {
-                console.error('💥 Uygulama başlatma hatası:', error);
-                emergencyFallback();
-            }
-        }
-
+    } catch (error) {
+        console.error('💥 Uygulama başlatma hatası:', error);
+        emergencyFallback();
+    }
+}
         // Yardımcı fonksiyonlar
         function scrollElement(element, amount) {
             if (element) {
