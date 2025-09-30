@@ -1618,13 +1618,13 @@ function initializeLocation() {
     updateLocationModal();
 }
 
-// Konum modalını güncelle - İl ve İlçe seçimi ekle (GÜNCELLENMİŞ)
+// Konum modalını güncelle - SADECE KONUM TESPİTİ
 function updateLocationModal() {
     const locationModal = document.getElementById('locationModal');
     if (!locationModal) return;
     
     locationModal.querySelector('.modal-body').innerHTML = `
-        <p><strong>Siparişiniz için lütfen konumunuzu seçin:</strong></p>
+        <p><strong>Siparişiniz için lütfen konumunuzu belirleyin:</strong></p>
         
         <div class="location-options">
             <div class="location-option" data-location="inside">
@@ -1652,55 +1652,17 @@ function updateLocationModal() {
             </div>
         </div>
 
-        <!-- Adrese teslim için il/ilçe seçimi -->
-        <div id="deliveryLocationForm" style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-            <h4 style="margin-bottom: 15px;">Teslimat Adresiniz</h4>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-		<div style="display: flex; gap: 10px; margin-top: 15px;">
-  		  <button id="detectLocationBtn" style="padding: 12px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; flex: 1;">
-       		 <i class="fas fa-location-arrow"></i> Konumumu Otomatik Tespit Et
-  		  </button>
-		</div>
-
-                <div>
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">İl *</label>
-                    <select id="citySelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-                        <option value="">İl seçin</option>
-                        <option value="istanbul">İstanbul</option>
-                        <option value="ankara">Ankara</option>
-                        <option value="izmir">İzmir</option>
-                        <option value="bursa">Bursa</option>
-                        <option value="balikesir">Balıkesir</option>
-                        <option value="bandirma">Bandırma</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">İlçe *</label>
-                    <select id="districtSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;" disabled>
-                        <option value="">Önce il seçin</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div style="grid-column: 1 / -1;">
-                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Detaylı Adres *</label>
-                <textarea id="detailedAddress" placeholder="Cadde, sokak, apartman, daire no vb." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; height: 80px; resize: vertical;"></textarea>
-            </div>
-            
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button id="saveDeliveryAddress" style="flex: 1; padding: 12px; background: var(--success); color: white; border: none; border-radius: 5px; cursor: pointer;">
-                    <i class="fas fa-check"></i> Adresi Kaydet ve Devam Et
-                </button>
-            </div>
-            
+        <!-- Konum tespit butonu -->
+        <div style="margin-top: 20px; text-align: center;">
+            <button id="detectLocationBtn" style="width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px;">
+                <i class="fas fa-location-arrow"></i> Konumumu Otomatik Belirle
+            </button>
             <div id="locationResult" class="location-result" style="display: none; margin-top: 15px;"></div>
         </div>
 
-        <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px; border: 1px solid #ffeaa7;">
+        <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 5px; border: 1px solid #ffeaa7; font-size: 14px;">
             <i class="fas fa-info-circle"></i>
-            <strong>Not:</strong> Konum bilgisi, size en yakın satıcıları göstermek ve teslimat için kullanılacaktır.
+            <strong>Not:</strong> Konumunuz sadece size en yakın satıcıları göstermek için kullanılacaktır.
         </div>
     `;
     
@@ -1719,126 +1681,59 @@ function updateLocationModal() {
                 // Bu seçeneği seçili yap
                 this.classList.add('selected');
                 
-                // Adrese teslim seçildiyse formu göster
-                const deliveryForm = document.getElementById('deliveryLocationForm');
-                if (locationType === 'delivery') {
-                    deliveryForm.style.display = 'block';
-                } else {
-                    deliveryForm.style.display = 'none';
-                    // Diğer seçeneklerde direkt olarak seçimi yap
+                // Restoran içi veya paket servis için direkt seç
+                if (locationType === 'inside' || locationType === 'takeaway') {
                     selectLocation(locationType);
+                } else {
+                    // Adrese teslim için konum tespiti gerekli
+                    speakToUser("Adrese teslim için lütfen konumunuzu belirleyin.");
                 }
             });
         });
         
-        // İl seçiminde ilçe listesini güncelle
-        const citySelect = document.getElementById('citySelect');
-        const districtSelect = document.getElementById('districtSelect');
-        
-        if (citySelect && districtSelect) {
-            citySelect.addEventListener('change', function() {
-                updateDistricts(this.value);
-            });
-        }
-        
-        // Adres kaydet butonu
-        const saveBtn = document.getElementById('saveDeliveryAddress');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', function() {
-                const city = document.getElementById('citySelect').value;
-                const district = document.getElementById('districtSelect').value;
-                const detailedAddress = document.getElementById('detailedAddress').value;
-                
-                if (!city || !district) {
-                    alert('Lütfen il ve ilçe bilgilerinizi seçin.');
-                    return;
-                }
-                
-                if (!detailedAddress || detailedAddress.trim().length < 10) {
-                    alert('Lütfen detaylı adresinizi girin (en az 10 karakter).');
-                    return;
-                }
-                
-                // Konum bilgisini kaydet
-                userLocation = {
-                    city: city,
-                    district: district,
-                    address: detailedAddress.trim(),
-                    fullAddress: `${detailedAddress.trim()}, ${district}, ${city}`
-                };
-                
-                isLocationDetected = true;
-                selectLocation('delivery');
-            });
-        }
-        
         // Konum tespit butonu
         const detectBtn = document.getElementById('detectLocationBtn');
         if (detectBtn) {
-            detectBtn.addEventListener('click', detectUserLocation);
+            detectBtn.addEventListener('click', function() {
+                detectUserLocation().then(success => {
+                    if (success) {
+                        // Konum tespit edildiğinde, adrese teslim seçeneğini otomatik seç
+                        const deliveryOption = document.querySelector('.location-option[data-location="delivery"]');
+                        if (deliveryOption) {
+                            deliveryOption.classList.add('selected');
+                            selectLocation('delivery');
+                        }
+                    }
+                });
+            });
         }
         
     }, 100);
 }
 
-// İlçe listesini güncelle
-function updateDistricts(city) {
-    const districtSelect = document.getElementById('districtSelect');
-    if (!districtSelect) return;
-    
-    districtSelect.innerHTML = '<option value="">İlçe seçin</option>';
-    districtSelect.disabled = true;
-    
-    const districts = getDistrictsByCity(city);
-    
-    districts.forEach(district => {
-        const option = document.createElement('option');
-        option.value = district;
-        option.textContent = district;
-        districtSelect.appendChild(option);
-    });
-    
-    districtSelect.disabled = false;
-}
-
-// İl-İlçe eşleştirmesi
-function getDistrictsByCity(city) {
-    const districtMap = {
-        'istanbul': ['Kadıköy', 'Beşiktaş', 'Şişli', 'Beyoğlu', 'Üsküdar', 'Fatih', 'Bakırköy', 'Avcılar', 'Küçükçekmece', 'Büyükçekmece'],
-        'ankara': ['Çankaya', 'Keçiören', 'Yenimahalle', 'Altındağ', 'Mamak', 'Sincan', 'Etimesgut'],
-        'izmir': ['Konak', 'Karşıyaka', 'Bornova', 'Buca', 'Bayraklı', 'Çiğli', 'Gaziemir'],
-        'bursa': ['Osmangazi', 'Yıldırım', 'Nilüfer', 'Gemlik', 'İnegöl', 'Mudanya'],
-        'balikesir': ['Altıeylül', 'Karesi', 'Edremit', 'Bandırma', 'Gönen', 'Burhaniye'],
-        'bandirma': ['Merkez', 'Şirinevler', 'Yenişehir', 'Paşakent', '100. Yıl']
-    };
-    
-    return districtMap[city] || [];
-}
-
-
 //=====================================
 // KONUM ALMA FONKSİYONU
 //=====================================
 
-// Konum tespit et - HTML5 Geolocation API
+// Konum tespit et - HTML5 Geolocation API (GÜNCELLENMİŞ)
 async function detectUserLocation() {
     const resultDiv = document.getElementById('locationResult');
     const detectBtn = document.getElementById('detectLocationBtn');
     
     if (!navigator.geolocation) {
         showLocationError("Tarayıcınız konum servisini desteklemiyor.");
-        return;
+        return false;
     }
     
     // Butonu loading durumuna getir
     if (detectBtn) {
-        detectBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Konum Tespit Ediliyor...';
+        detectBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Konumunuz Belirleniyor...';
         detectBtn.disabled = true;
     }
     
     if (resultDiv) {
         resultDiv.style.display = 'block';
-        resultDiv.innerHTML = '<div style="color: #007bff;"><i class="fas fa-spinner fa-spin"></i> Konumunuz tespit ediliyor...</div>';
+        resultDiv.innerHTML = '<div style="color: #007bff;"><i class="fas fa-spinner fa-spin"></i> Konumunuz belirleniyor...</div>';
     }
     
     try {
@@ -1848,13 +1743,14 @@ async function detectUserLocation() {
         // Konumu adrese çevir
         const address = await reverseGeocode(latitude, longitude);
         
-        // Konum bilgisini kaydet
+        // Konum bilgisini kaydet - şehir ve ilçe bilgisi
         userLocation = {
             latitude,
             longitude,
             address: address.display_name,
             city: address.address?.city || address.address?.town || address.address?.village || 'Bilinmeyen',
-            district: address.address?.suburb || address.address?.county || 'Bilinmeyen'
+            district: address.address?.suburb || address.address?.county || address.address?.state_district || 'Bilinmeyen',
+            fullAddress: address.display_name
         };
         
         isLocationDetected = true;
@@ -1864,32 +1760,77 @@ async function detectUserLocation() {
             resultDiv.innerHTML = `
                 <div style="color: var(--success);">
                     <i class="fas fa-check-circle"></i> 
-                    <strong>Konumunuz Tespit Edildi</strong>
+                    <strong>Konumunuz Belirlendi!</strong>
                     <div style="font-size: 12px; margin-top: 5px;">
                         ${userLocation.district}, ${userLocation.city}
-                    </div>
-                    <div style="font-size: 11px; color: #666; margin-top: 3px;">
-                        ${userLocation.address.substring(0, 100)}...
                     </div>
                 </div>
             `;
         }
         
-        // Konum bilgisini sesle duyur
-        speakToUser(`Konumunuz tespit edildi: ${userLocation.district}, ${userLocation.city}. Adrese teslim seçeneği aktif.`);
+        debugLog('📍 Konum tespit edildi:', userLocation);
+        return true;
         
     } catch (error) {
         console.error('Konum tespit hatası:', error);
-        showLocationError("Konumunuz tespit edilemedi. Lütfen manuel olarak adres giriniz.");
+        showLocationError("Konumunuz belirlenemedi. Lütfen tarayıcı ayarlarınızdan konum erişimine izin verin.");
+        return false;
     } finally {
         // Butonu eski haline getir
         if (detectBtn) {
-            detectBtn.innerHTML = '<i class="fas fa-location-arrow"></i> Konumumu Tespit Et';
+            detectBtn.innerHTML = '<i class="fas fa-location-arrow"></i> Konumumu Otomatik Belirle';
             detectBtn.disabled = false;
         }
     }
 }
 
+// Yeni üyelik sırasında adres teyidi
+async function confirmAddressWithAssistant() {
+    return new Promise((resolve) => {
+        if (!userLocation || !userLocation.fullAddress) {
+            resolve(false);
+            return;
+        }
+        
+        const detectedAddress = userLocation.fullAddress;
+        
+        speakToUser(`Konumunuz şu şekilde belirlendi: ${detectedAddress}. Bu adresiniz doğru mu? Lütfen 'Evet' veya 'Hayır' diyerek teyit edin.`);
+        
+        // Sesli cevap bekliyoruz
+        const originalProcessCommand = window.processVoiceCommand;
+        let responseReceived = false;
+        
+        window.processVoiceCommand = function(transcript) {
+            const message = transcript.toLowerCase().trim();
+            
+            if (message.includes('evet') || message.includes('doğru') || message.includes('onay')) {
+                responseReceived = true;
+                window.processVoiceCommand = originalProcessCommand;
+                speakToUser("Teşekkür ederim! Adresiniz kaydedildi.");
+                resolve(true);
+            } 
+            else if (message.includes('hayır') || message.includes('yanlış') || message.includes('değil')) {
+                responseReceived = true;
+                window.processVoiceCommand = originalProcessCommand;
+                speakToUser("Özür dilerim. Lütfen doğru adresinizi söyleyin.");
+                resolve(false);
+            }
+            else {
+                // Anlaşılamadı, tekrar sor
+                speakToUser(`Adresiniz: ${detectedAddress}. Doğru mu? Lütfen 'Evet' veya 'Hayır' diyerek teyit edin.`);
+            }
+        };
+        
+        // 30 saniye timeout
+        setTimeout(() => {
+            if (!responseReceived) {
+                window.processVoiceCommand = originalProcessCommand;
+                speakToUser("Adres teyidi zaman aşımına uğradı. Varsayılan adres kullanılacak.");
+                resolve(true); // Zaman aşımında varsayılan olarak kabul et
+            }
+        }, 30000);
+    });
+}
 // HTML5 Geolocation Promise wrapper
 function getCurrentPosition() {
     return new Promise((resolve, reject) => {
@@ -2726,8 +2667,7 @@ function saveSession() {
 // 1. BÖLÜM EKSİKLERİNİ TAMAMLAMA - VERİTABANI BAĞLANTILARI
 // =============================================
 
-// 1.1. Telefon ile müşteri kontrolü - TAMAMLANMIŞ HALİ
-// Müşteri kontrolü - TAM GERÇEK SORGULAR
+// Müşteri kontrolü - ADRES TEYİDİ EKLENDİ
 async function checkCustomerByPhone(phone) {
     try {
         const cleanPhone = phone.replace(/\D/g, '');
@@ -2744,8 +2684,20 @@ async function checkCustomerByPhone(phone) {
         }
         
         if (data) {
-            // Mevcut kullanıcı bulundu
+            // MEVCUT KULLANICI - Konum karşılaştırması yap
             currentCustomer = data;
+            
+            // Konum tespit edilmişse ve mevcut adresten farklıysa not düş
+            if (isLocationDetected && currentCustomer.address) {
+                const currentAddress = `${userLocation.district}, ${userLocation.city}`;
+                const savedAddress = currentCustomer.address;
+                
+                if (currentAddress !== savedAddress) {
+                    debugLog('📍 Konum farkı tespit edildi:', { current: currentAddress, saved: savedAddress });
+                    // Bu bilgiyi sipariş notlarına ekleyeceğiz
+                }
+            }
+            
             updateCustomerUI();
             hideHowItWorksBanner();
             orderSummary.style.display = 'flex';
@@ -2759,7 +2711,7 @@ async function checkCustomerByPhone(phone) {
                 showLocationModal();
             }
         } else {
-            // Yeni kullanıcı
+            // YENİ KULLANICI - Adres teyidi yap
             speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
             conversationStep = 2;
             
@@ -2768,6 +2720,22 @@ async function checkCustomerByPhone(phone) {
                 role: 'customer',
                 bonus_amount: 0 
             };
+            
+            // Konum tespiti yapılmamışsa yap
+            if (!isLocationDetected) {
+                speakToUser("Konumunuz belirleniyor...");
+                const locationSuccess = await detectUserLocation();
+                if (locationSuccess) {
+                    // Adres teyidi iste
+                    const addressConfirmed = await confirmAddressWithAssistant();
+                    if (addressConfirmed) {
+                        // Teyit edilen adresi kaydet
+                        currentCustomer.address = userLocation.fullAddress;
+                        currentCustomer.city = userLocation.city;
+                        speakToUser("Harika! Şimdi adınızı ve soyadınızı söyleyin.");
+                    }
+                }
+            }
         }
         
     } catch (error) {
@@ -2776,16 +2744,20 @@ async function checkCustomerByPhone(phone) {
     }
 }
 
-    // Yeni müşteri kaydı - TAM GERÇEK SORGULAR
+    // Yeni müşteri kaydı - KONUM BİLGİSİNİ EKLE
 async function createCustomerProfile(customerData) {
     try {
+        // Konum bilgisini customerData'ya ekle (teyit edilmişse)
+        const address = userLocation ? userLocation.fullAddress : (customerData.address || 'Adres belirtilmemiş');
+        const city = userLocation ? userLocation.city : (customerData.city || 'Şehir belirtilmemiş');
+        
         const { data, error } = await supabase
             .from('customers')
             .insert([{
                 name: customerData.name,
                 phone: customerData.phone,
-                city: customerData.city,
-                address: customerData.address,
+                city: city,
+                address: address,
                 role: 'customer',
                 bonus_amount: 0,
                 created_at: new Date().toISOString()
@@ -2797,13 +2769,13 @@ async function createCustomerProfile(customerData) {
         
         currentCustomer = data;
         updateCustomerUI();
-	
-	// Referans bilgilerini ekle
+
+        // Referans bilgilerini ekle
         if (referralGroupCode) {
-        customerData.group_code = referralGroupCode;
+            customerData.group_code = referralGroupCode;
         }
         if (referralCode) {
-        customerData.referrer_id = await getReferrerId(referralCode);
+            customerData.referrer_id = await getReferrerId(referralCode);
         }
 
         hideHowItWorksBanner();
@@ -2814,9 +2786,9 @@ async function createCustomerProfile(customerData) {
         
         saveSession();
        
-	// Referans kodu varsa işle
+        // Referans kodu varsa işle
         if (referralCode) {
-        await processReferralAfterSignup();
+            await processReferralAfterSignup();
         }
  
         if (!selectedLocation) {
@@ -4576,6 +4548,7 @@ function updateCartItemQuantity(productId, change) {
 // 3. SİPARİŞ TAMAMLAMA SİSTEMİ
 // =============================================
 
+// Sipariş tamamlama - KONUM FARKI NOTU EKLE
 async function finalizeOrder(paymentMethod) {
     if (cart.length === 0) {
         speakToUser("Sepetiniz boş. Lütfen önce ürün ekleyin.");
@@ -4603,6 +4576,19 @@ async function finalizeOrder(paymentMethod) {
     const total = subtotal + vat;
     
     try {
+        // KONUM FARKI NOTU HAZIRLA
+        let orderNotes = "";
+        if (currentCustomer && currentCustomer.address && isLocationDetected) {
+            const currentAddress = `${userLocation.district}, ${userLocation.city}`;
+            const savedAddress = currentCustomer.address;
+            
+            // Adresler farklıysa not ekle
+            if (!savedAddress.includes(currentAddress)) {
+                orderNotes = `Kullanıcının kayıtlı adresi: ${savedAddress}. Mevcut konum: ${currentAddress}.`;
+                debugLog('📍 Konum farkı sipariş notuna eklendi:', orderNotes);
+            }
+        }
+        
         // 1. Siparişi kaydet
         const { data: order, error: orderError } = await supabase
             .from('orders')
@@ -4613,6 +4599,7 @@ async function finalizeOrder(paymentMethod) {
                 payment_method: paymentMethod,
                 status: 'pending',
                 location: selectedLocation,
+                order_notes: orderNotes, // Konum notunu ekle
                 order_date: new Date().toISOString()
             }])
             .select()
@@ -4663,7 +4650,6 @@ async function finalizeOrder(paymentMethod) {
         speakToUser("Siparişiniz alınırken bir hata oluştu. Lütfen tekrar deneyin.");
     }
 }
-
 // Adres onayı başlatma
 function startAddressConfirmation(total) {
     if (currentCustomer && currentCustomer.address) {
