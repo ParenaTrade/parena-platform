@@ -3154,6 +3154,9 @@ function displayStoreTypes(types) {
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
     
+    // Konum bilgilerini debug et
+    debugLocationInfo();
+    
     // Konum kontrolü - eğer konum seçilmemişse modal aç
     if (!selectedLocation) {
         debugLog('📍 Konum seçilmemiş, modal açılıyor');
@@ -3402,12 +3405,12 @@ async function loadProductsByReyon(reyonId) {
         debugLog('🔄 Demo ürünler kullanılıyor');
     }
 }
-// Satıcı yükleme fonksiyonunu güncelle - Mesafe kontrolü ekle
+// Satıcı yükleme fonksiyonunu güncelle - KONUM EŞLEŞTİRMESİ
 async function loadSellersByStoreType(storeTypeId) {
     try {
         debugLog(`🔍 Satıcılar yükleniyor: ${storeTypeId}`);
         
-        // Tüm aktif satıcıları getir
+        // ÖNCE: Tüm aktif satıcıları getir (konum filtresiz)
         const { data, error } = await supabase
             .from('seller_profiles')
             .select('*')
@@ -3420,17 +3423,33 @@ async function loadSellersByStoreType(storeTypeId) {
             throw error;
         }
 
+        debugLog(`📊 Tüm satıcılar: ${data?.length || 0} adet`);
+
         if (data && data.length > 0) {
-            // Mesafe kontrolü yap
-            const filteredSellers = await filterSellersByDistance(data);
-            sellers = filteredSellers;
+            // Konum bilgisi varsa filtrele, yoksa tüm satıcıları göster
+            if (userLocation.city && userLocation.district) {
+                const filteredSellers = await filterSellersByLocation(data);
+                sellers = filteredSellers;
+                
+                debugLog(`✅ Konuma göre filtrelenmiş satıcılar: ${filteredSellers.length} adet (${data.length - filteredSellers.length} satıcı konum dışında)`);
+                
+                if (filteredSellers.length === 0) {
+                    // Konuma uygun satıcı yoksa, tüm satıcıları göster
+                    sellers = data;
+                    debugLog('⚠️ Konuma uygun satıcı bulunamadı, tüm satıcılar gösteriliyor');
+                    speakToUser("Size yakın satıcı bulunamadı. Tüm satıcılar listeleniyor.");
+                } else {
+                    speakToUser(`Size en yakın ${filteredSellers.length} satıcı bulundu.`);
+                }
+            } else {
+                // Konum bilgisi yoksa tüm satıcıları göster
+                sellers = data;
+                debugLog('📍 Konum bilgisi yok, tüm satıcılar gösteriliyor');
+                speakToUser("Konumunuz belirlenmediği için tüm satıcılar listeleniyor.");
+            }
             
-            debugLog(`✅ Satıcılar yüklendi: ${filteredSellers.length} adet (${data.length - filteredSellers.length} satıcı mesafe dışında)`);
             updateSellersGrid();
             
-            if (filteredSellers.length === 0) {
-                speakToUser("Bu kategoride size yakın satıcı bulunamadı. Lütfen başka bir kategori seçin veya konumunuzu değiştirin.");
-            }
         } else {
             debugLog('⚠️ Bu kategoride satıcı bulunamadı');
             sellers = [];
@@ -3445,6 +3464,7 @@ async function loadSellersByStoreType(storeTypeId) {
         debugLog('🔄 Demo satıcılar kullanılıyor');
     }
 }
+
 
 // Satıcıları mesafeye göre filtrele
 async function filterSellersByDistance(allSellers) {
@@ -3508,7 +3528,7 @@ async function filterSellersByLocation(allSellers) {
     return filteredSellers;
 }
 
-// Satıcının teslimat bölgesini kontrol et
+// Satıcının teslimat bölgesini kontrol et - ESNEK EŞLEŞTİRME
 async function checkSellerDeliveryRange(seller) {
     try {
         // Satıcının teslimat bölgelerini getir
@@ -3526,11 +3546,27 @@ async function checkSellerDeliveryRange(seller) {
             return true;
         }
 
-        // Kullanıcının konumunu satıcının teslimat bölgeleriyle karşılaştır
-        const matchedArea = deliveryAreas.find(area => 
-            area.city.toLowerCase().includes(userLocation.city.toLowerCase()) &&
-            area.district.toLowerCase().includes(userLocation.district.toLowerCase())
-        );
+        // Kullanıcının konumunu satıcının teslimat bölgeleriyle karşılaştır - ESNEK
+        const matchedArea = deliveryAreas.find(area => {
+            const areaCity = (area.city || '').toLowerCase().trim();
+            const areaDistrict = (area.district || '').toLowerCase().trim();
+            const userCity = (userLocation.city || '').toLowerCase().trim();
+            const userDistrict = (userLocation.district || '').toLowerCase().trim();
+            
+            const cityMatch = areaCity && userCity && (
+                areaCity.includes(userCity) || 
+                userCity.includes(areaCity) ||
+                areaCity === userCity
+            );
+            
+            const districtMatch = areaDistrict && userDistrict && (
+                areaDistrict.includes(userDistrict) ||
+                userDistrict.includes(areaDistrict) ||
+                areaDistrict === userDistrict
+            );
+            
+            return cityMatch && districtMatch;
+        });
 
         if (matchedArea) {
             debugLog(`✅ ${seller.business_name} - Teslimat bölgesi uygun: ${userLocation.district}, ${userLocation.city}`);
@@ -3549,6 +3585,22 @@ async function checkSellerDeliveryRange(seller) {
         console.error('Teslimat bölgesi kontrol hatası:', error);
         // Hata durumunda teslimat yapıyor kabul et
         return true;
+    }
+}
+
+// Konum bilgilerini debug et
+function debugLocationInfo() {
+    debugLog('📍 KONUM BİLGİLERİ:');
+    debugLog(`- Şehir: ${userLocation.city}`);
+    debugLog(`- İlçe: ${userLocation.district}`);
+    debugLog(`- Adres: ${userLocation.address}`);
+    debugLog(`- Tam Adres: ${userLocation.fullAddress}`);
+    
+    if (sellers.length > 0) {
+        debugLog('📍 SATICI KONUMLARI:');
+        sellers.forEach(seller => {
+            debugLog(`- ${seller.business_name}: ${seller.district}, ${seller.city}`);
+        });
     }
 }
 
@@ -3790,25 +3842,31 @@ function getDemoReyons(storeTypeId) {
     return demoReyons[storeTypeId] || [];
 }
 
+// Demo satıcılar - konum bilgisi ekle
 function getDemoSellers() {
     return [
         { 
             id: '1', 
-            full_name: "Migros", 
-            city: "İstanbul", 
-            imgurl: "https://via.placeholder.com/200x120?text=Migros", 
-            address: "Kadıköy, İstanbul"
+            business_name: "Demo Market", 
+            full_name: "Demo Market",
+            city: userLocation.city || "İstanbul", 
+            district: userLocation.district || "Kadıköy",
+            imgurl: "https://via.placeholder.com/200x120?text=Demo+Market", 
+            address: "Demo Adres",
+            rating: "4.5"
         },
         { 
             id: '2', 
-            full_name: "CarrefourSA", 
-            city: "İstanbul", 
-            imgurl: "https://via.placeholder.com/200x120?text=Carrefour", 
-            address: "Beşiktaş, İstanbul"
+            business_name: "Örnek Market", 
+            full_name: "Örnek Market",
+            city: userLocation.city || "İstanbul", 
+            district: userLocation.district || "Beşiktaş",
+            imgurl: "https://via.placeholder.com/200x120?text=Ornek+Market", 
+            address: "Örnek Adres",
+            rating: "4.2"
         }
     ];
 }
-
 
 
 
