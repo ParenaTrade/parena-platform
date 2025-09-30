@@ -2540,7 +2540,7 @@ async function loadStoreTypes() {
     }
 }
 	
-// Store type'ları ekranda göster
+// Store type'ları ekranda göster - AKIŞ DÜZELTMESİ
 function displayStoreTypes(types) {
     const sellerTypeGrid = document.getElementById('sellerTypeGrid');
     if (!sellerTypeGrid) {
@@ -2596,37 +2596,54 @@ function displayStoreTypes(types) {
         sellerTypeGrid.appendChild(typeCard);
     });
     
+    // Store type seçildiğinde diğer bölümleri gizle
+    if (sellersSection) sellersSection.style.display = 'none';
+    if (categoriesSection) categoriesSection.style.display = 'none';
+    if (productsSection) productsSection.style.display = 'none';
+    
     debugLog("✅ Store type'lar başarıyla yüklendi");
 }
 
 
-// Store type seçildiğinde - TAMİR EDİLMİŞ
 // Store type seçildiğinde - GÜNCELLENMİŞ VERSİYON
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
     
+    // Store type bilgisini kaydet
+    selectedStoreTypeId = storeTypeId;
+    selectedStoreTypeName = storeTypeName;
+    
+    // Konum kontrolü
+    if (!selectedLocation) {
+        debugLog('📍 Konum seçilmemiş, modal açılıyor');
+        showLocationModal();
+        return;
+    }
+    
+    await proceedWithStoreTypeSelection(storeTypeId, storeTypeName);
+}
+
+// Konum seçildikten sonra store type işlemini devam ettir - AKIŞ DÜZELTMESİ
+async function proceedWithStoreTypeSelection(storeTypeId, storeTypeName) {
     // Önceki seçimleri temizle
-    selectedSellerType = storeTypeName;
     selectedSellerId = null;
     selectedCategoryId = null;
+    products = [];
     
     // UI durumunu sıfırla
     resetSections();
     
     try {
-        // 1. Önce reyonları yükle
-        await loadReyonsByStoreType(storeTypeId);
-        
-        // 2. Sonra satıcıları yükle
+        // SADECE SATICILARI YÜKLE - Reyonları henüz yükleme
         await loadSellersByStoreType(storeTypeId);
         
-        // 3. Kategori başlığını güncelle
-        if (categoriesTitle) {
-            categoriesTitle.textContent = storeTypeName === 'Market' ? '🛒 Reyonlar' : '📋 Menü Kategorileri';
-        }
+        // Sadece satıcılar bölümünü göster
+        if (sellersSection) sellersSection.style.display = 'block';
+        if (categoriesSection) categoriesSection.style.display = 'none'; // Reyonları gizle
+        if (productsSection) productsSection.style.display = 'none'; // Ürünleri gizle
         
-        debugLog(`✅ ${storeTypeName} için yükleme tamamlandı`);
-        speakToUser(`${storeTypeName} seçildi. Size en yakın ${storeTypeName.toLowerCase()}lar listeleniyor.`);
+        debugLog(`✅ ${storeTypeName} için satıcılar yüklendi`);
+        speakToUser(`${storeTypeName} seçildi. Size en yakın ${storeTypeName.toLowerCase()}lar listeleniyor. Lütfen bir satıcı seçin.`);
         
     } catch (error) {
         console.error('❌ Store type seçiminde hata:', error);
@@ -2634,7 +2651,8 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     }
 }
 
-// Bölümleri sıfırla - GÜNCELLENMİŞ
+
+// Bölümleri sıfırla - AKIŞ DÜZELTMESİ
 function resetSections() {
     // Tüm seçimleri temizle
     document.querySelectorAll('.seller-type-card, .seller-card, .category-card').forEach(card => {
@@ -2649,17 +2667,19 @@ function resetSections() {
         categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
     }
     if (productsGrid) {
-        productsGrid.innerHTML = '';
+        productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
     }
     
     // Bölüm görünürlüğünü ayarla
-    if (productsSection) {
-        productsSection.style.display = 'none';
-    }
+    if (sellersSection) sellersSection.style.display = 'none';
+    if (categoriesSection) categoriesSection.style.display = 'none';
+    if (productsSection) productsSection.style.display = 'none';
+    
     if (selectedSellerInfo) {
         selectedSellerInfo.textContent = 'Satıcı seçilmedi';
     }
 }
+
 // =============================================
 // 2. BÖLÜM: REYONLARIN, SATICILARIN YÜKLENMESİ
 // =============================================
@@ -2692,8 +2712,7 @@ async function loadReyonsByStoreType(storeTypeId) {
     }
 }
 
-// Kategorileri göster - TAMİR EDİLMİŞ
-// Kategorileri göster - TAMİR EDİLMİŞ
+// Kategorileri göster - AKIŞ DÜZELTMESİ
 function displayCategories(categoriesToShow, type) {
     const categoriesGrid = document.getElementById('categoriesGrid');
     if (!categoriesGrid) return;
@@ -2739,7 +2758,7 @@ function displayCategories(categoriesToShow, type) {
             <div class="category-name">${category.name}</div>
         `;
         
-        categoryCard.addEventListener('click', function() {
+        categoryCard.addEventListener('click', async function() {
             if (!selectedSellerId) {
                 speakToUser("Önce bir satıcı seçmelisiniz.");
                 return;
@@ -2755,8 +2774,8 @@ function displayCategories(categoriesToShow, type) {
             
             selectedCategoryId = category.id;
             
-            // Reyon seçildiğinde ürünleri filtrele
-            filterProductsByReyon(category.id);
+            // REYON SEÇİLDİĞİNDE ÜRÜNLERİ YÜKLE
+            await loadProductsByReyon(category.id);
             
             debugLog(`🛒 Reyon seçildi: ${category.name}`);
             speakToUser(`${category.name} reyonundaki ürünler listeleniyor.`);
@@ -2764,6 +2783,72 @@ function displayCategories(categoriesToShow, type) {
         
         categoriesGrid.appendChild(categoryCard);
     });
+}
+
+// Reyona göre ürünleri yükle - YENİ FONKSİYON
+async function loadProductsByReyon(reyonId) {
+    try {
+        debugLog(`📦 Reyona göre ürünler yükleniyor: ${reyonId}, Satıcı: ${selectedSellerId}`);
+        
+        if (!selectedSellerId) {
+            speakToUser("Önce bir satıcı seçmelisiniz.");
+            return;
+        }
+        
+        const { data, error } = await supabase
+            .from('product_prices')
+            .select(`
+                *,
+                products (
+                    id, name, imgurl, reyon_id, category_id, is_active, description
+                )
+            `)
+            .eq('sube_id', selectedSellerId)
+            .eq('products.reyon_id', reyonId)
+            .eq('products.is_active', true);
+
+        if (error) {
+            console.error('❌ Ürün yükleme hatası:', error);
+            throw error;
+        }
+
+        // Veriyi işle
+        products = data
+            .filter(item => item.products)
+            .map(item => ({
+                id: item.products.id,
+                product_price_id: item.id,
+                name: item.products.name,
+                price: item.price,
+                discount_price: item.discount_price,
+                imgurl: item.products.imgurl,
+                reyon_id: item.products.reyon_id,
+                category_id: item.products.category_id,
+                seller_id: selectedSellerId,
+                description: item.products.description
+            }));
+
+        debugLog(`✅ Ürünler yüklendi: ${products.length} adet`);
+        
+        // Ürünleri göster
+        displayProducts(products);
+        
+        // Ürünler bölümünü göster
+        if (productsSection) productsSection.style.display = 'block';
+        
+        if (products.length === 0) {
+            speakToUser("Bu reyonda ürün bulunamadı.");
+        } else {
+            speakToUser(`${products.length} ürün bulundu.`);
+        }
+
+    } catch (error) {
+        console.error('❌ Ürün yükleme hatası:', error);
+        products = getDemoProducts();
+        displayProducts(products);
+        speakToUser("Ürünler yüklenirken hata oluştu. Demo ürünler gösteriliyor.");
+        debugLog('🔄 Demo ürünler kullanılıyor');
+    }
 }
 
 // Satıcı yükleme - TAMİR EDİLMİŞ
@@ -2886,6 +2971,7 @@ function getDefaultSellerImage(seller) {
 }
 
 // Satıcı seç - GÜNCELLENMİŞ
+// Satıcı seç - AKIŞ DÜZELTMESİ
 async function selectSeller(seller) {
     debugLog(`🎯 Satıcı seçiliyor: ${seller.business_name || seller.full_name}`);
     
@@ -2901,7 +2987,8 @@ async function selectSeller(seller) {
     }
     
     selectedSellerId = seller.id;
-    selectedCategoryId = null; // Yeni satıcı seçildiğinde kategori seçimini sıfırla
+    selectedCategoryId = null;
+    products = []; // Ürünleri temizle
     
     // Satıcı bilgisini güncelle
     if (selectedSellerInfo) {
@@ -2911,18 +2998,20 @@ async function selectSeller(seller) {
         `;
     }
     
-    // Ürünler bölümünü hazırla
-    if (productsSection) {
-        productsSection.style.display = 'block';
-        productsGrid.innerHTML = '<div class="text-center">Ürünler yükleniyor...</div>';
-    }
+    // REYONLARI YÜKLE ve GÖSTER
+    await loadReyonsByStoreType(selectedStoreTypeId);
     
-    // Reyonaları aktif/pasif yap
-    updateReyonsAvailability();
+    // Bölüm görünürlüğünü ayarla
+    if (categoriesSection) categoriesSection.style.display = 'block'; // Reyonları göster
+    if (productsSection) productsSection.style.display = 'none'; // Ürünleri gizle
+    
+    // Ürünler grid'ini temizle
+    if (productsGrid) productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
     
     debugLog(`✅ Satıcı seçildi: ${seller.business_name || seller.full_name}`);
-    speakToUser(`${seller.business_name || seller.full_name} seçildi. Reyonalardan birini seçerek ürünlere ulaşabilirsiniz.`);
+    speakToUser(`${seller.business_name || seller.full_name} seçildi. Şimdi bir reyon seçin.`);
 }
+
 
 // Reyonaları güncelle - YENİ FONKSİYON
 function updateReyonsAvailability() {
@@ -3158,28 +3247,29 @@ function handleRoot1(message, subRoot) {
 // 2. KÖK: SATICI İŞLEMLERİ
 // =============================================
 
+// 2. KÖK: SATICI İŞLEMLERİ - AKIŞ DÜZELTMESİ
 function handleRoot2(message, subRoot) {
     // 2:1 - Satıcı tipi seçimi
     if (subRoot === 1) {
         if (message.includes('market')) {
             selectStoreTypeByName('Market');
             speakToUser("Market seçildi. Size en yakın marketler yükleniyor...");
-            commandRoot = "3:1"; // Ürün seçimine geç
+            commandRoot = "2:2"; // Satıcı seçimine geç
         }
         else if (message.includes('restoran') || message.includes('yemek')) {
             selectStoreTypeByName('Restoran');
             speakToUser("Restoran seçildi. Size en yakın restoranlar yükleniyor...");
-            commandRoot = "3:1";
+            commandRoot = "2:2";
         }
         else if (message.includes('eczane')) {
             selectStoreTypeByName('Eczane');
             speakToUser("Eczane seçildi. Size en yakın eczaneler yükleniyor...");
-            commandRoot = "3:1";
+            commandRoot = "2:2";
         }
         else if (message.includes('fırın')) {
             selectStoreTypeByName('Fırın');
             speakToUser("Fırın seçildi. Size en yakın fırınlar yükleniyor...");
-            commandRoot = "3:1";
+            commandRoot = "2:2";
         }
         else if (message.includes('geri') || message.includes('önceki')) {
             speakToUser("Ana menüye dönülüyor...");
@@ -3189,8 +3279,52 @@ function handleRoot2(message, subRoot) {
             speakToUser("Hangi tür satıcıdan alışveriş yapmak istersiniz? Market, restoran, eczane veya fırın?");
         }
     }
+    // 2:2 - Satıcı seçimi
+    else if (subRoot === 2) {
+        if (sellers.length === 0) {
+            speakToUser("Henüz satıcı yüklenmedi. Lütfen bekleyin.");
+            return;
+        }
+        
+        // Satıcı ismi ile eşleştirme
+        const matchedSeller = sellers.find(seller => 
+            message.includes(seller.business_name?.toLowerCase()) || 
+            message.includes(seller.full_name?.toLowerCase())
+        );
+        
+        if (matchedSeller) {
+            selectSeller(matchedSeller);
+            speakToUser(`${matchedSeller.business_name} seçildi. Şimdi bir reyon seçin.`);
+            commandRoot = "2:3"; // Reyon seçimine geç
+        } else {
+            speakToUser(`Mevcut satıcılar: ${sellers.map(s => s.business_name || s.full_name).join(', ')}. Hangisini seçmek istersiniz?`);
+        }
+    }
+    // 2:3 - Reyon seçimi
+    else if (subRoot === 3) {
+        if (categories.length === 0) {
+            speakToUser("Henüz reyon yüklenmedi. Lütfen bekleyin.");
+            return;
+        }
+        
+        // Reyon ismi ile eşleştirme
+        const matchedCategory = categories.find(category => 
+            message.includes(category.name.toLowerCase())
+        );
+        
+        if (matchedCategory) {
+            // Reyon seçimi simüle et
+            const categoryCard = document.querySelector(`[data-category-id="${matchedCategory.id}"]`);
+            if (categoryCard) {
+                categoryCard.click();
+            }
+            speakToUser(`${matchedCategory.name} reyonu seçildi. Ürünler listeleniyor.`);
+            commandRoot = "3:1"; // Ürün seçimine geç
+        } else {
+            speakToUser(`Mevcut reyonlar: ${categories.map(c => c.name).join(', ')}. Hangisini seçmek istersiniz?`);
+        }
+    }
 }
-
 // =============================================
 // 3. KÖK: ÜRÜN İŞLEMLERİ
 // =============================================
