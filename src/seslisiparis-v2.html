@@ -3150,14 +3150,14 @@ function displayStoreTypes(types) {
     debugLog("✅ Store type'lar başarıyla yüklendi");
 }
 
-// Store type seçildiğinde - Konum zorunluluğu
+// Store type seçildiğinde - ILIKE DEBUG
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
     
     // Konum bilgilerini debug et
     debugLocationInfo();
     
-    // Konum kontrolü - eğer konum seçilmemişse modal aç
+    // Konum kontrolü
     if (!selectedLocation) {
         debugLog('📍 Konum seçilmemiş, modal açılıyor');
         speakToUser("Lütfen önce bir konum seçiniz.");
@@ -3165,7 +3165,6 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
         return;
     }
     
-    // Adrese teslim seçildiyse konum bilgisi kontrolü
     if (selectedLocation === 'delivery' && !isLocationDetected) {
         debugLog('📍 Adres bilgisi yok, modal açılıyor');
         speakToUser("Adrese teslim için lütfen konumunuzu belirleyin.");
@@ -3173,7 +3172,6 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
         return;
     }
     
-    // Store type bilgisini kaydet
     selectedStoreTypeId = storeTypeId;
     selectedStoreTypeName = storeTypeName;
     
@@ -3405,66 +3403,73 @@ async function loadProductsByReyon(reyonId) {
         debugLog('🔄 Demo ürünler kullanılıyor');
     }
 }
-// Satıcı yükleme fonksiyonunu güncelle - KONUM EŞLEŞTİRMESİ
+// Satıcı yükleme fonksiyonunu güncelle - ILIKE SORGUSU
 async function loadSellersByStoreType(storeTypeId) {
     try {
         debugLog(`🔍 Satıcılar yükleniyor: ${storeTypeId}`);
         
-        // ÖNCE: Tüm aktif satıcıları getir (konum filtresiz)
-        const { data, error } = await supabase
+        let query = supabase
             .from('seller_profiles')
             .select('*')
             .eq('status', 'True')
-            .eq('store_type_id', storeTypeId)
-            .order('business_name');
+            .eq('store_type_id', storeTypeId);
+
+        // Konum bilgisi varsa, ILIKE sorgusu ile filtrele
+        if (userLocation.city) {
+            const customerCity = userLocation.city;
+            const customerDistrict = userLocation.district;
+            
+            debugLog(`📍 ILIKE sorgusu: city=%${customerCity}%, district=%${customerDistrict}%`);
+            
+            // ILIKE ile esnek arama
+            query = query.or(`city.ilike.%${customerCity}%,district.ilike.%${customerDistrict}%,address.ilike.%${customerCity}%`);
+        }
+
+        const { data, error } = await query.order('business_name');
 
         if (error) {
             console.error('❌ Satıcı yükleme hatası:', error);
             throw error;
         }
 
-        debugLog(`📊 Tüm satıcılar: ${data?.length || 0} adet`);
+        debugLog(`📊 Konuma uygun satıcılar: ${data?.length || 0} adet`);
 
         if (data && data.length > 0) {
-            // Konum bilgisi varsa filtrele, yoksa tüm satıcıları göster
-            if (userLocation.city && userLocation.district) {
-                const filteredSellers = await filterSellersByLocation(data);
-                sellers = filteredSellers;
-                
-                debugLog(`✅ Konuma göre filtrelenmiş satıcılar: ${filteredSellers.length} adet (${data.length - filteredSellers.length} satıcı konum dışında)`);
-                
-                if (filteredSellers.length === 0) {
-                    // Konuma uygun satıcı yoksa, tüm satıcıları göster
-                    sellers = data;
-                    debugLog('⚠️ Konuma uygun satıcı bulunamadı, tüm satıcılar gösteriliyor');
-                    speakToUser("Size yakın satıcı bulunamadı. Tüm satıcılar listeleniyor.");
-                } else {
-                    speakToUser(`Size en yakın ${filteredSellers.length} satıcı bulundu.`);
-                }
+            sellers = data;
+            
+            // Teslimat bilgilerini ekle
+            await addDeliveryInfoToSellers(sellers);
+            
+            debugLog(`✅ Satıcılar yüklendi: ${sellers.length} adet`);
+            
+            if (userLocation.city) {
+                speakToUser(`${sellers.length} satıcı bulundu. Konumunuz: ${userLocation.district}, ${userLocation.city}`);
             } else {
-                // Konum bilgisi yoksa tüm satıcıları göster
-                sellers = data;
-                debugLog('📍 Konum bilgisi yok, tüm satıcılar gösteriliyor');
-                speakToUser("Konumunuz belirlenmediği için tüm satıcılar listeleniyor.");
+                speakToUser(`${sellers.length} satıcı bulundu.`);
             }
             
             updateSellersGrid();
             
         } else {
-            debugLog('⚠️ Bu kategoride satıcı bulunamadı');
+            debugLog('⚠️ Bu kategoride ve konumda satıcı bulunamadı');
             sellers = [];
             updateSellersGrid();
-            speakToUser("Bu kategoride satıcı bulunamadı. Lütfen başka bir kategori seçin.");
+            
+            if (userLocation.city) {
+                speakToUser(`Bu kategoride ${userLocation.district}, ${userLocation.city} konumunda satıcı bulunamadı. Lütfen başka bir kategori seçin.`);
+            } else {
+                speakToUser("Bu kategoride satıcı bulunamadı. Lütfen başka bir kategori seçin.");
+            }
         }
 
     } catch (error) {
         console.error('❌ Satıcı yükleme hatası:', error);
+        debugLog('🔄 Hata oluştu, demo satıcılar kullanılıyor');
         sellers = getDemoSellers();
         updateSellersGrid();
-        debugLog('🔄 Demo satıcılar kullanılıyor');
+        speakToUser("Satıcılar yüklenirken hata oluştu. Demo satıcılar gösteriliyor.");
     }
 }
-
 
 // Satıcıları mesafeye göre filtrele
 async function filterSellersByDistance(allSellers) {
@@ -3485,8 +3490,7 @@ async function filterSellersByDistance(allSellers) {
     return filteredSellers;
 }
 
-
-// Satıcıları konuma göre filtrele - ESNEK EŞLEŞTİRME
+// Satıcıları konuma göre filtrele - ILIKE SORGUSU
 async function filterSellersByLocation(allSellers) {
     if (!userLocation.city || !userLocation.district) {
         debugLog('⚠️ Konum bilgisi eksik, tüm satıcılar gösteriliyor');
@@ -3494,38 +3498,91 @@ async function filterSellersByLocation(allSellers) {
     }
     
     const filteredSellers = [];
-    const userCity = userLocation.city.toLowerCase().trim();
-    const userDistrict = userLocation.district.toLowerCase().trim();
+    const userCity = userLocation.city.toLowerCase();
+    const userDistrict = userLocation.district.toLowerCase();
     
-    debugLog(`📍 Konum eşleştirmesi: ${userDistrict}, ${userCity}`);
+    debugLog(`📍 ILIKE filtreleme: ${userDistrict}, ${userCity}`);
     
     for (const seller of allSellers) {
-        const sellerCity = (seller.city || '').toLowerCase().trim();
-        const sellerDistrict = (seller.district || '').toLowerCase().trim();
+        const sellerCity = (seller.city || '').toLowerCase();
+        const sellerDistrict = (seller.district || '').toLowerCase();
+        const sellerAddress = (seller.address || '').toLowerCase();
         
-        // Eşleşme kontrolü - daha esnek
-        const cityMatch = sellerCity && userCity && (
-            sellerCity.includes(userCity) || 
-            userCity.includes(sellerCity) ||
-            sellerCity === userCity
-        );
+        // ILIKE benzeri esnek eşleşme
+        const cityMatch = sellerCity.includes(userCity) || userCity.includes(sellerCity);
+        const districtMatch = sellerDistrict.includes(userDistrict) || userDistrict.includes(sellerDistrict);
+        const addressMatch = sellerAddress.includes(userCity) || sellerAddress.includes(userDistrict);
         
-        const districtMatch = sellerDistrict && userDistrict && (
-            sellerDistrict.includes(userDistrict) ||
-            userDistrict.includes(sellerDistrict) || 
-            sellerDistrict === userDistrict
-        );
-        
-        // Şehir eşleşiyorsa ve ilçe eşleşiyorsa (veya ilçe bilgisi yoksa) ekle
-        if (cityMatch && (districtMatch || !sellerDistrict)) {
+        if (cityMatch || districtMatch || addressMatch) {
             filteredSellers.push(seller);
-            debugLog(`✅ Satıcı eşleşti: ${seller.business_name} - ${sellerDistrict}, ${sellerCity}`);
+            debugLog(`✅ ILIKE eşleşme: ${seller.business_name} - ${sellerDistrict}, ${sellerCity}`);
         } else {
-            debugLog(`❌ Satıcı eşleşmedi: ${seller.business_name} - ${sellerDistrict}, ${sellerCity}`);
+            debugLog(`❌ ILIKE eşleşmedi: ${seller.business_name} - ${sellerDistrict}, ${sellerCity}`);
         }
     }
     
     return filteredSellers;
+}
+
+
+// Satıcılara teslimat bilgisi ekle - ILIKE UYUMLU
+async function addDeliveryInfoToSellers(sellers) {
+    if (!sellers || sellers.length === 0) return;
+    
+    debugLog(`📍 Teslimat bilgileri ekleniyor: ${sellers.length} satıcı`);
+    
+    for (const seller of sellers) {
+        try {
+            // Satıcının teslimat bölgelerini getir
+            const { data: deliveryAreas, error } = await supabase
+                .from('seller_delivery_areas')
+                .select('city, district, delivery_fee, min_order_amount')
+                .eq('seller_id', seller.id)
+                .eq('is_active', true);
+
+            if (error) {
+                console.error(`Teslimat bilgisi alma hatası (${seller.business_name}):`, error);
+                continue;
+            }
+
+            // Teslimat bölgesi yoksa varsayılan değerler
+            if (!deliveryAreas || deliveryAreas.length === 0) {
+                seller.delivery_fee = 0;
+                seller.min_order_amount = 0;
+                seller.delivery_available = true;
+                continue;
+            }
+
+            // ILIKE benzeri esnek eşleşme
+            const matchedArea = deliveryAreas.find(area => {
+                const areaCity = (area.city || '').toLowerCase();
+                const areaDistrict = (area.district || '').toLowerCase();
+                const userCity = (userLocation.city || '').toLowerCase();
+                const userDistrict = (userLocation.district || '').toLowerCase();
+                
+                const cityMatch = areaCity.includes(userCity) || userCity.includes(areaCity);
+                const districtMatch = areaDistrict.includes(userDistrict) || userDistrict.includes(areaDistrict);
+                
+                return cityMatch && districtMatch;
+            });
+
+            if (matchedArea) {
+                seller.delivery_fee = matchedArea.delivery_fee || 0;
+                seller.min_order_amount = matchedArea.min_order_amount || 0;
+                seller.delivery_available = true;
+            } else {
+                seller.delivery_fee = null;
+                seller.min_order_amount = null;
+                seller.delivery_available = false;
+            }
+
+        } catch (error) {
+            console.error(`Teslimat bilgisi ekleme hatası (${seller.business_name}):`, error);
+            seller.delivery_fee = 0;
+            seller.min_order_amount = 0;
+            seller.delivery_available = true;
+        }
+    }
 }
 
 // Satıcının teslimat bölgesini kontrol et - ESNEK EŞLEŞTİRME
@@ -3588,19 +3645,39 @@ async function checkSellerDeliveryRange(seller) {
     }
 }
 
-// Konum bilgilerini debug et
+// Demo satıcılar - ILIKE UYUMLU
+function getDemoSellers() {
+    const userCity = userLocation.city || "Batum";
+    const userDistrict = userLocation.district || "Airport";
+    
+    return [
+        { 
+            id: 'demo-1', 
+            business_name: `${userCity} Market`, 
+            full_name: `${userCity} Market`,
+            city: userCity, 
+            district: userDistrict,
+            imgurl: "https://via.placeholder.com/200x120?text=Local+Market", 
+            address: `${userDistrict}, ${userCity}`,
+            rating: "4.7",
+            delivery_fee: 10.00,
+            min_order_amount: 25.00,
+            delivery_available: true,
+            store_type_id: "3b6d27de-3f30-4113-82f2-d71e9b1cf89f",
+            status: "True"
+        }
+    ];
+}
+
+// Konum bilgilerini debug et - ILIKE SORGUSU
 function debugLocationInfo() {
     debugLog('📍 KONUM BİLGİLERİ:');
-    debugLog(`- Şehir: ${userLocation.city}`);
-    debugLog(`- İlçe: ${userLocation.district}`);
-    debugLog(`- Adres: ${userLocation.address}`);
-    debugLog(`- Tam Adres: ${userLocation.fullAddress}`);
+    debugLog(`- Şehir: "${userLocation.city}"`);
+    debugLog(`- İlçe: "${userLocation.district}"`);
+    debugLog(`- Adres: "${userLocation.address}"`);
     
-    if (sellers.length > 0) {
-        debugLog('📍 SATICI KONUMLARI:');
-        sellers.forEach(seller => {
-            debugLog(`- ${seller.business_name}: ${seller.district}, ${seller.city}`);
-        });
+    if (userLocation.city) {
+        debugLog(`📋 ILIKE SORGUSU: city.ilike.%${userLocation.city}%, district.ilike.%${userLocation.district}%, address.ilike.%${userLocation.city}%`);
     }
 }
 
