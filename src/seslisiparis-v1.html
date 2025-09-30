@@ -2496,33 +2496,18 @@ function showNotification(message, type = 'info') {
 // =============================================
 // 2. BÖLÜM STORE TYPE - MAĞAZA TÜRLERİNİ LİSTELE
 // =============================================
+// Load store types - GÜNCELLENMİŞ
 async function loadStoreTypes() {
     try {
         debugLog('🔧 StoreTypes yükleniyor...');
         
-        // DETAYLI SORGULAMA
         const { data, error, count } = await supabase
             .from('store_type')
-            .select('*', { count: 'exact' }) // Kayıt sayısını da al
+            .select('*', { count: 'exact' })
             .eq('status', 'Active')
-			.order('sort_code');
+            .order('sort_code');
 
-        debugLog('🔍 StoreTypes sorgu sonucu:', { 
-            dataLength: data?.length, 
-            error: error,
-            count: count 
-        });
-
-        if (error) {
-            console.error('❌ StoreTypes yükleme hatası:', error);
-            console.error('❌ Hata detayları:', {
-                message: error.message,
-                details: error.details,
-                hint: error.hint,
-                code: error.code
-            });
-            throw error;
-        }
+        if (error) throw error;
 
         if (data && data.length > 0) {
             storeTypes = data;
@@ -2532,30 +2517,29 @@ async function loadStoreTypes() {
             return;
         }
 
-        // VERİ YOKSA FALLBACK
-        console.warn('⚠️ StoreTypes verisi boş, fallback kullanılıyor. Count:', count);
         throw new Error('StoreTypes verisi boş');
         
     } catch (error) {
         console.error('❌ StoreTypes yükleme hatası:', error);
         
-        // Cache'den dene
+        // Cache kontrolü
         const cached = localStorage.getItem('storeTypes');
         if (cached) {
             try {
                 storeTypes = JSON.parse(cached);
                 debugLog('✅ StoreTypes cache\'den yüklendi');
                 displayStoreTypes(storeTypes);
+                return;
             } catch (parseError) {
                 console.error('❌ Cache parse hatası:', parseError);
-                await useFallbackStoreTypes();
             }
-        } else {
-            // Son çare: demo veriler
-            await useFallbackStoreTypes();
         }
+        
+        // Fallback
+        await useFallbackStoreTypes();
     }
-}	
+}
+	
 // Store type'ları ekranda göster
 function displayStoreTypes(types) {
     const sellerTypeGrid = document.getElementById('sellerTypeGrid');
@@ -2617,48 +2601,65 @@ function displayStoreTypes(types) {
 
 
 // Store type seçildiğinde - TAMİR EDİLMİŞ
+// Store type seçildiğinde - GÜNCELLENMİŞ VERSİYON
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
     
+    // Önceki seçimleri temizle
     selectedSellerType = storeTypeName;
-    selectedSellerId = null; // Yeni store type seçildiğinde satıcıyı sıfırla
+    selectedSellerId = null;
+    selectedCategoryId = null;
     
-    // Kategori/reyon başlığını güncelle
-    if (categoriesTitle) {
-        categoriesTitle.textContent = storeTypeName === 'Market' ? '🛒 Reyonlar' : '📋 Menü Kategorileri';
-    }
-    
-    // İlgili bölümleri sıfırla
+    // UI durumunu sıfırla
     resetSections();
     
-    // Reyonları yükle
-    await loadReyonsByStoreType(storeTypeId);
-    
-    // Satıcıları yükle
-    await loadSellersByStoreType(storeTypeId);
-    
-    speakToUser(`${storeTypeName} seçildi. Size en yakın ${storeTypeName.toLowerCase()}lar listeleniyor.`);
+    try {
+        // 1. Önce reyonları yükle
+        await loadReyonsByStoreType(storeTypeId);
+        
+        // 2. Sonra satıcıları yükle
+        await loadSellersByStoreType(storeTypeId);
+        
+        // 3. Kategori başlığını güncelle
+        if (categoriesTitle) {
+            categoriesTitle.textContent = storeTypeName === 'Market' ? '🛒 Reyonlar' : '📋 Menü Kategorileri';
+        }
+        
+        debugLog(`✅ ${storeTypeName} için yükleme tamamlandı`);
+        speakToUser(`${storeTypeName} seçildi. Size en yakın ${storeTypeName.toLowerCase()}lar listeleniyor.`);
+        
+    } catch (error) {
+        console.error('❌ Store type seçiminde hata:', error);
+        speakToUser("Mağaza yüklenirken bir hata oluştu. Lütfen tekrar deneyin.");
+    }
 }
 
-// Bölümleri sıfırla
+// Bölümleri sıfırla - GÜNCELLENMİŞ
 function resetSections() {
-    if (categoriesSection) {
-        categoriesSection.style.display = 'block';
-        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
-    }
-    if (sellersSection) {
-        sellersSection.style.display = 'block';
+    // Tüm seçimleri temizle
+    document.querySelectorAll('.seller-type-card, .seller-card, .category-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Grid içeriklerini sıfırla
+    if (sellerGrid) {
         sellerGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
     }
+    if (categoriesGrid) {
+        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
+    }
+    if (productsGrid) {
+        productsGrid.innerHTML = '';
+    }
+    
+    // Bölüm görünürlüğünü ayarla
     if (productsSection) {
         productsSection.style.display = 'none';
-        productsGrid.innerHTML = '';
     }
     if (selectedSellerInfo) {
         selectedSellerInfo.textContent = 'Satıcı seçilmedi';
     }
 }
-
 // =============================================
 // 2. BÖLÜM: REYONLARIN, SATICILARIN YÜKLENMESİ
 // =============================================
@@ -2845,19 +2846,22 @@ function updateSellersGrid() {
             sellerCard.classList.add('disabled');
         }
         
-        sellerCard.innerHTML = `
-            <img src="${seller.imgurl || 'https://via.placeholder.com/200x120?text=Satıcı'}" 
-                 alt="${seller.business_name || seller.full_name}" 
-                 class="seller-image"
-                 onerror="this.src='https://via.placeholder.com/200x120?text=Satıcı'">
-            <div class="seller-info">
-                <div class="seller-name">${seller.business_name || seller.full_name}</div>
-                <div class="seller-details">
-                    <span><i class="fas fa-map-marker-alt"></i> ${seller.city || 'Şehir belirtilmemiş'}</span>
-                    <span><i class="fas fa-star" style="color: gold;"></i> 4.5</span>
-                </div>
-            </div>
-        `;
+        // seller-card oluşturulduğu kısmı güncelleyin:
+sellerCard.innerHTML = `
+    <div class="seller-image-container">
+        <img src="${seller.imgurl || getDefaultSellerImage(seller)}" 
+             alt="${seller.business_name || seller.full_name}" 
+             class="seller-image"
+             onerror="this.src='${getDefaultSellerImage(seller)}'; this.onerror=null;">
+    </div>
+    <div class="seller-info">
+        <div class="seller-name">${seller.business_name || seller.full_name}</div>
+        <div class="seller-details">
+            <span><i class="fas fa-map-marker-alt"></i> ${seller.city || 'Şehir belirtilmemiş'}</span>
+            <span><i class="fas fa-star" style="color: gold;"></i> ${seller.rating || '4.5'}</span>
+        </div>
+    </div>
+`;
         
         sellerCard.addEventListener('click', () => {
             if (isSellerLocked && selectedSellerId !== seller.id) {
@@ -2872,20 +2876,32 @@ function updateSellersGrid() {
     });
 }
 
-// Satıcı seç - TAMİR EDİLMİŞ
+
+
+// Varsayılan resim fonksiyonu ekleyin:
+function getDefaultSellerImage(seller) {
+    const sellerName = seller.business_name || seller.full_name || 'Satıcı';
+    // Base64 encoded basit bir placeholder
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGVlMmYzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY3Njc2NyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlNhdMSxY8SxPC90ZXh0Pjwvc3ZnPg==';
+}
+
+// Satıcı seç - GÜNCELLENMİŞ
 async function selectSeller(seller) {
-    // Tüm satıcı kartlarından seçimi kaldır
-    document.querySelectorAll('.seller-card').forEach(card => {
+    debugLog(`🎯 Satıcı seçiliyor: ${seller.business_name || seller.full_name}`);
+    
+    // Önceki seçimleri temizle
+    document.querySelectorAll('.seller-card, .category-card').forEach(card => {
         card.classList.remove('selected');
     });
     
-    // Bu satıcıyı seçili yap
+    // Yeni satıcıyı seç
     const sellerCard = document.querySelector(`[data-seller-id="${seller.id}"]`);
     if (sellerCard) {
         sellerCard.classList.add('selected');
     }
     
     selectedSellerId = seller.id;
+    selectedCategoryId = null; // Yeni satıcı seçildiğinde kategori seçimini sıfırla
     
     // Satıcı bilgisini güncelle
     if (selectedSellerInfo) {
@@ -2895,17 +2911,35 @@ async function selectSeller(seller) {
         `;
     }
     
-    // Ürünler bölümünü göster
+    // Ürünler bölümünü hazırla
     if (productsSection) {
         productsSection.style.display = 'block';
         productsGrid.innerHTML = '<div class="text-center">Ürünler yükleniyor...</div>';
     }
     
-    debugLog(`✅ Satıcı seçildi: ${seller.business_name || seller.full_name}`);
-    speakToUser(`${seller.business_name || seller.full_name} seçildi. Ürünler yükleniyor.`);
+    // Reyonaları aktif/pasif yap
+    updateReyonsAvailability();
     
-    // Satıcının ürünlerini yükle
-    await loadSellerProducts(seller.id);
+    debugLog(`✅ Satıcı seçildi: ${seller.business_name || seller.full_name}`);
+    speakToUser(`${seller.business_name || seller.full_name} seçildi. Reyonalardan birini seçerek ürünlere ulaşabilirsiniz.`);
+}
+
+// Reyonaları güncelle - YENİ FONKSİYON
+function updateReyonsAvailability() {
+    if (!categories || categories.length === 0) return;
+    
+    const categoryCards = document.querySelectorAll('.category-card');
+    categoryCards.forEach(card => {
+        if (selectedSellerId) {
+            card.style.opacity = '1';
+            card.style.cursor = 'pointer';
+            card.style.pointerEvents = 'auto';
+        } else {
+            card.style.opacity = '0.5';
+            card.style.cursor = 'not-allowed';
+            card.style.pointerEvents = 'none';
+        }
+    });
 }
 
 // Reyona göre ürünleri grupla
