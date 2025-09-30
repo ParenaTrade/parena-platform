@@ -3286,33 +3286,87 @@ function resetSections() {
 // =============================================
 // 2. BÖLÜM: REYONLARIN, SATICILARIN YÜKLENMESİ
 // =============================================
-// Reyon yükleme - TAMİR EDİLMİŞ
-async function loadReyonsByStoreType(storeTypeId) {
+// Satıcıya göre reyonları yükle - DÜZELTİLMİŞ
+async function loadReyonsBySeller(sellerId) {
     try {
-        debugLog(`🛒 Reyonlar yükleniyor, StoreType: ${storeTypeId}`);
+        debugLog(`📦 Satıcıya göre reyonlar yükleniyor: ${sellerId}`);
         
+        // Doğru SQL sorgusu - birleştirilmiş tablolar
         const { data, error } = await supabase
             .from('reyon')
-            .select('*')
-            .eq('store_type_id', storeTypeId)
+            .select(`
+                *,
+                products!inner(
+                    id,
+                    product_prices!inner(
+                        seller_id
+                    )
+                )
+            `)
+            .eq('products.product_prices.seller_id', sellerId)
             .order('name');
 
         if (error) {
             console.error('❌ Reyon yükleme hatası:', error);
+            debugLog(`❌ SQL HATASI: ${error.message}`);
             throw error;
         }
 
-        categories = data || [];
+        debugLog(`📊 REYON SONUÇ: ${data?.length || 0} reyon bulundu`);
+        
+        // Benzersiz reyonları al (eğer aynı reyon birden fazla üründe varsa)
+        const uniqueReyons = [];
+        const seenReyons = new Set();
+        
+        data.forEach(reyon => {
+            if (!seenReyons.has(reyon.id)) {
+                seenReyons.add(reyon.id);
+                uniqueReyons.push(reyon);
+            }
+        });
+
+        categories = uniqueReyons;
         displayCategories(categories, 'reyon');
-        debugLog(`✅ Reyonlar yüklendi: ${categories.length} adet`);
+        
+        debugLog(`✅ Satıcı reyonları yüklendi: ${categories.length} adet`);
+        
+        if (categories.length === 0) {
+            speakToUser("Bu satıcıda reyon bulunamadı.");
+        } else {
+            speakToUser(`${categories.length} reyon bulundu. Bir reyon seçin.`);
+        }
 
     } catch (error) {
         console.error('❌ Reyon yükleme hatası:', error);
-        // Fallback demo reyonlar
-        categories = getDemoReyons(storeTypeId);
+        debugLog('🔄 Hata oluştu, demo reyonlar kullanılıyor');
+        categories = getDemoReyons();
         displayCategories(categories, 'reyon');
-        debugLog('🔄 Demo reyonlar kullanılıyor');
+        speakToUser("Reyonlar yüklenirken hata oluştu. Demo reyonlar gösteriliyor.");
     }
+}
+
+// Demo reyonlar (yedek)
+function getDemoReyons() {
+    return [
+        { id: 1, name: 'Meyve & Sebze', store_type_id: 1 },
+        { id: 2, name: 'Süt Ürünleri', store_type_id: 1 },
+        { id: 3, name: 'Et & Tavuk', store_type_id: 1 },
+        { id: 4, name: 'Temel Gıda', store_type_id: 1 }
+    ];
+}
+
+// Demo ürünler (yedek)
+function getDemoProducts() {
+    return [
+        { 
+            id: 1, 
+            name: 'Demo Ürün 1', 
+            price: 25.99, 
+            imgurl: '', 
+            unit_type: 'kg',
+            description: 'Demo ürün açıklaması'
+        }
+    ];
 }
 
 // Kategorileri göster - ÜRÜN YÜKLEME DÜZELTMESİ
@@ -3388,29 +3442,30 @@ function displayCategories(categoriesToShow, type) {
     });
 }
 
-// Reyona göre ürünleri yükle - DEBUG EKLİ
+// Reyon seçildiğinde ürünleri yükle - DÜZELTİLMİŞ
 async function loadProductsByReyon(reyonId) {
     try {
-        debugLog(`📦 Reyona göre ürünler yükleniyor: ${reyonId}, Satıcı: ${selectedSellerId}`);
+        debugLog(`🛒 Reyona göre ürünler yükleniyor: ${reyonId}, Satıcı: ${selectedSellerId}`);
         
         if (!selectedSellerId) {
             speakToUser("Önce bir satıcı seçmelisiniz.");
             return;
         }
         
-        debugLog(`🔍 SQL SORGUSU: product_prices WHERE seller_id='${selectedSellerId}' AND products.reyon_id='${reyonId}'`);
+        debugLog(`🔍 SQL SORGUSU: seller_id='${selectedSellerId}' AND reyon_id='${reyonId}'`);
         
         const { data, error } = await supabase
             .from('product_prices')
             .select(`
                 *,
-                products (
-                    id, name, imgurl, reyon_id, category_id, is_active, description
+                products!inner(
+                    id, name, imgurl, reyon_id, category_id, is_active, description, unit_type
                 )
             `)
             .eq('seller_id', selectedSellerId)
             .eq('products.reyon_id', reyonId)
-            .eq('products.is_active', true);
+            .eq('products.is_active', true)
+            .order('products.name');
 
         if (error) {
             console.error('❌ Ürün yükleme hatası:', error);
@@ -3418,8 +3473,7 @@ async function loadProductsByReyon(reyonId) {
             throw error;
         }
 
-        debugLog(`📊 SQL SONUCU: ${data?.length || 0} ürün bulundu`);
-        debugLog(`📦 VERİ:`, data);
+        debugLog(`📊 ÜRÜN SONUÇ: ${data?.length || 0} ürün bulundu`);
 
         // Veriyi işle
         products = data
@@ -3434,7 +3488,8 @@ async function loadProductsByReyon(reyonId) {
                 reyon_id: item.products.reyon_id,
                 category_id: item.products.category_id,
                 seller_id: selectedSellerId,
-                description: item.products.description
+                description: item.products.description,
+                unit_type: item.products.unit_type
             }));
 
         debugLog(`✅ Ürünler yüklendi: ${products.length} adet`);
@@ -3442,8 +3497,9 @@ async function loadProductsByReyon(reyonId) {
         // Ürünleri göster
         displayProducts(products);
         
-        // Ürünler bölümünü göster
+        // Ürünler bölümünü göster, reyonları gizle
         if (productsSection) productsSection.style.display = 'block';
+        if (categoriesSection) categoriesSection.style.display = 'none';
         
         if (products.length === 0) {
             speakToUser("Bu reyonda ürün bulunamadı.");
@@ -4010,7 +4066,7 @@ function getDefaultSellerImage(seller) {
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGVlMmYzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY3Njc2NyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlNhdMSxY8SxPC90ZXh0Pjwvc3ZnPg==';
 }
 
-// Satıcı seç - KATEGORİ ve ÜRÜNLERİ SIFIRLA
+// Satıcı seç - GÜNCELLENMİŞ
 async function selectSeller(seller) {
     debugLog(`🎯 Satıcı seçiliyor: ${seller.business_name || seller.full_name}`);
     
@@ -4055,8 +4111,8 @@ async function selectSeller(seller) {
         `;
     }
     
-    // REYONLARI YÜKLE ve GÖSTER
-    await loadReyonsByStoreType(selectedStoreTypeId);
+    // SATICIYA GÖRE REYONLARI YÜKLE (DÜZELTİLDİ)
+    await loadReyonsBySeller(seller.id);
     
     // Bölüm görünürlüğünü ayarla
     if (categoriesSection) categoriesSection.style.display = 'block'; // Reyonları göster
@@ -4074,6 +4130,7 @@ async function selectSeller(seller) {
         speakToUser(`${seller.business_name || seller.full_name} seçildi. Şimdi bir reyon seçin.`);
     }
 }
+
 
 // Reyonaları güncelle - YENİ FONKSİYON
 function updateReyonsAvailability() {
