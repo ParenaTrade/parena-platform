@@ -2489,66 +2489,9 @@ function showNotification(message, type = 'info') {
 }
 
 
-async function loadStoreTypes() {
-    try {
-        debugLog('🔧 StoreTypes yükleniyor...');
-        
-        // DETAYLI SORGULAMA
-        const { data, error, count } = await supabase
-            .from('store_type')
-            .select('*', { count: 'exact' }) // Kayıt sayısını da al
-            .eq('status', 'Active')
-			.order('sort_code');
-
-        debugLog('🔍 StoreTypes sorgu sonucu:', { 
-            dataLength: data?.length, 
-            error: error,
-            count: count 
-        });
-
-        if (error) {
-            console.error('❌ StoreTypes yükleme hatası:', error);
-            console.error('❌ Hata detayları:', {
-                message: error.message,
-                details: error.details,
-                hint: error.hint,
-                code: error.code
-            });
-            throw error;
-        }
-
-        if (data && data.length > 0) {
-            storeTypes = data;
-            localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
-            debugLog(`✅ StoreTypes sunucudan yüklendi: ${data.length} adet`);
-            displayStoreTypes(storeTypes);
-            return;
-        }
-
-        // VERİ YOKSA FALLBACK
-        console.warn('⚠️ StoreTypes verisi boş, fallback kullanılıyor. Count:', count);
-        throw new Error('StoreTypes verisi boş');
-        
-    } catch (error) {
-        console.error('❌ StoreTypes yükleme hatası:', error);
-        
-        // Cache'den dene
-        const cached = localStorage.getItem('storeTypes');
-        if (cached) {
-            try {
-                storeTypes = JSON.parse(cached);
-                debugLog('✅ StoreTypes cache\'den yüklendi');
-                displayStoreTypes(storeTypes);
-            } catch (parseError) {
-                console.error('❌ Cache parse hatası:', parseError);
-                await useFallbackStoreTypes();
-            }
-        } else {
-            // Son çare: demo veriler
-            await useFallbackStoreTypes();
-        }
-    }
-}	
+// =============================================
+// 2. BÖLÜM STORE TYPE - MAĞAZA TÜRLERİNİ LİSTELE
+// =============================================
 // Store type'ları ekranda göster
 function displayStoreTypes(types) {
     const sellerTypeGrid = document.getElementById('sellerTypeGrid');
@@ -2652,6 +2595,7 @@ function resetSections() {
 
 
 
+
 // =============================================
 // 2. BÖLÜM: REYONLARIN, SATICILARIN YÜKLENMESİ
 // =============================================
@@ -2685,7 +2629,7 @@ async function loadReyonsByStoreType(storeTypeId) {
 }
 
 	// Satıcı yükleme - GÜÇLENDİRİLMİŞ
-loadSellersByStoreType
+
 // Kategorileri göster - TAMİR EDİLMİŞ
 function displayCategories(categoriesToShow, type) {
     const categoriesGrid = document.getElementById('categoriesGrid');
