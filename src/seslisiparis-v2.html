@@ -1401,6 +1401,8 @@ body.modal-open {
         let selectedLocation = null;
         let referralCode = null;
         let referralGroupCode = null;
+	let selectedStoreTypeId = null;
+	let selectedStoreTypeName = null;
 	
 	// Global state'e ekle
 	let userLocation = {
@@ -1486,7 +1488,6 @@ body.modal-open {
         // LOKASYON SEÇİM SİSTEMİ
         // =============================================
 
-        // Konum modalını kapatma butonunu kaldır veya devre dışı bırak
 function showLocationModal() {
     const modal = document.getElementById('locationModal');
     if (!modal) {
@@ -1498,33 +1499,13 @@ function showLocationModal() {
     modal.style.display = 'flex';
     modal.style.zIndex = '10000';
     
-    // Modal dışına tıklanınca kapanmasını engelle
-    modal.onclick = function(e) {
-        if (e.target === modal) {
-            // Kapatma işlemini engelle - konum zorunlu
-            speakToUser("Lütfen bir konum seçiniz. Konum seçmeden devam edemezsiniz.");
-        }
-    };
-
-    // Kapatma butonunu devre dışı bırak
-    const closeBtn = document.getElementById('closeLocationModal');
-    if (closeBtn) {
-        closeBtn.style.display = 'none'; // Butonu gizle
-    }
-
+    // Modal içeriğini güncelle
+    updateLocationModal();
+    
     debugLog('📍 Konum modalı gösterildi (zorunlu)');
 }
 
-
-        function hideLocationModal() {
-            const modal = document.getElementById('locationModal');
-            if (modal) {
-                modal.style.display = 'none';
-                document.body.classList.remove('modal-open');
-            }
-        }
-
-// Konum seçimini güncelle - İl/ilçe zorunluluğu
+// Konum seçimini güncelle - İl/ilçe zorunluluğu (GÜNCELLENMİŞ)
 function selectLocation(locationType) {
     console.log('📍 Seçilen konum:', locationType);
     
@@ -1533,31 +1514,12 @@ function selectLocation(locationType) {
         return;
     }
     
-    // Adrese teslim seçildiyse il/ilçe kontrolü yap
+    // Adrese teslim seçildiyse konum bilgisi kontrolü
     if (locationType === 'delivery') {
-        const city = document.getElementById('citySelect')?.value;
-        const district = document.getElementById('districtSelect')?.value;
-        const detailedAddress = document.getElementById('detailedAddress')?.value;
-        
-        if (!city || !district) {
-            speakToUser("Lütfen il ve ilçe bilgilerinizi seçin.");
+        if (!isLocationDetected) {
+            speakToUser("Adrese teslim için lütfen konumunuzu belirleyin.");
             return;
         }
-        
-        if (!detailedAddress || detailedAddress.trim().length < 10) {
-            speakToUser("Lütfen detaylı adresinizi girin (en az 10 karakter).");
-            return;
-        }
-        
-        // Konum bilgisini kaydet
-        userLocation = {
-            city: city,
-            district: district,
-            address: detailedAddress.trim(),
-            fullAddress: `${detailedAddress.trim()}, ${district}, ${city}`
-        };
-        
-        isLocationDetected = true;
     }
     
     selectedLocation = locationType;
@@ -1575,6 +1537,7 @@ function selectLocation(locationType) {
     debugLog('📍 Konum seçildi:', locationType);
     speakToUser(`Konumunuz kaydedildi. ${locationType === 'delivery' ? 'Adrese teslim seçeneği aktif.' : ''}`);
 }
+
 
 // Konum alma fonksiyonu
 function getCurrentLocation() {
@@ -1655,9 +1618,7 @@ function initializeLocation() {
     updateLocationModal();
 }
 
-
-
-// Konum modalını güncelle - İl ve İlçe seçimi ekle
+// Konum modalını güncelle - İl ve İlçe seçimi ekle (GÜNCELLENMİŞ)
 function updateLocationModal() {
     const locationModal = document.getElementById('locationModal');
     if (!locationModal) return;
@@ -1696,6 +1657,12 @@ function updateLocationModal() {
             <h4 style="margin-bottom: 15px;">Teslimat Adresiniz</h4>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+		<div style="display: flex; gap: 10px; margin-top: 15px;">
+  		  <button id="detectLocationBtn" style="padding: 12px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; flex: 1;">
+       		 <i class="fas fa-location-arrow"></i> Konumumu Otomatik Tespit Et
+  		  </button>
+		</div>
+
                 <div>
                     <label style="display: block; margin-bottom: 5px; font-weight: bold;">İl *</label>
                     <select id="citySelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
@@ -1706,7 +1673,6 @@ function updateLocationModal() {
                         <option value="bursa">Bursa</option>
                         <option value="balikesir">Balıkesir</option>
                         <option value="bandirma">Bandırma</option>
-                        <!-- Diğer iller eklenebilir -->
                     </select>
                 </div>
                 
@@ -1714,22 +1680,18 @@ function updateLocationModal() {
                     <label style="display: block; margin-bottom: 5px; font-weight: bold;">İlçe *</label>
                     <select id="districtSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;" disabled>
                         <option value="">Önce il seçin</option>
-                    </div>
-                </div>
-                
-                <div style="grid-column: 1 / -1;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Detaylı Adres *</label>
-                    <textarea id="detailedAddress" placeholder="Cadde, sokak, apartman, daire no vb." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; height: 80px; resize: vertical;"></textarea>
+                    </select>
                 </div>
             </div>
             
-            <div style="display: flex; gap: 10px;">
+            <div style="grid-column: 1 / -1;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Detaylı Adres *</label>
+                <textarea id="detailedAddress" placeholder="Cadde, sokak, apartman, daire no vb." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; height: 80px; resize: vertical;"></textarea>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
                 <button id="saveDeliveryAddress" style="flex: 1; padding: 12px; background: var(--success); color: white; border: none; border-radius: 5px; cursor: pointer;">
-                    <i class="fas fa-check"></i> Adresi Kaydet
-                </button>
-                
-                <button id="detectLocationBtn" style="padding: 12px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer;">
-                    <i class="fas fa-location-arrow"></i> Konumumu Tespit Et
+                    <i class="fas fa-check"></i> Adresi Kaydet ve Devam Et
                 </button>
             </div>
             
@@ -1742,27 +1704,80 @@ function updateLocationModal() {
         </div>
     `;
     
-    // İl seçiminde ilçe listesini güncelle
-    const citySelect = document.getElementById('citySelect');
-    const districtSelect = document.getElementById('districtSelect');
-    
-    if (citySelect && districtSelect) {
-        citySelect.addEventListener('change', function() {
-            updateDistricts(this.value);
-        });
-    }
-    
-    // Konum tespit butonuna event listener ekle
+    // LOKASYON SEÇİM EVENT'LERİNİ EKLE
     setTimeout(() => {
+        // Lokasyon seçeneklerine tıklama event'leri
+        document.querySelectorAll('.location-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const locationType = this.getAttribute('data-location');
+                
+                // Tüm seçeneklerden seçimi kaldır
+                document.querySelectorAll('.location-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                
+                // Bu seçeneği seçili yap
+                this.classList.add('selected');
+                
+                // Adrese teslim seçildiyse formu göster
+                const deliveryForm = document.getElementById('deliveryLocationForm');
+                if (locationType === 'delivery') {
+                    deliveryForm.style.display = 'block';
+                } else {
+                    deliveryForm.style.display = 'none';
+                    // Diğer seçeneklerde direkt olarak seçimi yap
+                    selectLocation(locationType);
+                }
+            });
+        });
+        
+        // İl seçiminde ilçe listesini güncelle
+        const citySelect = document.getElementById('citySelect');
+        const districtSelect = document.getElementById('districtSelect');
+        
+        if (citySelect && districtSelect) {
+            citySelect.addEventListener('change', function() {
+                updateDistricts(this.value);
+            });
+        }
+        
+        // Adres kaydet butonu
+        const saveBtn = document.getElementById('saveDeliveryAddress');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function() {
+                const city = document.getElementById('citySelect').value;
+                const district = document.getElementById('districtSelect').value;
+                const detailedAddress = document.getElementById('detailedAddress').value;
+                
+                if (!city || !district) {
+                    alert('Lütfen il ve ilçe bilgilerinizi seçin.');
+                    return;
+                }
+                
+                if (!detailedAddress || detailedAddress.trim().length < 10) {
+                    alert('Lütfen detaylı adresinizi girin (en az 10 karakter).');
+                    return;
+                }
+                
+                // Konum bilgisini kaydet
+                userLocation = {
+                    city: city,
+                    district: district,
+                    address: detailedAddress.trim(),
+                    fullAddress: `${detailedAddress.trim()}, ${district}, ${city}`
+                };
+                
+                isLocationDetected = true;
+                selectLocation('delivery');
+            });
+        }
+        
+        // Konum tespit butonu
         const detectBtn = document.getElementById('detectLocationBtn');
         if (detectBtn) {
             detectBtn.addEventListener('click', detectUserLocation);
         }
         
-        const saveBtn = document.getElementById('saveDeliveryAddress');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', saveManualAddress);
-        }
     }, 100);
 }
 
