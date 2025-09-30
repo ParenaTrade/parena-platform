@@ -3465,6 +3465,49 @@ async function filterSellersByDistance(allSellers) {
     return filteredSellers;
 }
 
+
+// Satıcıları konuma göre filtrele - ESNEK EŞLEŞTİRME
+async function filterSellersByLocation(allSellers) {
+    if (!userLocation.city || !userLocation.district) {
+        debugLog('⚠️ Konum bilgisi eksik, tüm satıcılar gösteriliyor');
+        return allSellers;
+    }
+    
+    const filteredSellers = [];
+    const userCity = userLocation.city.toLowerCase().trim();
+    const userDistrict = userLocation.district.toLowerCase().trim();
+    
+    debugLog(`📍 Konum eşleştirmesi: ${userDistrict}, ${userCity}`);
+    
+    for (const seller of allSellers) {
+        const sellerCity = (seller.city || '').toLowerCase().trim();
+        const sellerDistrict = (seller.district || '').toLowerCase().trim();
+        
+        // Eşleşme kontrolü - daha esnek
+        const cityMatch = sellerCity && userCity && (
+            sellerCity.includes(userCity) || 
+            userCity.includes(sellerCity) ||
+            sellerCity === userCity
+        );
+        
+        const districtMatch = sellerDistrict && userDistrict && (
+            sellerDistrict.includes(userDistrict) ||
+            userDistrict.includes(sellerDistrict) || 
+            sellerDistrict === userDistrict
+        );
+        
+        // Şehir eşleşiyorsa ve ilçe eşleşiyorsa (veya ilçe bilgisi yoksa) ekle
+        if (cityMatch && (districtMatch || !sellerDistrict)) {
+            filteredSellers.push(seller);
+            debugLog(`✅ Satıcı eşleşti: ${seller.business_name} - ${sellerDistrict}, ${sellerCity}`);
+        } else {
+            debugLog(`❌ Satıcı eşleşmedi: ${seller.business_name} - ${sellerDistrict}, ${sellerCity}`);
+        }
+    }
+    
+    return filteredSellers;
+}
+
 // Satıcının teslimat bölgesini kontrol et
 async function checkSellerDeliveryRange(seller) {
     try {
