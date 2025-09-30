@@ -2105,50 +2105,8 @@ body.modal-open {
 
 	document.addEventListener('DOMContentLoaded', initApp);
 
-        // =============================================
-        // GEÇİCİ FONKSİYONLAR (1. BÖLÜM'de tamamlanacak)
-        // =============================================
-
-        // Bu fonksiyonlar 1. Bölüm'de detaylandırılacak
-        async function restoreSession() {
-            // Geçici implementasyon
-            const savedSession = localStorage.getItem('onurmarket_session');
-            if (savedSession) {
-                try {
-                    const sessionData = JSON.parse(savedSession);
-                    currentCustomer = sessionData.customer;
-                    debugLog('✅ Oturum geri yüklendi');
-                } catch (error) {
-                    console.error('Oturum geri yükleme hatası:', error);
-                }
-            }
-        }
-
-        async function loadStoreTypes() {
-            // Geçici implementasyon
-            storeTypes = [
-                { id: 1, name: 'Market', code: 'market' },
-                { id: 2, name: 'Restoran', code: 'restaurant' },
-                { id: 3, name: 'Eczane', code: 'pharmacy' }
-            ];
-            debugLog('✅ StoreTypes yüklendi');
-        }
-
-        async function checkCustomerByPhone(phone) {
-            // Geçici implementasyon - 1. Bölüm'de tamamlanacak
-            console.log('Telefon kontrolü:', phone);
-        }
-
-        function logout() {
-            // Geçici implementasyon - 1. Bölüm'de tamamlanacak
-            console.log('Çıkış yapılıyor...');
-        }
-
-        function finalizeOrder(method) {
-            // Geçici implementasyon - 3. Bölüm'de tamamlanacak
-            console.log('Ödeme yöntemi:', method);
-        }
-
+       
+      
 
 // =============================================
 // 1. BÖLÜM: LOGIN GİRİŞ VE KAYIT SÜRECİ
@@ -2207,7 +2165,7 @@ function saveSession() {
 }
 
 
-// Referans kodu işleme
+	// Referans kodu işleme
         async function processReferralCode(code, groupCode) {
             try {
                 const { data, error } = await supabase
@@ -2530,11 +2488,7 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// =============================================
-// 2. BÖLÜM: REYONLARIN, SATICILARIN YÜKLENMESİ
-// =============================================
 
-// Store type'ları yükle
 async function loadStoreTypes() {
     try {
         debugLog('🔧 StoreTypes yükleniyor...');
@@ -2696,10 +2650,12 @@ function resetSections() {
     }
 }
 
-// =============================================
-// 2. BÖLÜM VERİTABANI EKSİKLERİNİ TAMAMLAMA - REYON/SATICILAR
-// =============================================
 
+
+// =============================================
+// 2. BÖLÜM: REYONLARIN, SATICILARIN YÜKLENMESİ
+// =============================================
+// Reyon yükleme - TAMİR EDİLMİŞ
 async function loadReyonsByStoreType(storeTypeId) {
     try {
         debugLog(`🛒 Reyonlar yükleniyor, StoreType: ${storeTypeId}`);
@@ -2728,49 +2684,9 @@ async function loadReyonsByStoreType(storeTypeId) {
     }
 }
 
-// Satıcı yükleme - TAM GERÇEK SORGULAR
-async function loadSellersByStoreType(storeTypeId) {
-    try {
-        // Müşteri şehir bilgisini al
-        const customerCity = currentCustomer?.city || 'Bandırma';
-        
-        debugLog(`🔍 Satıcılar yükleniyor: ${storeTypeId}, Şehir: ${customerCity}`);
-        
-        const { data, error } = await supabase
-            .from('seller_profiles')
-            .select('*')
-            .eq('status', 'True')
-            .eq('store_type_id', storeTypeId)
-            .ilike('city', `%${customerCity}%`)
-            .order('business_name');
-
-        if (error) {
-            console.error('❌ Satıcı yükleme hatası:', error);
-            throw error;
-        }
-
-        if (data && data.length > 0) {
-            sellers = data;
-            debugLog(`✅ Satıcılar yüklendi: ${data.length} adet`);
-            updateSellersGrid();
-        } else {
-            debugLog('⚠️ Bu kategoride satıcı bulunamadı');
-            sellers = [];
-            updateSellersGrid();
-            speakToUser("Bu kategoride size yakın satıcı bulunamadı. Lütfen başka bir kategori seçin.");
-        }
-
-    } catch (error) {
-        console.error('❌ Satıcı yükleme hatası:', error);
-        // Fallback demo satıcılar
-        sellers = getDemoSellers();
-        updateSellersGrid();
-        debugLog('🔄 Demo satıcılar kullanılıyor');
-    }
-}
-	// İlk satıcıyı otomatik seç
-
-// Kategorileri/reyonları göster
+	// Satıcı yükleme - GÜÇLENDİRİLMİŞ
+loadSellersByStoreType
+// Kategorileri göster - TAMİR EDİLMİŞ
 function displayCategories(categoriesToShow, type) {
     const categoriesGrid = document.getElementById('categoriesGrid');
     if (!categoriesGrid) return;
@@ -2842,8 +2758,56 @@ function displayCategories(categoriesToShow, type) {
         categoriesGrid.appendChild(categoryCard);
     });
 }
+// Satıcı yükleme - TAMİR EDİLMİŞ
+async function loadSellersByStoreType(storeTypeId) {
+    try {
+        // Müşteri şehir bilgisini al
+        const customerCity = currentCustomer?.city || 'Bandırma';
+        
+        debugLog(`🔍 Satıcılar yükleniyor: ${storeTypeId}, Şehir: ${customerCity}`);
+        
+        const { data, error } = await supabase
+            .from('seller_profiles')
+            .select('*')
+            .eq('status', 'True')
+            .eq('store_type_id', storeTypeId)
+            .ilike('city', `%${customerCity}%`)
+            .order('business_name');
 
-// Satıcı grid'ini güncelle
+        if (error) {
+            console.error('❌ Satıcı yükleme hatası:', error);
+            throw error;
+        }
+
+        if (data && data.length > 0) {
+            sellers = data;
+            debugLog(`✅ Satıcılar yüklendi: ${data.length} adet`);
+            updateSellersGrid();
+        } else {
+            debugLog('⚠️ Bu kategoride satıcı bulunamadı');
+            sellers = [];
+            updateSellersGrid();
+            speakToUser("Bu kategoride size yakın satıcı bulunamadı. Lütfen başka bir kategori seçin.");
+        }
+
+    } catch (error) {
+        console.error('❌ Satıcı yükleme hatası:', error);
+        // Fallback demo satıcılar
+        sellers = getDemoSellers();
+        updateSellersGrid();
+        debugLog('🔄 Demo satıcılar kullanılıyor');
+    }
+}
+	// İlk satıcıyı otomatik seç
+function selectFirstSeller(sellerId) {
+    const sellerCard = document.querySelector(`[data-seller-id="${sellerId}"]`);
+    if (sellerCard) {
+        sellerCard.click();
+        debugLog(`✅ İlk satıcı otomatik seçildi: ${sellerId}`);
+    }
+}
+	
+// Satıcı grid'ini güncelle - TAMİR EDİLMİŞ
 function updateSellersGrid() {
     const sellerGrid = document.getElementById('sellerGrid');
     if (!sellerGrid) return;
@@ -2899,71 +2863,6 @@ function updateSellersGrid() {
         sellerGrid.appendChild(sellerCard);
     });
 }
-// Fallback veriler
-async function useFallbackStoreTypes() {
-    // Manuel olarak tüm store type'ları tanımlayın
-    storeTypes = [
-        { id: '1', name: 'Market', code: 'market', description: 'Market ve bakkallar' },
-        { id: '2', name: 'Restoran', code: 'restaurant', description: 'Yemek restoranları' },
-        { id: '3', name: 'Kafe', code: 'cafe', description: 'Kafe ve pastaneler' },
-        { id: '4', name: 'Fırın', code: 'bakery', description: 'Fırın ve unlu mamüller' },
-        { id: '5', name: 'Eczane', code: 'pharmacy', description: 'Eczane ve ilaçlar' },
-        { id: '6', name: 'Teknoloji', code: 'technology', description: 'Elektronik ürünler' },
-        { id: '7', name: 'Giyim', code: 'clothing', description: 'Giyim mağazaları' },
-        { id: '8', name: 'Kitap', code: 'bookstore', description: 'Kitapçılar' },
-        { id: '9', name: 'Spor', code: 'sports', description: 'Spor malzemeleri' },
-        { id: '10', name: 'Kozmetik', code: 'cosmetics', description: 'Kozmetik ürünler' },
-        { id: '11', name: 'Ev Eşyası', code: 'home', description: 'Ev eşyaları' },
-        { id: '12', name: 'Oyuncak', code: 'toys', description: 'Oyuncak mağazaları' }
-    ];
-    
-    localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
-    displayStoreTypes(storeTypes);
-    debugLog('🔄 Manuel StoreTypes kullanılıyor');
-}
-
-
-function getDemoReyons(storeTypeId) {
-    const demoReyons = {
-        '1': [ // Market reyonları
-            { id: '1', name: 'Meyve & Sebze', image_url: '' },
-            { id: '2', name: 'Süt Ürünleri', image_url: '' },
-            { id: '3', name: 'Et & Tavuk', image_url: '' }
-        ],
-        '2': [ // Restoran kategorileri
-            { id: '4', name: 'Ana Yemekler' },
-            { id: '5', name: 'Çorbalar' },
-            { id: '6', name: 'Tatlılar' }
-        ],
-        '3': [ // Eczane kategorileri
-            { id: '7', name: 'Ağrı Kesiciler' },
-            { id: '8', name: 'Vitaminler' }
-        ]
-    };
-    
-    return demoReyons[storeTypeId] || [];
-}
-
-
-function getDemoSellers() {
-    return [
-        { 
-            id: '1', 
-            full_name: "Migros", 
-            city: "İstanbul", 
-            imgurl: "https://via.placeholder.com/200x120?text=Migros", 
-            address: "Kadıköy, İstanbul"
-        },
-        { 
-            id: '2', 
-            full_name: "CarrefourSA", 
-            city: "İstanbul", 
-            imgurl: "https://via.placeholder.com/200x120?text=Carrefour", 
-            address: "Beşiktaş, İstanbul"
-        }
-    ];
-}
-
 // Satıcı seç - TAMİR EDİLMİŞ
 async function selectSeller(seller) {
     // Tüm satıcı kartlarından seçimi kaldır
@@ -2999,6 +2898,7 @@ async function selectSeller(seller) {
     // Satıcının ürünlerini yükle
     await loadSellerProducts(seller.id);
 }
+
 // Reyona göre ürünleri grupla
 function displayProductsByReyon(productsToShow) {
     if (!productsToShow || productsToShow.length === 0) {
@@ -3024,6 +2924,7 @@ function displayProductsByReyon(productsToShow) {
     // Ürünleri göster
     displayProducts(productsToShow);
 }
+	
 // Reyonaları ürünlerle güncelle
 function updateReyonsWithProducts(products) {
     if (!categories || categories.length === 0) return;
@@ -3046,6 +2947,68 @@ function updateReyonsWithProducts(products) {
         }
     });
 }	
+	// Fallback veriler
+async function useFallbackStoreTypes() {
+    // Manuel olarak tüm store type'ları tanımlayın
+    storeTypes = [
+        { id: '1', name: 'Market', code: 'market', description: 'Market ve bakkallar' },
+        { id: '2', name: 'Restoran', code: 'restaurant', description: 'Yemek restoranları' },
+        { id: '3', name: 'Kafe', code: 'cafe', description: 'Kafe ve pastaneler' },
+        { id: '4', name: 'Fırın', code: 'bakery', description: 'Fırın ve unlu mamüller' },
+        { id: '5', name: 'Eczane', code: 'pharmacy', description: 'Eczane ve ilaçlar' },
+        { id: '6', name: 'Teknoloji', code: 'technology', description: 'Elektronik ürünler' },
+        { id: '7', name: 'Giyim', code: 'clothing', description: 'Giyim mağazaları' },
+        { id: '8', name: 'Kitap', code: 'bookstore', description: 'Kitapçılar' },
+        { id: '9', name: 'Spor', code: 'sports', description: 'Spor malzemeleri' },
+        { id: '10', name: 'Kozmetik', code: 'cosmetics', description: 'Kozmetik ürünler' },
+        { id: '11', name: 'Ev Eşyası', code: 'home', description: 'Ev eşyaları' },
+        { id: '12', name: 'Oyuncak', code: 'toys', description: 'Oyuncak mağazaları' }
+    ];
+    
+    localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
+    displayStoreTypes(storeTypes);
+    debugLog('🔄 Manuel StoreTypes kullanılıyor');
+}
+function getDemoReyons(storeTypeId) {
+    const demoReyons = {
+        '1': [ // Market reyonları
+            { id: '1', name: 'Meyve & Sebze', image_url: '' },
+            { id: '2', name: 'Süt Ürünleri', image_url: '' },
+            { id: '3', name: 'Et & Tavuk', image_url: '' }
+        ],
+        '2': [ // Restoran kategorileri
+            { id: '4', name: 'Ana Yemekler' },
+            { id: '5', name: 'Çorbalar' },
+            { id: '6', name: 'Tatlılar' }
+        ],
+        '3': [ // Eczane kategorileri
+            { id: '7', name: 'Ağrı Kesiciler' },
+            { id: '8', name: 'Vitaminler' }
+        ]
+    };
+    
+    return demoReyons[storeTypeId] || [];
+}
+
+function getDemoSellers() {
+    return [
+        { 
+            id: '1', 
+            full_name: "Migros", 
+            city: "İstanbul", 
+            imgurl: "https://via.placeholder.com/200x120?text=Migros", 
+            address: "Kadıköy, İstanbul"
+        },
+        { 
+            id: '2', 
+            full_name: "CarrefourSA", 
+            city: "İstanbul", 
+            imgurl: "https://via.placeholder.com/200x120?text=Carrefour", 
+            address: "Beşiktaş, İstanbul"
+        }
+    ];
+}
+
 
 
 
@@ -3953,3 +3916,4 @@ function getDemoProducts() {
 </script>	
 </body>
 </html>
+
