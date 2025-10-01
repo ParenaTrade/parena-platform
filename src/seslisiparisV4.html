@@ -2403,22 +2403,6 @@ function setupHorizontalScrolling() {
             });
         });
         
-        // Konum modalını göster
-        function showLocationModal() {
-            document.getElementById('locationModal').style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        }
-        
-        // Konum modalını gizle
-        function hideLocationModal() {
-            document.getElementById('locationModal').style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-
-
-
-
-
         // =============================================
         // BAŞLANGIÇ KODLARI - 1. BÖLÜM ÖNCESİ
         // =============================================
@@ -3496,22 +3480,7 @@ function onUserLoggedIn() {
                 logoutBtn.style.display = currentCustomer ? 'block' : 'none';
             }
         }
-
-        function showHowItWorksBanner() {
-            if (howItWorks) howItWorks.style.display = 'block';
-            if (categoriesSection) categoriesSection.style.display = 'none';
-            if (sellersSection) sellersSection.style.display = 'none';
-            if (productsSection) productsSection.style.display = 'none';
-            if (orderSummary) orderSummary.style.display = 'none';
-        }
-
-        function hideHowItWorksBanner() {
-            if (howItWorks) howItWorks.style.display = 'none';
-            if (categoriesSection) categoriesSection.style.display = 'block';
-            if (sellersSection) sellersSection.style.display = 'block';
-            if (orderSummary) orderSummary.style.display = 'flex';
-        }
-
+        
         function updateCustomerUI() {
             if (currentCustomer) {
                 if (userName) userName.textContent = currentCustomer.name || 'Profilim';
@@ -3725,13 +3694,6 @@ async function initApp() {
     }
 }	
 
-        // Yardımcı fonksiyonlar
-        function scrollElement(element, amount) {
-            if (element) {
-                element.scrollBy({ left: amount, behavior: 'smooth' });
-            }
-        }
-
 // Sepet toggle fonksiyonu - GÜVENLİ
 function toggleCart() {
     try {
@@ -3744,18 +3706,8 @@ function toggleCart() {
         console.error('❌ Sepet toggle hatası:', error);
     }
 }
-        function openCart() {
-            if (cartContainer) {
-                cartContainer.classList.add('open');
-            }
-        }
-
-        function closeCart() {
-            if (cartContainer) {
-                cartContainer.classList.remove('open');
-            }
-        }
-
+       
+    
     // Sadece bir event listener ekle
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -3889,57 +3841,6 @@ function saveSession() {
 // =============================================
 // 1. BÖLÜM EKSİKLERİNİ TAMAMLAMA - VERİTABANI BAĞLANTILARI
 // =============================================
-
-// Müşteri kontrolü - GÜNCELLENMİŞ
-async function checkCustomerByPhone(phone) {
-    try {
-        const cleanPhone = phone.replace(/\D/g, '');
-        
-        const { data, error } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('phone', cleanPhone)
-            .maybeSingle();
-        
-        if (error) {
-            console.error('Müşteri sorgulama hatası:', error);
-            throw error;
-        }
-        
-        if (data) {
-            // MEVCUT KULLANICI
-            currentCustomer = data;
-            updateCustomerUI();
-            hideHowItWorksBanner();
-            orderSummary.style.display = 'flex';
-            
-            speakToUser(`Hoş geldiniz ${data.name}!`);
-            
-            // Oturum açıldığında yapılacak işlemler
-            onUserLoggedIn();
-            
-            saveSession();
-            
-            if (!selectedLocation) {
-                showLocationModal();
-            }
-        } else {
-            // YENİ KULLANICI
-            speakToUser("Telefon numaranız kayıtlı değil. Yeni üyelik oluşturalım. Lütfen adınızı ve soyadınızı söyler misiniz?");
-            currentRoot = "8:2";
-            
-            currentCustomer = { 
-                phone: cleanPhone, 
-                role: 'customer',
-                bonus_amount: 0 
-            };
-        }
-        
-    } catch (error) {
-        console.error('Müşteri kontrol hatası:', error);
-        speakToUser("Sistemde geçici bir sorun oluştu. Lütfen daha sonra tekrar deneyiniz.");
-    }
-}
 
 
 // Müşteri kontrolü - ADRES TEYİDİ EKLENDİ
@@ -4131,21 +4032,7 @@ async function createCustomerProfile(customerData) {
             }
         }
 
- 
-// Kullanıcı arayüzünü güncelle
-function updateCustomerUI() {
-    if (currentCustomer) {
-        if (userName) userName.textContent = currentCustomer.name || 'Profilim';
-        if (profileName) profileName.textContent = currentCustomer.name || '-';
-        if (profilePhone) profilePhone.textContent = currentCustomer.phone || '-';
-        if (profileCity) profileCity.textContent = currentCustomer.city || '-';
-        if (profileAddress) profileAddress.textContent = currentCustomer.address || '-';
-        if (profileBonus) profileBonus.textContent = money(currentCustomer.bonus_amount || 0);
-        if (profileAvatar) profileAvatar.textContent = (currentCustomer.name || 'P').charAt(0).toUpperCase();
-    }
-}
-
-// Çıkış işlemi
+ // Çıkış işlemi
 async function logout() {
     try {
         speakToUser("Oturumunuz kapatılıyor...");
@@ -4577,19 +4464,7 @@ function getDemoReyons() {
     ];
 }
 
-// Demo ürünler (yedek)
-function getDemoProducts() {
-    return [
-        { 
-            id: 1, 
-            name: 'Demo Ürün 1', 
-            price: 25.99, 
-            imgurl: '', 
-            unit_type: 'kg',
-            description: 'Demo ürün açıklaması'
-        }
-    ];
-}
+
 
 // Kategorileri göster - ÜRÜN YÜKLEME DÜZELTMESİ
 function displayCategories(categoriesToShow, type) {
@@ -5111,78 +4986,6 @@ function getStoreTypeName(storeTypeId) {
     if (!storeTypes || storeTypes.length === 0) return '';
     const storeType = storeTypes.find(type => type.id === storeTypeId);
     return storeType ? storeType.name : '';
-}
-
-// Satıcı grid'ini güncelle - Teslimat bilgisi ekle
-function updateSellersGrid() {
-    const sellerGrid = document.getElementById('sellerGrid');
-    if (!sellerGrid) return;
-    
-    sellerGrid.innerHTML = '';
-    
-    if (sellers.length === 0) {
-        sellerGrid.innerHTML = `
-            <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
-                <i class="fas fa-store fa-3x mb-3"></i>
-                <p>Bu kategoride size yakın satıcı bulunamadı</p>
-                <small>Lütfen konumunuzu veya kategoriyi değiştirin</small>
-            </div>
-        `;
-        return;
-    }
-    
-    sellers.forEach(seller => {
-        const sellerCard = document.createElement('div');
-        sellerCard.className = 'seller-card';
-        sellerCard.dataset.sellerId = seller.id;
-        
-        if (selectedSellerId === seller.id) {
-            sellerCard.classList.add('selected');
-        }
-        if (isSellerLocked && selectedSellerId !== seller.id) {
-            sellerCard.classList.add('disabled');
-        }
-        
-        // Teslimat bilgilerini hazırla
-        let deliveryInfo = '';
-        if (seller.delivery_fee > 0) {
-            deliveryInfo = `<div class="delivery-fee">Teslimat: ${money(seller.delivery_fee)}</div>`;
-        } else if (seller.delivery_fee === 0) {
-            deliveryInfo = `<div class="delivery-fee free">Ücretsiz Teslimat</div>`;
-        }
-        
-        if (seller.min_order_amount > 0) {
-            deliveryInfo += `<div class="min-order">Min. Sipariş: ${money(seller.min_order_amount)}</div>`;
-        }
-        
-        sellerCard.innerHTML = `
-            <div class="seller-image-container">
-                <img src="${seller.imgurl || getDefaultSellerImage(seller)}" 
-                     alt="${seller.business_name || seller.full_name}" 
-                     class="seller-image"
-                     onerror="this.src='${getDefaultSellerImage(seller)}'; this.onerror=null;">
-            </div>
-            <div class="seller-info">
-                <div class="seller-name">${seller.business_name || seller.full_name}</div>
-                <div class="seller-details">
-                    <span><i class="fas fa-map-marker-alt"></i> ${seller.city || 'Şehir belirtilmemiş'}</span>
-                    <span><i class="fas fa-star" style="color: gold;"></i> ${seller.rating || '4.5'}</span>
-                </div>
-                ${deliveryInfo ? `<div class="delivery-info">${deliveryInfo}</div>` : ''}
-            </div>
-        `;
-        
-        sellerCard.addEventListener('click', () => {
-            if (isSellerLocked && selectedSellerId !== seller.id) {
-                speakToUser("Önce sepetinizi boşaltmalısınız farklı bir satıcı seçmek için.");
-                return;
-            }
-            
-            selectSeller(seller);
-        });
-        
-        sellerGrid.appendChild(sellerCard);
-    });
 }
 
 // Satıcı grid'ini güncelle - FİLTRELENMİŞ SATICILARI GÖSTER
@@ -6859,19 +6662,7 @@ displayProducts = function(productsToShow) {
     originalDisplayProducts(productsToShow);
     setTimeout(enhanceProductCardsForVoice, 100);
 };
-
-// Müşteri kontrolü (mevcut fonksiyon)
-async function checkCustomerByPhone(phone) {
-    // Mevcut kod aynen kalacak
-    const { data } = await supabase.from('customers').select().eq('phone', phone);
-    if (data && data.length > 0) {
-        currentCustomer = data[0];
-        currentRoot = '2:1'; // Satıcı seçimine git
-    } else {
-        currentRoot = '1:4'; // Kayıt ekranına git
-    }
-}
-
+	
 // =============================================
 // YARDIMCI FONKSİYONLAR
 // =============================================
@@ -7845,15 +7636,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return distance;
 }
 
-// Sepet işlemleri
-function toggleCart() {
-    if (cartContainer.classList.contains('open')) {
-        closeCart();
-    } else {
-        openCart();
-    }
-}
-
 // Sepet açma fonksiyonu - GÜVENLİ
 function openCart() {
     try {
@@ -7952,26 +7734,7 @@ function scrollElement(element, amount) {
     element.scrollBy({ left: amount, behavior: 'smooth' });
 }
 
-// Demo veri fallback'leri
-function getDemoReyons(storeTypeId) {
-    const demoReyons = {
-        '1': [ { id: '1', name: 'Meyve & Sebze' }, { id: '2', name: 'Süt Ürünleri' } ],
-        '2': [ { id: '3', name: 'Ana Yemekler' }, { id: '4', name: 'Çorbalar' } ]
-    };
-    return demoReyons[storeTypeId] || [];
-}
 
-function getDemoSellers() {
-    return [
-        { id: '1', full_name: "Demo Market", city: "İstanbul", business_name: "Demo Market" }
-    ];
-}
-
-function getDemoProducts() {
-    return [
-        { id: '1', name: "Demo Ürün", price: 10.00, seller_id: '1', product_price_id: '1' }
-    ];
-}
 
 </script>	
 </body>
