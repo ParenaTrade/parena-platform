@@ -2288,8 +2288,8 @@ function setupHorizontalScrolling() {
 // VIDEO AUTOPLAY SORUNU ÇÖZÜMÜ
 // =============================================
 
-// Banner video autoplay sorununu çöz
-	function setupBannerVideo() {
+// Banner video autoplay sorununu çöz - DOMContentLoaded DIŞINDA tanımla
+function setupBannerVideo() {
     const bannerVideo = document.getElementById('bannerVideo');
     if (!bannerVideo) return;
     
@@ -2315,51 +2315,7 @@ function setupHorizontalScrolling() {
     bannerVideo.playsInline = true;
     bannerVideo.setAttribute('playsinline', '');
     bannerVideo.setAttribute('webkit-playsinline', '');
-
-  }); 
-            
-            // Banner konum butonu
-            document.getElementById('bannerLocationBtn').addEventListener('click', function() {
-                showLocationModal();
-            });
-            
-            // Konum modalı event'leri
-            document.getElementById('closeLocationModal').addEventListener('click', hideLocationModal);
-            
-            document.querySelectorAll('.location-option').forEach(option => {
-                option.addEventListener('click', function() {
-                    // Tüm seçeneklerden seçimi kaldır
-                    document.querySelectorAll('.location-option').forEach(opt => {
-                        opt.classList.remove('selected');
-                    });
-                    
-                    // Bu seçeneği seçili yap
-                    this.classList.add('selected');
-                    
-                    // Konum türünü seç
-                    const locationType = this.getAttribute('data-location');
-                    
-                    // Modal'ı kapat
-                    setTimeout(hideLocationModal, 500);
-                });
-            });
-            
-            // Konum tespit butonu
-            document.getElementById('detectLocationBtn').addEventListener('click', function() {
-                // Konum tespit simülasyonu
-                const resultDiv = document.getElementById('locationResult');
-                resultDiv.style.display = 'block';
-                resultDiv.innerHTML = `
-                    <div style="color: var(--success);">
-                        <i class="fas fa-check-circle"></i> 
-                        <strong>Konumunuz Belirlendi!</strong>
-                        <div style="font-size: 12px; margin-top: 5px;">
-                            Kadıköy, İstanbul
-                        </div>
-                    </div>
-                `;
-            });
-            
+}            
             // Dışarı tıklayınca modal'ı kapat
             window.addEventListener('click', function(e) {
                 if (e.target === document.getElementById('locationModal')) {
@@ -3678,31 +3634,71 @@ function toggleCart() {
 document.addEventListener('DOMContentLoaded', function() {
     if (domLoaded) return;
     domLoaded = true;
-
-    console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
-
-    // Dil seçeneklerini oluştur
-    populateLanguageOptions();
     
-    // Tarayıcı dilini algıla ve çevir
+    console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
+    
+    // Tüm initialization işlemleri
+    populateLanguageOptions();
     const browserLang = detectBrowserLanguage();
     translatePage(browserLang);
-    
-    // Varsayılan banner'ı yükle
     updateBanner('market');
-    
-    // Yatay kaydırma ayarlarını yap
     setupHorizontalScrolling();
-    
-    // Örnek verileri yükle
     loadSampleData();
-    
-    // Ödeme butonlarını güncelle
     updatePaymentButtons();
-    
-    // Sepet konteynırını güncelle
     updateCartContainer();
-
+    
+    // Banner video setup
+    setupBannerVideo();
+    
+    // Banner konum butonu
+    document.getElementById('bannerLocationBtn').addEventListener('click', function() {
+        showLocationModal();
+    });
+            
+    // Konum modalı event'leri
+    document.getElementById('closeLocationModal').addEventListener('click', hideLocationModal);
+            
+    document.querySelectorAll('.location-option').forEach(option => {
+        option.addEventListener('click', function() {
+            // Tüm seçeneklerden seçimi kaldır
+            document.querySelectorAll('.location-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+                    
+            // Bu seçeneği seçili yap
+            this.classList.add('selected');
+                    
+            // Konum türünü seç
+            const locationType = this.getAttribute('data-location');
+                    
+            // Modal'ı kapat
+            setTimeout(hideLocationModal, 500);
+        });
+    });
+            
+    // Konum tespit butonu
+    document.getElementById('detectLocationBtn').addEventListener('click', function() {
+        // Konum tespit simülasyonu
+        const resultDiv = document.getElementById('locationResult');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div style="color: var(--success);">
+                <i class="fas fa-check-circle"></i> 
+                <strong>Konumunuz Belirlendi!</strong>
+                <div style="font-size: 12px; margin-top: 5px;">
+                    Kadıköy, İstanbul
+                </div>
+            </div>
+        `;
+    });
+            
+    // Dışarı tıklayınca modal'ı kapat
+    window.addEventListener('click', function(e) {
+        if (e.target === document.getElementById('locationModal')) {
+            hideLocationModal();
+        }
+    });
+    
     // Dil değiştirme event'leri
     document.getElementById('languageBtn').addEventListener('click', function() {
         document.getElementById('languageDropdown').classList.toggle('show');
@@ -3719,8 +3715,8 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('languageDropdown').classList.remove('show');
         }
     });
-
-    // Sepet kontrolü
+    
+    // Sepet durumu kontrolü
     if (cartContainer) {
         setTimeout(() => {
             const hasItems = cart.length > 0 || pendingCart.length > 0;
@@ -3730,7 +3726,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 2000);
     }
-
+    
     // Ana uygulamayı başlat
     initApp().catch(error => {
         console.error('❌ Uygulama başlatma hatası:', error);
@@ -3738,7 +3734,36 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// =============================================
+// Banner video autoplay sorununu çöz - DOMContentLoaded DIŞINDA tanımla
+function setupBannerVideo() {
+    const bannerVideo = document.getElementById('bannerVideo');
+    if (!bannerVideo) return;
+    
+    // Video yükleme event'leri
+    bannerVideo.addEventListener('loadeddata', function() {
+        console.log('🎥 Video yüklendi, oynatılmaya çalışılıyor...');
+        this.play().catch(e => {
+            console.log('⚠️ Video otomatik oynatılamıyor:', e.name);
+        });
+    });
+    
+    bannerVideo.addEventListener('error', function(e) {
+        console.error('❌ Video yükleme hatası:', e);
+        // Fallback: Arkaplan rengi göster
+        const banner = document.getElementById('banner');
+        if (banner) {
+            banner.style.background = 'linear-gradient(135deg, var(--primary), var(--primary-light))';
+        }
+    });
+    
+    // Muted ve playsinline özelliklerini garanti et
+    bannerVideo.muted = true;
+    bannerVideo.playsInline = true;
+    bannerVideo.setAttribute('playsinline', '');
+    bannerVideo.setAttribute('webkit-playsinline', '');
+}
+
+	// =============================================
 // 1. BÖLÜM: LOGIN GİRİŞ VE KAYIT SÜRECİ
 // =============================================
 
