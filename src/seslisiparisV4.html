@@ -2316,42 +2316,7 @@ function setupHorizontalScrolling() {
     bannerVideo.setAttribute('playsinline', '');
     bannerVideo.setAttribute('webkit-playsinline', '');
 }
-
-
-	
-        document.addEventListener('DOMContentLoaded', function() {
-            // Dil seçeneklerini oluştur
-            populateLanguageOptions();
-            
-            // Tarayıcı dilini algıla ve çevir
-            const browserLang = detectBrowserLanguage();
-            translatePage(browserLang);
-            
-            // Varsayılan banner'ı yükle
-            updateBanner('market');
-            
-            // Yatay kaydırma ayarlarını yap
-            setupHorizontalScrolling();
-            
-            // Örnek verileri yükle
-            loadSampleData();
-            
-            // Dil değiştirme event'leri
-            document.getElementById('languageBtn').addEventListener('click', function() {
-                document.getElementById('languageDropdown').classList.toggle('show');
-            });
-            
-            document.addEventListener('click', function(e) {
-                if (!e.target.closest('.language-selector')) {
-                    document.getElementById('languageDropdown').classList.remove('show');
-                }
-                
-                if (e.target.closest('.language-option')) {
-                    const lang = e.target.closest('.language-option').getAttribute('data-lang');
-                    translatePage(lang);
-                    document.getElementById('languageDropdown').classList.remove('show');
-                }
-            });
+     });
             
             // Banner konum butonu
             document.getElementById('bannerLocationBtn').addEventListener('click', function() {
@@ -3707,33 +3672,66 @@ function toggleCart() {
     }
 }
        
-    
-    // Sadece bir event listener ekle
-
-document.addEventListener('DOMContentLoaded', function() {
-    if (domLoaded) return;
-    domLoaded = true;
-    
-    console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
-    initApp().catch(error => {
-        console.error('❌ Uygulama başlatma hatası:', error);
-        emergencyFallback();
-    });
-});
-
-
-
 // =============================================
 // GÜNCELLENMİŞ EVENT HANDLER
 // =============================================
-
-// Sadece bir event listener ekle
-
 document.addEventListener('DOMContentLoaded', function() {
     if (domLoaded) return;
     domLoaded = true;
-    
+
     console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
+
+    // Dil seçeneklerini oluştur
+    populateLanguageOptions();
+    
+    // Tarayıcı dilini algıla ve çevir
+    const browserLang = detectBrowserLanguage();
+    translatePage(browserLang);
+    
+    // Varsayılan banner'ı yükle
+    updateBanner('market');
+    
+    // Yatay kaydırma ayarlarını yap
+    setupHorizontalScrolling();
+    
+    // Örnek verileri yükle
+    loadSampleData();
+    
+    // Ödeme butonlarını güncelle
+    updatePaymentButtons();
+    
+    // Sepet konteynırını güncelle
+    updateCartContainer();
+
+    // Dil değiştirme event'leri
+    document.getElementById('languageBtn').addEventListener('click', function() {
+        document.getElementById('languageDropdown').classList.toggle('show');
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.language-selector')) {
+            document.getElementById('languageDropdown').classList.remove('show');
+        }
+        
+        if (e.target.closest('.language-option')) {
+            const lang = e.target.closest('.language-option').getAttribute('data-lang');
+            translatePage(lang);
+            document.getElementById('languageDropdown').classList.remove('show');
+        }
+    });
+
+    // Sepet kontrolü
+    if (cartContainer) {
+        setTimeout(() => {
+            const hasItems = cart.length > 0 || pendingCart.length > 0;
+            if (hasItems) {
+                openCart();
+                debugLog('🛒 Sayfa yüklendi - Sepet otomatik açıldı (ürün var)');
+            }
+        }, 2000);
+    }
+
+    // Ana uygulamayı başlat
     initApp().catch(error => {
         console.error('❌ Uygulama başlatma hatası:', error);
         emergencyFallback();
@@ -6507,33 +6505,6 @@ setupSessionListeners();
 // SAYFA YÜKLENDİĞİNDE OTURUM SİSTEMİNİ BAŞLAT
 // =============================================
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Ödeme butonlarını güncelle
-    updatePaymentButtons();
-    
-    // Sepet konteynırını güncelle
-    updateCartContainer();
-});
-
-
-// Sayfa yüklendiğinde sepet durumunu kontrol et
-document.addEventListener('DOMContentLoaded', function() {
-    // Sepet konteynırını kontrol et
-    if (!cartContainer) {
-        console.error('❌ Sepet konteynırı bulunamadı!');
-        return;
-    }
-    
-    // Eğer sepette ürün varsa sepeti aç
-    setTimeout(() => {
-        const hasItems = cart.length > 0 || pendingCart.length > 0;
-        if (hasItems) {
-            openCart();
-            debugLog('🛒 Sayfa yüklendi - Sepet otomatik açıldı (ürün var)');
-        }
-    }, 2000);
-});
-
 // Ödeme butonlarını güncelle - OTURUM KONTROLLÜ
 function updatePaymentButtons() {
     if (!payCashBtn || !payCardBtn || !payBonusBtn) return;
@@ -6564,25 +6535,6 @@ function updatePaymentButtons() {
         payBonusBtn.style.opacity = '';
     }
 }
-
-
-// Sayfa yüklendiğinde sepet durumunu kontrol et
-document.addEventListener('DOMContentLoaded', function() {
-    // Sepet konteynırını kontrol et
-    if (!cartContainer) {
-        console.error('❌ Sepet konteynırı bulunamadı!');
-        return;
-    }
-    
-    // Eğer sepette ürün varsa sepeti aç
-    setTimeout(() => {
-        const hasItems = cart.length > 0 || pendingCart.length > 0;
-        if (hasItems) {
-            openCart();
-            debugLog('🛒 Sayfa yüklendi - Sepet otomatik açıldı (ürün var)');
-        }
-    }, 2000);
-});
 
 // =============================================
 // ÜRÜN EKLEME KOMUTLARI İÇİN KURAL GÜNCELLEMESİ
