@@ -1940,41 +1940,40 @@
             bannerDescription.textContent = description;
         }
 
-// Banner video fallback sistemi
-function setupBannerFallback() {
-    const banner = document.getElementById('banner');
+	function setupBannerVideo() {
     const bannerVideo = document.getElementById('bannerVideo');
+    const banner = document.getElementById('banner');
     
-    if (!banner || !bannerVideo) return;
-    
-    // Video yüklenemezse fallback
-    bannerVideo.addEventListener('error', function() {
-        console.log('🎥 Video yüklenemedi, fallback aktif');
-        banner.style.background = 'linear-gradient(135deg, var(--primary), var(--primary-light))';
-        bannerVideo.style.display = 'none';
-    });
-    
-    // Video yüklenirse
+    if (!bannerVideo || !banner) return;
+
+    // Muted ve playsinline özelliklerini garanti et
+    bannerVideo.muted = true;
+    bannerVideo.playsInline = true;
+    bannerVideo.setAttribute('playsinline', '');
+    bannerVideo.setAttribute('webkit-playsinline', '');
+
+    // Video yükleme event'leri
     bannerVideo.addEventListener('loadeddata', function() {
-        console.log('🎥 Video başarıyla yüklendi');
+        console.log('🎥 Video yüklendi, oynatılmaya çalışılıyor...');
         this.play().catch(e => {
-            console.log('⚠️ Video oynatılamadı:', e.name);
+            console.log('⚠️ Video otomatik oynatılamıyor:', e.name);
             // Oynatılamazsa fallback
-            banner.style.background = 'linear-gradient(135deg, var(--primary), var(--primary-light))';
-            bannerVideo.style.display = 'none';
+            fallbackToGradient();
         });
     });
+    
+    bannerVideo.addEventListener('error', function(e) {
+        console.error('❌ Video yükleme hatası:', e);
+        fallbackToGradient();
+    });
+
+    function fallbackToGradient() {
+        banner.style.background = 'linear-gradient(135deg, var(--primary), var(--primary-light))';
+        bannerVideo.style.display = 'none';
+    }
 }
-
-// Banner fallback'i başlat
-document.addEventListener('DOMContentLoaded', setupBannerFallback);
-
 	
-        // =============================================
-        // YATAY KAYDIRMA FONKSİYONLARI
-        // =============================================
-        
-        
+	
         // =============================================
         // ÖRNEK VERİ YÜKLEME
         // =============================================
