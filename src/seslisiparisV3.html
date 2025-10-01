@@ -2450,6 +2450,7 @@ function showLocationModal() {
 }
 
 // Konum seçimini güncelle - TÜM SATICILARI YÜKLE
+// Konum seçimini güncelle - KÖK DEĞİŞİKLİĞİ EKLENDİ
 function selectLocation(locationType) {
     console.log('📍 Seçilen konum:', locationType);
     
@@ -2475,15 +2476,18 @@ function selectLocation(locationType) {
     updateLocationText();
     hideLocationModal();
     
+    // KÖK DEĞİŞİKLİĞİ: Konum seçildi, mağaza tipi seçimine geç
+    currentRoot = "1:0";
+    
     // KONUM SEÇİLDİĞİNDE TÜM SATICILARI YÜKLE
     loadAllSellersByLocation();
     
     debugLog('📍 Konum seçildi:', locationType);
     
     if (locationType === 'delivery') {
-        speakToUser(`Konumunuz kaydedildi: ${userLocation.district}, ${userLocation.city}. Tüm satıcılar yükleniyor.`);
+        speakToUser(`Konumunuz kaydedildi: ${userLocation.district}, ${userLocation.city}. Hangi mağaza tipinden alışveriş yapmak istersiniz? Market, restoran, eczane?`);
     } else {
-        speakToUser(`Konumunuz kaydedildi: ${locationType === 'inside' ? 'Restoran içinde' : 'Paket servis'}. Tüm satıcılar yükleniyor.`);
+        speakToUser(`Konumunuz kaydedildi: ${locationType === 'inside' ? 'Restoran içinde' : 'Paket servis'}. Hangi mağaza tipinden alışveriş yapmak istersiniz?`);
     }
 }
 
@@ -3148,63 +3152,26 @@ function saveManualAddress() {
         }
 
         function processVoiceCommand(transcript) {
-            const message = transcript.toLowerCase();
-            if (userMessage) {
-                userMessage.textContent = transcript;
-            }
+    const message = transcript.toLowerCase().trim();
+    if (userMessage) userMessage.textContent = transcript;
 
-            // Store type seçimi
-            if (message.includes('market')) {
-                selectStoreTypeByName('Market');
-                speakToUser("Market seçildi. Size en yakın marketler listeleniyor.");
-            } else if (message.includes('restoran') || message.includes('lokanta')) {
-                selectStoreTypeByName('Restoran');
-                speakToUser("Restoran Ses Geliyormu seçildi. Size en yakın restoranlar listeleniyor.");
-            } else if (message.includes('eczane')) {
-                selectStoreTypeByName('Eczane');
-                speakToUser("Eczane seçildi. Size en yakın eczaneler listeleniyor.");
-            } else if (message.includes('fırın')) {
-                selectStoreTypeByName('Fırın');
-                speakToUser("Fırın seçildi. Size en yakın fırınlar listeleniyor.");
-            }
-            
-            // Giriş süreci
-            if (conversationStep === 0) {
-                if (message.includes('evet') || message.includes('isterim') || message.includes('tabi') || message.includes('olur')) {
-                    speakToUser("Harika! Telefon numaranızı söyler misiniz?");
-                    conversationStep = 1;
-                } else if (message.includes('hayır') || message.includes('istemiyorum')) {
-                    speakToUser("Peki, giriş yapmak istediğiniz zaman bana 'Evet' deyin.");
-                } else {
-                    speakToUser("Giriş yapmak istiyor musunuz? Lütfen 'Evet' veya 'Hayır' diyerek yanıt verin.");
-                }
-                return;
-            }
-            
-            if (conversationStep === 1) {
-                const phoneMatch = message.match(/\d+/g);
-                if (phoneMatch) {
-                    const phone = phoneMatch.join('');
-                    checkCustomerByPhone(phone);
-                } else {
-                    speakToUser("Telefon numaranızı anlayamadım. Lütfen numaranızı söyler misiniz?");
-                }
-                return;
-            }
-            
-            // Diğer komutlar için buraya eklemeler yapılacak
-        }
+    debugLog(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot}`);
 
-        function selectStoreTypeByName(typeName) {
-            const typeCard = Array.from(document.querySelectorAll('.seller-type-card')).find(card => 
-                card.dataset.typeName === typeName
-            );
-            
-            if (typeCard) {
-                typeCard.click();
-            }
-        }
+    // Askıda cevap varsa, onu işle
+    if (pendingResponse) {
+        return handlePendingResponse(message);
+    }
 
+    // Mevcut kök için kuralları ara
+    const match = findRuleMatch(message, currentRoot);
+    
+    if (match) {
+        executeMatchedRule(match, message);
+    } else {
+        // Eşleşme yoksa AI'ya yönlendir
+        handleAIRequest(message, currentRoot);
+    }
+}
         // =============================================
         // SAYFA YÜKLEME SÜRECİ
         // =============================================
@@ -3485,20 +3452,22 @@ function saveManualAddress() {
         // ANA UYGULAMA BAŞLATMA
         // =============================================
 
-        async function initApp() {
+      // =============================================
+// ANA UYGULAMA BAŞLATMA - REVİZE EDİLMİŞ
+// =============================================
+
+async function initApp() {
     try {
         debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
-        // 1. VERİTABANI ODAKLI ASİSTAN SİSTEMİ		
-        await loadCommandRules();
-
-        // 2. DOM hazır olana kadar bekle
+        
+        // 1. DOM hazır olana kadar bekle
         await waitForDOMElements();
         debugLog('✅ DOM hazır');
 
-        // 3. Konum event'lerini ayarla
+        // 2. Konum event'lerini ayarla
         setupLocationEvents();
         
-        // 3.5 Modal kapatma event'lerini ayarla
+        // 3. Modal kapatma event'lerini ayarla
         setupModalCloseEvents();
         
         // 4. StoreTypes yükle
@@ -3520,6 +3489,10 @@ function saveManualAddress() {
         // 8. Event handler'ları ayarla
         setupEventHandlers();
         debugLog('✅ Event handlerlar ayarlandı');
+
+        // 9. KÖK KOMUT SİSTEMİNİ YÜKLE (AI'dan önce)
+        await loadCommandRules();
+        debugLog('✅ Kök komut sistemi yüklendi');
 
         debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
 
@@ -4092,7 +4065,8 @@ function displayStoreTypes(types) {
 // Store type seçildiğinde - KATEGORİ ve ÜRÜNLERİ SIFIRLA
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
-    
+   
+    currentRoot = "2:0"; // Mağaza tipi seçildi, satıcı seçimine geç
     // Store type bilgisini kaydet
     selectedStoreTypeId = storeTypeId;
     selectedStoreTypeName = storeTypeName;
@@ -5571,7 +5545,10 @@ async function loadCommandRules() {
 // Ana komut işleme fonksiyonu (SADECE 50 SATIR!)
 async function processVoiceCommand(transcript) {
     const message = transcript.toLowerCase().trim();
-    
+    if (userMessage) userMessage.textContent = transcript;
+
+    debugLog(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot}`);
+
     // 1. Askıda cevap varsa, onu işle
     if (pendingResponse) {
         return handlePendingResponse(message);
@@ -5637,6 +5614,7 @@ async function executeMatchedRule(match, message) {
 }
 
 // AI isteği işleme (10 satır)
+// AI isteği işleme - ÖĞRENME EKLENDİ
 async function handleAIRequest(message, root) {
     speakToUser("Anlıyorum...");
     
@@ -5647,7 +5625,7 @@ async function handleAIRequest(message, root) {
         currentRoot = aiResult.suggested_root;
         
         // Öğrenmeyi kaydet
-        await saveAILearning(root, message, aiResult);
+        await saveToAILearningCache(message, aiResult.response, root, aiResult.confidence);
     } else {
         speakToUser("Üzgünüm, tam anlayamadım. Lütfen tekrar söyler misiniz?");
     }
@@ -5691,37 +5669,227 @@ async function saveAILearning(originalRoot, userInput, aiResult) {
     }]);
 }
 
+async function saveToAILearningCache(userInput, aiResponse, rootCode, confidence) {
+    try {
+        const { error } = await supabase
+            .from('ai_learning_cache')
+            .insert([{
+                user_input: userInput,
+                ai_response: aiResponse,
+                root_code: rootCode,
+                confidence_score: confidence,
+                created_at: new Date().toISOString()
+            }]);
+
+        if (error) throw error;
+        debugLog('✅ AI öğrenme verisi kaydedildi');
+    } catch (error) {
+        console.error('❌ AI öğrenme kaydetme hatası:', error);
+    }
+}
+
+
+
 
 
 //AKSİYON YÖNETİCİSİ
 
-// Aksiyonları yönet (tüm işlevsellik burada)
+// =============================================
+// YENİ KÖK SIRALAMASI İÇİN AKSİYON FONKSİYONLARI
+// =============================================
+
 async function executeAction(actionName, data) {
     console.log(`⚡ Aksiyon: ${actionName}`, data);
     
     switch(actionName) {
-        case 'set_phone':
-            currentCustomer.phone = data.phone;
-            break;
-            
-        case 'check_phone':
-            await checkCustomerByPhone(data.phone);
-            break;
-            
+        // Mağaza tipi seçim aksiyonları
         case 'select_market':
             await selectStoreTypeByName('Market');
             break;
-            
         case 'select_restaurant':
             await selectStoreTypeByName('Restoran');
             break;
+        case 'select_pharmacy':
+            await selectStoreTypeByName('Eczane');
+            break;
+        case 'select_bakery':
+            await selectStoreTypeByName('Fırın');
+            break;
+        case 'select_cafe':
+            await selectStoreTypeByName('Kafe');
+            break;
             
-        case 'save_address':
-            await saveCustomerAddress(data);
+        // Satıcı seçim aksiyonları
+        case 'select_seller_by_index':
+            await selectSellerByIndex(extractNumber(data.message));
+            break;
+        case 'go_back_store_type':
+            currentRoot = "1:0";
+            speakToUser("Mağaza tipi seçimine dönülüyor.");
+            break;
+            
+        // Reyon seçim aksiyonları
+        case 'select_category_fruits':
+            await selectCategoryByName('Meyve & Sebze');
+            break;
+        case 'select_category_dairy':
+            await selectCategoryByName('Süt Ürünleri');
+            break;
+        case 'select_category_meat':
+            await selectCategoryByName('Et & Tavuk');
+            break;
+        case 'select_category_drinks':
+            await selectCategoryByName('İçecekler');
+            break;
+        case 'select_category_by_index':
+            await selectCategoryByIndex(extractNumber(data.message));
+            break;
+        case 'go_back_seller':
+            currentRoot = "2:0";
+            speakToUser("Satıcı seçimine dönülüyor.");
+            break;
+            
+        // Ürün seçim aksiyonları
+        case 'add_to_cart':
+            await handleAddToCartCommand(data.message);
+            break;
+        case 'add_product_by_index':
+            await addProductByIndex(extractNumber(data.message));
+            break;
+        case 'show_cart':
+            openCart();
+            currentRoot = "5:0";
+            break;
+        case 'go_back_category':
+            currentRoot = "3:0";
+            speakToUser("Reyon seçimine dönülüyor.");
+            break;
+            
+        // Sepet aksiyonları
+        case 'start_payment':
+            currentRoot = "6:0";
+            speakToUser("Ödeme yöntemi seçin: nakit, kart veya bonus.");
+            break;
+        case 'continue_shopping':
+            closeCart();
+            currentRoot = "4:0";
+            speakToUser("Alışverişe devam ediliyor.");
+            break;
+        case 'clear_cart':
+            cart = [];
+            updateCartUI();
+            speakToUser("Sepetiniz temizlendi.");
+            break;
+        case 'go_back_products':
+            closeCart();
+            currentRoot = "4:0";
+            break;
+            
+        // Ödeme aksiyonları
+        case 'set_payment_cash':
+            currentPaymentMethod = 'nakit';
+            currentRoot = "7:0";
+            speakToUser("Nakit ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'set_payment_card':
+            currentPaymentMethod = 'kart';
+            currentRoot = "7:0";
+            speakToUser("Kart ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'set_payment_bonus':
+            currentPaymentMethod = 'bonus';
+            currentRoot = "7:0";
+            speakToUser("Bonus ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'go_back_payment':
+            currentRoot = "6:0";
+            speakToUser("Ödeme yöntemi seçimine dönülüyor.");
+            break;
+            
+        // Adres aksiyonları
+        case 'confirm_address':
+            currentRoot = "8:0";
+            speakToUser("Teslimat adresiniz onaylandı. Lütfen telefon numaranızı söyleyin.");
+            break;
+        case 'request_new_address':
+            currentRoot = "7:1";
+            speakToUser("Lütfen yeni teslimat adresinizi söyleyin.");
+            break;
+        case 'save_new_address':
+            if (currentCustomer) {
+                currentCustomer.address = data.extractedData.address;
+            }
+            userLocation.fullAddress = data.extractedData.address;
+            currentRoot = "8:0";
+            speakToUser("Yeni adresiniz kaydedildi. Lütfen telefon numaranızı söyleyin.");
+            break;
+        case 'go_back_address':
+            currentRoot = "7:0";
+            break;
+            
+        // Telefon aksiyonları
+        case 'set_phone':
+            currentCustomer = { ...currentCustomer, phone: data.extractedData.phone };
+            break;
+        case 'check_phone':
+            await checkCustomerByPhone(data.extractedData.phone);
+            break;
+        case 'retry_phone':
+            currentRoot = "8:0";
+            speakToUser("Lütfen telefon numaranızı tekrar söyleyin.");
+            break;
+        case 'go_back_phone':
+            currentRoot = "8:0";
+            break;
+            
+        // Sipariş onay aksiyonları
+        case 'confirm_order':
+            await finalizeOrder(currentPaymentMethod);
+            currentRoot = "0:0";
+            break;
+        case 'cancel_order':
+            cart = [];
+            updateCartUI();
+            currentRoot = "0:0";
+            speakToUser("Siparişiniz iptal edildi. Yeni bir siparişe başlayabilirsiniz.");
             break;
             
         default:
             console.warn(`Bilinmeyen aksiyon: ${actionName}`);
+    }
+}
+
+// Yardımcı fonksiyonlar
+function extractNumber(message) {
+    const numbers = message.match(/\d+/g);
+    return numbers ? parseInt(numbers[0]) : 1;
+}
+
+async function selectSellerByIndex(index) {
+    if (sellers.length >= index) {
+        await selectSeller(sellers[index - 1]);
+    }
+}
+
+async function selectCategoryByName(categoryName) {
+    const category = categories.find(cat => cat.name.includes(categoryName));
+    if (category) {
+        const categoryCard = document.querySelector(`[data-category-id="${category.id}"]`);
+        if (categoryCard) categoryCard.click();
+    }
+}
+
+async function selectCategoryByIndex(index) {
+    if (categories.length >= index) {
+        const categoryCard = document.querySelectorAll('.category-card')[index - 1];
+        if (categoryCard) categoryCard.click();
+    }
+}
+
+async function addProductByIndex(index) {
+    if (products.length >= index) {
+        const product = products[index - 1];
+        addToCart(product, 1);
     }
 }
 
@@ -6320,5 +6488,3 @@ function getDemoProducts() {
 </script>	
 </body>
 </html>
-
-
