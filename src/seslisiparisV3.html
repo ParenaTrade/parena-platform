@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesli Sipariş - Onur Market</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #5d3ebc;
+            --primary-light: #7849f7;
+            --secondary: #ffd300;
+            --accent: #ff6b00;
+            --dark: #1a1a1a;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+            --gray-light: #e9ecef;
+            --success: #28a745;
+            --danger: #dc3545;
+            --border-radius: 12px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+        
+        [data-theme="dark"] {
+            --primary: #6d4ee0;
+            --primary-light: #8a6df7;
+            --secondary: #ffd300;
+            --accent: #ff7b1a;
+            --dark: #f8f9fa;
+            --light: #1a1a1a;
+            --gray: #a0a0a0;
+            --gray-light: #2d2d2d;
+            --success: #34c759;
+            --danger: #ff3b30;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light);
+            color: var(--dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.6;
+        }
+        
+        /* Header Styles */
+        header {
+            background-color: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .logo-icon::after {
+            content: "";
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--secondary);
+            border-radius: 50%;
+            bottom: 5px;
+            right: 5px;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .action-btn {
+            background: none;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: var(--transition);
+            color: var(--dark);
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .action-btn:hover {
+            background: var(--gray-light);
+        }
+        
+        .order-summary {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--primary);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .order-summary:hover {
+            background: var(--primary-light);
+            transform: translateY(-2px);
+        }
+        
+        .order-count {
+            background: var(--secondary);
+            color: var(--dark);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .language-selector {
+            position: relative;
+        }
+        
+        .language-btn {
+            background: none;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 500;
+            color: var(--dark);
+        }
+        
+        .language-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 10px 0;
+            width: 150px;
+            display: none;
+            z-index: 10;
+        }
+        
+        .language-dropdown.show {
+            display: block;
+        }
+        
+        .language-option {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .language-option:hover {
+            background: var(--gray-light);
+        }
+        
+        .language-option.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        /* Banner Styles */
+        .banner {
+            position: relative;
+            height: 300px;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 0 20px;
+        }
+        
+        .banner-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.2;
+        }
+        
+        .banner-content {
+            position: relative;
+            z-index: 2;
+            max-width: 600px;
+        }
+        
+        .banner h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        
+        .banner p {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        
+        /* Main Content */
+        .main-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+            flex: 1;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title i {
+            color: var(--primary);
+        }
+        
+        /* Store Type Grid */
+        .store-type-container {
+            margin-bottom: 30px;
+        }
+        
+        .store-type-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .store-type-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .store-type-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .store-type-card.selected {
+            border-color: var(--primary);
+            background: rgba(93, 62, 188, 0.05);
+        }
+        
+        .store-type-icon {
+            font-size: 32px;
+            color: var(--primary);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(93, 62, 188, 0.1);
+        }
+        
+        .store-type-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        /* Sellers Grid */
+        .sellers-container {
+            margin-bottom: 30px;
+        }
+        
+        .seller-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .seller-card {
+            background: white;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            border: 2px solid transparent;
+        }
+        
+        .seller-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .seller-card.selected {
+            border-color: var(--success);
+        }
+        
+        .seller-image {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+        }
+        
+        .seller-info {
+            padding: 15px;
+        }
+        
+        .seller-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 18px;
+        }
+        
+        .seller-details {
+            font-size: 14px;
+            color: var(--gray);
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .seller-rating {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--secondary);
+        }
+        
+        .delivery-info {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--gray-light);
+        }
+        
+        .delivery-fee {
+            font-size: 14px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .delivery-fee.free {
+            color: var(--success);
+        }
+        
+        .min-order {
+            font-size: 12px;
+            color: var(--gray);
+            margin-top: 2px;
+        }
+        
+        /* Categories Grid */
+        .categories-container {
+            margin-bottom: 30px;
+        }
+        
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .category-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .category-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .category-card.selected {
+            border-color: var(--success);
+            background: rgba(40, 167, 69, 0.05);
+        }
+        
+        .category-icon {
+            font-size: 32px;
+            color: var(--success);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(40, 167, 69, 0.1);
+        }
+        
+        .category-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        /* Products Grid */
+        .products-section {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+        
+        .products-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .product-card {
+            background: white;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--gray-light);
+        }
+        
+        .product-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .product-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--accent);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .product-image {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+        }
+        
+        .product-info {
+            padding: 15px;
+        }
+        
+        .product-name {
+            font-weight: 500;
+            margin-bottom: 5px;
+            font-size: 14px;
+            height: 40px;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        
+        .product-price {
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 16px;
+        }
+        
+        .product-discount {
+            color: var(--danger);
+            font-size: 12px;
+            text-decoration: line-through;
+            margin-left: 5px;
+        }
+        
+        .add-to-cart-btn {
+            margin-top: 10px;
+            width: 100%;
+            padding: 10px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        
+        .add-to-cart-btn:hover {
+            background: var(--primary-light);
+        }
+        
+        /* Cart Section */
+        .cart-container {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100%;
+            background: white;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .cart-container.open {
+            right: 0;
+        }
+        
+        .cart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .cart-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--gray);
+        }
+        
+        .cart-items {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .cart-item-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+        
+        .cart-item-image {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+        
+        .cart-item-details {
+            font-size: 14px;
+        }
+        
+        .cart-item-name {
+            font-weight: 500;
+        }
+        
+        .cart-item-price {
+            color: var(--gray);
+            font-size: 12px;
+        }
+        
+        .cart-item-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .quantity-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1px solid var(--gray-light);
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .quantity-btn:hover {
+            background: var(--gray-light);
+        }
+        
+        .cart-totals {
+            border-top: 1px solid var(--gray-light);
+            padding: 20px;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .total-final {
+            font-weight: 600;
+            font-size: 18px;
+            border-top: 1px solid var(--gray-light);
+            padding-top: 10px;
+        }
+        
+        .payment-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+            padding: 0 20px 20px;
+        }
+        
+        .payment-btn {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .payment-btn.cash {
+            background: var(--success);
+            color: white;
+        }
+        
+        .payment-btn.card {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .payment-btn.bonus {
+            background: var(--accent);
+            color: white;
+            grid-column: 1 / -1;
+        }
+        
+        .payment-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--dark);
+            color: white;
+            padding: 40px 0 20px;
+            margin-top: auto;
+        }
+        
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+        
+        .footer-section h3 {
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: var(--secondary);
+        }
+        
+        .footer-links {
+            list-style: none;
+        }
+        
+        .footer-links li {
+            margin-bottom: 10px;
+        }
+        
+        .footer-links a {
+            color: #ccc;
+            text-decoration: none;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .footer-links a:hover {
+            color: white;
+        }
+        
+        .social-links {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .social-link {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        
+        .social-link:hover {
+            background: var(--primary);
+            transform: translateY(-3px);
+        }
+        
+        .partner-login {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        
+        .partner-login:hover {
+            background: var(--primary-light);
+        }
+        
+        .footer-bottom {
+            text-align: center;
+            padding-top: 20px;
+            margin-top: 20px;
+            border-top: 1px solid #444;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        /* Voice Assistant */
+        .voice-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            width: 300px;
+            z-index: 100;
+            display: block;
+        }
+        
+        .status-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .status-title {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .status-title i {
+            margin-right: 8px;
+            color: var(--accent);
+        }
+        
+        .status-close {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: var(--gray);
+        }
+        
+        .status-content {
+            margin-bottom: 15px;
+        }
+        
+        .assistant-message {
+            padding: 12px;
+            background: rgba(93, 62, 188, 0.1);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+        
+        .user-message {
+            padding: 12px;
+            background: rgba(255, 107, 0, 0.1);
+            border-radius: 8px;
+            text-align: right;
+            color: var(--accent);
+        }
+        
+        .voice-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 30px;
+            margin-top: 10px;
+        }
+        
+        .voice-bar {
+            width: 6px;
+            height: 10px;
+            background: #ddd;
+            margin: 0 3px;
+            border-radius: 3px;
+        }
+        
+        .listening .voice-bar {
+            animation: voiceIndicator 0.8s infinite;
+        }
+        
+        @keyframes voiceIndicator {
+            0%, 100% { height: 10px; background: #ddd; }
+            50% { height: 30px; background: var(--accent); }
+        }
+        
+        /* Location Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            max-width: 500px;
+            width: 100%;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .close-modal {
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--gray);
+        }
+        
+        .location-options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .location-option {
+            padding: 20px;
+            border: 2px solid var(--gray-light);
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .location-option:hover {
+            border-color: var(--primary);
+            background: rgba(93, 62, 188, 0.05);
+        }
+        
+        .location-option.selected {
+            border-color: var(--primary);
+            background: rgba(93, 62, 188, 0.1);
+        }
+        
+        .location-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .location-details h4 {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .location-details p {
+            color: var(--gray);
+            font-size: 14px;
+        }
+        
+        .location-detect-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 20px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: var(--transition);
+        }
+        
+        .location-detect-btn:hover {
+            background: var(--primary-light);
+        }
+        
+        .location-detect-btn:disabled {
+            background: var(--gray);
+            cursor: not-allowed;
+        }
+        
+        .location-result {
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            background: rgba(93, 62, 188, 0.05);
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-container {
+                flex-direction: column;
+                gap: 15px;
+                padding: 15px;
+            }
+            
+            .logo {
+                font-size: 20px;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .banner {
+                height: 250px;
+            }
+            
+            .banner h1 {
+                font-size: 2rem;
+            }
+            
+            .banner p {
+                font-size: 1rem;
+            }
+            
+            .store-type-grid {
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            }
+            
+            .seller-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .categories-grid {
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            }
+            
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+            
+            .cart-container {
+                width: 100%;
+                right: -100%;
+            }
+            
+            .voice-status {
+                width: calc(100% - 40px);
+                right: 20px;
+                left: 20px;
+            }
+            
+            .footer-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .store-type-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .categories-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .payment-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Animation for logo */
+        @keyframes logoPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .logo-icon {
+            animation: logoPulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-container">
+            <a href="#" class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <span data-translate="app_name">Sesli Sipariş</span>
+            </a>
+            
+            <div class="header-actions">
+                <div class="language-selector">
+                    <button class="language-btn" id="languageBtn">
+                        <i class="fas fa-globe"></i>
+                        <span id="currentLanguage">TR</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="language-dropdown" id="languageDropdown">
+                        <div class="language-option active" data-lang="tr">
+                            <i class="fas fa-check"></i>
+                            <span>Türkçe</span>
+                        </div>
+                        <div class="language-option" data-lang="en">
+                            <i class="fas fa-check"></i>
+                            <span>English</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="location-marker action-btn" id="locationMarker">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span id="locationText" data-translate="select_location">Konum Seçin</span>
+                </div>
+                
+                <div class="order-summary" id="orderSummary" style="display: none;">
+                    <div class="order-count" id="orderCount">0</div>
+                    <div data-translate="order">Sipariş: <span id="orderTotal">0 ₺</span></div>
+                </div>
+               
+                <div class="profile-info">
+                    <button class="action-btn" id="profileBtn">
+                        <i class="fas fa-user"></i>
+                        <span id="userName" data-translate="profile">Profilim</span>
+                    </button>
+                    <div class="profile-dropdown" id="profileDropdown">
+                        <!-- Profile dropdown content -->
+                    </div>
+                </div>
+
+                <button id="microphoneToggle" class="action-btn">
+                    <i class="fas fa-microphone-slash"></i>
+                    <span data-translate="microphone_off">Mikrofon (Kapalı)</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Banner -->
+    <div class="banner" id="banner">
+        <video class="banner-video" id="bannerVideo" loop muted>
+            <!-- Video will be set dynamically based on store type -->
+        </video>
+        <div class="banner-content">
+            <h1 id="bannerTitle" data-translate="banner_title">Sesli Sipariş ile Kolay Alışveriş</h1>
+            <p id="bannerDescription" data-translate="banner_description">Sadece konuşun, siparişiniz kapınızda!</p>
+            <button class="location-detect-btn" id="bannerLocationBtn">
+                <i class="fas fa-location-arrow"></i>
+                <span data-translate="detect_location">Konumumu Belirle</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Store Type Selection -->
+        <section>
+            <h2 class="section-title" data-translate="what_to_eat">
+                <i class="fas fa-utensils"></i>
+                Ne yemek istersiniz?
+            </h2>
+            <div class="store-type-container">
+                <div class="store-type-grid" id="storeTypeGrid">
+                    <!-- Store types will be loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Sellers Grid -->
+        <section id="sellersSection" style="display: none;">
+            <h2 class="section-title" data-translate="nearest_places">
+                <i class="fas fa-store"></i>
+                Size En Yakın Yerler
+            </h2>
+            <div class="sellers-container">
+                <div class="seller-grid" id="sellerGrid">
+                    <!-- Sellers will be loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Categories Grid -->
+        <section id="categoriesSection" style="display: none;">
+            <h2 class="section-title" id="categoriesTitle" data-translate="categories">
+                <i class="fas fa-layer-group"></i>
+                Kategoriler
+            </h2>
+            <div class="categories-container">
+                <div class="categories-grid" id="categoriesGrid">
+                    <!-- Categories will be loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Products Grid -->
+        <section class="products-section" id="productsSection" style="display: none;">
+            <div class="products-header">
+                <h2 class="section-title" style="margin-bottom: 0;" data-translate="products">
+                    <i class="fas fa-box-open"></i>
+                    Ürünler
+                </h2>
+                <div id="selectedSellerInfo" class="text-gray">Satıcı seçilmedi</div>
+            </div>
+            <div class="products-grid" id="productsGrid">
+                <!-- Products will be loaded here -->
+            </div>
+        </section>
+    </div>
+
+    <!-- Location Modal -->
+    <div id="locationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" data-translate="select_location">Konum Seçiniz</h3>
+                <span class="close-modal" id="closeLocationModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p data-translate="location_description">Lütfen sipariş vermek istediğiniz konumu seçin:</p>
+                <div class="location-options">
+                    <div class="location-option" data-location="inside">
+                        <div class="location-icon">
+                            <i class="fas fa-utensils"></i>
+                        </div>
+                        <div class="location-details">
+                            <h4 data-translate="inside_restaurant">Restoran içinde</h4>
+                            <p data-translate="inside_description">Yemeğinizi restoranda yiyin</p>
+                        </div>
+                    </div>
+                    <div class="location-option" data-location="takeaway">
+                        <div class="location-icon">
+                            <i class="fas fa-shopping-bag"></i>
+                        </div>
+                        <div class="location-details">
+                            <h4 data-translate="takeaway">Paket servis</h4>
+                            <p data-translate="takeaway_description">Yemeğinizi kendiniz alın</p>
+                        </div>
+                    </div>
+                    <div class="location-option" data-location="delivery">
+                        <div class="location-icon">
+                            <i class="fas fa-motorcycle"></i>
+                        </div>
+                        <div class="location-details">
+                            <h4 data-translate="delivery">Adrese teslim</h4>
+                            <p data-translate="delivery_description">Yemeğiniz adresinize gelsin</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <button id="detectLocationBtn" class="location-detect-btn">
+                    <i class="fas fa-location-arrow"></i>
+                    <span data-translate="auto_detect">Konumumu Otomatik Belirle</span>
+                </button>
+                
+                <div id="locationResult" class="location-result" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Section -->
+    <div class="cart-container" id="cartContainer">
+        <div class="cart-header">
+            <h2 data-translate="your_cart">Sepetiniz</h2>
+            <button class="cart-close" id="cartClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="cart-items" id="cartItems">
+            <div class="text-center" style="padding: 30px; color: var(--gray);">
+                <i class="fas fa-shopping-cart fa-2x mb-3"></i>
+                <p data-translate="empty_cart">Sepetiniz boş</p>
+            </div>
+        </div>
+        <div class="cart-totals">
+            <div class="total-row">
+                <span data-translate="subtotal">Ara Toplam:</span>
+                <span id="subtotal">0 ₺</span>
+            </div>
+            <div class="total-row">
+                <span data-translate="discount">İndirim:</span>
+                <span id="discount">0 ₺</span>
+            </div>
+            <div class="total-row">
+                <span data-translate="vat">KDV (%18):</span>
+                <span id="vatAmount">0 ₺</span>
+            </div>
+            <div class="total-row total-final">
+                <span data-translate="total">Toplam:</span>
+                <span id="totalAmount">0 ₺</span>
+            </div>
+        </div>
+        <div class="payment-buttons">
+            <button class="payment-btn cash" id="payCash" data-translate="pay_cash">Nakit Öde</button>
+            <button class="payment-btn card" id="payCard" data-translate="pay_card">Kartla Öde</button>
+            <button class="payment-btn bonus" id="payBonus" data-translate="pay_bonus">Bonus ile Öde</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-section">
+                <h3 data-translate="app_name">Sesli Sipariş</h3>
+                <p data-translate="footer_description">Sesli komutlarla kolayca sipariş verin. Hızlı, güvenli ve pratik alışveriş deneyimi.</p>
+                <div class="social-links">
+                    <a href="#" class="social-link"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="social-link"><i class="fab fa-twitter"></i></a>
+                    <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
+                    <a href="https://wa.me/?text=Merhaba!%20Sesli%20Sipariş%20sisteminden%20alışveriş%20yapmak%20istiyorum." class="social-link" target="_blank"><i class="fab fa-whatsapp"></i></a>
+                </div>
+            </div>
+            
+            <div class="footer-section">
+                <h3 data-translate="quick_links">Hızlı Bağlantılar</h3>
+                <ul class="footer-links">
+                    <li><a href="#" id="referralLink"><i class="fas fa-link"></i> <span data-translate="referral_link">Referans Linki</span></a></li>
+                    <li><a href="#" id="whatsappOrder"><i class="fab fa-whatsapp"></i> <span data-translate="whatsapp_order">WhatsApp ile Sipariş</span></a></li>
+                    <li><a href="#"><i class="fas fa-shopping-bag"></i> <span data-translate="my_orders">Siparişlerim</span></a></li>
+                    <li><a href="#"><i class="fas fa-question-circle"></i> <span data-translate="help">Yardım</span></a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h3 data-translate="contact">İletişim</h3>
+                <ul class="footer-links">
+                    <li><a href="tel:08501234567"><i class="fas fa-phone"></i> 0850 123 45 67</a></li>
+                    <li><a href="mailto:info@seslisiparis.com"><i class="fas fa-envelope"></i> info@seslisiparis.com</a></li>
+                    <li><a href="#"><i class="fas fa-map-marker-alt"></i> <span data-translate="location">İstanbul, Türkiye</span></a></li>
+                </ul>
+                <a href="#" class="partner-login" data-translate="partner_login">Partner Girişi</a>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <p>&copy; 2023 Sesli Sipariş Sistemi. <span data-translate="all_rights_reserved">Tüm hakları saklıdır.</span></p>
+        </div>
+    </footer>
+
+    <!-- Voice Assistant -->
+    <div class="voice-status" id="voiceStatusPanel">
+        <div class="status-header">
+            <div class="status-title">
+                <i class="fas fa-microphone"></i>
+                <span data-translate="voice_assistant">Sesli Asistan</span>
+            </div>
+            <button class="status-close" id="closeVoiceStatus">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="status-content">
+            <div class="assistant-message" id="assistantMessage" data-translate="welcome_message">Merhaba! Sipariş vermek için mikrofonu açın ve konuşun.</div>
+            <div class="user-message" id="userMessage"></div>
+        </div>
+        <div class="voice-indicator" id="voiceIndicator">
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+        </div>
+    </div>
+
+    <script>
+        // =============================================
+        // ÇOKLU DİL DESTEĞİ
+        // =============================================
+        
+        const translations = {
+            tr: {
+                app_name: "Sesli Sipariş",
+                select_location: "Konum Seçin",
+                order: "Sipariş:",
+                profile: "Profilim",
+                microphone_off: "Mikrofon (Kapalı)",
+                banner_title: "Sesli Sipariş ile Kolay Alışveriş",
+                banner_description: "Sadece konuşun, siparişiniz kapınızda!",
+                detect_location: "Konumumu Belirle",
+                what_to_eat: "Ne yemek istersiniz?",
+                nearest_places: "Size En Yakın Yerler",
+                categories: "Kategoriler",
+                products: "Ürünler",
+                inside_restaurant: "Restoran içinde",
+                inside_description: "Yemeğinizi restoranda yiyin",
+                takeaway: "Paket servis",
+                takeaway_description: "Yemeğinizi kendiniz alın",
+                delivery: "Adrese teslim",
+                delivery_description: "Yemeğiniz adresinize gelsin",
+                auto_detect: "Konumumu Otomatik Belirle",
+                your_cart: "Sepetiniz",
+                empty_cart: "Sepetiniz boş",
+                subtotal: "Ara Toplam:",
+                discount: "İndirim:",
+                vat: "KDV (%18):",
+                total: "Toplam:",
+                pay_cash: "Nakit Öde",
+                pay_card: "Kartla Öde",
+                pay_bonus: "Bonus ile Öde",
+                footer_description: "Sesli komutlarla kolayca sipariş verin. Hızlı, güvenli ve pratik alışveriş deneyimi.",
+                quick_links: "Hızlı Bağlantılar",
+                referral_link: "Referans Linki",
+                whatsapp_order: "WhatsApp ile Sipariş",
+                my_orders: "Siparişlerim",
+                help: "Yardım",
+                contact: "İletişim",
+                location: "İstanbul, Türkiye",
+                partner_login: "Partner Girişi",
+                all_rights_reserved: "Tüm hakları saklıdır.",
+                voice_assistant: "Sesli Asistan",
+                welcome_message: "Merhaba! Sipariş vermek için mikrofonu açın ve konuşun."
+            },
+            en: {
+                app_name: "Voice Order",
+                select_location: "Select Location",
+                order: "Order:",
+                profile: "My Profile",
+                microphone_off: "Microphone (Off)",
+                banner_title: "Easy Shopping with Voice Order",
+                banner_description: "Just speak, your order is at your door!",
+                detect_location: "Detect My Location",
+                what_to_eat: "What would you like to eat?",
+                nearest_places: "Nearest Places to You",
+                categories: "Categories",
+                products: "Products",
+                inside_restaurant: "Inside Restaurant",
+                inside_description: "Eat your meal at the restaurant",
+                takeaway: "Takeaway",
+                takeaway_description: "Pick up your meal yourself",
+                delivery: "Home Delivery",
+                delivery_description: "Your meal delivered to your address",
+                auto_detect: "Auto Detect My Location",
+                your_cart: "Your Cart",
+                empty_cart: "Your cart is empty",
+                subtotal: "Subtotal:",
+                discount: "Discount:",
+                vat: "VAT (%18):",
+                total: "Total:",
+                pay_cash: "Pay Cash",
+                pay_card: "Pay by Card",
+                pay_bonus: "Pay with Bonus",
+                footer_description: "Order easily with voice commands. Fast, secure and practical shopping experience.",
+                quick_links: "Quick Links",
+                referral_link: "Referral Link",
+                whatsapp_order: "Order via WhatsApp",
+                my_orders: "My Orders",
+                help: "Help",
+                contact: "Contact",
+                location: "Istanbul, Turkey",
+                partner_login: "Partner Login",
+                all_rights_reserved: "All rights reserved.",
+                voice_assistant: "Voice Assistant",
+                welcome_message: "Hello! Turn on the microphone to place an order and start speaking."
+            }
+        };
+        
+        let currentLanguage = 'tr';
+        
+        // Tarayıcı dilini algıla
+        function detectBrowserLanguage() {
+            const browserLang = navigator.language || navigator.userLanguage;
+            if (browserLang.startsWith('tr')) {
+                return 'tr';
+            } else if (browserLang.startsWith('en')) {
+                return 'en';
+            }
+            return 'tr'; // Varsayılan dil
+        }
+        
+        // Sayfayı çevir
+        function translatePage(lang) {
+            currentLanguage = lang;
+            document.querySelectorAll('[data-translate]').forEach(element => {
+                const key = element.getAttribute('data-translate');
+                if (translations[lang] && translations[lang][key]) {
+                    if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                        element.placeholder = translations[lang][key];
+                    } else {
+                        element.textContent = translations[lang][key];
+                    }
+                }
+            });
+            
+            // Dil düğmesini güncelle
+            document.getElementById('currentLanguage').textContent = lang.toUpperCase();
+            
+            // Sesli asistan dilini güncelle
+            if (recognition) {
+                recognition.lang = lang === 'tr' ? 'tr-TR' : 'en-US';
+            }
+            
+            // Dil seçeneklerini güncelle
+            document.querySelectorAll('.language-option').forEach(option => {
+                if (option.getAttribute('data-lang') === lang) {
+                    option.classList.add('active');
+                } else {
+                    option.classList.remove('active');
+                }
+            });
+        }
+        
+        // =============================================
+        // DİNAMİK BANNER SİSTEMİ
+        // =============================================
+        
+        const bannerVideos = {
+            market: "https://assets.mixkit.co/videos/preview/mixkit-people-shopping-in-a-supermarket-43244-large.mp4",
+            restaurant: "https://assets.mixkit.co/videos/preview/mixkit-cooking-a-meal-in-a-restaurant-kitchen-43239-large.mp4",
+            bakery: "https://assets.mixkit.co/videos/preview/mixkit-baker-preparing-bread-in-a-traditional-oven-43237-large.mp4",
+            pharmacy: "https://assets.mixkit.co/videos/preview/mixkit-pharmacist-preparing-medicine-in-a-pharmacy-43236-large.mp4"
+        };
+        
+        const bannerTitles = {
+            tr: {
+                market: "Market Alışverişini Sesinle Yap",
+                restaurant: "Lezzetli Yemekler Sesinle Kapında",
+                bakery: "Taze Fırın Ürünleri Sesinle Gelsin",
+                pharmacy: "İlaçların Sesinle Kapında"
+            },
+            en: {
+                market: "Do Your Grocery Shopping with Your Voice",
+                restaurant: "Delicious Food at Your Door with Your Voice",
+                bakery: "Fresh Bakery Products with Your Voice",
+                pharmacy: "Your Medications at Your Door with Your Voice"
+            }
+        };
+        
+        const bannerDescriptions = {
+            tr: {
+                market: "Market ürünlerini sesinle sipariş et, kapına gelsin!",
+                restaurant: "Restoran lezzetlerini sesinle keşfet!",
+                bakery: "Taze ekmek ve pastane ürünleri sesinle kapında!",
+                pharmacy: "İlaçlarını sesinle sipariş et, zaman kazan!"
+            },
+            en: {
+                market: "Order grocery products with your voice, delivered to your door!",
+                restaurant: "Discover restaurant flavors with your voice!",
+                bakery: "Fresh bread and bakery products with your voice at your door!",
+                pharmacy: "Order your medications with your voice, save time!"
+            }
+        };
+        
+        function updateBanner(storeType) {
+            const banner = document.getElementById('banner');
+            const bannerVideo = document.getElementById('bannerVideo');
+            const bannerTitle = document.getElementById('bannerTitle');
+            const bannerDescription = document.getElementById('bannerDescription');
+            
+            // Varsayılan değerler
+            let videoSrc = bannerVideos.market;
+            let title = bannerTitles[currentLanguage].market;
+            let description = bannerDescriptions[currentLanguage].market;
+            
+            // Store type'a göre içerikleri belirle
+            if (storeType && bannerVideos[storeType]) {
+                videoSrc = bannerVideos[storeType];
+                title = bannerTitles[currentLanguage][storeType];
+                description = bannerDescriptions[currentLanguage][storeType];
+            }
+            
+            // Banner'ı güncelle
+            bannerVideo.src = videoSrc;
+            bannerVideo.load();
+            bannerVideo.play().catch(e => console.log("Video autoplay prevented:", e));
+            
+            bannerTitle.textContent = title;
+            bannerDescription.textContent = description;
+        }
+        
+        // =============================================
+        // UYGULAMA BAŞLATMA
+        // =============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tarayıcı dilini algıla ve çevir
+            const browserLang = detectBrowserLanguage();
+            translatePage(browserLang);
+            
+            // Varsayılan banner'ı yükle
+            updateBanner('market');
+            
+            // Dil değiştirme event'leri
+            document.getElementById('languageBtn').addEventListener('click', function() {
+                document.getElementById('languageDropdown').classList.toggle('show');
+            });
+            
+            document.querySelectorAll('.language-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const lang = this.getAttribute('data-lang');
+                    translatePage(lang);
+                    document.getElementById('languageDropdown').classList.remove('show');
+                });
+            });
+            
+            // Banner konum butonu
+            document.getElementById('bannerLocationBtn').addEventListener('click', function() {
+                showLocationModal();
+            });
+            
+            // Diğer event'leri buraya ekleyebilirsiniz
+            // (Mevcut JavaScript kodunuzun geri kalanı)
+        });
+        
+        // Mevcut JavaScript kodunuzun geri kalanı buraya gelecek
+        // (Supabase bağlantısı, sesli asistan, konum yönetimi vb.)
+        
+        // Örnek store type seçimi
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.store-type-card')) {
+                const card = e.target.closest('.store-type-card');
+                const storeType = card.getAttribute('data-store-type');
+                
+                // Tüm kartlardan seçimi kaldır
+                document.querySelectorAll('.store-type-card').forEach(c => {
+                    c.classList.remove('selected');
+                });
+                
+                // Bu kartı seçili yap
+                card.classList.add('selected');
+                
+                // Banner'ı güncelle
+                updateBanner(storeType);
+                
+                // Satıcıları yükle vb.
+                // loadSellersByStoreType(storeType);
+            }
+        });
+        
+        // Konum modalını göster
+        function showLocationModal() {
+            document.getElementById('locationModal').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        // Konum modalını gizle
+        function hideLocationModal() {
+            document.getElementById('locationModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+        
+        // Konum modalı event'leri
+        document.getElementById('closeLocationModal').addEventListener('click', hideLocationModal);
+        
+        document.querySelectorAll('.location-option').forEach(option => {
+            option.addEventListener('click', function() {
+                // Tüm seçeneklerden seçimi kaldır
+                document.querySelectorAll('.location-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                
+                // Bu seçeneği seçili yap
+                this.classList.add('selected');
+                
+                // Konum türünü seç
+                const locationType = this.getAttribute('data-location');
+                // selectLocation(locationType);
+                
+                // Modal'ı kapat
+                setTimeout(hideLocationModal, 500);
+            });
+        });
+        
+        // Konum tespit butonu
+        document.getElementById('detectLocationBtn').addEventListener('click', function() {
+            // detectUserLocation();
+        });
+        
+        // Dışarı tıklayınca modal'ı kapat
+        window.addEventListener('click', function(e) {
+            if (e.target === document.getElementById('locationModal')) {
+                hideLocationModal();
+            }
+            
+            // Dil dropdown'ını kapat
+            if (!e.target.closest('.language-selector')) {
+                document.getElementById('languageDropdown').classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>
