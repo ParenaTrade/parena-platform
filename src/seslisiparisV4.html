@@ -4052,11 +4052,7 @@ function onUserLoggedIn() {
 // =============================================
 
 async function initApp() {
-    if (appInitialized) {
-        console.log('⚠️ Uygulama zaten başlatılmış, tekrar başlatılmıyor.');
-        return;
-    }
-    
+    if (appInitialized) return;
     appInitialized = true;
     
     try {
@@ -4067,47 +4063,34 @@ async function initApp() {
         setupProductImageFallbacks();
         setupBannerVideo();
         
-        // 2. AI komut sistemini yükle (direkt yükle)
+        // 2. ÖNCE selectSeller ve diğer temel fonksiyonları tanımla
+        setupBasicFunctions();
+        
+        // 3. SONRA filtre temizleme sistemini kur
+        setupFilterCleanup();
+        
+        // 4. Diğer sistemleri yükle
+        await checkAndPopulateCommandRules();
         await loadCommandRules();
         debugLog('✅ AI komut sistemi yüklendi');
 
-        // 3. DOM hazır olana kadar bekle
         await waitForDOMElements();
         debugLog('✅ DOM hazır');
 
-        // 4. Yatay kaydırma sistemlerini ayarla
-        setupHorizontalScrolling();
-        
-        // 5. Konum event'lerini ayarla
-        setupLocationEvents();
-        
-        // 6. Modal kapatma event'lerini ayarla
-        setupModalCloseEvents();
-        
-        // 7. StoreTypes yükle
         await loadStoreTypes();
         debugLog('✅ StoreTypes yüklendi');
 
-        // 8. Oturumu geri yükle
         await restoreSession();
         debugLog('✅ Oturum yüklendi');
 
-        // 9. Konum yönetimi
         initializeLocation();
         debugLog('✅ Konum yönetimi tamamlandı');
 
-        // 10. UI elementlerini ayarla
         updateUIAfterLogin();
         debugLog('✅ UI güncellendi');
 
-        // 11. Event handler'ları ayarla
         setupEventHandlers();
         debugLog('✅ Event handlerlar ayarlandı');
-
-        // 12. Sesli ürün ekleme sistemini başlat
-        setTimeout(() => {
-            debugLog('🎤 Sesli ürün ekleme sistemi aktif');
-        }, 3000);
 
         debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
 
@@ -4116,7 +4099,46 @@ async function initApp() {
         emergencyFallback();
     }
 }
-	
+
+// Temel fonksiyonları tanımla
+function setupBasicFunctions() {
+    console.log('🔧 Temel fonksiyonlar tanımlanıyor...');
+    
+    // selectSeller tanımla
+    if (typeof window.selectSeller === 'undefined') {
+        window.selectSeller = async function(seller) {
+            console.log('🎯 Satıcı seçildi (temel):', seller?.business_name);
+            
+            if (!seller) return false;
+            
+            selectedSellerId = seller.id;
+            
+            // Satıcı bilgisini güncelle
+            if (selectedSellerInfo) {
+                selectedSellerInfo.textContent = seller.business_name || seller.full_name;
+            }
+            
+            // Kategoriler bölümünü göster
+            if (categoriesSection) {
+                categoriesSection.style.display = 'block';
+            }
+            
+            // Ürünler bölümünü gizle
+            if (productsSection) {
+                productsSection.style.display = 'none';
+            }
+            
+            speakToUser(`${seller.business_name || seller.full_name} seçildi. Kategoriler yükleniyor.`);
+            
+            // Kategorileri yükle
+            await loadReyonsBySeller(seller.id);
+            
+            return true;
+        };
+    }
+    
+    console.log('✅ Temel fonksiyonlar tanımlandı');
+}	
 	// Sepet toggle fonksiyonu - GÜVENLİ
 function toggleCart() {
     try {
