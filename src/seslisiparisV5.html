@@ -1977,51 +1977,40 @@
         // =============================================
         // ÖRNEK VERİ YÜKLEME
         // =============================================
-        
         function loadSampleData() {
-            // Store types
-            const storeTypes = [
-                { id: 1, name: 'Market', type: 'market', icon: 'fas fa-store' },
-                { id: 2, name: 'Restoran', type: 'restaurant', icon: 'fas fa-utensils' },
-                { id: 3, name: 'Fırın', type: 'bakery', icon: 'fas fa-bread-slice' },
-                { id: 4, name: 'Eczane', type: 'pharmacy', icon: 'fas fa-prescription-bottle' },
-                { id: 5, name: 'Kafe', type: 'cafe', icon: 'fas fa-coffee' },
-                { id: 6, name: 'Fast Food', type: 'fastfood', icon: 'fas fa-hamburger' }
-            ];
-            
-            const storeTypeGrid = document.getElementById('storeTypeGrid');
-            storeTypes.forEach(store => {
-                const card = document.createElement('div');
-                card.className = 'store-type-card';
-                card.setAttribute('data-store-type', store.type);
-                
-                card.innerHTML = `
-                    <div class="store-type-icon">
-                        <i class="${store.icon}"></i>
-                    </div>
-                    <div class="store-type-name">${store.name}</div>
-                `;
-                
-                card.addEventListener('click', function() {
-                    // Tüm kartlardan seçimi kaldır
-                    document.querySelectorAll('.store-type-card').forEach(c => {
-                        c.classList.remove('selected');
-                    });
-                    
-                    // Bu kartı seçili yap
-                    this.classList.add('selected');
-                    
-                    // Banner'ı güncelle
-                    updateBanner(store.type);
-                    
-                    // Satıcıları göster
-                    document.getElementById('sellersSection').style.display = 'block';
-                    loadSampleSellers();
-                });
-                
-                storeTypeGrid.appendChild(card);
-            });
+    try {
+        debugLog('📊 Demo veriler yükleniyor...');
+        
+        // Elementleri kontrol et
+        const sellerGrid = document.getElementById('sellerGrid');
+        const categoriesGrid = document.getElementById('categoriesGrid');
+        const productsGrid = document.getElementById('productsGrid');
+        
+        if (!sellerGrid || !categoriesGrid || !productsGrid) {
+            console.error('❌ DOM elementleri henüz hazır değil');
+            debugLog('⚠️ DOM elementleri bulunamadı, demo veri yükleme ertelendi');
+            return;
         }
+        
+        // Demo satıcıları yükle
+        const demoData = `
+            <div class="text-center" style="padding: 20px; color: #6c757d;">
+                <i class="fas fa-store fa-2x mb-2"></i>
+                <p>Demo veriler yükleniyor...</p>
+            </div>
+        `;
+        
+        if (sellerGrid) sellerGrid.innerHTML = demoData;
+        if (categoriesGrid) categoriesGrid.innerHTML = demoData;
+        if (productsGrid) productsGrid.innerHTML = demoData;
+        
+        debugLog('✅ Demo veriler başarıyla yüklendi');
+        
+    } catch (error) {
+        console.error('❌ Demo veri yükleme hatası:', error);
+        debugLog('❌ Demo veri yükleme başarısız');
+    }
+}
         
         function loadSampleSellers() {
             const sellers = [
@@ -3265,39 +3254,38 @@ function onUserLoggedIn() {
         // SAYFA YÜKLEME SÜRECİ
         // =============================================
 
-        function waitForDOMElements() {
-            return new Promise((resolve) => {
-                const elements = {
-                    'microphoneToggle': document.getElementById('microphoneToggle'),
-                    'locationModal': document.getElementById('locationModal'),
-                    'locationMarker': document.getElementById('locationMarker'),
-                    'profileBtn': document.getElementById('profileBtn'),
-                    'logoutBtn': document.getElementById('logoutBtn')
-                };
-
-                let attempts = 0;
-                const maxAttempts = 50;
-
-                const checkElements = () => {
-                    attempts++;
-                    const loaded = Object.values(elements).filter(el => el !== null).length;
-                    const total = Object.keys(elements).length;
-
-                    debugLog(`DOM yükleme: ${loaded}/${total} (deneme ${attempts})`);
-
-                    if (loaded >= 3 || attempts >= maxAttempts) {
-                        debugLog('✅ Minimum DOM elementleri yüklendi');
-                        resolve();
-                        return;
-                    }
-
-                    setTimeout(checkElements, 100);
-                };
-
-                checkElements();
+        async function waitForDOMElements() {
+    const requiredElements = [
+        'sellerGrid', 'categoriesGrid', 'productsGrid', 
+        'bannerVideo', 'cartContainer'
+    ];
+    
+    return new Promise((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 50; // 5 saniye
+        
+        function checkElements() {
+            attempts++;
+            const allExist = requiredElements.every(id => {
+                const element = document.getElementById(id);
+                if (!element) {
+                    debugLog(`⏳ Bekleniyor: ${id}`);
+                    return false;
+                }
+                return true;
             });
+            
+            if (allExist || attempts >= maxAttempts) {
+                debugLog(`✅ Gerekli elementler ${allExist ? 'bulundu' : 'zaman aşımı'}`);
+                resolve(allExist);
+            } else {
+                setTimeout(checkElements, 100);
+            }
         }
-
+        
+        checkElements();
+    });
+}
         function setupEventHandlers() {
             try {
                 debugLog('🔧 Event handlerlar ayarlanıyor...');
@@ -3553,47 +3541,44 @@ async function initApp() {
         setupProductImageFallbacks();
         setupBannerVideo();
         
-        // 2. Komut kurallarını kontrol et
-        await checkAndPopulateCommandRules();
-        
-        // 3. AI komut sistemini yükle
+        // 2. AI komut sistemini yükle (direkt yükle)
         await loadCommandRules();
         debugLog('✅ AI komut sistemi yüklendi');
 
-        // 4. DOM hazır olana kadar bekle
+        // 3. DOM hazır olana kadar bekle
         await waitForDOMElements();
         debugLog('✅ DOM hazır');
 
-        // 5. Yatay kaydırma sistemlerini ayarla
+        // 4. Yatay kaydırma sistemlerini ayarla
         setupHorizontalScrolling();
         
-        // 6. Konum event'lerini ayarla
+        // 5. Konum event'lerini ayarla
         setupLocationEvents();
         
-        // 7. Modal kapatma event'lerini ayarla
+        // 6. Modal kapatma event'lerini ayarla
         setupModalCloseEvents();
         
-        // 8. StoreTypes yükle
+        // 7. StoreTypes yükle
         await loadStoreTypes();
         debugLog('✅ StoreTypes yüklendi');
 
-        // 9. Oturumu geri yükle
+        // 8. Oturumu geri yükle
         await restoreSession();
         debugLog('✅ Oturum yüklendi');
 
-        // 10. Konum yönetimi
+        // 9. Konum yönetimi
         initializeLocation();
         debugLog('✅ Konum yönetimi tamamlandı');
 
-        // 11. UI elementlerini ayarla
+        // 10. UI elementlerini ayarla
         updateUIAfterLogin();
         debugLog('✅ UI güncellendi');
 
-        // 12. Event handler'ları ayarla
+        // 11. Event handler'ları ayarla
         setupEventHandlers();
         debugLog('✅ Event handlerlar ayarlandı');
 
-        // 13. Sesli ürün ekleme sistemini başlat
+        // 12. Sesli ürün ekleme sistemini başlat
         setTimeout(() => {
             debugLog('🎤 Sesli ürün ekleme sistemi aktif');
         }, 3000);
@@ -3604,9 +3589,11 @@ async function initApp() {
         console.error('💥 Uygulama başlatma hatası:', error);
         emergencyFallback();
     }
-}	
-
-// Sepet toggle fonksiyonu - GÜVENLİ
+}
+	
+	
+	
+	// Sepet toggle fonksiyonu - GÜVENLİ
 function toggleCart() {
     try {
         if (cartContainer.classList.contains('open')) {
@@ -3618,29 +3605,60 @@ function toggleCart() {
         console.error('❌ Sepet toggle hatası:', error);
     }
 }
-       
-// =============================================
-// GÜNCELLENMİŞ EVENT HANDLER
-// =============================================
+
+// Sepet açma fonksiyonu - EKSİK OLAN
+function openCart() {
+    try {
+        if (cartContainer) {
+            cartContainer.classList.add('open');
+            debugLog('🛒 Sepet açıldı');
+            
+            // Sepet içeriğini güncelle
+            if (currentCustomer) {
+                updateCartUI();
+            } else {
+                updateGuestCartUI();
+            }
+        } else {
+            console.error('❌ Sepet konteynırı bulunamadı');
+        }
+    } catch (error) {
+        console.error('❌ Sepet açma hatası:', error);
+    }
+}
+
+// Sepet kapatma fonksiyonu - EKSİK OLAN
+function closeCart() {
+    try {
+        if (cartContainer) {
+            cartContainer.classList.remove('open');
+            debugLog('🛒 Sepet kapandı');
+        }
+    } catch (error) {
+        console.error('❌ Sepet kapatma hatası:', error);
+    }
+}
+
+	
 document.addEventListener('DOMContentLoaded', function() {
     if (domLoaded) return;
     domLoaded = true;
 
     console.log('🚀 DOM yüklendi, uygulama başlatılıyor...');
 
-    // Tüm initialization işlemleri
+    // ÖNCE: Temel DOM işlemleri
     populateLanguageOptions();
     const browserLang = detectBrowserLanguage();
     translatePage(browserLang);
     updateBanner('market');
-    setupHorizontalScrolling();
-    loadSampleData();
-    updatePaymentButtons();
-    updateCartContainer();
-
-    // Banner video setup
-    setupBannerVideo();
-
+    
+    // SONRA: Sadece initApp'te olmayan işlemler
+    setTimeout(() => {
+        loadSampleData(); // ← Sadece burada çağrılıyor
+        updateCartContainer(); // ← Sadece burada çağrılıyor
+        // setupBannerVideo(); // ← SİLİNDİ (initApp'te zaten var)
+        // setupHorizontalScrolling(); // ← SİLİNDİ (initApp'te zaten var)
+    }, 100);	
     // Banner konum butonu
     document.getElementById('bannerLocationBtn').addEventListener('click', function() {
         showLocationModal();
@@ -3718,43 +3736,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 2000);
     }
 
-    // Ana uygulamayı başlat
-    initApp().catch(error => {
-        console.error('❌ Uygulama başlatma hatası:', error);
-        emergencyFallback();
-    });
+   setTimeout(() => {
+        initApp().catch(error => {
+            console.error('❌ Uygulama başlatma hatası:', error);
+            emergencyFallback();
+        });
+    }, 500);
 });
 	
-// Banner video autoplay sorununu çöz - DOMContentLoaded DIŞINDA tanımla
-function setupBannerVideo() {
-    const bannerVideo = document.getElementById('bannerVideo');
-    if (!bannerVideo) return;
-    
-    // Video yükleme event'leri
-    bannerVideo.addEventListener('loadeddata', function() {
-        console.log('🎥 Video yüklendi, oynatılmaya çalışılıyor...');
-        this.play().catch(e => {
-            console.log('⚠️ Video otomatik oynatılamıyor:', e.name);
-        });
-    });
-    
-    bannerVideo.addEventListener('error', function(e) {
-        console.error('❌ Video yükleme hatası:', e);
-        // Fallback: Arkaplan rengi göster
-        const banner = document.getElementById('banner');
-        if (banner) {
-            banner.style.background = 'linear-gradient(135deg, var(--primary), var(--primary-light))';
-        }
-    });
-    
-    // Muted ve playsinline özelliklerini garanti et
-    bannerVideo.muted = true;
-    bannerVideo.playsInline = true;
-    bannerVideo.setAttribute('playsinline', '');
-    bannerVideo.setAttribute('webkit-playsinline', '');
+// Sepet konteynırını güncelle - OTURUM DURUMU GÖSTER
+function updateCartContainer() {
+    const cartHeader = document.querySelector('.cart-header h2');
+    if (cartHeader && !currentCustomer) {
+        cartHeader.innerHTML = `Sepetiniz <small style="color: var(--accent);">(Misafir)</small>`;
+    }
 }
 
-	// =============================================
+// =============================================
 // 1. BÖLÜM: LOGIN GİRİŞ VE KAYIT SÜRECİ
 // =============================================
 
@@ -4425,7 +4423,7 @@ async function loadReyonsBySeller(sellerId) {
                         seller_id
                     )
                 )
-            `)
+            `)  // ← BACKTICK BURADA KAPANDI
             .eq('products.product_prices.seller_id', sellerId)
             .order('name');
 
@@ -4467,7 +4465,6 @@ async function loadReyonsBySeller(sellerId) {
         speakToUser("Reyonlar yüklenirken hata oluştu. Demo reyonlar gösteriliyor.");
     }
 }
-
 // Demo reyonlar (yedek)
 function getDemoReyons() {
     return [
@@ -4553,6 +4550,55 @@ function displayCategories(categoriesToShow, type) {
     });
 }
 
+// Reyona göre ürünleri grupla
+function displayProductsByReyon(productsToShow) {
+    if (!productsToShow || productsToShow.length === 0) {
+        productsGrid.innerHTML = `
+            <div class="text-center" style="grid-column: 1 / -1; padding: 40px; color: #6c757d;">
+                <i class="fas fa-box-open fa-3x mb-3"></i>
+                <p>Bu satıcıda ürün bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+	
+// Demo ürünler - GERÇEKÇİ
+function getDemoProducts() {
+    return [
+        { 
+            id: 'demo-1', 
+            name: "Süt 1L", 
+            price: 15.90, 
+            discount_price: 12.90,
+            imgurl: "https://via.placeholder.com/150x100?text=Süt", 
+            description: "Tam yağlı süt",
+            seller_id: selectedSellerId || 'demo-seller',
+            product_price_id: 'demo-price-1'
+        },
+        { 
+            id: 'demo-2', 
+            name: "Ekmek", 
+            price: 5.50, 
+            discount_price: null,
+            imgurl: "https://via.placeholder.com/150x100?text=Ekmek", 
+            description: "Taze ekmek",
+            seller_id: selectedSellerId || 'demo-seller',
+            product_price_id: 'demo-price-2'
+        },
+        { 
+            id: 'demo-3', 
+            name: "Yumurta 10'lu", 
+            price: 32.00, 
+            discount_price: 28.00,
+            imgurl: "https://via.placeholder.com/150x100?text=Yumurta", 
+            description: "Organik yumurta",
+            seller_id: selectedSellerId || 'demo-seller',
+            product_price_id: 'demo-price-3'
+        }
+    ];
+}
+
+	
 // Reyon seçildiğinde ürünleri yükle - SORGU DÜZELTİLMİŞ
 async function loadProductsByReyon(reyonId) {
     try {
@@ -4567,16 +4613,10 @@ async function loadProductsByReyon(reyonId) {
         
         const { data, error } = await supabase
             .from('product_prices')
-            .select(`
-                *,
-                products!inner(
-                    id, name, imgurl, reyon_id, category_id, is_active, description, unit_type
-                )
-            `)
+            .select('*, products!inner(id, name, imgurl, reyon_id, category_id, is_active, description, unit_type)')
             .eq('seller_id', selectedSellerId)
             .eq('products.reyon_id', reyonId)
             .eq('products.is_active', true);
-            
 
         if (error) {
             console.error('❌ Ürün yükleme hatası:', error);
@@ -4626,7 +4666,7 @@ async function loadProductsByReyon(reyonId) {
         speakToUser("Ürünler yüklenirken hata oluştu. Demo ürünler gösteriliyor.");
     }
 }
-
+	
 // Satıcı yükleme fonksiyonunu güncelle - ILIKE SORGUSU
 async function loadSellersByStoreType(storeTypeId) {
     try {
@@ -5189,17 +5229,7 @@ function updateReyonsAvailability() {
     });
 }
 
-// Reyona göre ürünleri grupla
-function displayProductsByReyon(productsToShow) {
-    if (!productsToShow || productsToShow.length === 0) {
-        productsGrid.innerHTML = `
-            <div class="text-center" style="grid-column: 1 / -1; padding: 40px; color: #6c757d;">
-                <i class="fas fa-box-open fa-3x mb-3"></i>
-                <p>Bu satıcıda ürün bulunamadı</p>
-            </div>
-        `;
-        return;
-    }
+
     
     // Reyona göre grupla
     const productsByReyon = {};
@@ -6494,13 +6524,6 @@ function addDebugButtons() {
 }
 // =============================================
 
-// Sepet konteynırını güncelle - OTURUM DURUMU GÖSTER
-function updateCartContainer() {
-    const cartHeader = document.querySelector('.cart-header h2');
-    if (cartHeader && !currentCustomer) {
-        cartHeader.innerHTML = `Sepetiniz <small style="color: var(--accent);">(Misafir)</small>`;
-    }
-}
 
 
 // Oturum değişikliklerini dinle
@@ -6980,12 +7003,7 @@ async function loadSellerProducts(sellerId) {
         
         const { data, error } = await supabase
             .from('product_prices')
-            .select(`
-                *,
-                products (
-                    id, name, imgurl, reyon_id, category_id, is_active
-                )
-            `)
+            .select('*, products(id, name, imgurl, reyon_id, category_id, is_active)')
             .eq('seller_id', sellerId)
             .eq('products.is_active', true);
 
@@ -6993,7 +7011,7 @@ async function loadSellerProducts(sellerId) {
             console.error('❌ Ürün yükleme hatası:', error);
             throw error;
         }
-
+		
         // Veriyi işle
         products = data
             .filter(item => item.products) // products null olmayanları filtrele
@@ -7604,39 +7622,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return distance;
 }
 
-// Sepet açma fonksiyonu - GÜVENLİ
-function openCart() {
-    try {
-        if (cartContainer) {
-            cartContainer.classList.add('open');
-            debugLog('🛒 Sepet açıldı');
-            
-            // Sepet içeriğini güncelle
-            if (currentCustomer) {
-                updateCartUI();
-            } else {
-                updateGuestCartUI();
-            }
-        } else {
-            console.error('❌ Sepet konteynırı bulunamadı');
-        }
-    } catch (error) {
-        console.error('❌ Sepet açma hatası:', error);
-    }
-}
-
-	// Sepet kapatma fonksiyonu - GÜVENLİ
-function closeCart() {
-    try {
-        if (cartContainer) {
-            cartContainer.classList.remove('open');
-            debugLog('🛒 Sepet kapandı');
-        }
-    } catch (error) {
-        console.error('❌ Sepet kapatma hatası:', error);
-    }
-}
-
+	
 // Reyon'a göre ürünleri filtrele - TAMİR EDİLMİŞ
 function filterProductsByReyon(reyonId) {
     if (!products || products.length === 0) {
@@ -7661,46 +7647,15 @@ function filterProductsByCategory(categoryId) {
     displayProducts(filteredProducts.length > 0 ? filteredProducts : products);
 }
 
-// Demo ürünler - GERÇEKÇİ
-function getDemoProducts() {
-    return [
-        { 
-            id: 'demo-1', 
-            name: "Süt 1L", 
-            price: 15.90, 
-            discount_price: 12.90,
-            imgurl: "https://via.placeholder.com/150x100?text=Süt", 
-            description: "Tam yağlı süt",
-            seller_id: selectedSellerId || 'demo-seller',
-            product_price_id: 'demo-price-1'
-        },
-        { 
-            id: 'demo-2', 
-            name: "Ekmek", 
-            price: 5.50, 
-            discount_price: null,
-            imgurl: "https://via.placeholder.com/150x100?text=Ekmek", 
-            description: "Taze ekmek",
-            seller_id: selectedSellerId || 'demo-seller',
-            product_price_id: 'demo-price-2'
-        },
-        { 
-            id: 'demo-3', 
-            name: "Yumurta 10'lu", 
-            price: 32.00, 
-            discount_price: 28.00,
-            imgurl: "https://via.placeholder.com/150x100?text=Yumurta", 
-            description: "Organik yumurta",
-            seller_id: selectedSellerId || 'demo-seller',
-            product_price_id: 'demo-price-3'
-        }
-    ];
-}
+
 
 // Kaydırma fonksiyonu
 function scrollElement(element, amount) {
     element.scrollBy({ left: amount, behavior: 'smooth' });
 }
+}	
+// Debug
+console.log("✅ Script başarıyla yüklendi");
 
 </script>	
 </body>
