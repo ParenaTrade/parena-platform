@@ -7003,7 +7003,8 @@ function extractProductInfoFromCommand(message) {
 }
 	
 // Sesli ürün ekleme komutunu işle - TAMİR EDİLMİŞ
-async debugLog(`🛒 Ürün ekleme komutu işleniyor: "${message}"`);
+async function handleAddToCartCommand(message) {
+    debugLog(`🛒 Ürün ekleme komutu işleniyor: "${message}"`);
     
     if (!selectedSellerId) {
         speakToUser("Önce bir satıcı seçmelisiniz.");
@@ -7018,32 +7019,28 @@ async debugLog(`🛒 Ürün ekleme komutu işleniyor: "${message}"`);
     // Ürün bilgisini çıkar
     const productInfo = extractProductInfoFromCommand(message);
     
-    if (productInfo) {
+    if (productInfo && productInfo.productName) {
         const { productName, quantity } = productInfo;
+        debugLog(`🔍 Aranan ürün: "${productName}", Miktar: ${quantity}`);
+        
         const foundProduct = findProductByName(productName);
         
         if (foundProduct) {
             addToCart(foundProduct, quantity);
+            speakToUser(`${quantity} adet ${foundProduct.name} sepete eklendi.`);
             
-            // Miktara göre özel mesaj
-            let quantityText = "";
-            if (quantity === 1) {
-                quantityText = "1 adet";
-            } else if (quantity < 1) {
-                quantityText = `${quantity * 1000} gram`; // Gram cinsinden göster
-            } else {
-                quantityText = `${quantity} adet`;
-            }
-            
-            speakToUser(`${quantityText} ${productName} sepete eklendi.`);
+            // Sepeti otomatik aç
+            setTimeout(() => {
+                openCart();
+            }, 500);
             
             // Başarılı ürün ekleme sonrası AI öğrenmesi
-            saveSuccessfulProductMatch(message, productName);
+            saveSuccessfulProductMatch(message, foundProduct.name);
         } else {
             handleProductNotFound(message, productName);
         }
     } else {
-        speakToUser("Ürün ismini anlayamadım. Lütfen 'iki ekmek', 'yarım kilo domates' veya 'süt ekle' gibi söyleyin.");
+        speakToUser("Ürün ismini anlayamadım. Lütfen 'iki ekmek' veya 'süt ekle' gibi söyleyin.");
     }
 }
 	
