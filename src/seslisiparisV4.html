@@ -4817,8 +4817,6 @@ async function loadSellersByStoreType(storeTypeId) {
     }
 }
 
-// Konuma göre tüm satıcıları yükle (store type filtresi OLMADAN)
-// Konuma göre tüm satıcıları yükle
 async function loadAllSellersByLocation() {
     try {
         debugLog(`🔍 Konumdaki tüm satıcılar yükleniyor: ${userLocation.district}, ${userLocation.city}`);
@@ -4828,14 +4826,12 @@ async function loadAllSellersByLocation() {
             .select('*')
             .eq('status', 'True');
 
-        // Konum bilgisi varsa, ILIKE sorgusu ile filtrele
         if (userLocation.city && userLocation.district) {
             const customerCity = userLocation.city;
             const customerDistrict = userLocation.district;
             
             debugLog(`📍 TÜM SATICILAR - ILIKE sorgusu: city=%${customerCity}%, district=%${customerDistrict}%`);
             
-            // ILIKE ile esnek arama - city, district ve address alanlarında
             query = query.or(`city.ilike.%${customerCity}%,district.ilike.%${customerDistrict}%,address.ilike.%${customerCity}%,address.ilike.%${customerDistrict}%`);
         }
 
@@ -4850,24 +4846,16 @@ async function loadAllSellersByLocation() {
 
         if (data && data.length > 0) {
             allSellersInLocation = data;
-            
-            // Teslimat bilgilerini ekle
             await addDeliveryInfoToSellers(allSellersInLocation);
-            
             debugLog(`✅ Tüm satıcılar yüklendi: ${allSellersInLocation.length} adet`);
-            
-            // Tüm satıcıları göster (henüz store type filtresi yok)
             showAllSellers();
-            
             speakToUser(`Konumunuzda ${allSellersInLocation.length} satıcı bulundu. Hangi kategoriyi seçmek istersiniz?`);
-            
         } else {
             debugLog('⚠️ Bu konumda satıcı bulunamadı');
             allSellersInLocation = [];
             showAllSellers();
             speakToUser("Bu konumda satıcı bulunamadı. Lütfen konumunuzu değiştirin.");
         }
-
     } catch (error) {
         console.error('❌ Tüm satıcılar yükleme hatası:', error);
         debugLog('🔄 Hata oluştu, demo satıcılar kullanılıyor');
@@ -4876,6 +4864,7 @@ async function loadAllSellersByLocation() {
         speakToUser("Satıcılar yüklenirken hata oluştu. Demo satıcılar gösteriliyor.");
     }
 }
+	
 	
 // Tüm satıcıları göster (store type filtresi olmadan)
 function showAllSellers() {
@@ -5125,7 +5114,6 @@ function getStoreTypeName(storeTypeId) {
     return storeType ? storeType.name : '';
 }
 	
-// Satıcı grid'ini güncelle - FİLTRELENMİŞ SATICILARI GÖSTER
 // Satıcı grid'ini güncelle
 function updateSellersGrid() {
     const sellerGrid = document.getElementById('sellerGrid');
@@ -7014,6 +7002,7 @@ async function handleAddToCartCommand(message) {
 	
 
 // Ürün ismine göre arama fonksiyonu
+// ÖNCE tüm fonksiyonları tanımla
 function findProductByName(productName) {
     if (!products || products.length === 0) return null;
     
