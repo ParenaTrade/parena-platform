@@ -2463,6 +2463,450 @@ function setupBannerVideo() {
             }
         }
 
+
+
+
+
+
+// =============================================
+// STORE TYPE VE SATICI YÜKLEME SİSTEMİ
+// =============================================
+
+// Store type'ları yükle
+async function loadStoreTypes() {
+    try {
+        debugLog('🔧 StoreTypes yükleniyor...');
+        
+        const { data, error } = await supabase
+            .from('store_type')
+            .select('*')
+            .eq('status', 'Active')
+            .order('sort_code');
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            storeTypes = data;
+            localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
+            debugLog(`✅ StoreTypes sunucudan yüklendi: ${data.length} adet`);
+            displayStoreTypes(storeTypes);
+            return;
+        }
+
+        throw new Error('StoreTypes verisi boş');
+        
+    } catch (error) {
+        console.error('❌ StoreTypes yükleme hatası:', error);
+        
+        // Cache kontrolü
+        const cached = localStorage.getItem('storeTypes');
+        if (cached) {
+            try {
+                storeTypes = JSON.parse(cached);
+                debugLog('✅ StoreTypes cache\'den yüklendi');
+                displayStoreTypes(storeTypes);
+                return;
+            } catch (parseError) {
+                console.error('❌ Cache parse hatası:', parseError);
+            }
+        }
+        
+        // Fallback
+        await useFallbackStoreTypes();
+    }
+}
+
+// Store type'ları ekranda göster
+function displayStoreTypes(types) {
+    const sellerTypeGrid = document.getElementById('sellerTypeGrid');
+    if (!sellerTypeGrid) {
+        console.error('❌ SellerTypeGrid bulunamadı');
+        return;
+    }
+    
+    sellerTypeGrid.innerHTML = '';
+    
+    if (!types || types.length === 0) {
+        sellerTypeGrid.innerHTML = `
+            <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
+                <i class="fas fa-store fa-3x mb-3"></i>
+                <p>Mağaza tipi bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const iconMap = {
+        'Market': 'fas fa-store',
+        'Restoran': 'fas fa-utensils',
+        'Eczane': 'fas fa-prescription-bottle',
+        'Fırın': 'fas fa-bread-slice',
+        'Kafe': 'fas fa-coffee'
+    };
+    
+    types.forEach(type => {
+        const typeCard = document.createElement('div');
+        typeCard.className = 'seller-type-card';
+        typeCard.dataset.typeId = type.id;
+        typeCard.dataset.typeName = type.name;
+        
+        typeCard.innerHTML = `
+            <div class="seller-type-icon">
+                <i class="${iconMap[type.name] || 'fas fa-store'}"></i>
+            </div>
+            <div class="seller-type-name">${type.name}</div>
+        `;
+        
+        typeCard.addEventListener('click', () => {
+            // Tüm kartlardan seçimi kaldır
+            document.querySelectorAll('.seller-type-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Bu kartı seçili yap
+            typeCard.classList.add('selected');
+            
+            onStoreTypeSelected(type.id, type.name);
+        });
+        
+        sellerTypeGrid.appendChild(typeCard);
+    });
+    
+    // Store type seçildiğinde diğer bölümleri gizle
+    if (sellersSection) sellersSection.style.display = 'none';
+    if (categoriesSection) categoriesSection.style.display = 'none';
+    if (productsSection) productsSection.style.display = 'none';
+    
+    debugLog("✅ Store type'lar başarıyla yüklendi");
+}
+
+// Store type seçildiğinde
+async function onStoreTypeSelected(storeTypeId, storeTypeName) {
+    debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
+   
+    currentRoot = "2:0";
+    selectedStoreTypeId = storeTypeId;
+    selectedStoreTypeName = storeTypeName;
+    
+    // Satıcıları store type'a göre filtrele
+    filterSellersByStoreType(storeTypeId);
+    
+    // Kategorileri ve ürünleri sıfırla
+    selectedCategoryId = null;
+    products = [];
+    
+    // Kategori grid'ini temizle
+    if (categoriesGrid) {
+        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
+    }
+    
+    // Ürünler grid'ini temizle
+    if (productsGrid) {
+        productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
+    }
+    
+    // Ürünler bölümünü gizle
+    if (productsSection) productsSection.style.display = 'none';
+    
+    debugLog(`✅ Satıcılar filtrelendi: ${storeTypeName}`);
+    speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu.`);
+}
+
+// Satıcıları store type'a göre filtrele
+function filterSellersByStoreType(storeTypeId) {
+    if (!allSellersInLocation || allSellersInLocation.length === 0) {
+        debugLog('⚠️ Filtrelenecek satıcı yok');
+        filteredSellers = [];
+        updateSellersGrid();
+        return;
+    }
+    
+    // Store type'a göre filtrele
+    filteredSellers = allSellersInLocation.filter(seller => seller.store_type_id === storeTypeId);
+    
+    // Global sellers değişkenini güncelle
+    sellers = filteredSellers;
+    
+    debugLog(`📊 Store type filtresi: ${filteredSellers.length} satıcı`);
+    
+    // Filtrelenmiş satıcıları göster
+    updateSellersGrid();
+    
+    // Eğer filtrelenmiş satıcı yoksa uyarı ver
+    if (filteredSellers.length === 0) {
+        speakToUser(`Bu kategoride satıcı bulunamadı. Lütfen başka bir kategori seçin.`);
+    }
+}
+
+// Konuma göre tüm satıcıları yükle
+async function loadAllSellersByLocation() {
+    try {
+        debugLog(`🔍 Konumdaki tüm satıcılar yükleniyor: ${userLocation.district}, ${userLocation.city}`);
+        
+        let query = supabase
+            .from('seller_profiles')
+            .select('*')
+            .eq('status', 'True');
+
+        if (userLocation.city && userLocation.district) {
+            const customerCity = userLocation.city;
+            const customerDistrict = userLocation.district;
+            
+            debugLog(`📍 TÜM SATICILAR - ILIKE sorgusu: city=%${customerCity}%, district=%${customerDistrict}%`);
+            
+            query = query.or(`city.ilike.%${customerCity}%,district.ilike.%${customerDistrict}%,address.ilike.%${customerCity}%,address.ilike.%${customerDistrict}%`);
+        }
+
+        const { data, error } = await query.order('business_name');
+
+        if (error) {
+            console.error('❌ Tüm satıcılar yükleme hatası:', error);
+            throw error;
+        }
+
+        debugLog(`📊 Konumdaki tüm satıcılar: ${data?.length || 0} adet`);
+
+        if (data && data.length > 0) {
+            allSellersInLocation = data;
+            
+            // Teslimat bilgilerini ekle
+            await addDeliveryInfoToSellers(allSellersInLocation);
+            
+            debugLog(`✅ Tüm satıcılar yüklendi: ${allSellersInLocation.length} adet`);
+            
+            // Tüm satıcıları göster (henüz store type filtresi yok)
+            showAllSellers();
+            
+            speakToUser(`Konumunuzda ${allSellersInLocation.length} satıcı bulundu. Hangi kategoriyi seçmek istersiniz?`);
+            
+        } else {
+            debugLog('⚠️ Bu konumda satıcı bulunamadı');
+            allSellersInLocation = [];
+            showAllSellers();
+            speakToUser("Bu konumda satıcı bulunamadı. Lütfen konumunuzu değiştirin.");
+        }
+
+    } catch (error) {
+        console.error('❌ Tüm satıcılar yükleme hatası:', error);
+        debugLog('🔄 Hata oluştu, demo satıcılar kullanılıyor');
+        allSellersInLocation = getDemoSellers();
+        showAllSellers();
+        speakToUser("Satıcılar yüklenirken hata oluştu. Demo satıcılar gösteriliyor.");
+    }
+}
+
+// Tüm satıcıları göster
+function showAllSellers() {
+    // Global sellers değişkenini güncelle
+    sellers = allSellersInLocation;
+    filteredSellers = [...allSellersInLocation];
+    
+    // UI'ı güncelle
+    updateSellersGrid();
+    
+    // Bölümleri göster
+    if (sellersSection) sellersSection.style.display = 'block';
+    if (categoriesSection) categoriesSection.style.display = 'none';
+    if (productsSection) productsSection.style.display = 'none';
+    
+    // Store type seçimini sıfırla
+    resetStoreTypeSelection();
+    
+    debugLog(`✅ Tüm satıcılar gösteriliyor: ${sellers.length} adet`);
+}
+
+// Satıcı grid'ini güncelle
+function updateSellersGrid() {
+    const sellerGrid = document.getElementById('sellerGrid');
+    if (!sellerGrid) return;
+    
+    sellerGrid.innerHTML = '';
+    
+    const sellersToShow = sellers;
+    
+    if (sellersToShow.length === 0) {
+        sellerGrid.innerHTML = `
+            <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
+                <i class="fas fa-store fa-3x mb-3"></i>
+                <p>Bu konumda satıcı bulunamadı</p>
+                <small>Lütfen konumunuzu değiştirin veya başka bir kategori seçin</small>
+            </div>
+        `;
+        return;
+    }
+    
+    debugLog(`🔄 Satıcı grid güncelleniyor: ${sellersToShow.length} satıcı`);
+    
+    sellersToShow.forEach(seller => {
+        const sellerCard = document.createElement('div');
+        sellerCard.className = 'seller-card';
+        sellerCard.dataset.sellerId = seller.id;
+        
+        if (selectedSellerId === seller.id) sellerCard.classList.add('selected');
+        if (isSellerLocked && selectedSellerId !== seller.id) sellerCard.classList.add('disabled');
+        
+        const storeTypeInfo = selectedStoreTypeId ? '' : `<small style="color: var(--gray); display: block; margin-top: 5px;">${getStoreTypeName(seller.store_type_id)}</small>`;
+        
+        let deliveryInfo = '';
+        if (selectedLocation === 'delivery') {
+            if (seller.delivery_available === false) {
+                deliveryInfo = `<div class="delivery-fee" style="color: #dc3545;"><i class="fas fa-times-circle"></i> Bu Konuma Teslimat Yok</div>`;
+            } else if (seller.delivery_fee > 0) {
+                deliveryInfo = `<div class="delivery-fee"><i class="fas fa-motorcycle"></i> Teslimat: ${money(seller.delivery_fee)}</div>`;
+            } else if (seller.delivery_fee === 0) {
+                deliveryInfo = `<div class="delivery-fee free"><i class="fas fa-motorcycle"></i> Ücretsiz Teslimat</div>`;
+            } else {
+                deliveryInfo = `<div class="delivery-fee"><i class="fas fa-motorcycle"></i> Teslimat Bilgisi Yok</div>`;
+            }
+            
+            if (seller.min_order_amount > 0) {
+                deliveryInfo += `<div class="min-order">Min. Sipariş: ${money(seller.min_order_amount)}</div>`;
+            }
+        } else {
+            deliveryInfo = `<div class="delivery-fee"><i class="fas fa-check-circle"></i> ${selectedLocation === 'inside' ? 'Restoran İçi' : 'Paket Servis'}</div>`;
+        }
+        
+        sellerCard.innerHTML = `
+            <div class="seller-image-container">
+                <img src="${seller.imgurl || getDefaultSellerImage(seller)}" 
+                     alt="${seller.business_name || seller.full_name}" 
+                     class="seller-image"
+                     onerror="this.src='${getDefaultSellerImage(seller)}'; this.onerror=null;">
+            </div>
+            <div class="seller-info">
+                <div class="seller-name">${seller.business_name || seller.full_name}</div>
+                <div class="seller-details">
+                    <span><i class="fas fa-map-marker-alt"></i> ${seller.district || ''}, ${seller.city || 'Şehir belirtilmemiş'}</span>
+                    <span><i class="fas fa-star" style="color: gold;"></i> ${seller.rating || '4.5'}</span>
+                </div>
+                ${storeTypeInfo}
+                ${deliveryInfo ? `<div class="delivery-info">${deliveryInfo}</div>` : ''}
+            </div>
+        `;
+        
+        sellerCard.addEventListener('click', () => {
+            if (isSellerLocked && selectedSellerId !== seller.id) {
+                speakToUser("Önce sepetinizi boşaltmalısınız farklı bir satıcı seçmek için.");
+                return;
+            }
+            
+            if (selectedLocation === 'delivery' && seller.delivery_available === false) {
+                speakToUser("Bu satıcı konumunuza teslimat yapmıyor. Lütfen başka bir satıcı seçin veya paket servis seçeneğini kullanın.");
+                return;
+            }
+            
+            selectSeller(seller);
+        });
+        
+        sellerGrid.appendChild(sellerCard);
+    });
+}
+
+// Store type seçimini sıfırla
+function resetStoreTypeSelection() {
+    document.querySelectorAll('.seller-type-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    selectedStoreTypeId = null;
+    selectedStoreTypeName = null;
+    
+    sellers = allSellersInLocation;
+    filteredSellers = [...allSellersInLocation];
+    
+    debugLog('🔄 Store type seçimi sıfırlandı, tüm satıcılar gösteriliyor');
+}
+
+// Store type ID'den isim alma
+function getStoreTypeName(storeTypeId) {
+    if (!storeTypes || storeTypes.length === 0) return '';
+    const storeType = storeTypes.find(type => type.id == storeTypeId);
+    return storeType ? storeType.name : '';
+}
+
+// Varsayılan satıcı resmi
+function getDefaultSellerImage(seller) {
+    const sellerName = seller.business_name || seller.full_name || 'Satıcı';
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGVlMmYzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY3Njc2NyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlNhdMSxY8SxPC90ZXh0Pjwvc3ZnPg==';
+}
+
+// Fallback store type'lar
+async function useFallbackStoreTypes() {
+    storeTypes = [
+        { id: 1, name: 'Market', code: 'market', description: 'Market ve bakkallar' },
+        { id: 2, name: 'Restoran', code: 'restaurant', description: 'Yemek restoranları' },
+        { id: 3, name: 'Kafe', code: 'cafe', description: 'Kafe ve pastaneler' },
+        { id: 4, name: 'Fırın', code: 'bakery', description: 'Fırın ve unlu mamüller' },
+        { id: 5, name: 'Eczane', code: 'pharmacy', description: 'Eczane ve ilaçlar' }
+    ];
+    
+    localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
+    displayStoreTypes(storeTypes);
+    debugLog('🔄 Manuel StoreTypes kullanılıyor');
+}
+
+// Demo satıcılar
+function getDemoSellers() {
+    return [
+        { 
+            id: 1, 
+            business_name: "Örnek Market", 
+            full_name: "Örnek Market",
+            city: userLocation.city || "İstanbul", 
+            district: userLocation.district || "Kadıköy",
+            imgurl: "", 
+            address: "Demo Adres",
+            rating: "4.5",
+            store_type_id: 1
+        },
+        { 
+            id: 2, 
+            business_name: "Lezzet Restoran", 
+            full_name: "Lezzet Restoran",
+            city: userLocation.city || "İstanbul", 
+            district: userLocation.district || "Beşiktaş",
+            imgurl: "", 
+            address: "Örnek Adres",
+            rating: "4.2",
+            store_type_id: 2
+        }
+    ];
+}
+
+// Satıcılara teslimat bilgisi ekle
+async function addDeliveryInfoToSellers(sellers) {
+    if (!sellers || sellers.length === 0) return;
+    
+    debugLog(`📍 Teslimat bilgileri ekleniyor: ${sellers.length} satıcı`);
+    
+    for (const seller of sellers) {
+        try {
+            // Basit teslimat bilgisi - gerçek uygulamada veritabanından çekilecek
+            seller.delivery_fee = Math.random() > 0.5 ? 5.99 : 0;
+            seller.min_order_amount = Math.random() > 0.5 ? 50 : 0;
+            seller.delivery_available = true;
+            seller.rating = (4 + Math.random()).toFixed(1);
+            
+        } catch (error) {
+            console.error(`Teslimat bilgisi ekleme hatası (${seller.business_name}):`, error);
+            seller.delivery_fee = 0;
+            seller.min_order_amount = 0;
+            seller.delivery_available = true;
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+	
         // =============================================
         // LOKASYON SEÇİM SİSTEMİ
         // =============================================
