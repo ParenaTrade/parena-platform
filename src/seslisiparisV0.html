@@ -2438,32 +2438,29 @@
 async function initApp() {
     try {
         debugLog('🚀 === UYGULAMA BAŞLATILIYOR ===');
-        
-        // 1. ÖNCE AI KOMUT SİSTEMİNİ YÜKLE
+        // 1. Konum event'lerini ayarla
+        setupLocationEvents();
+	   // 2. Konum yönetimi
+        initializeLocation();
+        debugLog('✅ Konum yönetimi tamamlandı');
+		 // 3. Modal kapatma event'lerini ayarla
+        setupModalCloseEvents();
+
+		// 4. StoreTypes yükle
+        await loadStoreTypes();
+        debugLog('✅ StoreTypes yüklendi');
+		
+        // 5. ÖNCE AI KOMUT SİSTEMİNİ YÜKLE
         await loadCommandRules();
         debugLog('✅ AI komut sistemi yüklendi');
 
-        // 2. DOM hazır olana kadar bekle
+        // 6. DOM hazır olana kadar bekle
         await waitForDOMElements();
-        debugLog('✅ DOM hazır');
+        debugLog('✅ DOM hazır'); 
 
-        // 3. Konum event'lerini ayarla
-        setupLocationEvents();
-        
-        // 4. Modal kapatma event'lerini ayarla
-        setupModalCloseEvents();
-        
-        // 5. StoreTypes yükle
-        await loadStoreTypes();
-        debugLog('✅ StoreTypes yüklendi');
-
-        // 6. Oturumu geri yükle
+        // 7. Oturumu geri yükle
         await restoreSession();
         debugLog('✅ Oturum yüklendi');
-
-        // 7. Konum yönetimi
-        initializeLocation();
-        debugLog('✅ Konum yönetimi tamamlandı');
 
         // 8. UI elementlerini ayarla
         updateUIAfterLogin();
@@ -3186,6 +3183,436 @@ function setupModalCloseEvents() {
             }
         }
 
+// =============================================
+// VERİTABANI ODAKLI ASİSTAN SİSTEMİ
+// =============================================
+	
+// Veritabanından kök kurallarını yükle
+// Komut kurallarını veritabanından yükle
+async function loadCommandRules() {
+    try {
+        const { data, error } = await supabase
+            .from('voice_command_rules')
+            .select('*')
+            .eq('is_active', true)
+            .order('priority', { ascending: false });
+
+        if (error) throw error;
+
+        commandRules.clear();
+        data.forEach(rule => {
+            if (!commandRules.has(rule.root_code)) {
+                commandRules.set(rule.root_code, []);
+            }
+            commandRules.get(rule.root_code).push(rule);
+        });
+
+        console.log(`✅ ${data.length} komut kuralı yüklendi`);
+    } catch (error) {
+        console.error('Komut kuralları yükleme hatası:', error);
+        // Fallback: Temel kuralları elle yükle
+        loadFallbackCommandRules();
+    }
+}
+
+
+// Fallback komut kuralları
+function loadFallbackCommandRules() {
+    commandRules.clear();
+    
+    // Temel kuralları elle ekle
+    const fallbackRules = [
+        {
+            root_code: '0:0',
+            input_patterns: 'merhaba|selam|başla',
+            output_text: 'Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen konumunuzu seçin.',
+            next_root: '1:0',
+            action_name: 'show_location_modal'
+        },
+        {
+            root_code: '1:0', 
+            input_patterns: 'market',
+            output_text: 'Market seçildi. Size en yakın marketler listeleniyor.',
+            next_root: '2:0',
+            action_name: 'select_market'
+        }
+        // Diğer temel kuralları buraya ekleyebilirsiniz
+    ];
+    
+    fallbackRules.forEach(rule => {
+        if (!commandRules.has(rule.root_code)) {
+            commandRules.set(rule.root_code, []);
+        }
+        commandRules.get(rule.root_code).push(rule);
+    });
+    
+    console.log('🔄 Fallback komut kuralları yüklendi');
+}
+
+// Ana komut işleme fonksiyonu (SADECE 50 SATIR!)
+async function processVoiceCommand(transcript) {
+    const message = transcript.toLowerCase().trim();
+    if (userMessage) userMessage.textContent = transcript;
+
+    debugLog(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot}`);
+
+    // 1. Askıda cevap varsa, onu işle
+    if (pendingResponse) {
+        return handlePendingResponse(message);
+    }
+
+    // 2. Mevcut kök için kuralları ara
+    const match = await findRuleMatch(message, currentRoot);
+    
+    if (match) {
+        await executeMatchedRule(match, message);
+    } else {
+        // 3. Eşleşme yoksa AI'ya yönlendir
+        await handleAIRequest(message, currentRoot);
+    }
+}
+
+// Kök komut eşleştirme
+async function findRuleMatch(message, root) {
+    const rules = commandRules.get(root) || [];
+    
+    for (const rule of rules) {
+        const patterns = rule.input_patterns.split('|');
+        for (const pattern of patterns) {
+            if (matchesPattern(message, pattern)) {
+                return { rule, pattern, extractedData: extractData(message, pattern) };
+            }
+        }
+    }
+    return null;
+}
+
+// Pattern eşleştirme
+function matchesPattern(message, pattern) {
+    if (pattern.startsWith('regex:')) {
+        const regex = new RegExp(pattern.replace('regex:', ''));
+        return regex.test(message);
+    }
+    return message.includes(pattern);
+}
+
+// Veri çıkarma
+function extractData(message, pattern) {
+    const data = {};
+    
+    if (pattern.startsWith('regex:')) {
+        const regex = new RegExp(pattern.replace('regex:', ''));
+        const match = message.match(regex);
+        if (match && match.groups) {
+            return match.groups;
+        }
+    }
+    
+    // Telefon numarası çıkarma
+    const phoneMatch = message.match(/\d+/g);
+    if (phoneMatch && phoneMatch.join('').length >= 10) {
+        data.phone = phoneMatch.join('');
+    }
+    
+    return data;
+}
+
+// Eşleşen kuralı çalıştır
+async function executeMatchedRule(match, message) {
+    const { rule, extractedData } = match;
+    
+    // Çıktıyı hazırla
+    let output = rule.output_text;
+    if (extractedData.phone) output = output.replace('{phone}', extractedData.phone);
+    
+    // Sesli cevap ver
+    speakToUser(output);
+    
+    // Aksiyonu çalıştır
+    if (rule.action_name) {
+        await executeAction(rule.action_name, { 
+            extractedData, 
+            message 
+        });
+    }
+    
+    // Askıda cevap bekliyorsa
+    if (rule.next_root && rule.next_root.includes('?')) {
+        pendingResponse = { nextRoot: rule.next_root, context: extractedData };
+    } else {
+        currentRoot = rule.next_root || currentRoot;
+    }
+}
+
+// AI isteği işleme (10 satır)
+// AI isteği işleme - ÖĞRENME EKLENDİ
+async function handleAIRequest(message, root) {
+    speakToUser("Anlıyorum...");
+    
+    const aiResult = await queryAI(message, root);
+    
+    if (aiResult.confidence > 0.7) {
+        speakToUser(aiResult.response);
+        currentRoot = aiResult.suggested_root;
+        
+        // Öğrenmeyi kaydet
+        await saveToAILearningCache(message, aiResult.response, root, aiResult.confidence);
+    } else {
+        speakToUser("Üzgünüm, tam anlayamadım. Lütfen tekrar söyler misiniz?");
+    }
+}
+
+// Askıda cevap işleme
+async function handlePendingResponse(message) {
+    if (!pendingResponse) return;
+    
+    const { nextRoot, context } = pendingResponse;
+    pendingResponse = null;
+    
+    if (message.includes('evet') || !message.includes('hayır')) {
+        currentRoot = nextRoot.replace('?', '');
+        speakToUser("Tamam, devam ediyorum...");
+    } else {
+        speakToUser("Anladım, başka nasıl yardımcı olabilirim?");
+        currentRoot = "0:0";
+    }
+}
+
+// AI sorgusu (8 satır - mock)
+async function queryAI(message, contextRoot) {
+    // Gerçek implementasyon için API endpoint
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve({
+                response: "Anladım, siparişinizi tamamlamak için ödeme yöntemi seçin.",
+                suggested_root: "5:1",
+                confidence: 0.8
+            });
+        }, 1000);
+    });
+}
+
+// Öğrenmeyi kaydet (5 satır)
+async function saveAILearning(originalRoot, userInput, aiResult) {
+    await supabase.from('ai_learning_log').insert([{
+        original_root: originalRoot,
+        user_input: userInput,
+        ai_response: aiResult.response,
+        resolved_root: aiResult.suggested_root,
+        confidence_score: aiResult.confidence
+    }]);
+}
+
+async function saveToAILearningCache(userInput, aiResponse, rootCode, confidence) {
+    try {
+        const { error } = await supabase
+            .from('ai_learning_cache')
+            .insert([{
+                user_input: userInput,
+                ai_response: aiResponse,
+                root_code: rootCode,
+                confidence_score: confidence,
+                created_at: new Date().toISOString()
+            }]);
+
+        if (error) throw error;
+        debugLog('✅ AI öğrenme verisi kaydedildi');
+    } catch (error) {
+        console.error('❌ AI öğrenme kaydetme hatası:', error);
+    }
+}
+
+// =============================================
+// YENİ KÖK SIRALAMASI İÇİN AKSİYON FONKSİYONLARI
+// =============================================
+
+async function executeAction(actionName, data) {
+    console.log(`⚡ Aksiyon: ${actionName}`, data);
+    
+    switch(actionName) {
+        // Mağaza tipi seçim aksiyonları
+        case 'select_market':
+            await selectStoreTypeByName('Market');
+            break;
+        case 'select_restaurant':
+            await selectStoreTypeByName('Restoran');
+            break;
+        case 'select_pharmacy':
+            await selectStoreTypeByName('Eczane');
+            break;
+        case 'select_bakery':
+            await selectStoreTypeByName('Fırın');
+            break;
+        case 'select_cafe':
+            await selectStoreTypeByName('Kafe');
+            break;
+            
+        // Satıcı seçim aksiyonları
+        case 'select_seller_by_index':
+            await selectSellerByIndex(extractNumber(data.message));
+            break;
+        case 'go_back_store_type':
+            currentRoot = "1:0";
+            speakToUser("Mağaza tipi seçimine dönülüyor.");
+            break;
+            
+        // Reyon seçim aksiyonları
+        case 'select_category_fruits':
+            await selectCategoryByName('Meyve & Sebze');
+            break;
+        case 'select_category_dairy':
+            await selectCategoryByName('Süt Ürünleri');
+            break;
+        case 'select_category_meat':
+            await selectCategoryByName('Et & Tavuk');
+            break;
+        case 'select_category_drinks':
+            await selectCategoryByName('İçecekler');
+            break;
+        case 'select_category_by_index':
+            await selectCategoryByIndex(extractNumber(data.message));
+            break;
+        case 'go_back_seller':
+            currentRoot = "2:0";
+            speakToUser("Satıcı seçimine dönülüyor.");
+            break;
+            
+        // Ürün seçim aksiyonları
+         case 'add_to_cart_voice':
+            await handleAddToCartCommand(data.message || '');
+            break;
+
+	case 'add_specific_product':
+            await handleSpecificProduct(data.extractedData?.product || '');
+            break;
+
+        case 'add_product_by_index':
+            await addProductByIndex(extractNumberFromMessage(data.message));
+            break;
+
+        case 'show_cart':
+            openCart();
+            currentRoot = "5:0";
+            break;
+        case 'go_back_category':
+            currentRoot = "3:0";
+            speakToUser("Reyon seçimine dönülüyor.");
+            break;
+            
+        // Sepet aksiyonları
+        case 'start_payment':
+            currentRoot = "6:0";
+            speakToUser("Ödeme yöntemi seçin: nakit, kart veya bonus.");
+            break;
+
+	case 'start_payment_session_check':
+            await startPaymentWithSessionCheck();
+            break;
+
+	case 'set_payment_cash_session':
+            await setPaymentWithSessionCheck('nakit');
+            break;
+
+	case 'set_payment_card_session':
+            await setPaymentWithSessionCheck('kart');
+            break;
+
+	case 'set_payment_bonus_session':
+            await setPaymentWithSessionCheck('bonus');
+            break;
+
+	case 'show_cart_session':
+            await showCartWithSessionStatus();
+            break;
+
+        case 'continue_shopping':
+            closeCart();
+            currentRoot = "4:0";
+            speakToUser("Alışverişe devam ediliyor.");
+            break;
+        case 'clear_cart':
+            cart = [];
+            updateCartUI();
+            speakToUser("Sepetiniz temizlendi.");
+            break;
+        case 'go_back_products':
+            closeCart();
+            currentRoot = "4:0";
+            break;
+            
+        // Ödeme aksiyonları
+        case 'set_payment_cash':
+            currentPaymentMethod = 'nakit';
+            currentRoot = "7:0";
+            speakToUser("Nakit ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'set_payment_card':
+            currentPaymentMethod = 'kart';
+            currentRoot = "7:0";
+            speakToUser("Kart ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'set_payment_bonus':
+            currentPaymentMethod = 'bonus';
+            currentRoot = "7:0";
+            speakToUser("Bonus ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'go_back_payment':
+            currentRoot = "6:0";
+            speakToUser("Ödeme yöntemi seçimine dönülüyor.");
+            break;
+            
+        // Adres aksiyonları
+        case 'confirm_address':
+            currentRoot = "8:0";
+            speakToUser("Teslimat adresiniz onaylandı. Lütfen telefon numaranızı söyleyin.");
+            break;
+        case 'request_new_address':
+            currentRoot = "7:1";
+            speakToUser("Lütfen yeni teslimat adresinizi söyleyin.");
+            break;
+        case 'save_new_address':
+            if (currentCustomer) {
+                currentCustomer.address = data.extractedData.address;
+            }
+            userLocation.fullAddress = data.extractedData.address;
+            currentRoot = "8:0";
+            speakToUser("Yeni adresiniz kaydedildi. Lütfen telefon numaranızı söyleyin.");
+            break;
+        case 'go_back_address':
+            currentRoot = "7:0";
+            break;
+            
+        // Telefon aksiyonları
+        case 'set_phone':
+            currentCustomer = { ...currentCustomer, phone: data.extractedData.phone };
+            break;
+        case 'check_phone':
+            await checkCustomerByPhone(data.extractedData.phone);
+            break;
+        case 'retry_phone':
+            currentRoot = "8:0";
+            speakToUser("Lütfen telefon numaranızı tekrar söyleyin.");
+            break;
+        case 'go_back_phone':
+            currentRoot = "8:0";
+            break;
+            
+        // Sipariş onay aksiyonları
+        case 'confirm_order':
+            await finalizeOrder(currentPaymentMethod);
+            currentRoot = "0:0";
+            break;
+        case 'cancel_order':
+            cart = [];
+            updateCartUI();
+            currentRoot = "0:0";
+            speakToUser("Siparişiniz iptal edildi. Yeni bir siparişe başlayabilirsiniz.");
+            break;
+            
+        default:
+            console.warn(`Bilinmeyen aksiyon: ${actionName}`);
+    }
+}
 
 // =============================================
 // SAYFA YÜKLENDİĞİNDE SESLİ ÜRÜN SİSTEMİNİ AKTİF ET
@@ -6156,436 +6583,6 @@ function handleRoot5(message, subRoot) {
     }
 }
 
-// =============================================
-// VERİTABANI ODAKLI ASİSTAN SİSTEMİ
-// =============================================
-	
-// Veritabanından kök kurallarını yükle
-// Komut kurallarını veritabanından yükle
-async function loadCommandRules() {
-    try {
-        const { data, error } = await supabase
-            .from('voice_command_rules')
-            .select('*')
-            .eq('is_active', true)
-            .order('priority', { ascending: false });
-
-        if (error) throw error;
-
-        commandRules.clear();
-        data.forEach(rule => {
-            if (!commandRules.has(rule.root_code)) {
-                commandRules.set(rule.root_code, []);
-            }
-            commandRules.get(rule.root_code).push(rule);
-        });
-
-        console.log(`✅ ${data.length} komut kuralı yüklendi`);
-    } catch (error) {
-        console.error('Komut kuralları yükleme hatası:', error);
-        // Fallback: Temel kuralları elle yükle
-        loadFallbackCommandRules();
-    }
-}
-
-
-// Fallback komut kuralları
-function loadFallbackCommandRules() {
-    commandRules.clear();
-    
-    // Temel kuralları elle ekle
-    const fallbackRules = [
-        {
-            root_code: '0:0',
-            input_patterns: 'merhaba|selam|başla',
-            output_text: 'Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen konumunuzu seçin.',
-            next_root: '1:0',
-            action_name: 'show_location_modal'
-        },
-        {
-            root_code: '1:0', 
-            input_patterns: 'market',
-            output_text: 'Market seçildi. Size en yakın marketler listeleniyor.',
-            next_root: '2:0',
-            action_name: 'select_market'
-        }
-        // Diğer temel kuralları buraya ekleyebilirsiniz
-    ];
-    
-    fallbackRules.forEach(rule => {
-        if (!commandRules.has(rule.root_code)) {
-            commandRules.set(rule.root_code, []);
-        }
-        commandRules.get(rule.root_code).push(rule);
-    });
-    
-    console.log('🔄 Fallback komut kuralları yüklendi');
-}
-
-// Ana komut işleme fonksiyonu (SADECE 50 SATIR!)
-async function processVoiceCommand(transcript) {
-    const message = transcript.toLowerCase().trim();
-    if (userMessage) userMessage.textContent = transcript;
-
-    debugLog(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot}`);
-
-    // 1. Askıda cevap varsa, onu işle
-    if (pendingResponse) {
-        return handlePendingResponse(message);
-    }
-
-    // 2. Mevcut kök için kuralları ara
-    const match = await findRuleMatch(message, currentRoot);
-    
-    if (match) {
-        await executeMatchedRule(match, message);
-    } else {
-        // 3. Eşleşme yoksa AI'ya yönlendir
-        await handleAIRequest(message, currentRoot);
-    }
-}
-
-// Kök komut eşleştirme
-async function findRuleMatch(message, root) {
-    const rules = commandRules.get(root) || [];
-    
-    for (const rule of rules) {
-        const patterns = rule.input_patterns.split('|');
-        for (const pattern of patterns) {
-            if (matchesPattern(message, pattern)) {
-                return { rule, pattern, extractedData: extractData(message, pattern) };
-            }
-        }
-    }
-    return null;
-}
-
-// Pattern eşleştirme
-function matchesPattern(message, pattern) {
-    if (pattern.startsWith('regex:')) {
-        const regex = new RegExp(pattern.replace('regex:', ''));
-        return regex.test(message);
-    }
-    return message.includes(pattern);
-}
-
-// Veri çıkarma
-function extractData(message, pattern) {
-    const data = {};
-    
-    if (pattern.startsWith('regex:')) {
-        const regex = new RegExp(pattern.replace('regex:', ''));
-        const match = message.match(regex);
-        if (match && match.groups) {
-            return match.groups;
-        }
-    }
-    
-    // Telefon numarası çıkarma
-    const phoneMatch = message.match(/\d+/g);
-    if (phoneMatch && phoneMatch.join('').length >= 10) {
-        data.phone = phoneMatch.join('');
-    }
-    
-    return data;
-}
-
-// Eşleşen kuralı çalıştır
-async function executeMatchedRule(match, message) {
-    const { rule, extractedData } = match;
-    
-    // Çıktıyı hazırla
-    let output = rule.output_text;
-    if (extractedData.phone) output = output.replace('{phone}', extractedData.phone);
-    
-    // Sesli cevap ver
-    speakToUser(output);
-    
-    // Aksiyonu çalıştır
-    if (rule.action_name) {
-        await executeAction(rule.action_name, { 
-            extractedData, 
-            message 
-        });
-    }
-    
-    // Askıda cevap bekliyorsa
-    if (rule.next_root && rule.next_root.includes('?')) {
-        pendingResponse = { nextRoot: rule.next_root, context: extractedData };
-    } else {
-        currentRoot = rule.next_root || currentRoot;
-    }
-}
-
-// AI isteği işleme (10 satır)
-// AI isteği işleme - ÖĞRENME EKLENDİ
-async function handleAIRequest(message, root) {
-    speakToUser("Anlıyorum...");
-    
-    const aiResult = await queryAI(message, root);
-    
-    if (aiResult.confidence > 0.7) {
-        speakToUser(aiResult.response);
-        currentRoot = aiResult.suggested_root;
-        
-        // Öğrenmeyi kaydet
-        await saveToAILearningCache(message, aiResult.response, root, aiResult.confidence);
-    } else {
-        speakToUser("Üzgünüm, tam anlayamadım. Lütfen tekrar söyler misiniz?");
-    }
-}
-
-// Askıda cevap işleme
-async function handlePendingResponse(message) {
-    if (!pendingResponse) return;
-    
-    const { nextRoot, context } = pendingResponse;
-    pendingResponse = null;
-    
-    if (message.includes('evet') || !message.includes('hayır')) {
-        currentRoot = nextRoot.replace('?', '');
-        speakToUser("Tamam, devam ediyorum...");
-    } else {
-        speakToUser("Anladım, başka nasıl yardımcı olabilirim?");
-        currentRoot = "0:0";
-    }
-}
-
-// AI sorgusu (8 satır - mock)
-async function queryAI(message, contextRoot) {
-    // Gerçek implementasyon için API endpoint
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve({
-                response: "Anladım, siparişinizi tamamlamak için ödeme yöntemi seçin.",
-                suggested_root: "5:1",
-                confidence: 0.8
-            });
-        }, 1000);
-    });
-}
-
-// Öğrenmeyi kaydet (5 satır)
-async function saveAILearning(originalRoot, userInput, aiResult) {
-    await supabase.from('ai_learning_log').insert([{
-        original_root: originalRoot,
-        user_input: userInput,
-        ai_response: aiResult.response,
-        resolved_root: aiResult.suggested_root,
-        confidence_score: aiResult.confidence
-    }]);
-}
-
-async function saveToAILearningCache(userInput, aiResponse, rootCode, confidence) {
-    try {
-        const { error } = await supabase
-            .from('ai_learning_cache')
-            .insert([{
-                user_input: userInput,
-                ai_response: aiResponse,
-                root_code: rootCode,
-                confidence_score: confidence,
-                created_at: new Date().toISOString()
-            }]);
-
-        if (error) throw error;
-        debugLog('✅ AI öğrenme verisi kaydedildi');
-    } catch (error) {
-        console.error('❌ AI öğrenme kaydetme hatası:', error);
-    }
-}
-
-// =============================================
-// YENİ KÖK SIRALAMASI İÇİN AKSİYON FONKSİYONLARI
-// =============================================
-
-async function executeAction(actionName, data) {
-    console.log(`⚡ Aksiyon: ${actionName}`, data);
-    
-    switch(actionName) {
-        // Mağaza tipi seçim aksiyonları
-        case 'select_market':
-            await selectStoreTypeByName('Market');
-            break;
-        case 'select_restaurant':
-            await selectStoreTypeByName('Restoran');
-            break;
-        case 'select_pharmacy':
-            await selectStoreTypeByName('Eczane');
-            break;
-        case 'select_bakery':
-            await selectStoreTypeByName('Fırın');
-            break;
-        case 'select_cafe':
-            await selectStoreTypeByName('Kafe');
-            break;
-            
-        // Satıcı seçim aksiyonları
-        case 'select_seller_by_index':
-            await selectSellerByIndex(extractNumber(data.message));
-            break;
-        case 'go_back_store_type':
-            currentRoot = "1:0";
-            speakToUser("Mağaza tipi seçimine dönülüyor.");
-            break;
-            
-        // Reyon seçim aksiyonları
-        case 'select_category_fruits':
-            await selectCategoryByName('Meyve & Sebze');
-            break;
-        case 'select_category_dairy':
-            await selectCategoryByName('Süt Ürünleri');
-            break;
-        case 'select_category_meat':
-            await selectCategoryByName('Et & Tavuk');
-            break;
-        case 'select_category_drinks':
-            await selectCategoryByName('İçecekler');
-            break;
-        case 'select_category_by_index':
-            await selectCategoryByIndex(extractNumber(data.message));
-            break;
-        case 'go_back_seller':
-            currentRoot = "2:0";
-            speakToUser("Satıcı seçimine dönülüyor.");
-            break;
-            
-        // Ürün seçim aksiyonları
-         case 'add_to_cart_voice':
-            await handleAddToCartCommand(data.message || '');
-            break;
-
-	case 'add_specific_product':
-            await handleSpecificProduct(data.extractedData?.product || '');
-            break;
-
-        case 'add_product_by_index':
-            await addProductByIndex(extractNumberFromMessage(data.message));
-            break;
-
-        case 'show_cart':
-            openCart();
-            currentRoot = "5:0";
-            break;
-        case 'go_back_category':
-            currentRoot = "3:0";
-            speakToUser("Reyon seçimine dönülüyor.");
-            break;
-            
-        // Sepet aksiyonları
-        case 'start_payment':
-            currentRoot = "6:0";
-            speakToUser("Ödeme yöntemi seçin: nakit, kart veya bonus.");
-            break;
-
-	case 'start_payment_session_check':
-            await startPaymentWithSessionCheck();
-            break;
-
-	case 'set_payment_cash_session':
-            await setPaymentWithSessionCheck('nakit');
-            break;
-
-	case 'set_payment_card_session':
-            await setPaymentWithSessionCheck('kart');
-            break;
-
-	case 'set_payment_bonus_session':
-            await setPaymentWithSessionCheck('bonus');
-            break;
-
-	case 'show_cart_session':
-            await showCartWithSessionStatus();
-            break;
-
-        case 'continue_shopping':
-            closeCart();
-            currentRoot = "4:0";
-            speakToUser("Alışverişe devam ediliyor.");
-            break;
-        case 'clear_cart':
-            cart = [];
-            updateCartUI();
-            speakToUser("Sepetiniz temizlendi.");
-            break;
-        case 'go_back_products':
-            closeCart();
-            currentRoot = "4:0";
-            break;
-            
-        // Ödeme aksiyonları
-        case 'set_payment_cash':
-            currentPaymentMethod = 'nakit';
-            currentRoot = "7:0";
-            speakToUser("Nakit ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
-            break;
-        case 'set_payment_card':
-            currentPaymentMethod = 'kart';
-            currentRoot = "7:0";
-            speakToUser("Kart ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
-            break;
-        case 'set_payment_bonus':
-            currentPaymentMethod = 'bonus';
-            currentRoot = "7:0";
-            speakToUser("Bonus ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
-            break;
-        case 'go_back_payment':
-            currentRoot = "6:0";
-            speakToUser("Ödeme yöntemi seçimine dönülüyor.");
-            break;
-            
-        // Adres aksiyonları
-        case 'confirm_address':
-            currentRoot = "8:0";
-            speakToUser("Teslimat adresiniz onaylandı. Lütfen telefon numaranızı söyleyin.");
-            break;
-        case 'request_new_address':
-            currentRoot = "7:1";
-            speakToUser("Lütfen yeni teslimat adresinizi söyleyin.");
-            break;
-        case 'save_new_address':
-            if (currentCustomer) {
-                currentCustomer.address = data.extractedData.address;
-            }
-            userLocation.fullAddress = data.extractedData.address;
-            currentRoot = "8:0";
-            speakToUser("Yeni adresiniz kaydedildi. Lütfen telefon numaranızı söyleyin.");
-            break;
-        case 'go_back_address':
-            currentRoot = "7:0";
-            break;
-            
-        // Telefon aksiyonları
-        case 'set_phone':
-            currentCustomer = { ...currentCustomer, phone: data.extractedData.phone };
-            break;
-        case 'check_phone':
-            await checkCustomerByPhone(data.extractedData.phone);
-            break;
-        case 'retry_phone':
-            currentRoot = "8:0";
-            speakToUser("Lütfen telefon numaranızı tekrar söyleyin.");
-            break;
-        case 'go_back_phone':
-            currentRoot = "8:0";
-            break;
-            
-        // Sipariş onay aksiyonları
-        case 'confirm_order':
-            await finalizeOrder(currentPaymentMethod);
-            currentRoot = "0:0";
-            break;
-        case 'cancel_order':
-            cart = [];
-            updateCartUI();
-            currentRoot = "0:0";
-            speakToUser("Siparişiniz iptal edildi. Yeni bir siparişe başlayabilirsiniz.");
-            break;
-            
-        default:
-            console.warn(`Bilinmeyen aksiyon: ${actionName}`);
-    }
-}
 
 // UI İYİLEŞTİRMELERİ
 // =============================================
@@ -6997,6 +6994,7 @@ function scrollElement(element, amount) {
 </body>
 
 </html>
+
 
 
 
