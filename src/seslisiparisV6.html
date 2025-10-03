@@ -3348,13 +3348,46 @@ function onUserLoggedIn() {
             updateLogoutButtonVisibility();
             
             if (currentCustomer) {
-                hideHowItWorks();
+                hideHowItWorksBanner();
             } else {
-                showHowItWorks();
+                showHowItWorksBanner();
             }
             
             updateCustomerUI();
             updateLocationText();
+        }
+
+        function updateLogoutButtonVisibility() {
+            if (logoutBtn) {
+                logoutBtn.style.display = currentCustomer ? 'block' : 'none';
+            }
+        }
+
+        function showHowItWorksBanner() {
+            if (howItWorks) howItWorks.style.display = 'block';
+            if (categoriesSection) categoriesSection.style.display = 'none';
+            if (sellersSection) sellersSection.style.display = 'none';
+            if (productsSection) productsSection.style.display = 'none';
+            if (orderSummary) orderSummary.style.display = 'none';
+        }
+
+        function hideHowItWorksBanner() {
+            if (howItWorks) howItWorks.style.display = 'none';
+            if (categoriesSection) categoriesSection.style.display = 'block';
+            if (sellersSection) sellersSection.style.display = 'block';
+            if (orderSummary) orderSummary.style.display = 'flex';
+        }
+
+        function updateCustomerUI() {
+            if (currentCustomer) {
+                if (userName) userName.textContent = currentCustomer.name || 'Profilim';
+                if (profileName) profileName.textContent = currentCustomer.name || '-';
+                if (profilePhone) profilePhone.textContent = currentCustomer.phone || '-';
+                if (profileCity) profileCity.textContent = currentCustomer.city || '-';
+                if (profileAddress) profileAddress.textContent = currentCustomer.address || '-';
+                if (profileBonus) profileBonus.textContent = money(currentCustomer.bonus_amount || 0);
+                if (profileAvatar) profileAvatar.textContent = (currentCustomer.name || 'P').charAt(0).toUpperCase();
+            }
         }
 
         function updateLogoutButtonVisibility() {
@@ -3514,7 +3547,6 @@ function onUserLoggedIn() {
       // =============================================
 // ANA UYGULAMA BAŞLATMA - REVİZE EDİLMİŞ
 // =============================================
-
 // Uygulama başlangıcında AI sistemini başlat
 async function initApp() {
     try {
@@ -3553,10 +3585,7 @@ async function initApp() {
         // 9. Event handler'ları ayarla
         setupEventHandlers();
         debugLog('✅ Event handlerlar ayarlandı');
-		
-		 // ✅ Sayfa yüklenince sepet otomatik aç
-        openCart();
-
+		openCart();	
         debugLog('🎉 === UYGULAMA BAŞLATMA TAMAMLANDI ===');
 
     } catch (error) {
@@ -3572,6 +3601,25 @@ async function initApp() {
             }
         }
 
+        function toggleCart() {
+            if (cartContainer.classList.contains('open')) {
+                closeCart();
+            } else {
+                openCart();
+            }
+        }
+
+        function openCart() {
+            if (cartContainer) {
+                cartContainer.classList.add('open');
+            }
+        }
+
+        function closeCart() {
+            if (cartContainer) {
+                cartContainer.classList.remove('open');
+            }
+        }
 
         // Sayfa yüklendiğinde initApp'i çalıştır
         document.addEventListener('DOMContentLoaded', function() {
@@ -3580,6 +3628,7 @@ async function initApp() {
         });
 
 	document.addEventListener('DOMContentLoaded', initApp);
+
 
        
 // =============================================
@@ -4012,36 +4061,11 @@ function updateUIAfterLogout() {
     if (profileCity) profileCity.textContent = '-';
     if (profileAddress) profileAddress.textContent = '-';
     if (profileBonus) profileBonus.textContent = '0 ₺';
-    if (profileAvatar) profileAvatar.textContent = 'P';
-    
+    if (profileAvatar) profileAvatar.textContent = 'P';    
     if (orderSummary) orderSummary.style.display = 'none';
-    showHowItWorksBanner();
+   
 }
 
-// Banner yönetimi
-function showHowItWorksBanner() {
-    const banner = document.getElementById('howItWorks');
-    if (banner) banner.style.display = 'block';
-    
-    // Diğer bölümleri gizle
-    const sections = ['categoriesSection', 'sellersSection', 'productsSection'];
-    sections.forEach(section => {
-        const el = document.getElementById(section);
-        if (el) el.style.display = 'none';
-    });
-}
-
-function hideHowItWorksBanner() {
-    const banner = document.getElementById('howItWorks');
-    if (banner) banner.style.display = 'block';
-    
-    // Diğer bölümleri göster
-    const sections = ['categoriesSection', 'sellersSection'];
-    sections.forEach(section => {
-        const el = document.getElementById(section);
-        if (el) el.style.display = 'none';
-    });
-}
 
 // Bildirim göster
 function showNotification(message, type = 'info') {
