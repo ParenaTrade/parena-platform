@@ -1997,7 +1997,7 @@
                 { id: 6, name: 'Fast Food', type: 'fastfood', icon: 'fas fa-hamburger' }
             ];
             
-            const storeTypeGrid = document.getElementById('sellerTypeGrid');
+            const storeTypeGrid = document.getElementById('storeTypeGrid');
             storeTypes.forEach(store => {
                 const card = document.createElement('div');
                 card.className = 'store-type-card';
@@ -4135,15 +4135,16 @@ async function loadStoreTypes() {
 }
 	
 // Store type'ları ekranda göster - AKIŞ DÜZELTMESİ
+// Mağaza tiplerini ekrana bas
 function displayStoreTypes(types) {
     const sellerTypeGrid = document.getElementById('sellerTypeGrid');
     if (!sellerTypeGrid) {
-        console.error('❌ SellerTypeGrid bulunamadı');
+        console.error('❌ sellerTypeGrid bulunamadı');
         return;
     }
-    
+
     sellerTypeGrid.innerHTML = '';
-    
+
     if (!types || types.length === 0) {
         sellerTypeGrid.innerHTML = `
             <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
@@ -4153,7 +4154,7 @@ function displayStoreTypes(types) {
         `;
         return;
     }
-    
+
     const iconMap = {
         'Market': 'fas fa-store',
         'Restoran': 'fas fa-utensils',
@@ -4161,42 +4162,71 @@ function displayStoreTypes(types) {
         'Fırın': 'fas fa-bread-slice',
         'Kafe': 'fas fa-coffee'
     };
-    
+
     types.forEach(type => {
         const typeCard = document.createElement('div');
         typeCard.className = 'seller-type-card';
         typeCard.dataset.typeId = type.id;
         typeCard.dataset.typeName = type.name;
-        
+
         typeCard.innerHTML = `
             <div class="seller-type-icon">
                 <i class="${iconMap[type.name] || 'fas fa-store'}"></i>
             </div>
             <div class="seller-type-name">${type.name}</div>
         `;
-        
+
         typeCard.addEventListener('click', () => {
-            // Tüm kartlardan seçimi kaldır
             document.querySelectorAll('.seller-type-card').forEach(card => {
                 card.classList.remove('selected');
             });
-            
-            // Bu kartı seçili yap
             typeCard.classList.add('selected');
-            
+
+            // Tıklandığında işlem
             onStoreTypeSelected(type.id, type.name);
         });
-        
+
         sellerTypeGrid.appendChild(typeCard);
     });
-    
-    // Store type seçildiğinde diğer bölümleri gizle
+
+    // Bölümleri sıfırla
     if (sellersSection) sellersSection.style.display = 'none';
     if (categoriesSection) categoriesSection.style.display = 'none';
     if (productsSection) productsSection.style.display = 'none';
-    
-    debugLog("✅ Store type'lar başarıyla yüklendi");
+
+    console.log("✅ Store type'lar başarıyla yüklendi");
 }
+
+// Supabase’den mağaza tiplerini çek
+async function loadStoreTypesFromDB() {
+    const { data, error } = await supabase
+        .from("store_types") // 📌 tablo adını kendi DB’ne göre değiştir
+        .select("*");
+
+    if (error) {
+        console.error("❌ Store Types Hatası:", error.message);
+        return;
+    }
+
+    displayStoreTypes(data);
+}
+
+// Yatay kaydırma setup
+function setupHorizontalScrolling() {
+    document.getElementById('scrollSellerTypesLeft').addEventListener('click', () => {
+        document.getElementById('sellerTypeGrid').scrollBy({ left: -200, behavior: 'smooth' });
+    });
+
+    document.getElementById('scrollSellerTypesRight').addEventListener('click', () => {
+        document.getElementById('sellerTypeGrid').scrollBy({ left: 200, behavior: 'smooth' });
+    });
+}
+
+// Sayfa açıldığında çalıştır
+document.addEventListener("DOMContentLoaded", () => {
+    setupHorizontalScrolling();
+    loadStoreTypesFromDB(); 
+});
 
 // Store type seçildiğinde - KATEGORİ ve ÜRÜNLERİ SIFIRLA
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
