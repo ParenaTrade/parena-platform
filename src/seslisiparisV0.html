@@ -3194,6 +3194,211 @@ async function detectUserLocation() {
             }
         }
 
+
+        // =============================================
+        // MİKROFON VE SESLİ ASİSTAN SİSTEMİ
+        // =============================================
+
+        function handleMicrophoneToggle() {
+            console.log('🎤 Mikrofon toggle çağrıldı', { 
+                selectedLocation: selectedLocation, 
+                currentCustomer: currentCustomer 
+            });
+            
+            if (!selectedLocation) {
+                console.log('📍 Konum seçilmemiş');
+                showLocationModal();
+                speakToUser("Lütfen önce bir konum seçiniz.");
+                return;
+            }
+            
+            if (isListening) {
+                disableMicrophone();
+            } else {
+                enableMicrophone();
+            }
+        }
+
+
+
+        async function enableMicrophone() {
+            try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Mikrofon erişimi desteklenmiyor");
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                isMicrophoneEnabled = true;
+                microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (Açık)</span>';
+                microphoneToggle.classList.add('listening');
+                
+                initializeSpeechRecognition();
+                
+                if (assistantMessage) {
+                    assistantMessage.textContent = "Mikrofon açıldı. Konuşmaya başlayabilirsiniz.";
+                }
+                
+                // Sesli karşılama mesajı
+                setTimeout(() => {
+                    initializeVoiceAssistant();
+                }, 1000);
+                
+                stream.getTracks().forEach(track => track.stop());
+                
+            } catch (error) {
+                console.error("Mikrofon erişim hatası:", error);
+                let errorMessage = "Mikrofon erişimi sağlanamadı. ";
+                
+                if (error.name === "NotAllowedError") {
+                    errorMessage += "Lütfen tarayıcı ayarlarınızdan mikrofon erişimine izin verin.";
+                } else if (error.name === "NotFoundError") {
+                    errorMessage += "Mikrofon cihazı bulunamadı.";
+                } else {
+                    errorMessage += "Beklenmeyen bir hata oluştu: " + error.message;
+                }
+                
+                if (assistantMessage) {
+                    assistantMessage.textContent = errorMessage;
+                }
+                disableMicrophone();
+            }
+        }
+
+        function disableMicrophone() {
+            isMicrophoneEnabled = false;
+            microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon (Kapalı)</span>';
+            microphoneToggle.classList.remove('listening');
+            
+            if (recognition) {
+                recognition.stop();
+            }
+            
+            if (voiceIndicator) {
+                voiceIndicator.classList.remove('listening');
+            }
+            
+            if (assistantMessage) {
+                assistantMessage.textContent = "Mikrofon kapalı. Sesli sipariş için lütfen mikrofonu açın.";
+            }
+        }
+
+        function initializeSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                if (assistantMessage) {
+                    assistantMessage.textContent = "Tarayıcınız ses tanıma özelliğini desteklemiyor";
+                }
+                disableMicrophone();
+                return;
+            }
+            
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.lang = 'tr-TR';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            
+            recognition.onstart = function() {
+                isListening = true;
+                if (voiceIndicator) {
+                    voiceIndicator.classList.add('listening');
+                }
+                if (assistantMessage) {
+                    assistantMessage.textContent = "Dinliyorum... Konuşmaya başlayın.";
+                }
+            };
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[event.results.length - 1][0].transcript;
+                if (userMessage) {
+                    userMessage.textContent = transcript;
+                }
+                processVoiceCommand(transcript);
+            };
+            
+            recognition.onerror = function(event) {
+                console.error('Ses tanıma hatası:', event.error);
+                
+                if (event.error === 'no-speech') {
+                    return;
+                } 
+                
+                if (event.error === 'not-allowed') {
+                    if (assistantMessage) {
+                        assistantMessage.textContent = "Mikrofon erişimine izin verilmedi. Lütfen tarayıcı ayarlarınızdan izin verin.";
+                    }
+                    disableMicrophone();
+                } else {
+                    if (assistantMessage) {
+                        assistantMessage.textContent = "Ses tanıma hatası: " + event.error;
+                    }
+                }
+                
+                isListening = false;
+                if (voiceIndicator) {
+                    voiceIndicator.classList.remove('listening');
+                }
+            };
+            
+            recognition.onend = function() {
+                isListening = false;
+                if (voiceIndicator) {
+                    voiceIndicator.classList.remove('listening');
+                }
+                
+                if (isMicrophoneEnabled && !isListening) {
+                    setTimeout(() => {
+                        try {
+                            recognition.start();
+                        } catch (error) {
+                            console.log('Ses tanıma yeniden başlatılamadı:', error);
+                        }
+                    }, 500);
+                }
+            };
+            
+            try {
+                recognition.start();
+            } catch (error) {
+                console.error('Ses tanıma başlatılamadı:', error);
+                if (assistantMessage) {
+                    assistantMessage.textContent = "Ses tanıma başlatılamadı. Lütfen sayfayı yenileyin.";
+                }
+                disableMicrophone();
+            }
+        }
+
+        function initializeVoiceAssistant() {
+            setTimeout(() => {
+                if (!currentCustomer) {
+                    speakToUser("Merhaba! Sesli sipariş sistemine hoş geldiniz. Telefon numaranızı söyleyerek giriş yapabilir veya misafir olarak devam edebilirsiniz.");
+                    conversationStep = 0;
+                } else {
+                    speakToUser(`Hoş geldiniz ${currentCustomer.name}! Ne satın almak istersiniz?`);
+                }
+            }, 1000);
+        }
+
+        function speakToUser(message) {
+            if (assistantMessage) {
+                assistantMessage.textContent = message;
+            }
+            
+            if ('speechSynthesis' in window) {
+                const speech = new SpeechSynthesisUtterance(message);
+                speech.lang = 'tr-TR';
+                speech.volume = 1;
+                speech.rate = 1;
+                speech.pitch = 1;
+                window.speechSynthesis.speak(speech);
+            }
+        }
+
+
+
+	
 // =============================================
 // VERİTABANI ODAKLI ASİSTAN SİSTEMİ
 // =============================================
@@ -6995,6 +7200,7 @@ function scrollElement(element, amount) {
 </body>
 
 </html>
+
 
 
 
