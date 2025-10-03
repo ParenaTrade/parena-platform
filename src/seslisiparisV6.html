@@ -4189,6 +4189,7 @@ function displayStoreTypes(types) {
     });
 
     // Bölümleri sıfırla
+	if (howItWorks) howItWorks.style.display = 'none';
     if (sellersSection) sellersSection.style.display = 'none';
     if (categoriesSection) categoriesSection.style.display = 'none';
     if (productsSection) productsSection.style.display = 'none';
@@ -4230,7 +4231,8 @@ document.addEventListener("DOMContentLoaded", () => {
 // Store type seçildiğinde - KATEGORİ ve ÜRÜNLERİ SIFIRLA
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
-   
+
+	
     currentRoot = "2:0"; // Mağaza tipi seçildi, satıcı seçimine geç
     // Store type bilgisini kaydet
     selectedStoreTypeId = storeTypeId;
@@ -4324,6 +4326,7 @@ async function proceedWithStoreTypeSelection(storeTypeId, storeTypeName) {
         if (sellersSection) sellersSection.style.display = 'block';
         if (categoriesSection) categoriesSection.style.display = 'none'; // Reyonları gizle
         if (productsSection) productsSection.style.display = 'none'; // Ürünleri gizle
+		
         
         debugLog(`✅ ${storeTypeName} için satıcılar yüklendi`);
         speakToUser(`${storeTypeName} seçildi. Size en yakın ${storeTypeName.toLowerCase()}lar listeleniyor. Lütfen bir satıcı seçin.`);
@@ -7238,8 +7241,41 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return distance;
 }
 
-// Sepet işlemleri
+
+	// --- Sepet Kontrol --- //
+let cartAutoCloseTimer;
+
+function openCart() {
+    if (!cartContainer) return;
+
+    cartContainer.classList.add('open');
+
+    // varsa eski timer iptal et
+    if (cartAutoCloseTimer) {
+        clearTimeout(cartAutoCloseTimer);
+    }
+
+    // 10 saniye sonra otomatik kapan
+    cartAutoCloseTimer = setTimeout(() => {
+        closeCart();
+    }, 10000);
+
+    // Sepet açıldığında sipariş özeti de görünür olsun
+    if (orderSummary) orderSummary.style.display = 'flex';
+}
+
+function closeCart() {
+    if (!cartContainer) return;
+
+    cartContainer.classList.remove('open');
+
+    // sepet kapanınca sipariş özeti kaybolmasın!
+    if (orderSummary) orderSummary.style.display = 'flex';
+}
+
 function toggleCart() {
+    if (!cartContainer) return;
+
     if (cartContainer.classList.contains('open')) {
         closeCart();
     } else {
@@ -7247,13 +7283,7 @@ function toggleCart() {
     }
 }
 
-function openCart() {
-    cartContainer.classList.add('open');
-}
 
-function closeCart() {
-    cartContainer.classList.remove('open');
-}
 
 // Reyon'a göre ürünleri filtrele - TAMİR EDİLMİŞ
 function filterProductsByReyon(reyonId) {
