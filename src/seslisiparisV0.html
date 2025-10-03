@@ -3237,6 +3237,49 @@ function processRootCommand(message) {
 //==================================================
 // MAĞAZA YÜKLEME - STORE TYPE İŞLEMLERİ (STORE)
 //==================================================
+// Load store types - GÜNCELLENMİŞ
+async function loadStoreTypes() {
+    try {
+        debugLog('🔧 StoreTypes yükleniyor...');
+        
+        const { data, error, count } = await supabase
+            .from('store_type')
+            .select('*', { count: 'exact' })
+            .eq('status', 'Active')
+            .order('sort_code');
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            storeTypes = data;
+            localStorage.setItem('storeTypes', JSON.stringify(storeTypes));
+            debugLog(`✅ StoreTypes sunucudan yüklendi: ${data.length} adet`);
+            displayStoreTypes(storeTypes);
+            return;
+        }
+
+        throw new Error('StoreTypes verisi boş');
+        
+    } catch (error) {
+        console.error('❌ StoreTypes yükleme hatası:', error);
+        
+        // Cache kontrolü
+        const cached = localStorage.getItem('storeTypes');
+        if (cached) {
+            try {
+                storeTypes = JSON.parse(cached);
+                debugLog('✅ StoreTypes cache\'den yüklendi');
+                displayStoreTypes(storeTypes);
+                return;
+            } catch (parseError) {
+                console.error('❌ Cache parse hatası:', parseError);
+            }
+        }
+        
+        // Fallback
+        await useFallbackStoreTypes();
+    }
+}
 
 // Tüm store type'ları seçilebilir yap
 function enableAllStoreTypes() {
@@ -3271,8 +3314,201 @@ function getStoreTypeName(storeTypeId) {
     return storeType ? storeType.name : '';
 }
 
+// Store type'ları ekranda göster - AKIŞ DÜZELTMESİ
+function displayStoreTypes(types) {
+    const sellerTypeGrid = document.getElementById('sellerTypeGrid');
+    if (!sellerTypeGrid) {
+        console.error('❌ SellerTypeGrid bulunamadı');
+        return;
+    }
+    
+    sellerTypeGrid.innerHTML = '';
+    
+    if (!types || types.length === 0) {
+        sellerTypeGrid.innerHTML = `
+            <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
+                <i class="fas fa-store fa-3x mb-3"></i>
+                <p>Mağaza tipi bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const iconMap = {
+        'Market': 'fas fa-store',
+        'Restoran': 'fas fa-utensils',
+        'Eczane': 'fas fa-prescription-bottle',
+        'Fırın': 'fas fa-bread-slice',
+        'Kafe': 'fas fa-coffee'
+    };
+    
+    types.forEach(type => {
+        const typeCard = document.createElement('div');
+        typeCard.className = 'seller-type-card';
+        typeCard.dataset.typeId = type.id;
+        typeCard.dataset.typeName = type.name;
+        
+        typeCard.innerHTML = `
+            <div class="seller-type-icon">
+                <i class="${iconMap[type.name] || 'fas fa-store'}"></i>
+            </div>
+            <div class="seller-type-name">${type.name}</div>
+        `;
+        
+        typeCard.addEventListener('click', () => {
+            // Tüm kartlardan seçimi kaldır
+            document.querySelectorAll('.seller-type-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Bu kartı seçili yap
+            typeCard.classList.add('selected');
+            
+            onStoreTypeSelected(type.id, type.name);
+        });
+        
+        sellerTypeGrid.appendChild(typeCard);
+    });
+ // Store type seçildiğinde diğer bölümleri gizle
+    if (sellersSection) sellersSection.style.display = 'none';
+    if (categoriesSection) categoriesSection.style.display = 'none';
+    if (productsSection) productsSection.style.display = 'none';
+    
+    debugLog("✅ Store type'lar başarıyla yüklendi");
+}
 
+// Store type seçildiğinde - KATEGORİ ve ÜRÜNLERİ SIFIRLA
+async function onStoreTypeSelected(storeTypeId, storeTypeName) {
+    debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
+   
+    currentRoot = "2:0"; // Mağaza tipi seçildi, satıcı seçimine geç
+    // Store type bilgisini kaydet
+    selectedStoreTypeId = storeTypeId;
+    selectedStoreTypeName = storeTypeName;
+    
+    // Satıcıları store type'a göre filtrele
+    filterSellersByStoreType(storeTypeId);
+    
+    // Kategorileri ve ürünleri sıfırla
+    selectedCategoryId = null;
+    products = [];
+    
+    // Kategori grid'ini temizle
+    if (categoriesGrid) {
+        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
+    }
+    
+    // Ürünler grid'ini temizle
+    if (productsGrid) {
+        productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
+    }
+    
+    // Ürünler bölümünü gizle
+    if (productsSection) productsSection.style.display = 'none';
+    
+    debugLog(`✅ Satıcılar filtrelendi: ${storeTypeName}`);
+    speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu.`);
+}
 
+// Satıcıları store type'a göre filtrele
+function filterSellersByStoreType(storeTypeId) {
+    if (!allSellersInLocation || allSellersInLocation.length === 0) {
+        debugLog('⚠️ Filtrelenecek satıcı yok');
+        filteredSellers = [];
+        updateSellersGrid();
+        return;
+    }
+    
+    // Store type'a göre filtrele
+    filteredSellers = allSellersInLocation.filter(seller => seller.store_type_id === storeTypeId);
+    
+    // Global sellers değişkenini güncelle
+    sellers = filteredSellers;
+    
+    debugLog(`📊 Store type filtresi: ${filteredSellers.length} satıcı`);
+    
+    // Filtrelenmiş satıcıları göster
+    updateSellersGrid();
+    
+    // Eğer filtrelenmiş satıcı yoksa uyarı ver
+    if (filteredSellers.length === 0) {
+        speakToUser(`Bu kategoride satıcı bulunamadı. Lütfen başka bir kategori seçin.`);
+    }
+}
+// Store type seçimini sıfırla - TÜM SATICILARI GÖSTER
+function resetStoreTypeSelection() {
+    // Tüm store type kartlarındaki seçimi kaldır
+    document.querySelectorAll('.seller-type-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Global state'i sıfırla
+    selectedStoreTypeId = null;
+    selectedStoreTypeName = null;
+    
+    // Tüm satıcıları göster
+    sellers = allSellersInLocation;
+    filteredSellers = [...allSellersInLocation];
+    
+    debugLog('🔄 Store type seçimi sıfırlandı, tüm satıcılar gösteriliyor');
+}
+
+// Konum seçildikten sonra store type işlemini devam ettir - AKIŞ DÜZELTMESİ
+async function proceedWithStoreTypeSelection(storeTypeId, storeTypeName) {
+    // Önceki seçimleri temizle
+    selectedSellerId = null;
+    selectedCategoryId = null;
+    products = [];
+    
+    // UI durumunu sıfırla
+    resetSections();
+    
+    try {
+        // SADECE SATICILARI YÜKLE - Reyonları henüz yükleme
+        await loadSellersByStoreType(storeTypeId);
+        
+        // Sadece satıcılar bölümünü göster
+        if (sellersSection) sellersSection.style.display = 'block';
+        if (categoriesSection) categoriesSection.style.display = 'none'; // Reyonları gizle
+        if (productsSection) productsSection.style.display = 'none'; // Ürünleri gizle
+        
+        debugLog(`✅ ${storeTypeName} için satıcılar yüklendi`);
+        speakToUser(`${storeTypeName} seçildi. Size en yakın ${storeTypeName.toLowerCase()}lar listeleniyor. Lütfen bir satıcı seçin.`);
+        
+    } catch (error) {
+        console.error('❌ Store type seçiminde hata:', error);
+        speakToUser("Mağaza yüklenirken bir hata oluştu. Lütfen tekrar deneyin.");
+    }
+}
+// Bölümleri sıfırla - AKIŞ DÜZELTMESİ
+function resetSections() {
+    // Tüm seçimleri temizle
+    document.querySelectorAll('.seller-type-card, .seller-card, .category-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Grid içeriklerini sıfırla
+    if (sellerGrid) {
+        sellerGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
+    }
+    if (categoriesGrid) {
+        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
+    }
+    if (productsGrid) {
+        productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
+    }
+    
+    // Bölüm görünürlüğünü ayarla
+    if (sellersSection) sellersSection.style.display = 'none';
+    if (categoriesSection) categoriesSection.style.display = 'none';
+    if (productsSection) productsSection.style.display = 'none';
+    
+    if (selectedSellerInfo) {
+        selectedSellerInfo.textContent = 'Satıcı seçilmedi';
+    }
+}
+
+	
 //===================================================
 // SATICI YÜKLEME - SELLET TYPE İŞLEMLERİ (SELLER)
 //===================================================
@@ -6761,4 +6997,5 @@ function scrollElement(element, amount) {
 </body>
 
 </html>
+
 
