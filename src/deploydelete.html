@@ -1,44 +1,82 @@
-import express from "express";
-import fetch from "node-fetch";
-import cors from "cors";
-import dotenv from "dotenv";
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vercel Deployment Yönetimi</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background: #f2f2f2; }
+    button { padding: 8px 12px; margin-top: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>🚀 Vercel Deployment Listesi</h2>
+  <button id="loadBtn">Listeyi Getir</button>
+  <button id="deleteBtn">Seçilenleri Sil</button>
 
-dotenv.config();
-const app = express();
-app.use(cors());
-app.use(express.json());
+  <table id="deployTable">
+    <thead>
+      <tr>
+        <th>Seç</th>
+        <th>Ad</th>
+        <th>Tarih</th>
+        <th>Durum</th>
+        <th>ID</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
-const PROJECT_ID = process.env.PROJECT_ID;
+  <script>
+    const API_BASE = "http://localhost:3000";
 
-// Deployment listesi
-app.get("/deployments", async (req, res) => {
-  try {
-    const response = await fetch(`https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&limit=50`, {
-      headers: { Authorization: `Bearer ${VERCEL_TOKEN}` },
-    });
-    const data = await response.json();
-    res.json(data.deployments || []);
-  } catch (err) {
-    res.status(500).json({ error: "Liste alınamadı", details: err.message });
-  }
-});
+    async function loadDeployments() {
+      const res = await fetch(`${API_BASE}/deployments`);
+      const data = await res.json();
 
-// Seçilen deployları sil
-app.post("/delete", async (req, res) => {
-  const { ids } = req.body;
-  if (!ids?.length) return res.status(400).json({ message: "ID listesi boş" });
+      const tbody = document.querySelector("#deployTable tbody");
+      tbody.innerHTML = "";
 
-  let success = 0;
-  for (const id of ids) {
-    const del = await fetch(`https://api.vercel.com/v13/deployments/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${VERCEL_TOKEN}` },
-    });
-    if (del.ok) success++;
-  }
+      data.forEach((d) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td><input type="checkbox" value="${d.uid}"></td>
+          <td>${d.name}</td>
+          <td>${new Date(d.createdAt).toLocaleString()}</td>
+          <td>${d.state}</td>
+          <td>${d.uid}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
 
-  res.json({ message: `✅ ${success}/${ids.length} deployment silindi.` });
-});
+    async function deleteSelected() {
+      const selected = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(cb => cb.value);
 
-app.listen(3000, () => console.log("🌍 Server çalışıyor: http://localhost:3000"));
+      if (selected.length === 0) {
+        alert("Hiçbir deployment seçilmedi.");
+        return;
+      }
+
+      if (!confirm(`${selected.length} deployment silinecek, emin misin?`)) return;
+
+      const res = await fetch(`${API_BASE}/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selected }),
+      });
+
+      const result = await res.json();
+      alert(result.message);
+      loadDeployments();
+    }
+
+    document.getElementById("loadBtn").addEventListener("click", loadDeployments);
+    document.getElementById("deleteBtn").addEventListener("click", deleteSelected);
+  </script>
+</body>
+</html>
