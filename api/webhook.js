@@ -2,12 +2,10 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     const body = req.body;
 
-    // Kullanıcıdan gelen mesajı al
     if (body.message) {
       const chatId = body.message.chat.id;
       const text = body.message.text;
 
-      // Eğer kullanıcı /start yazdıysa cevap verelim
       if (text === "/start") {
         await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
           method: "POST",
