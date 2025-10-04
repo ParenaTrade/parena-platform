@@ -1,36 +1,61 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}`;
+
 export default async function handler(req, res) {
-  if (req.method === "POST") {
-    console.log("Telegram update:", JSON.stringify(req.body, null, 2));
-    const body = req.body;
-
-    if (body.message) {
-      const chatId = body.message.chat.id;
-      const text = body.message.text;
-
-      if (text === "/start") {
-        try {
-          const resp = await fetch(
-            `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text: "👋 Merhaba! SuperPromo botuna hoş geldin 🚀",
-              }),
-            }
-          );
-
-          const data = await resp.json();
-          console.log("Telegram sendMessage response:", data);
-        } catch (err) {
-          console.error("Telegram API error:", err);
-        }
-      }
-    }
-
-    res.status(200).json({ ok: true });
-  } else {
-    res.status(200).send("Bot webhook çalışıyor ✅");
+  if (req.method !== 'POST') {
+    return res.status(200).json({ message: 'ok' });
   }
+
+  const body = req.body;
+
+  if (!body.message) {
+    return res.status(200).json({ message: 'no message' });
+  }
+
+  const chatId = body.message.chat.id;
+  const text = body.message.text;
+
+  if (text === '/start') {
+    await sendMessage(chatId, '👋 Merhaba! SuperPromo botuna hoş geldin 🚀\n/promos yazarak güncel kampanyaları görebilirsin.');
+  }
+
+  if (text === '/promos') {
+    // Kullanıcının dilini (örnek TR) alalım
+    let lang = body.message.from.language_code || 'tr';
+
+    const { data: promos, error } = await supabase
+      .from('promos')
+      .select('title, url')
+      .eq('active', true)
+      .eq('language', lang)
+      .limit(5);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      await sendMessage(chatId, '❌ Kampanyalar yüklenemedi, daha sonra tekrar dene.');
+    } else if (promos.length === 0) {
+      await sendMessage(chatId, '📭 Şu anda aktif promosyon yok.');
+    } else {
+      let msg = promos
+        .map(p => `🎁 ${p.title}\n🔗 ${p.url}`)
+        .join('\n\n');
+      await sendMessage(chatId, msg);
+    }
+  }
+
+  res.status(200).json({ ok: true });
+}
+
+async function sendMessage(chatId, text) {
+  await fetch(`${TELEGRAM_API}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text }),
+  });
 }
