@@ -1,15 +1,15 @@
 {
-  name superpromo-bot,
-  version 1.0.0,
-  description Telegram affiliate promo bot with Supabase backend,
-  main apiwebhook.js,
-  type module,
-  scripts {
-    dev vercel dev,
-    start node apiwebhook.js
+  "name": "superpromo-bot",
+  "version": "1.0.0",
+  "description": "Telegram affiliate promo bot with Supabase backend",
+  "main": "api/webhook.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "node api/webhook.js"
   },
-  dependencies {
-    @supabasesupabase-js ^2.44.0,
-    node-fetch ^3.3.2
+  "dependencies": {
+    "@supabase/supabase-js": "^2.44.0",
+    "node-fetch": "^3.3.2"
   }
 }
