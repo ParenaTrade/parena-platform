@@ -1,9 +1,11 @@
+// server.js
 import express from "express";
-import fetch from "node-fetch";
 import cors from "cors";
 import dotenv from "dotenv";
+import fetch from "node-fetch";
 
 dotenv.config();
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -11,34 +13,49 @@ app.use(express.json());
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
 const PROJECT_ID = process.env.PROJECT_ID;
 
-// Deployment listesi
+if (!VERCEL_TOKEN || !PROJECT_ID) {
+  console.error("⚠️ VERCEL_TOKEN veya PROJECT_ID .env içinde eksik!");
+  process.exit(1);
+}
+
+// Deployları listele
 app.get("/deployments", async (req, res) => {
   try {
-    const response = await fetch(`https://api.vercel.com/v6/deployments?projectId=${PROJECT_ID}&limit=50`, {
-      headers: { Authorization: `Bearer ${VERCEL_TOKEN}` },
+    const r = await fetch(`https://api.vercel.com/v9/projects/${PROJECT_ID}/deployments`, {
+      headers: { Authorization: `Bearer ${VERCEL_TOKEN}` }
     });
-    const data = await response.json();
+    const data = await r.json();
     res.json(data.deployments || []);
   } catch (err) {
-    res.status(500).json({ error: "Liste alınamadı", details: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Deployları çekmede hata" });
   }
 });
 
 // Seçilen deployları sil
 app.post("/delete", async (req, res) => {
   const { ids } = req.body;
-  if (!ids?.length) return res.status(400).json({ message: "ID listesi boş" });
+  if (!ids || !ids.length) return res.status(400).json({ message: "Seçili deploy yok" });
 
-  let success = 0;
+  let success = [];
+  let failed = [];
+
   for (const id of ids) {
-    const del = await fetch(`https://api.vercel.com/v13/deployments/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${VERCEL_TOKEN}` },
-    });
-    if (del.ok) success++;
+    try {
+      await fetch(`https://api.vercel.com/v13/deployments/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${VERCEL_TOKEN}` }
+      });
+      success.push(id);
+    } catch (err) {
+      failed.push(id);
+    }
   }
 
-  res.json({ message: `✅ ${success}/${ids.length} deployment silindi.` });
+  res.json({
+    message: `Silinen deploylar: ${success.join(", ")}${failed.length ? "\nBaşarısız: " + failed.join(", ") : ""}`
+  });
 });
 
-app.listen(3000, () => console.log("🌍 Server çalışıyor: http://localhost:3000"));
+const PORT = 3000;
+app.listen(PORT, () => console.log(`🌍 Server çalışıyor: http://localhost:${PORT}`));
