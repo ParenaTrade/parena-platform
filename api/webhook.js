@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import fetch from "node-fetch";
+import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -8,43 +9,45 @@ const supabase = createClient(
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}`;
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(200).json({ message: 'ok' });
+  if (req.method !== "POST") {
+    return res.status(200).json({ message: "ok" });
   }
 
   const body = req.body;
 
   if (!body.message) {
-    return res.status(200).json({ message: 'no message' });
+    return res.status(200).json({ message: "no message" });
   }
 
   const chatId = body.message.chat.id;
   const text = body.message.text;
 
-  if (text === '/start') {
-    await sendMessage(chatId, '👋 Merhaba! SuperPromo botuna hoş geldin 🚀\n/promos yazarak güncel kampanyaları görebilirsin.');
+  // /start komutu
+  if (text === "/start") {
+    await sendMessage(
+      chatId,
+      "👋 Merhaba! SuperPromo botuna hoş geldin 🚀\n/promos yazarak güncel kampanyaları görebilirsin."
+    );
   }
 
-  if (text === '/promos') {
-    // Kullanıcının dilini (örnek TR) alalım
-    let lang = body.message.from.language_code || 'tr';
+  // /promos komutu
+  if (text === "/promos") {
+    let lang = body.message.from.language_code || "tr";
 
     const { data: promos, error } = await supabase
-      .from('promos')
-      .select('title, url')
-      .eq('active', true)
-      .eq('language', lang)
+      .from("promos")
+      .select("title, url")
+      .eq("active", true)
+      .eq("language", lang)
       .limit(5);
 
     if (error) {
-      console.error('Supabase error:', error);
-      await sendMessage(chatId, '❌ Kampanyalar yüklenemedi, daha sonra tekrar dene.');
-    } else if (promos.length === 0) {
-      await sendMessage(chatId, '📭 Şu anda aktif promosyon yok.');
+      console.error("Supabase error:", error);
+      await sendMessage(chatId, "❌ Kampanyalar yüklenemedi, daha sonra tekrar dene.");
+    } else if (!promos || promos.length === 0) {
+      await sendMessage(chatId, "📭 Şu anda aktif promosyon yok.");
     } else {
-      let msg = promos
-        .map(p => `🎁 ${p.title}\n🔗 ${p.url}`)
-        .join('\n\n');
+      const msg = promos.map(p => `🎁 ${p.title}\n🔗 ${p.url}`).join("\n\n");
       await sendMessage(chatId, msg);
     }
   }
@@ -53,9 +56,15 @@ export default async function handler(req, res) {
 }
 
 async function sendMessage(chatId, text) {
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  });
+  try {
+    const resp = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text })
+    });
+    const data = await resp.json();
+    console.log("Telegram sendMessage response:", data);
+  } catch (err) {
+    console.error("sendMessage error:", err);
+  }
 }
