@@ -1,82 +1,96 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vercel Deployment Yönetimi</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background: #f2f2f2; }
-    button { padding: 8px 12px; margin-top: 10px; cursor: pointer; }
-  </style>
+<meta charset="UTF-8">
+<title>Deploy Silme</title>
+<style>
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+</style>
 </head>
 <body>
-  <h2>🚀 Vercel Deployment Listesi</h2>
-  <button id="loadBtn">Listeyi Getir</button>
-  <button id="deleteBtn">Seçilenleri Sil</button>
 
-  <table id="deployTable">
-    <thead>
-      <tr>
-        <th>Seç</th>
-        <th>Ad</th>
-        <th>Tarih</th>
-        <th>Durum</th>
-        <th>ID</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<h2>Deploy Yönetimi</h2>
 
-  <script>
-    const API_BASE = "http://localhost:3000";
+<label>Başlangıç Tarihi: <input type="date" id="startDate"></label>
+<label>Bitiş Tarihi: <input type="date" id="endDate"></label>
+<button id="filterBtn">Tarihe Göre Listele</button>
+<button id="selectAllBtn">Hepsini Seç</button>
+<button id="deselectAllBtn">Seçimleri Kaldır</button>
+<button id="deleteBtn">Seçilenleri Sil</button>
 
-    async function loadDeployments() {
-      const res = await fetch(`${API_BASE}/deployments`);
-      const data = await res.json();
+<table id="deployTable">
+  <thead>
+    <tr>
+      <th>Seç</th>
+      <th>Deploy Adı</th>
+      <th>Tarih</th>
+      <th>Durum</th>
+      <th>ID</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-      const tbody = document.querySelector("#deployTable tbody");
-      tbody.innerHTML = "";
+<script>
+async function fetchDeploys() {
+  const res = await fetch("http://localhost:3000/deployments"); // server.js endpoint
+  return await res.json();
+}
 
-      data.forEach((d) => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td><input type="checkbox" value="${d.uid}"></td>
-          <td>${d.name}</td>
-          <td>${new Date(d.createdAt).toLocaleString()}</td>
-          <td>${d.state}</td>
-          <td>${d.uid}</td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
+function renderDeployTable(deploys) {
+  const tbody = document.querySelector("#deployTable tbody");
+  tbody.innerHTML = "";
+  deploys.forEach(d => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input type="checkbox" class="deployCheckbox" data-id="${d.id}"></td>
+      <td>${d.name}</td>
+      <td>${new Date(d.created).toLocaleString()}</td>
+      <td>${d.state}</td>
+      <td>${d.id}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
 
-    async function deleteSelected() {
-      const selected = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
-        .map(cb => cb.value);
+document.getElementById("filterBtn").addEventListener("click", async () => {
+  const startDate = document.getElementById("startDate").value;
+  const endDate = document.getElementById("endDate").value;
+  if(!startDate || !endDate){ alert("Tarihleri seçin"); return; }
 
-      if (selected.length === 0) {
-        alert("Hiçbir deployment seçilmedi.");
-        return;
-      }
+  const allDeploys = await fetchDeploys();
+  const filtered = allDeploys.filter(d => {
+    const date = new Date(d.created);
+    return date >= new Date(startDate) && date <= new Date(endDate);
+  });
+  renderDeployTable(filtered);
+});
 
-      if (!confirm(`${selected.length} deployment silinecek, emin misin?`)) return;
+document.getElementById("selectAllBtn").addEventListener("click", () => {
+  document.querySelectorAll(".deployCheckbox").forEach(cb => cb.checked = true);
+});
 
-      const res = await fetch(`${API_BASE}/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selected }),
-      });
+document.getElementById("deselectAllBtn").addEventListener("click", () => {
+  document.querySelectorAll(".deployCheckbox").forEach(cb => cb.checked = false);
+});
 
-      const result = await res.json();
-      alert(result.message);
-      loadDeployments();
-    }
+document.getElementById("deleteBtn").addEventListener("click", async () => {
+  const selected = [...document.querySelectorAll(".deployCheckbox:checked")].map(cb => cb.dataset.id);
+  if(!selected.length){ alert("Seçili deploy yok"); return; }
 
-    document.getElementById("loadBtn").addEventListener("click", loadDeployments);
-    document.getElementById("deleteBtn").addEventListener("click", deleteSelected);
-  </script>
+  const res = await fetch("http://localhost:3000/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: selected })
+  });
+  const result = await res.json();
+  alert(result.message);
+
+  // Listeyi güncelle
+  document.getElementById("filterBtn").click();
+});
+</script>
+
 </body>
 </html>
