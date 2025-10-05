@@ -9,11 +9,11 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(200).send("SuperPromo webhook aktif 🚀");
+  if (req.method !== "POST") return res.status(200).send("Webhook aktif 🚀");
 
   try {
     const message = req.body.message;
-    if (!message || !message.text) return res.status(200).send("No message");
+    if (!message || !message.text) return res.status(200).send("Mesaj yok");
 
     const chatId = message.chat.id;
     const text = message.text.trim();
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     } else if (text === "/promos") {
       const { data, error } = await supabase
         .from("tlgsp_campaigns")
-        .select("title, url")
+        .select("title, api_url")
         .eq("active", true);
 
       if (error) throw error;
@@ -31,7 +31,9 @@ export default async function handler(req, res) {
       if (!data || data.length === 0) {
         await sendMessage(chatId, "Şu anda aktif kampanya bulunamadı ❌");
       } else {
-        const promosText = data.map(p => `🎯 *${p.title}*\n🔗 ${p.url}`).join("\n\n");
+        const promosText = data
+          .map(p => `🎯 *${p.title}*\n🔗 ${p.api_url}`)
+          .join("\n\n");
         await sendMessage(chatId, promosText);
       }
     } else {
