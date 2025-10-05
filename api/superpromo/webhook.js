@@ -15,7 +15,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 
 // Webhook endpoint
-app.post("/api/webhook", async (req, res) => {
+app.post("/", async (req, res) => {
   try {
     const message = req.body.message;
     if (!message || !message.text) return res.sendStatus(200);
@@ -66,4 +66,5 @@ async function sendMessage(chatId, text) {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`SuperPromos bot çalışıyor, port ${PORT}`);
+
 });
