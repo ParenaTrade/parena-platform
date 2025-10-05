@@ -42,16 +42,15 @@ app.post("/api/superpromo/webhook", async (req, res) => {
       if (text === "/start") {
         await sendMessage(chatId, "👋 Hoşgeldiniz! SuperPromo botuna başlamak için aşağıdaki butonları kullanabilirsiniz:", {
           reply_markup: {
-            inline_keyboard: [
-              [{ text: "Başla", callback_data: "kampanyalar" }],
-              [{ text: "Kampanyalar", callback_data: "kampanyalar" }],
-              [{ text: "Üyelik", callback_data: "uyelik" }],
-              [{ text: "Canlı Sonuçlar", callback_data: "canli_sonuclar" }],
-              [{ text: "İstatistikler", callback_data: "istatistikler" }],
-              [{ text: "Bahisler", callback_data: "bahisler" }]
-              [{ text: "Online", url: "https://parenatrade.vercel.app/pwa/start" }],
-              [{ text: "Üyelik", url: "https://parenatrade.vercel.app/pwa/signup" }],
-            ]
+          inline_keyboard: [
+          [{ text: "Başla", callback_data: "kampanyalar" }],
+          [{ text: "Kampanyalar", callback_data: "kampanyalar" }],
+          [{ text: "Canlı Sonuçlar", callback_data: "canli_sonuclar" }],
+          [{ text: "İstatistikler", callback_data: "istatistikler" }],
+          [{ text: "Bahisler", callback_data: "bahisler" }],
+          [{ text: "Online", url: "https://parenatrade.vercel.app/pwa/start" }],
+          [{ text: "Üyelik", url: "https://parenatrade.vercel.app/pwa/signup" }]
+        ]
           }
         });
       }
@@ -87,4 +86,5 @@ async function answerCallback(callback_query_id) {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`SuperPromos bot çalışıyor, port ${PORT}`));
+
 
