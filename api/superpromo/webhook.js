@@ -8,13 +8,12 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
-// Vercel serverless handler
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(200).send("SuperPromo webhook aktif 🚀");
 
   try {
     const message = req.body.message;
-    if (!message || !message.text) return res.sendStatus(200);
+    if (!message || !message.text) return res.status(200).send("No message");
 
     const chatId = message.chat.id;
     const text = message.text.trim();
@@ -39,10 +38,10 @@ export default async function handler(req, res) {
       await sendMessage(chatId, "Komut bulunamadı. /promos veya /start deneyin 💬");
     }
 
-    res.sendStatus(200);
+    res.status(200).send("OK");
   } catch (err) {
     console.error("Webhook error:", err);
-    res.sendStatus(500);
+    res.status(500).send("Webhook error");
   }
 }
 
