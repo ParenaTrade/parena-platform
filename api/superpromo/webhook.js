@@ -8,7 +8,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
-// Vercel için serverless handler
+// Vercel serverless handler
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(200).send("SuperPromo webhook aktif 🚀");
 
