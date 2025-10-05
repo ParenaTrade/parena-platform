@@ -1,117 +1,87 @@
+import express from "express";
 import fetch from "node-fetch";
-import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
+const app = express();
+app.use(express.json());
 
+// Supabase bağlantısı
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+// Telegram bot
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(200).send("Webhook aktif 🚀");
-
+app.post("/api/superpromo/webhook", async (req, res) => {
   try {
-    const message = req.body.message;
-    if (!message || !message.text) return res.status(200).send("Mesaj yok");
+    const message = req.body.message || req.body.callback_query;
+    if (!message) return res.sendStatus(200);
 
-    const chatId = message.chat.id;
-    const text = message.text.trim();
-    const userId = message.from.id;
-    const userCountry = message.from.language_code.toUpperCase() || "TR";
+    const chatId = message.chat ? message.chat.id : message.message.chat.id;
 
-    // Kara liste kontrolü
-    const { data: blacklist } = await supabase
-      .from("tlgsp_blacklist")
-      .select("*")
-      .eq("telegram_user_id", userId);
-
-    if ((blacklist || []).length > 0) {
-      await sendMessage(chatId, "⚠️ Bu kullanıcı kara listede");
-      return res.status(200).send("Kara listede");
-    }
-
-    // Komut tablosu kontrolü
-    const { data: command } = await supabase
-      .from("tlgsp_commands")
-      .select("*")
-      .eq("command", text)
-      .eq("active", true)
-      .limit(1)
-      .single();
-
-    if (!command) {
-      await sendMessage(chatId, "Komut bulunamadı. /deneme deneyin 💬");
-      return res.status(200).send("Komut yok");
-    }
-
-    // Görev tablosu
-    const { data: tasks } = await supabase
-      .from("tlgsp_tasks")
-      .select("*")
-      .eq("command_id", command.id)
-      .eq("active", true);
-
-    for (let task of (tasks || [])) {
-      if (task.task_type === "check_rules") {
-        const { data: rules } = await supabase
-          .from("tlgsp_rules")
-          .select("*")
-          .eq("country", userCountry);
-
-        if ((rules || []).length === 0 || rules[0].status !== "allowed") {
-          await sendMessage(chatId, "❌ Üzgünüm, ülkenize yönelik kampanya bulunamadı");
-          // Kara listeye ekle
-          await supabase.from("tlgsp_blacklist").insert({
-            telegram_user_id: userId,
-            reason: `Kural dışı ülke: ${userCountry}`,
-          });
-          continue;
-        } else {
-          await sendButtons(chatId);
-        }
-      } else if (task.task_type === "send_message") {
-        await sendMessage(chatId, task.task_payload.text);
+    // Callback tıklanırsa
+    if (req.body.callback_query) {
+      const data = req.body.callback_query.data;
+      if (data === "kampanyalar") {
+        await sendMessage(chatId, "🎯 Demo Kampanyalar:\n1. Kampanya 1\n2. Kampanya 2");
+      } else if (data === "uyelik") {
+        await sendMessage(chatId, "📝 Üyelik formu: https://example.com/signup");
+      } else if (data === "canli_sonuclar") {
+        await sendMessage(chatId, "📊 Canlı Sonuçlar: Demo veriler...");
+      } else if (data === "istatistikler") {
+        await sendMessage(chatId, "📈 İstatistikler: Demo veriler...");
+      } else if (data === "bahisler") {
+        await sendMessage(chatId, "🎲 Bahis yönlendirmesi: https://example.com/bahis");
+      }
+      // Callback mesajını onayla
+      await answerCallback(message.id);
+    } else if (message.text) {
+      const text = message.text.trim();
+      if (text === "/start") {
+        await sendMessage(chatId, "👋 Hoşgeldiniz! SuperPromo botuna başlamak için aşağıdaki butonları kullanabilirsiniz:", {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "Başla", callback_data: "kampanyalar" }],
+              [{ text: "Kampanyalar", callback_data: "kampanyalar" }],
+              [{ text: "Üyelik", callback_data: "uyelik" }],
+              [{ text: "Canlı Sonuçlar", callback_data: "canli_sonuclar" }],
+              [{ text: "İstatistikler", callback_data: "istatistikler" }],
+              [{ text: "Bahisler", callback_data: "bahisler" }]
+            ]
+          }
+        });
       }
     }
 
-    res.status(200).send("OK");
-
+    res.sendStatus(200);
   } catch (err) {
     console.error("Webhook error:", err);
-    res.status(500).send("Webhook error");
+    res.sendStatus(500);
   }
-}
+});
 
-// Normal mesaj gönderme
-async function sendMessage(chatId, text) {
+async function sendMessage(chatId, text, extra = {}) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "Markdown",
+      ...extra
+    })
   });
 }
 
-// Inline buton gönderme
-async function sendButtons(chatId) {
-  const buttons = {
-    chat_id: chatId,
-    text: "Seçeneklerden devam edin:",
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "Başla", callback_data: "start" }],
-        [{ text: "Kampanyalar", callback_data: "campaigns" }],
-        [{ text: "Üyelik", callback_data: "membership" }],
-        [{ text: "Canlı Sonuçlar", callback_data: "live_results" }],
-        [{ text: "İstatistikler", callback_data: "stats" }],
-        [{ text: "Bahisler", callback_data: "bets" }]
-      ]
-    }
-  };
-
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
+async function answerCallback(callback_query_id) {
+  await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(buttons),
+    body: JSON.stringify({ callback_query_id })
   });
 }
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`SuperPromos bot çalışıyor, port ${PORT}`));
