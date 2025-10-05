@@ -22,13 +22,13 @@ export default async function handler(req, res) {
     const text = message.text.trim();
     const userId = message.from.id;
 
-    // Kara listede mi kontrol et
+    // Kara liste kontrolü (null-safe)
     const { data: blacklist } = await supabase
       .from("tlgsp_blacklist")
       .select("*")
       .eq("telegram_user_id", userId);
 
-    if (blacklist.length > 0) {
+    if ((blacklist || []).length > 0) {
       await sendMessage(chatId, "⚠️ Bu kullanıcı kara listede");
       return res.status(200).send("Kara listede");
     }
@@ -54,31 +54,26 @@ export default async function handler(req, res) {
       .eq("command_id", command.id)
       .eq("active", true);
 
-    // Debug log
-    console.log("Gelen mesaj:", message);
-    console.log("Komut:", command);
-    console.log("Görevler:", tasks);
-
-    for (let task of tasks) {
+    for (let task of (tasks || [])) {
       if (task.task_type === "send_message") {
         await sendMessage(chatId, task.task_payload.text);
       } else if (task.task_type === "fetch_campaigns") {
-        // Kampanyaları çek ve filtrele (rule ve ülke demo)
         const userCountry = task.task_payload.country || "TR";
+
         const { data: campaigns } = await supabase
           .from("tlgsp_campaigns")
           .select("id, title, api_url, country, active")
           .eq("active", true);
 
         const allowedCampaigns = [];
-        for (let c of campaigns) {
+        for (let c of (campaigns || [])) {
           const { data: rules } = await supabase
             .from("tlgsp_rules")
             .select("*")
             .eq("campaign_id", c.id)
             .eq("country", userCountry);
 
-          if (rules.length > 0 && rules[0].status === "allowed") {
+          if ((rules || []).length > 0 && rules[0].status === "allowed") {
             allowedCampaigns.push(c);
           } else {
             // Rule dışı → kara liste
