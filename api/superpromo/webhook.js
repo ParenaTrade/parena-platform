@@ -1,21 +1,17 @@
-import express from "express";
 import fetch from "node-fetch";
-import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
 
 dotenv.config();
 
-const app = express();
-app.use(express.json());
-
-// Supabase bağlantısı
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
-// Telegram bot token
-const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
+// Vercel için serverless handler
+export default async function handler(req, res) {
+  if (req.method !== "POST") return res.status(200).send("SuperPromo webhook aktif 🚀");
 
-// Webhook endpoint
-app.post("/", async (req, res) => {
   try {
     const message = req.body.message;
     if (!message || !message.text) return res.sendStatus(200);
@@ -25,7 +21,7 @@ app.post("/", async (req, res) => {
 
     if (text === "/start") {
       await sendMessage(chatId, "👋 Merhaba! SuperPromo botuna hoş geldin 🚀");
-    } else if (text === "/campaigns") {
+    } else if (text === "/promos") {
       const { data, error } = await supabase
         .from("tlgsp_campaigns")
         .select("title, url")
@@ -36,11 +32,11 @@ app.post("/", async (req, res) => {
       if (!data || data.length === 0) {
         await sendMessage(chatId, "Şu anda aktif kampanya bulunamadı ❌");
       } else {
-        const campaignsText = data.map(p => `🎯 *${p.title}*\n🔗 ${p.url}`).join("\n\n");
-        await sendMessage(chatId, campaignsText);
+        const promosText = data.map(p => `🎯 *${p.title}*\n🔗 ${p.url}`).join("\n\n");
+        await sendMessage(chatId, promosText);
       }
     } else {
-      await sendMessage(chatId, "Komut bulunamadı. /campaigns veya /start deneyin 💬");
+      await sendMessage(chatId, "Komut bulunamadı. /promos veya /start deneyin 💬");
     }
 
     res.sendStatus(200);
@@ -48,23 +44,12 @@ app.post("/", async (req, res) => {
     console.error("Webhook error:", err);
     res.sendStatus(500);
   }
-});
+}
 
 async function sendMessage(chatId, text) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "Markdown"
-    }),
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
   });
 }
-
-// Local çalıştırma
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`SuperPromos bot çalışıyor, port ${PORT}`);
-
-});
