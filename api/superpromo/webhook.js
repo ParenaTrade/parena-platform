@@ -54,6 +54,11 @@ export default async function handler(req, res) {
       .eq("command_id", command.id)
       .eq("active", true);
 
+    // Debug log
+    console.log("Gelen mesaj:", message);
+    console.log("Komut:", command);
+    console.log("Görevler:", tasks);
+
     for (let task of tasks) {
       if (task.task_type === "send_message") {
         await sendMessage(chatId, task.task_payload.text);
@@ -93,7 +98,6 @@ export default async function handler(req, res) {
           await sendMessage(chatId, promosText);
         }
       }
-      // İleride referral_add vb. task_type eklenebilir
     }
 
     res.status(200).send("OK");
