@@ -4,10 +4,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Supabase bağlantısı
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-// Telegram Bot
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
@@ -21,8 +18,9 @@ export default async function handler(req, res) {
     const chatId = message.chat.id;
     const text = message.text.trim();
     const userId = message.from.id;
+    const userCountry = message.from.language_code.toUpperCase() || "TR";
 
-    // Kara liste kontrolü (null-safe)
+    // Kara liste kontrolü
     const { data: blacklist } = await supabase
       .from("tlgsp_blacklist")
       .select("*")
@@ -33,7 +31,7 @@ export default async function handler(req, res) {
       return res.status(200).send("Kara listede");
     }
 
-    // Komut tablosundan çek
+    // Komut tablosu kontrolü
     const { data: command } = await supabase
       .from("tlgsp_commands")
       .select("*")
@@ -43,11 +41,11 @@ export default async function handler(req, res) {
       .single();
 
     if (!command) {
-      await sendMessage(chatId, "Komut bulunamadı. /promos, /start veya /deneme deneyin 💬");
+      await sendMessage(chatId, "Komut bulunamadı. /deneme deneyin 💬");
       return res.status(200).send("Komut yok");
     }
 
-    // Komuta bağlı görevleri çek
+    // Görev tablosu
     const { data: tasks } = await supabase
       .from("tlgsp_tasks")
       .select("*")
@@ -55,43 +53,25 @@ export default async function handler(req, res) {
       .eq("active", true);
 
     for (let task of (tasks || [])) {
-      if (task.task_type === "send_message") {
-        await sendMessage(chatId, task.task_payload.text);
-      } else if (task.task_type === "fetch_campaigns") {
-        const userCountry = task.task_payload.country || "TR";
+      if (task.task_type === "check_rules") {
+        const { data: rules } = await supabase
+          .from("tlgsp_rules")
+          .select("*")
+          .eq("country", userCountry);
 
-        const { data: campaigns } = await supabase
-          .from("tlgsp_campaigns")
-          .select("id, title, api_url, country, active")
-          .eq("active", true);
-
-        const allowedCampaigns = [];
-        for (let c of (campaigns || [])) {
-          const { data: rules } = await supabase
-            .from("tlgsp_rules")
-            .select("*")
-            .eq("campaign_id", c.id)
-            .eq("country", userCountry);
-
-          if ((rules || []).length > 0 && rules[0].status === "allowed") {
-            allowedCampaigns.push(c);
-          } else {
-            // Rule dışı → kara liste
-            await supabase.from("tlgsp_blacklist").insert({
-              telegram_user_id: userId,
-              reason: `Kampanya kural dışı: ${c.title}`,
-            });
-          }
-        }
-
-        if (allowedCampaigns.length === 0) {
-          await sendMessage(chatId, "❌ Üzgünüm, ülkenize yönelik aktif kampanya bulunamadı");
+        if ((rules || []).length === 0 || rules[0].status !== "allowed") {
+          await sendMessage(chatId, "❌ Üzgünüm, ülkenize yönelik kampanya bulunamadı");
+          // Kara listeye ekle
+          await supabase.from("tlgsp_blacklist").insert({
+            telegram_user_id: userId,
+            reason: `Kural dışı ülke: ${userCountry}`,
+          });
+          continue;
         } else {
-          const promosText = allowedCampaigns
-            .map(p => `🎯 *${p.title}*\n🔗 ${p.api_url}`)
-            .join("\n\n");
-          await sendMessage(chatId, promosText);
+          await sendButtons(chatId);
         }
+      } else if (task.task_type === "send_message") {
+        await sendMessage(chatId, task.task_payload.text);
       }
     }
 
@@ -103,11 +83,35 @@ export default async function handler(req, res) {
   }
 }
 
-// Telegram mesaj gönderme
+// Normal mesaj gönderme
 async function sendMessage(chatId, text) {
   await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
+  });
+}
+
+// Inline buton gönderme
+async function sendButtons(chatId) {
+  const buttons = {
+    chat_id: chatId,
+    text: "Seçeneklerden devam edin:",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "Başla", callback_data: "start" }],
+        [{ text: "Kampanyalar", callback_data: "campaigns" }],
+        [{ text: "Üyelik", callback_data: "membership" }],
+        [{ text: "Canlı Sonuçlar", callback_data: "live_results" }],
+        [{ text: "İstatistikler", callback_data: "stats" }],
+        [{ text: "Bahisler", callback_data: "bets" }]
+      ]
+    }
+  };
+
+  await fetch(`${TELEGRAM_API}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buttons),
   });
 }
