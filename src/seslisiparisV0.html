@@ -3686,194 +3686,168 @@ async function saveToAILearningCache(userInput, aiResponse, rootCode, confidence
 // YENİ KÖK SIRALAMASI İÇİN AKSİYON FONKSİYONLARI
 // =============================================
 
+/**
+ * Kök Komut Sistemi tarafından tetiklenen eylemleri işler.
+ * @param {string} actionName - voice_command_rules_rows.csv'den gelen eylem adı.
+ * @param {any} data - Eylemin gerektirdiği ek veri (örn. regex yakalamaları, telefon numarası).
+ */
 async function executeAction(actionName, data) {
-    console.log(`⚡ Aksiyon: ${actionName}`, data);
-    
-    switch(actionName) {
-        // Mağaza tipi seçim aksiyonları
+    displayNotification(`Eylem Tetiklendi: ${actionName}`, 'info');
+
+    // Müşteri Kaydı için kullanılan geçici global değişkenler
+    let tempName = '';
+    let tempSurname = '';
+
+    switch (actionName) {
+        // BAŞLANGIÇ VE KONUM (0:0 -> 1:0)
+        case 'show_location_modal':
+            showLocationSelection(); // Konum modalını gösteren fonksiyonunuz.
+            break;
+
+        // SATICI VE KATEGORİ SEÇİMİ (1:0 -> 2:0 -> 3:0 -> 4:0)
         case 'select_market':
-            await selectStoreTypeByName('Market');
-            break;
         case 'select_restaurant':
-            await selectStoreTypeByName('Restoran');
-            break;
         case 'select_pharmacy':
-            await selectStoreTypeByName('Eczane');
-            break;
         case 'select_bakery':
-            await selectStoreTypeByName('Fırın');
+            // Satıcı/Mağaza listesini getir
+            listVendors(actionName.replace('select_', '')); 
             break;
-        case 'select_cafe':
-            await selectStoreTypeByName('Kafe');
+
+        case 'select_vendor':
+            // data[0] satıcı numarasını, data[1] ise satıcı adını veya ID'yi içermelidir.
+            // Gömülü Mantık (Önceki Yanıtta Revize Edilen): Satıcının adını söyleyen fonksiyonu burada çağırın.
+            // handleVendorSelection(data[0], data[1]); // Fonksiyonunuzun asıl çağrısı
+            listCategories(currentVendorId); // Kategorileri listele (3:0)
             break;
+
+        case 'select_category':
+            // data[0] kategori adını içerir.
+            // Gömülü Mantık (Önceki Yanıtta Revize Edilen): Kategorinin adını söyleyen fonksiyonu burada çağırın.
+            // handleCategorySelection(data[0]); 
+            listProducts(currentReyonId); // Ürünleri listele (4:0)
+            break;
+
+        // ÜRÜN VE SEPET YÖNETİMİ (4:0 -> 5:1)
+        case 'list_product_varieties':
+            const quantity = data[0]; // 5
+            const unit = data[1];     // kilo
+            const product = data[2];  // domates
             
-        // Satıcı seçim aksiyonları
-        case 'select_seller_by_index':
-            await selectSellerByIndex(extractNumber(data.message));
-            break;
-        case 'go_back_store_type':
-            currentRoot = "1:0";
-            speakToUser("Mağaza tipi seçimine dönülüyor.");
-            break;
+            // Veritabanından domates çeşitlerini getir
+            const varieties = await getProductVarieties(product);
             
-        // Reyon seçim aksiyonları
-        case 'select_category_fruits':
-            await selectCategoryByName('Meyve & Sebze');
+            let varietyMessage = `${varieties.length} çeşit ${product} bulundu. Lütfen istediğiniz çeşidi ve miktarı tekrar söyleyin.`;
+            speak(varietyMessage);
+            // Çeşitleri kullanıcı arayüzünde listele
+            displayProductVarieties(varieties, quantity, unit);
             break;
-        case 'select_category_dairy':
-            await selectCategoryByName('Süt Ürünleri');
-            break;
-        case 'select_category_meat':
-            await selectCategoryByName('Et & Tavuk');
-            break;
-        case 'select_category_drinks':
-            await selectCategoryByName('İçecekler');
-            break;
-        case 'select_category_by_index':
-            await selectCategoryByIndex(extractNumber(data.message));
-            break;
-        case 'go_back_seller':
-            currentRoot = "2:0";
-            speakToUser("Satıcı seçimine dönülüyor.");
-            break;
+
+        case 'add_to_cart':
+            // data: [sofralık, domates, 5, kilo]
+            const [variety, productName, qty, unit] = data;
+            const success = await addToCart(variety, productName, qty, unit);
             
-        // Ürün seçim aksiyonları
-         case 'add_to_cart_voice':
-            await handleAddToCartCommand(data.message || '');
-            break;
-
-	case 'add_specific_product':
-            await handleSpecificProduct(data.extractedData?.product || '');
-            break;
-
-        case 'add_product_by_index':
-            await addProductByIndex(extractNumberFromMessage(data.message));
-            break;
-
-        case 'show_cart':
-            openCart();
-            currentRoot = "5:0";
-            break;
-        case 'go_back_category':
-            currentRoot = "3:0";
-            speakToUser("Reyon seçimine dönülüyor.");
-            break;
-            
-        // Sepet aksiyonları
-        case 'start_payment':
-            currentRoot = "6:0";
-            speakToUser("Ödeme yöntemi seçin: nakit, kart veya bonus.");
-            break;
-
-	case 'start_payment_session_check':
-            await startPaymentWithSessionCheck();
-            break;
-
-	case 'set_payment_cash_session':
-            await setPaymentWithSessionCheck('nakit');
-            break;
-
-	case 'set_payment_card_session':
-            await setPaymentWithSessionCheck('kart');
-            break;
-
-	case 'set_payment_bonus_session':
-            await setPaymentWithSessionCheck('bonus');
-            break;
-
-	case 'show_cart_session':
-            await showCartWithSessionStatus();
-            break;
-
-        case 'continue_shopping':
-            closeCart();
-            currentRoot = "4:0";
-            speakToUser("Alışverişe devam ediliyor.");
-            break;
-        case 'clear_cart':
-            cart = [];
-            updateCartUI();
-            speakToUser("Sepetiniz temizlendi.");
-            break;
-        case 'go_back_products':
-            closeCart();
-            currentRoot = "4:0";
-            break;
-            
-        // Ödeme aksiyonları
-        case 'set_payment_cash':
-            currentPaymentMethod = 'nakit';
-            currentRoot = "7:0";
-            speakToUser("Nakit ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
-            break;
-        case 'set_payment_card':
-            currentPaymentMethod = 'kart';
-            currentRoot = "7:0";
-            speakToUser("Kart ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
-            break;
-        case 'set_payment_bonus':
-            currentPaymentMethod = 'bonus';
-            currentRoot = "7:0";
-            speakToUser("Bonus ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
-            break;
-        case 'go_back_payment':
-            currentRoot = "6:0";
-            speakToUser("Ödeme yöntemi seçimine dönülüyor.");
-            break;
-            
-        // Adres aksiyonları
-        case 'confirm_address':
-            currentRoot = "8:0";
-            speakToUser("Teslimat adresiniz onaylandı. Lütfen telefon numaranızı söyleyin.");
-            break;
-        case 'request_new_address':
-            currentRoot = "7:1";
-            speakToUser("Lütfen yeni teslimat adresinizi söyleyin.");
-            break;
-        case 'save_new_address':
-            if (currentCustomer) {
-                currentCustomer.address = data.extractedData.address;
+            if (success) {
+                speak(`${variety} ${productName}, ${qty} ${unit} sepete eklendi.`);
+                displayNotification(`Sepete Eklendi: ${variety} ${qty} ${unit}`, 'success');
+            } else {
+                speak('Ürün sepete eklenirken bir sorun oluştu.');
             }
-            userLocation.fullAddress = data.extractedData.address;
-            currentRoot = "8:0";
-            speakToUser("Yeni adresiniz kaydedildi. Lütfen telefon numaranızı söyleyin.");
             break;
-        case 'go_back_address':
-            currentRoot = "7:0";
+
+        case 'remove_item':
+            // data: [ürün adı]
+            await removeFromCart(data[0]);
+            speak(`${data[0]} sepetten çıkarıldı.`);
+            break;
+
+        case 'go_to_checkout':
+            showCartSummary();
+            // Sesli asistan: "Üyelik kontrolü için telefon numaranızı söyler misiniz?"
+            break;
+
+
+        // ÜYELİK VE KAYIT AKIŞI (7:0 -> 8:0 -> 8:2)
+        case 'check_customer':
+            const phoneNumber = data[0]; // Telefon numarasını içerir
+            const customer = await checkCustomerByPhone(phoneNumber);
+            
+            if (customer) {
+                // Mevcut Üye (7:1)
+                speak(`Hoş geldiniz ${customer.name} ${customer.surname}. Siparişinizi nasıl ödemek istersiniz?`);
+                currentRoot = "6:0"; // Ödeme seçimine direkt geçiş
+                showPaymentOptions();
+            } else {
+                // Yeni Üye (8:2)
+                speak('Üyeliğiniz bulunamadı. Lütfen adınızı ve soyadınızı söyler misiniz?');
+                currentRoot = "8:2"; // Yeni üye kayıt akışına geçiş
+            }
             break;
             
-        // Telefon aksiyonları
-        case 'set_phone':
-            currentCustomer = { ...currentCustomer, phone: data.extractedData.phone };
+        case 'set_name_surname':
+            // data: [ad, soyad]
+            tempName = data[0];
+            tempSurname = data[1];
+            // Burada adres teyidi için konuşma tetiklenmeli
+            speak(`${tempName} ${tempSurname}. Adresinizi teyit edelim: ${userLocationAddress} doğru mu?`);
             break;
-        case 'check_phone':
-            await checkCustomerByPhone(data.extractedData.phone);
+
+        case 'confirm_address':
+            // Adres teyit edildi. Bina/kapı no bilgisi istenmeli
+            speak('Adresiniz onaylandı. Lütfen bina ve kapı numarasını söyler misiniz?');
             break;
-        case 'retry_phone':
-            currentRoot = "8:0";
-            speakToUser("Lütfen telefon numaranızı tekrar söyleyin.");
-            break;
-        case 'go_back_phone':
-            currentRoot = "8:0";
+
+        case 'retry_address':
+            // Adres reddedildi. Yeni adres istenmeli.
+            speak('Adresinizde değişiklik mi var? Lütfen tam adresinizi (il, ilçe, mahalle, cadde, sokak) tekrar söyleyin.');
             break;
             
-        // Sipariş onay aksiyonları
+        case 'complete_registration':
+            // data: [bina no, kapı no]
+            const buildingNo = data[0];
+            const apartmentNo = data[1];
+            
+            const newUser = {
+                name: tempName, 
+                surname: tempSurname, 
+                phone: lastCheckedPhone, // Bir önceki adımda kontrol edilen telefon numarası
+                address: `${userLocationAddress}, Bina: ${buildingNo}, Kapı: ${apartmentNo}`
+            };
+            
+            await createNewCustomer(newUser); // Veritabanına kaydetme fonksiyonu
+            
+            speak(`Üyeliğiniz başarıyla oluşturuldu. Hoş geldiniz ${tempName}! Şimdi ödeme yönteminizi seçin.`);
+            currentRoot = "6:0"; // Ödeme seçimine geçiş
+            showPaymentOptions();
+            break;
+
+        // ÖDEME VE SİPARİŞİ TAMAMLAMA (6:0 -> 9:0)
+        case 'select_cash':
+        case 'select_credit_card':
+        case 'select_bonus':
+            // Ödeme seçildi, sipariş kayıt öncesi son teyit
+            speak(`Siparişiniz ${actionName.replace('select_', '')} seçeneği ile kaydediliyor. Onaylıyor musunuz?`);
+            break;
+            
         case 'confirm_order':
-            await finalizeOrder(currentPaymentMethod);
-            currentRoot = "0:0";
+            await finalizeOrder(); // Siparişi veritabanına kaydet
+            speak('Siparişiniz başarıyla kaydedildi! En kısa sürede teslim edilecektir.');
+            currentRoot = "0:0"; // Başlangıç durumuna dön
             break;
+
         case 'cancel_order':
-            cart = [];
-            updateCartUI();
+            // Sepeti temizle ve başlangıca dön
+            clearCart();
+            speak('Siparişiniz iptal edildi.');
             currentRoot = "0:0";
-            speakToUser("Siparişiniz iptal edildi. Yeni bir siparişe başlayabilirsiniz.");
             break;
             
         default:
-            console.warn(`Bilinmeyen aksiyon: ${actionName}`);
+            console.error(`Bilinmeyen Eylem: ${actionName}`);
+            // AI devreye girdiğinde bu kısım tetiklenmez, bu yüzden sadece konsola hata loglanır.
+            break;
     }
 }
-
 // =============================================
 // SAYFA YÜKLENDİĞİNDE SESLİ ÜRÜN SİSTEMİNİ AKTİF ET
 // =============================================
@@ -7255,6 +7229,7 @@ function scrollElement(element, amount) {
 </body>
 
 </html>
+
 
 
 
