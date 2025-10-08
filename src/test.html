@@ -1712,21 +1712,31 @@
             }
         }
 
-        function speakToUser(message) {
-            if (assistantMessage) {
-                assistantMessage.textContent = message;
-            }
-            
-            if ('speechSynthesis' in window) {
-                const speech = new SpeechSynthesisUtterance(message);
-                speech.lang = 'tr-TR';
-                speech.volume = 1;
-                speech.rate = 1;
-                speech.pitch = 1;
-                window.speechSynthesis.speak(speech);
-            }
-        }
+       // =============================================
+// SESSİZ ASİSTAN MESAJLARI
+// =============================================
 
+function speakToUser(message) {
+    console.log(`🗣️ Asistan: ${message}`);
+    
+    if (assistantMessage) {
+        assistantMessage.textContent = message;
+    }
+    
+    // Sesli okuma (isteğe bağlı)
+    if ('speechSynthesis' in window && isMicrophoneEnabled) {
+        const speech = new SpeechSynthesisUtterance(message);
+        speech.lang = currentLanguage === 'tr' ? 'tr-TR' : 
+                     currentLanguage === 'en' ? 'en-US' : 'de-DE';
+        speech.volume = 1;
+        speech.rate = 1;
+        speech.pitch = 1;
+        
+        // Önceki konuşmayı durdur
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(speech);
+    }
+}
         // =============================================
         // MİKROFON ve SES TANIMA
         // =============================================
@@ -2007,13 +2017,27 @@ async function initApp() {
     }
 }
 
-// Tüm dinamik verileri yükle
 async function loadAllDynamicData() {
     await loadCommandRules();
     await loadStoreTypes();
-    await loadLanguageOptions();
+    
+    // Dil seçeneklerini yükle (hata olsa bile devam et)
+    try {
+        await loadLanguageOptions();
+    } catch (error) {
+        console.log('Dil yükleme hatası, fallback kullanılıyor:', error);
+    }
+    
     debugLog('✅ Tüm dinamik veriler yüklendi');
 }
+
+// Uygulama başlatıldığında dil selector'ü kur
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        setupLanguageSelector();
+        translatePage('tr'); // Varsayılan dil
+    }, 1000);
+});
 
 // =============================================
 // DİNAMİK KOMUT SİSTEMİ - VERİTABANI ODAKLI
@@ -3518,32 +3542,32 @@ function dynamicEmergencyFallback() {
 // Dil seçeneklerini yükle
 async function loadLanguageOptions() {
     try {
+        // Önce languages tablosunu kontrol et
         const { data, error } = await supabase
             .from('languages')
             .select('*')
             .eq('is_active', true)
-            .order('sort_order');
+            .order('sort_order', { ascending: true });
             
-        if (error) throw error;
-        
+        if (error) {
+            // Tablo yoksa veya hata varsa, fallback kullan
+            console.log('❌ Languages tablosu bulunamadı, fallback kullanılıyor:', error);
+            return getFallbackLanguages();
+        }
+
         if (data && data.length > 0) {
             debugLog(`✅ ${data.length} dil seçeneği yüklendi`);
             return data;
         } else {
-            // Varsayılan diller
-            return [
-                { code: 'tr', name: 'Türkçe', flag: '🇹🇷', is_active: true },
-                { code: 'en', name: 'English', flag: '🇺🇸', is_active: true }
-            ];
+            // Veri yoksa fallback
+            return getFallbackLanguages();
         }
     } catch (error) {
         console.error('Dil seçenekleri yükleme hatası:', error);
-        return [
-            { code: 'tr', name: 'Türkçe', flag: '🇹🇷', is_active: true }
-        ];
+        return getFallbackLanguages();
     }
 }
-
+        
 // Dinamik konum event'lerini ayarla
 function setupDynamicLocationEvents() {
     const locationMarker = document.getElementById('locationMarker');
@@ -3576,7 +3600,185 @@ function setupDynamicModalCloseEvents() {
         });
     }
 }
+        function getFallbackLanguages() {
+    debugLog('🔄 Fallback dil seçenekleri kullanılıyor');
+    return [
+        { 
+            code: 'tr', 
+            name: 'Türkçe', 
+            flag: '🇹🇷', 
+            is_active: true,
+            sort_order: 1
+        },
+        { 
+            code: 'en', 
+            name: 'English', 
+            flag: '🇺🇸', 
+            is_active: true,
+            sort_order: 2
+        },
+        { 
+            code: 'de', 
+            name: 'Deutsch', 
+            flag: '🇩🇪', 
+            is_active: true,
+            sort_order: 3
+        }
+    ];
+}
+        // =============================================
+// ÇOKLU DİL DESTEĞİ - BASİT VERSİYON
+// =============================================
 
+const translations = {
+    tr: {
+        app_name: "Sesli Sipariş",
+        select_location: "Konum Seçin",
+        order: "Sipariş:",
+        profile: "Profilim",
+        microphone_off: "Mikrofon (Kapalı)",
+        banner_title: "Sesli Sipariş ile Kolay Alışveriş",
+        banner_description: "Sadece konuşun, siparişiniz kapınızda!",
+        what_to_eat: "Ne yemek istersiniz?",
+        nearest_places: "Size En Yakın Yerler",
+        categories: "Kategoriler",
+        products: "Ürünler",
+        your_cart: "Sepetiniz",
+        empty_cart: "Sepetiniz boş",
+        subtotal: "Ara Toplam:",
+        discount: "İndirim:",
+        vat: "KDV (%18):",
+        total: "Toplam:",
+        pay_cash: "Nakit Öde",
+        pay_card: "Kartla Öde",
+        pay_bonus: "Bonus ile Öde"
+    },
+    en: {
+        app_name: "Voice Order",
+        select_location: "Select Location",
+        order: "Order:",
+        profile: "My Profile",
+        microphone_off: "Microphone (Off)",
+        banner_title: "Easy Shopping with Voice Order",
+        banner_description: "Just speak, your order is at your door!",
+        what_to_eat: "What would you like to eat?",
+        nearest_places: "Nearest Places to You",
+        categories: "Categories",
+        products: "Products",
+        your_cart: "Your Cart",
+        empty_cart: "Your cart is empty",
+        subtotal: "Subtotal:",
+        discount: "Discount:",
+        vat: "VAT (%18):",
+        total: "Total:",
+        pay_cash: "Pay Cash",
+        pay_card: "Pay by Card",
+        pay_bonus: "Pay with Bonus"
+    },
+    de: {
+        app_name: "Sprachbestellung",
+        select_location: "Standort auswählen",
+        order: "Bestellung:",
+        profile: "Mein Profil",
+        microphone_off: "Mikrofon (Aus)",
+        banner_title: "Einfaches Einkaufen mit Sprachbestellung",
+        banner_description: "Einfach sprechen, Ihre Bestellung ist vor Ihrer Tür!",
+        what_to_eat: "Was möchten Sie essen?",
+        nearest_places: "Nächste Orte zu Ihnen",
+        categories: "Kategorien",
+        products: "Produkte",
+        your_cart: "Ihr Warenkorb",
+        empty_cart: "Ihr Warenkorb ist leer",
+        subtotal: "Zwischensumme:",
+        discount: "Rabatt:",
+        vat: "MwSt (%18):",
+        total: "Gesamt:",
+        pay_cash: "Bar bezahlen",
+        pay_card: "Mit Karte bezahlen",
+        pay_bonus: "Mit Bonus bezahlen"
+    }
+};
+
+let currentLanguage = 'tr';
+
+// Sayfayı çevir
+function translatePage(lang) {
+    currentLanguage = lang;
+    
+    document.querySelectorAll('[data-translate]').forEach(element => {
+        const key = element.getAttribute('data-translate');
+        if (translations[lang] && translations[lang][key]) {
+            if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                element.placeholder = translations[lang][key];
+            } else {
+                element.textContent = translations[lang][key];
+            }
+        }
+    });
+    
+    // Dil düğmesini güncelle
+    const currentLang = getFallbackLanguages().find(l => l.code === lang);
+    if (currentLang && document.getElementById('currentLanguage')) {
+        document.getElementById('currentLanguage').textContent = currentLang.flag;
+    }
+    
+    debugLog(`✅ Dil değiştirildi: ${lang}`);
+}
+
+        // =============================================
+// DİL SELECTOR UI
+// =============================================
+
+function setupLanguageSelector() {
+    const languageBtn = document.getElementById('languageBtn');
+    const languageDropdown = document.getElementById('languageDropdown');
+    
+    if (!languageBtn || !languageDropdown) return;
+    
+    // Dil seçeneklerini oluştur
+    populateLanguageDropdown();
+    
+    // Dil değiştirme event'i
+    languageBtn.addEventListener('click', function() {
+        languageDropdown.classList.toggle('show');
+    });
+    
+    // Dışarı tıklayınca kapat
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.language-selector')) {
+            languageDropdown.classList.remove('show');
+        }
+    });
+}
+
+        function populateLanguageDropdown() {
+    const languageDropdown = document.getElementById('languageDropdown');
+    if (!languageDropdown) return;
+    
+    languageDropdown.innerHTML = '';
+    
+    const languages = getFallbackLanguages();
+    
+    languages.forEach(lang => {
+        const option = document.createElement('div');
+        option.className = `language-option ${lang.code === currentLanguage ? 'active' : ''}`;
+        option.setAttribute('data-lang', lang.code);
+        
+        option.innerHTML = `
+            <span class="flag">${lang.flag}</span>
+            <span>${lang.name}</span>
+            ${lang.code === currentLanguage ? '<i class="fas fa-check"></i>' : ''}
+        `;
+        
+        option.addEventListener('click', function() {
+            translatePage(lang.code);
+            languageDropdown.classList.remove('show');
+        });
+        
+        languageDropdown.appendChild(option);
+    });
+}
+        
 // Dinamik konum seçenekleri event'leri
 function setupDynamicLocationOptionEvents() {
     document.querySelectorAll('.location-option').forEach(option => {
@@ -4201,6 +4403,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
