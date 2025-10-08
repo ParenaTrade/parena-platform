@@ -2351,10 +2351,7 @@
 	let currentRoot = "0:0"; // Mevcut kök durumu
 	let pendingResponse = null; // Askıda cevap
 	let commandRules = new Map(); // Komut kuralları
-	let lastCheckedPhone = null;
-	let tempName = '';
-    let tempSurname = '';
-	let recognition;
+	
 	
 
 	
@@ -2423,48 +2420,6 @@
         const referralLink = document.getElementById('referralLink');
         const whatsappOrder = document.getElementById('whatsappOrder');
 	
-
-
-	
-        
-
-
-        // ===============================================
-        // 4. KÖK KOMUT VE EYLEM YÖNETİMİ (BİRLEŞTİRİLMİŞ)
-        // ===============================================
-
-        // DÜZELTİLMİŞ: Kural eşleştirme
-        async function findRuleMatch(transcript, rootCode) {
-            const rules = await getVoiceCommandRules();
-            const currentRules = rules.filter(r => r.root_code === rootCode && r.is_active === 'true');
-
-            for (const rule of currentRules) {
-                const regex = new RegExp(rule.input_patterns.replace(/\|/g, '|'), 'i');
-                const match = transcript.match(regex);
-                
-                if (match) {
-                    const data = match.slice(1);
-                    return { rule, data };
-                }
-            }
-            return null;
-        }
-
-        // DÜZELTİLMİŞ: AI devreye girme
-        async function handleAIRequest(transcript, rootCode) {
-            displayNotification('AI Devrede: Bağlamsal yanıt aranıyor.', 'warning');
-            
-            const aiCache = await getAILearningCache();
-            
-            const bestMatch = aiCache.find(item => transcript.includes(item.user_input) || item.user_input.includes(transcript));
-
-            if (bestMatch) {
-                return bestMatch.ai_response;
-            } else {
-                return `Üzgünüm, bu komutu mevcut akışta ve öğrenilmiş yanıtlarda bulamadım. Lütfen 'İptal et' diyerek baştan başlayın veya ekrandaki seçeneklere uyun.`;
-            }
-        }
-
    
 
         // Utility functions
@@ -3731,6 +3686,45 @@ async function saveToAILearningCache(userInput, aiResponse, rootCode, confidence
         console.error('❌ AI öğrenme kaydetme hatası:', error);
     }
 }
+
+
+
+	 // ===============================================
+        // 4. KÖK KOMUT VE EYLEM YÖNETİMİ (BİRLEŞTİRİLMİŞ)
+        // ===============================================
+
+        // DÜZELTİLMİŞ: Kural eşleştirme
+        async function findRuleMatch(transcript, rootCode) {
+            const rules = await getVoiceCommandRules();
+            const currentRules = rules.filter(r => r.root_code === rootCode && r.is_active === 'true');
+
+            for (const rule of currentRules) {
+                const regex = new RegExp(rule.input_patterns.replace(/\|/g, '|'), 'i');
+                const match = transcript.match(regex);
+                
+                if (match) {
+                    const data = match.slice(1);
+                    return { rule, data };
+                }
+            }
+            return null;
+        }
+
+        // DÜZELTİLMİŞ: AI devreye girme
+        async function handleAIRequest(transcript, rootCode) {
+            displayNotification('AI Devrede: Bağlamsal yanıt aranıyor.', 'warning');
+            
+            const aiCache = await getAILearningCache();
+            
+            const bestMatch = aiCache.find(item => transcript.includes(item.user_input) || item.user_input.includes(transcript));
+
+            if (bestMatch) {
+                return bestMatch.ai_response;
+            } else {
+                return `Üzgünüm, bu komutu mevcut akışta ve öğrenilmiş yanıtlarda bulamadım. Lütfen 'İptal et' diyerek baştan başlayın veya ekrandaki seçeneklere uyun.`;
+            }
+        }
+
 
 // =============================================
 // YENİ KÖK SIRALAMASI İÇİN AKSİYON FONKSİYONLARI
@@ -7275,6 +7269,7 @@ function scrollElement(element, amount) {
 </body>
 
 </html>
+
 
 
 
