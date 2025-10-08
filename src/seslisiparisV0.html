@@ -2352,9 +2352,6 @@
 	let pendingResponse = null; // Askıda cevap
 	let commandRules = new Map(); // Komut kuralları
 	
-	
-
-	
 	// Global state'e ekle
 	let userLocation = {
    	 latitude: null,
@@ -2419,8 +2416,6 @@
         const locationModal = document.getElementById('locationModal');
         const referralLink = document.getElementById('referralLink');
         const whatsappOrder = document.getElementById('whatsappOrder');
-	
-   
 
         // Utility functions
         function money(n) { 
@@ -3687,208 +3682,198 @@ async function saveToAILearningCache(userInput, aiResponse, rootCode, confidence
     }
 }
 
-
-
-	 // ===============================================
-        // 4. KÖK KOMUT VE EYLEM YÖNETİMİ (BİRLEŞTİRİLMİŞ)
-        // ===============================================
-
-        // DÜZELTİLMİŞ: Kural eşleştirme
-        async function findRuleMatch(transcript, rootCode) {
-            const rules = await getVoiceCommandRules();
-            const currentRules = rules.filter(r => r.root_code === rootCode && r.is_active === 'true');
-
-            for (const rule of currentRules) {
-                const regex = new RegExp(rule.input_patterns.replace(/\|/g, '|'), 'i');
-                const match = transcript.match(regex);
-                
-                if (match) {
-                    const data = match.slice(1);
-                    return { rule, data };
-                }
-            }
-            return null;
-        }
-
-        // DÜZELTİLMİŞ: AI devreye girme
-        async function handleAIRequest(transcript, rootCode) {
-            displayNotification('AI Devrede: Bağlamsal yanıt aranıyor.', 'warning');
-            
-            const aiCache = await getAILearningCache();
-            
-            const bestMatch = aiCache.find(item => transcript.includes(item.user_input) || item.user_input.includes(transcript));
-
-            if (bestMatch) {
-                return bestMatch.ai_response;
-            } else {
-                return `Üzgünüm, bu komutu mevcut akışta ve öğrenilmiş yanıtlarda bulamadım. Lütfen 'İptal et' diyerek baştan başlayın veya ekrandaki seçeneklere uyun.`;
-            }
-        }
-
-
 // =============================================
 // YENİ KÖK SIRALAMASI İÇİN AKSİYON FONKSİYONLARI
 // =============================================
 
-     /** 🔥 DÜZELTİLMİŞ: Kök Komut Sistemi. Tüm konuşma, lojik ve state geçişleri burada yönetilir. */
-        async function executeAction(actionName, data, outputText) {
-            displayNotification(`Eylem Tetiklendi: ${actionName}`, 'info');
+async function executeAction(actionName, data) {
+    console.log(`⚡ Aksiyon: ${actionName}`, data);
+    
+    switch(actionName) {
+        // Mağaza tipi seçim aksiyonları
+        case 'select_market':
+            await selectStoreTypeByName('Market');
+            break;
+        case 'select_restaurant':
+            await selectStoreTypeByName('Restoran');
+            break;
+        case 'select_pharmacy':
+            await selectStoreTypeByName('Eczane');
+            break;
+        case 'select_bakery':
+            await selectStoreTypeByName('Fırın');
+            break;
+        case 'select_cafe':
+            await selectStoreTypeByName('Kafe');
+            break;
             
-            let speakMessage = outputText; // Varsayılan konuşma metni (kural tablosundan gelen)
-            const rules = await getVoiceCommandRules();
-            const rule = rules.find(r => r.action_name === actionName); // rule.next_root için
-            let finalRoot = rule ? rule.next_root : currentRoot; // Başarı durumunda geçilecek kök
+        // Satıcı seçim aksiyonları
+        case 'select_seller_by_index':
+            await selectSellerByIndex(extractNumber(data.message));
+            break;
+        case 'go_back_store_type':
+            currentRoot = "1:0";
+            speakToUser("Mağaza tipi seçimine dönülüyor.");
+            break;
+            
+        // Reyon seçim aksiyonları
+        case 'select_category_fruits':
+            await selectCategoryByName('Meyve & Sebze');
+            break;
+        case 'select_category_dairy':
+            await selectCategoryByName('Süt Ürünleri');
+            break;
+        case 'select_category_meat':
+            await selectCategoryByName('Et & Tavuk');
+            break;
+        case 'select_category_drinks':
+            await selectCategoryByName('İçecekler');
+            break;
+        case 'select_category_by_index':
+            await selectCategoryByIndex(extractNumber(data.message));
+            break;
+        case 'go_back_seller':
+            currentRoot = "2:0";
+            speakToUser("Satıcı seçimine dönülüyor.");
+            break;
+            
+        // Ürün seçim aksiyonları
+         case 'add_to_cart_voice':
+            await handleAddToCartCommand(data.message || '');
+            break;
 
-            switch (actionName) {
-                
-                case 'show_location_modal': 
-                    showLocationSelection(); 
-                    break;
-                
-                case 'select_location': // Konum Seçimi (delivery/inside/takeaway)
-                    const locationType = data[0]; 
-                    loadAllSellersByLocation(); // Satıcıları yükle
-                    
-                    if (locationType === 'delivery') {
-                        speakMessage = `Konumunuz kaydedildi: ${userLocation.district}, ${userLocation.city}. Hangi mağaza tipinden alışveriş yapmak istersiniz? Market, restoran, eczane?`;
-                    } else {
-                        speakMessage = `Konumunuz kaydedildi: ${locationType === 'inside' ? 'Restoran içinde' : 'Paket servis'}. Hangi mağaza tipinden alışveriş yapmak istersiniz?`;
-                    }
-                    showStoreTypeSelection();
-                    break;
+	case 'add_specific_product':
+            await handleSpecificProduct(data.extractedData?.product || '');
+            break;
 
-                // 🔥 YENİ MERKEZİ VE DİNAMİK MAĞAZA TİPİ SEÇİMİ
-                case 'select_store_type': 
-                    const storeTypeCommand = data[0]; 
-                    
-                    // 1. PERFORMANS: Anlık Geri Bildirim
-                    speak(`Lütfen bekleyin, ${storeTypeCommand} mağaza tipine ait veriler hazırlanıyor...`); 
-                    displayNotification(`"${storeTypeCommand}" için veriler sorgulanıyor...`, 'info');
-                    
-                    // 2. VERİTABANI SORGULAMALARI
-                    const activeStoreTypes = await loadActiveStoreTypes(); 
-                    const selectedType = activeStoreTypes.find(type => type.code.toLowerCase() === storeTypeCommand.toLowerCase());
+        case 'add_product_by_index':
+            await addProductByIndex(extractNumberFromMessage(data.message));
+            break;
 
-                    if (selectedType) {
-                        // 3. GLOBAL DEĞİŞKEN ATAMA VE SORGULAMA
-                        selectedStoreTypeId = selectedType.id; 
-                        selectedStoreTypeName = selectedType.name; 
-                        const filteredSellers = await loadSellersByStoreType(selectedType.id); 
-                        
-                        // 4. UI GÜNCELLEME
-                        listSellers(selectedType.name); 
-                        
-                        // 5. KONUŞMA BİLDİRİMİ
-                        speakMessage = `${selectedType.name} seçildi. ${filteredSellers.length} satıcı bulundu. Lütfen listeden bir satıcı seçin.`; 
-                        
-                        // finalRoot CSV'den gelen 2:0 olarak kalır.
-                        
-                    } else {
-                        // HATA DURUMU
-                        speakMessage = `Üzgünüm, ${storeTypeCommand} mağaza tipini bulamadım veya aktif değil.`;
-                        finalRoot = currentRoot; // Hata durumunda Root'u kilitle
-                    }
-                    
-                    // 6. DÖNGÜNÜN SONU (Konuşma ve Geçiş)
-                    // Konuşma ve Root ataması switch dışına taşındığı için break ile devam edilir.
-                    break;
+        case 'show_cart':
+            openCart();
+            currentRoot = "5:0";
+            break;
+        case 'go_back_category':
+            currentRoot = "3:0";
+            speakToUser("Reyon seçimine dönülüyor.");
+            break;
+            
+        // Sepet aksiyonları
+        case 'start_payment':
+            currentRoot = "6:0";
+            speakToUser("Ödeme yöntemi seçin: nakit, kart veya bonus.");
+            break;
 
-                case 'select_seller':
-                    const sellerSelectionText = data[0]; 
-                    const sellerInfo = parseSellerInfo(sellerSelectionText, selectedStoreTypeName); 
+	case 'start_payment_session_check':
+            await startPaymentWithSessionCheck();
+            break;
 
-                    if (!sellerInfo || !sellerInfo.id) {
-                        speakMessage = 'Satıcı seçiminizi anlayamadım. Lütfen tekrar söyleyin.';
-                        finalRoot = currentRoot; 
-                        break;
-                    }
+	case 'set_payment_cash_session':
+            await setPaymentWithSessionCheck('nakit');
+            break;
 
-                    selectedStoreTypeId = sellerInfo.id;
-                    listCategories(selectedStoreTypeId); 
-                    speakMessage = `${sellerInfo.name} satıcısı seçildi. Kategorileri listeliyorum.`;
-                    break;
+	case 'set_payment_card_session':
+            await setPaymentWithSessionCheck('kart');
+            break;
 
-                case 'select_category':
-                    const reyonName = data[0]; 
-                    selectedCategoryId = getReyonIdByName(reyonName); 
-                    
-                    const hasCampaign = await checkCampaigns(selectedStoreTypeId, reyonName); 
-                    
-                    if (hasCampaign) {
-                        speakMessage = `${outputText} Harika! Bu kategoride indirimler bulunmaktadır.`;
-                    }
-                    
-                    listProducts(selectedCategoryId); 
-                    break;
-                    
-                case 'list_product_varieties':
-                    const [quantity, unit, product] = data;
-                    const varieties = await getProductVarieties(product); 
-                    displayProductVarieties(varieties, quantity, unit);
-                    break;
+	case 'set_payment_bonus_session':
+            await setPaymentWithSessionCheck('bonus');
+            break;
 
-                case 'add_to_cart':
-                    const [productVariety, productName, qty, itemUnit] = data;
-                    const success = await addToCart(selectedStoreTypeId, selectedCategoryId, productName, productVariety, qty, itemUnit);
-                    if (success) { updateCartUI(); } 
-                    break;
+	case 'show_cart_session':
+            await showCartWithSessionStatus();
+            break;
 
-                case 'calculate_total':
-                    const total = await getCartTotal();
-                    speakMessage = `${outputText} ${total} Türk Lirasıdır.`;
-                    showCartSummary();
-                    break;
-
-                // ÜYELİK VE ADRES AKIŞI
-                case 'check_customer':
-                    const phoneNumber = data[0]; 
-                    lastCheckedPhone = phoneNumber;
-                    const customer = await checkCustomerByPhone(phoneNumber); 
-                    
-                    if (customer) {
-                        const registeredAddress = await getRegisteredAddress(phoneNumber); 
-                        selectedLocation = registeredAddress; 
-                        
-                        speakMessage = `Hoş geldiniz ${customer.name} ${customer.surname}. ${outputText} Adresiniz: ${selectedLocation}`;
-                        showAddressConfirmation(selectedLocation); 
-                        finalRoot = "6:0"; 
-                    } else {
-                        speakMessage = 'Üyeliğiniz bulunamadı. Lütfen adınızı ve soyadınızı söyler misiniz?';
-                        finalRoot = "8:2"; // Kayıt akışına geçiş
-                    }
-                    break;
-                    
-                case 'set_delivery_note':
-                    orderNotes = data[0]; 
-                    speakMessage = `Teslimat notu kaydedildi: ${orderNotes}. ${outputText}`;
-                    showPaymentOptions();
-                    break;
-                    
-                case 'confirm_order':
-                    await finalizeOrder(); 
-                    clearCart();
-                    finalRoot = "0:0"; 
-                    break;
-
-                case 'cancel_order': 
-                    clearCart();
-                    showLocationSelection();
-                    finalRoot = "0:0"; 
-                    break;
-                    
-                case 'go_back_location':
-                case 'go_back_seller':
-                case 'go_back_category':
-                case 'go_back_address':
-                    goBackInFlow(actionName); 
-                    // Geri gitme konuşması outputText olur.
-                    break;
-                    
-                default:
-                    console.error(`Bilinmeyen Eylem: ${actionName}.`);
-                    break;
+        case 'continue_shopping':
+            closeCart();
+            currentRoot = "4:0";
+            speakToUser("Alışverişe devam ediliyor.");
+            break;
+        case 'clear_cart':
+            cart = [];
+            updateCartUI();
+            speakToUser("Sepetiniz temizlendi.");
+            break;
+        case 'go_back_products':
+            closeCart();
+            currentRoot = "4:0";
+            break;
+            
+        // Ödeme aksiyonları
+        case 'set_payment_cash':
+            currentPaymentMethod = 'nakit';
+            currentRoot = "7:0";
+            speakToUser("Nakit ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'set_payment_card':
+            currentPaymentMethod = 'kart';
+            currentRoot = "7:0";
+            speakToUser("Kart ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'set_payment_bonus':
+            currentPaymentMethod = 'bonus';
+            currentRoot = "7:0";
+            speakToUser("Bonus ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'go_back_payment':
+            currentRoot = "6:0";
+            speakToUser("Ödeme yöntemi seçimine dönülüyor.");
+            break;
+            
+        // Adres aksiyonları
+        case 'confirm_address':
+            currentRoot = "8:0";
+            speakToUser("Teslimat adresiniz onaylandı. Lütfen telefon numaranızı söyleyin.");
+            break;
+        case 'request_new_address':
+            currentRoot = "7:1";
+            speakToUser("Lütfen yeni teslimat adresinizi söyleyin.");
+            break;
+        case 'save_new_address':
+            if (currentCustomer) {
+                currentCustomer.address = data.extractedData.address;
             }
-       
+            userLocation.fullAddress = data.extractedData.address;
+            currentRoot = "8:0";
+            speakToUser("Yeni adresiniz kaydedildi. Lütfen telefon numaranızı söyleyin.");
+            break;
+        case 'go_back_address':
+            currentRoot = "7:0";
+            break;
+            
+        // Telefon aksiyonları
+        case 'set_phone':
+            currentCustomer = { ...currentCustomer, phone: data.extractedData.phone };
+            break;
+        case 'check_phone':
+            await checkCustomerByPhone(data.extractedData.phone);
+            break;
+        case 'retry_phone':
+            currentRoot = "8:0";
+            speakToUser("Lütfen telefon numaranızı tekrar söyleyin.");
+            break;
+        case 'go_back_phone':
+            currentRoot = "8:0";
+            break;
+            
+        // Sipariş onay aksiyonları
+        case 'confirm_order':
+            await finalizeOrder(currentPaymentMethod);
+            currentRoot = "0:0";
+            break;
+        case 'cancel_order':
+            cart = [];
+            updateCartUI();
+            currentRoot = "0:0";
+            speakToUser("Siparişiniz iptal edildi. Yeni bir siparişe başlayabilirsiniz.");
+            break;
+            
+        default:
+            console.warn(`Bilinmeyen aksiyon: ${actionName}`);
+    }
+}
+
 // =============================================
 // SAYFA YÜKLENDİĞİNDE SESLİ ÜRÜN SİSTEMİNİ AKTİF ET
 // =============================================
@@ -4277,7 +4262,7 @@ async function loadSellersByStoreType(storeTypeId) {
 }
 
 // Konuma göre tüm satıcıları yükle (store type filtresi OLMADAN)
-async function loadAllSellersByLocation() { console.log("Satıcılar konuma göre filtrelendi."); return true; }
+async function loadAllSellersByLocation() {
     try {
         debugLog(`🔍 Konumdaki tüm satıcılar yükleniyor: ${userLocation.district}, ${userLocation.city}`);
         
@@ -4330,7 +4315,8 @@ async function loadAllSellersByLocation() { console.log("Satıcılar konuma gör
         console.error('❌ Tüm satıcılar yükleme hatası:', error);
         debugLog('🔄 Hata oluştu, demo satıcılar kullanılıyor');
         allSellersInLocation = getDemoSellers();
-
+        showAllSellers();
+        speakToUser("Satıcılar yüklenirken hata oluştu. Demo satıcılar gösteriliyor.");
     }
 }
 
@@ -7267,29 +7253,4 @@ function scrollElement(element, amount) {
 	
 </script>	
 </body>
-
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
