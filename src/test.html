@@ -2829,26 +2829,49 @@ function findProductByName(productName) {
     }
     
     const cleanProductName = productName.toLowerCase()
-        .replace(/[^\w\s]/g, '')
+        .replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, '') // Türkçe karakterleri koru
         .replace(/\s+/g, ' ')
         .trim();
     
     debugLog(`🔍 Ürün aranıyor: "${cleanProductName}" - Toplam ${products.length} ürün`);
     
-    // Tam eşleşme
+    // 1. Tam eşleşme (Türkçe karakter duyarlı)
     let found = products.find(p => 
-        p.name.toLowerCase().replace(/[^\w\s]/g, '') === cleanProductName
+        p.name.toLowerCase().replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, '') === cleanProductName
     );
     if (found) {
         debugLog(`✅ Tam eşleşme: ${found.name}`);
         return found;
     }
     
-    // Kısmi eşleşme
-    found = products.find(product => 
-        product.name.toLowerCase().includes(cleanProductName) ||
-        cleanProductName.includes(product.name.toLowerCase())
-    );
+    // 2. Anahtar kelime eşleşmesi
+    const searchWords = cleanProductName.split(' ').filter(word => word.length > 2);
+    found = products.find(product => {
+        const productNameClean = product.name.toLowerCase().replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, '');
+        return searchWords.every(word => 
+            productNameClean.includes(word) || 
+            word.includes(productNameClean) ||
+            calculateSimilarity(word, productNameClean) > 0.7
+        );
+    });
+    if (found) {
+        debugLog(`✅ Anahtar kelime eşleşmesi: ${found.name}`);
+        return found;
+    }
+    
+    // 3. Benzerlik eşleşmesi
+    found = findProductBySimilarity(cleanProductName);
+    if (found) {
+        debugLog(`✅ Benzerlik eşleşmesi: ${found.name}`);
+        return found;
+    }
+    
+    // 4. Kısmi eşleşme
+    found = products.find(product => {
+        const productNameClean = product.name.toLowerCase().replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, '');
+        return productNameClean.includes(cleanProductName) ||
+               cleanProductName.includes(productNameClean);
+    });
     if (found) {
         debugLog(`✅ Kısmi eşleşme: ${found.name}`);
         return found;
@@ -2858,49 +2881,215 @@ function findProductByName(productName) {
     return null;
 }
 
-// Ürün bilgisi çıkarımı
-function extractProductInfoFromCommand(message) {
-    debugLog(`🔍 Ürün bilgisi çıkarılıyor: "${message}"`);
+function findProductBySimilarity(searchName) {
+    let bestMatch = null;
+    let bestScore = 0;
     
-    let cleanMessage = message
-        .replace(/ekle|sepete|al|istiyorum|lütfen|bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+    const searchWords = searchName.split(' ').filter(word => word.length > 2);
     
-    // Sayıları bul
-    const numbers = message.match(/\d+/g);
-    let quantity = 1;
-    
-    if (numbers && numbers.length > 0) {
-        quantity = parseInt(numbers[0]);
-        cleanMessage = cleanMessage.replace(numbers[0], '').trim();
-    } else {
-        // Yazılı sayıları kontrol et
-        const textNumbers = {
-            'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5,
-            'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10
-        };
+    products.forEach(product => {
+        const productName = product.name.toLowerCase().replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, '');
         
-        for (const [text, num] of Object.entries(textNumbers)) {
-            if (message.includes(text)) {
-                quantity = num;
-                cleanMessage = cleanMessage.replace(text, '').trim();
-                break;
+        // Kelime bazlı benzerlik
+        let wordScore = 0;
+        searchWords.forEach(searchWord => {
+            let maxWordSimilarity = 0;
+            productName.split(' ').forEach(productWord => {
+                const similarity = calculateSimilarity(searchWord, productWord);
+                if (similarity > maxWordSimilarity) {
+                    maxWordSimilarity = similarity;
+                }
+            });
+            wordScore += maxWordSimilarity;
+        });
+        
+        const averageWordScore = wordScore / searchWords.length;
+        
+        // Tam isim benzerliği
+        const fullNameScore = calculateSimilarity(searchName, productName);
+        
+        // Kombine skor
+        const combinedScore = (averageWordScore + fullNameScore) / 2;
+        
+        if (combinedScore > bestScore && combinedScore > 0.6) {
+            bestScore = combinedScore;
+            bestMatch = product;
+        }
+    });
+    
+    return bestMatch;
+}
+
+function calculateSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    // Levenshtein distance
+    const distance = levenshteinDistance(str1, str2);
+    return (longer.length - distance) / longer.length;
+}       
+
+function levenshteinDistance(str1, str2) {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+        matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+        matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+        for (let j = 1; j <= str1.length; j++) {
+            if (str2.charAt(i-1) === str1.charAt(j-1)) {
+                matrix[i][j] = matrix[i-1][j-1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i-1][j-1] + 1,
+                    matrix[i][j-1] + 1,
+                    matrix[i-1][j] + 1
+                );
             }
         }
     }
     
-    const productName = cleanMessage.trim();
+    return matrix[str2.length][str1.length];
+}
+
+        function testVoiceProductAdd() {
+    const testCases = [
+        "5 kilo domates",
+        "3 ekmek",
+        "iki süt",
+        "bir peynir",
+        "yarım kilo kıyma",
+        "10 yumurta",
+        "iki litre süt",
+        "500 gram zeytin",
+        "bir paket makarna",
+        "5 domates"
+    ];
+    
+    testCases.forEach(testCase => {
+        console.log(`🧪 Test: "${testCase}"`);
+        const result = extractProductInfoFromCommand(testCase);
+        if (result) {
+            console.log(`✅ Çıkarım: ${result.quantity} ${result.unit} ${result.productName}`);
+            
+            // Ürün bulma testi
+            if (products.length > 0) {
+                const foundProduct = findProductByName(result.productName);
+                console.log(`🔍 Bulunan: ${foundProduct ? foundProduct.name : 'Bulunamadı'}`);
+            }
+        } else {
+            console.log(`❌ Çıkarım başarısız`);
+        }
+        console.log('---');
+    });
+}
+ // Sayfa yüklendiğinde test et
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        // Test modu aktifse testleri çalıştır
+        if (DEBUG_MODE) {
+            // testVoiceProductAdd(); // Testleri açmak için yorumu kaldırın
+        }
+    }, 3000);
+});       
+// Ürün bilgisi çıkarımı
+function extractProductInfoFromCommand(message) {
+    debugLog(`🔍 Ürün bilgisi çıkarılıyor: "${message}"`);
+    
+    // Temizleme ve normalize etme
+    let cleanMessage = message.toLowerCase()
+        .replace(/ekle|sepete|al|istiyorum|lütfen|rica|ediyorum|tane|adet/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    // Birim ve miktar çıkarımı
+    const unitPatterns = [
+        { pattern: /(\d+)\s*kilo?\s*(.*)/, unit: 'kg' },
+        { pattern: /(\d+)\s*kg\s*(.*)/, unit: 'kg' },
+        { pattern: /(\d+)\s*gram\s*(.*)/, unit: 'g' },
+        { pattern: /(\d+)\s*gr\s*(.*)/, unit: 'g' },
+        { pattern: /(\d+)\s*litre?\s*(.*)/, unit: 'lt' },
+        { pattern: /(\d+)\s*lt\s*(.*)/, unit: 'lt' },
+        { pattern: /(\d+)\s*ml\s*(.*)/, unit: 'ml' },
+        { pattern: /(\d+)\s*paket\s*(.*)/, unit: 'paket' },
+        { pattern: /(\d+)\s*düzine\s*(.*)/, unit: 'düzine' },
+        { pattern: /(\d+)\s*yarım\s*(.*)/, unit: 'yarım', multiplier: 0.5 },
+        { pattern: /(\d+)\s*çeyrek\s*(.*)/, unit: 'çeyrek', multiplier: 0.25 }
+    ];
+    
+    let quantity = 1;
+    let unit = 'adet';
+    let productName = '';
+    
+    // Özel birimleri kontrol et
+    for (const unitPattern of unitPatterns) {
+        const match = cleanMessage.match(unitPattern.pattern);
+        if (match) {
+            quantity = parseInt(match[1]);
+            if (unitPattern.multiplier) {
+                quantity *= unitPattern.multiplier;
+            }
+            unit = unitPattern.unit;
+            productName = match[2].trim();
+            break;
+        }
+    }
+    
+    // Eğer özel birim bulunamazsa, standart çıkarım
+    if (!productName) {
+        // Sayıları bul
+        const numbers = cleanMessage.match(/\d+/g);
+        if (numbers && numbers.length > 0) {
+            quantity = parseInt(numbers[0]);
+            productName = cleanMessage.replace(numbers[0], '').trim();
+        } else {
+            // Yazılı sayıları kontrol et
+            const textNumbers = {
+                'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5,
+                'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10,
+                'onbir': 11, 'oniki': 12, 'onüç': 13, 'ondört': 14, 'onbeş': 15
+            };
+            
+            for (const [text, num] of Object.entries(textNumbers)) {
+                if (cleanMessage.includes(text)) {
+                    quantity = num;
+                    productName = cleanMessage.replace(text, '').trim();
+                    break;
+                }
+            }
+            
+            // Sayı bulunamazsa varsayılan
+            if (!productName) {
+                productName = cleanMessage.trim();
+            }
+        }
+    }
+    
+    // Ürün ismini temizle
+    productName = productName
+        .replace(/^\s*(ve|ile|\+)\s*/, '') // Baştaki bağlaçları temizle
+        .replace(/\s*(ve|ile|\+)\s*$/, '') // Sondaki bağlaçları temizle
+        .replace(/\s+/g, ' ')
+        .trim();
     
     if (!productName) {
         debugLog('❌ Ürün ismi çıkarılamadı');
         return null;
     }
     
-    debugLog(`✅ Ürün bilgisi: "${productName}" x ${quantity}`);
-    return { productName, quantity };
+    debugLog(`✅ Ürün bilgisi: "${productName}" - ${quantity} ${unit}`);
+    return { productName, quantity, unit };
 }
-
+        
 // Ürün bulunamadı durumu
 function handleDynamicProductNotFound(message, attemptedName) {
     debugLog(`❌ Ürün bulunamadı: "${attemptedName}"`);
@@ -2961,22 +3150,24 @@ async function handleDynamicAddToCart(data) {
     }
     
     if (products.length === 0) {
-        speakToUser("Henüz ürün yüklenmedi. Lütfen bir reyon seçin.");
+        speakToUser("Henüz ürün yüklenmedi. Lütfen bir kategori seçin.");
         return;
     }
     
-    const productInfo = extractDynamicProductInfo(data.extractedData, data.message);
+    const productInfo = extractProductInfoFromCommand(data.message);
     if (!productInfo) {
-        speakToUser("Ürün ismini anlayamadım. Lütfen 'iki ekmek' veya 'süt ekle' gibi söyleyin.");
+        speakToUser("Ürün ismini anlayamadım. Lütfen '5 kilo domates' veya '3 ekmek' gibi söyleyin.");
         return;
     }
     
-    const { productName, quantity } = productInfo;
+    const { productName, quantity, unit } = productInfo;
+    debugLog(`🛒 Ürün ekleme: ${quantity} ${unit} ${productName}`);
+    
     const product = findProductByName(productName);
     
     if (product) {
         addToCart(product, quantity);
-        speakToUser(`${quantity} ${product.unit_type || 'adet'} ${product.name} sepete eklendi.`);
+        speakToUser(`${quantity} ${unit} ${product.name} sepete eklendi.`);
         
         // AI öğrenmesi için kaydet
         await saveSuccessfulProductMatch(data.message, product.name);
@@ -2984,7 +3175,6 @@ async function handleDynamicAddToCart(data) {
         handleDynamicProductNotFound(data.message, productName);
     }
 }
-
 // =============================================
 // DİNAMİK YARDIMCI FONKSİYONLAR
 // =============================================
@@ -3832,4 +4022,5 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
