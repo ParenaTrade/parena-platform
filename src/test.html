@@ -3130,6 +3130,178 @@ function levenshteinDistance(str1, str2) {
     return matrix[str2.length][str1.length];
 }
 
+// handleDynamicAIRequest fonksiyonu
+async function handleDynamicAIRequest(message, root) {
+    console.log(`🤖 AI İsteği: "${message}" | Kök: ${root}`);
+    
+    try {
+        // Basit AI mantığı - gerçek uygulamada bir AI servisine bağlanabilirsiniz
+        const response = await processAILogic(message, root);
+        
+        if (response.confidence > 0.7) {
+            speakToUser(response.message);
+            if (response.action) {
+                await executeDynamicAction(response.action, { message });
+            }
+            if (response.nextRoot) {
+                currentRoot = response.nextRoot;
+            }
+        } else {
+            // AI anlamadığında bağlamsal yardım göster
+            const helpMessage = getContextualHelpMessage(root);
+            speakToUser(helpMessage);
+        }
+    } catch (error) {
+        console.error('AI işleme hatası:', error);
+        speakToUser("Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.");
+    }
+}
+
+    // Basit AI işleme mantığı
+async function processAILogic(message, root) {
+    const lowerMessage = message.toLowerCase();
+    
+    // Kök bazlı AI yanıtları
+    switch(root) {
+        case '0:0': // Başlangıç
+            if (lowerMessage.includes('yardım') || lowerMessage.includes('help')) {
+                return {
+                    message: "Sesli sipariş sistemine hoş geldiniz. Konum seçerek başlayabilir, mağaza tipi seçebilir veya direkt 'market' veya 'restoran' diyerek alışverişe başlayabilirsiniz.",
+                    confidence: 0.9,
+                    nextRoot: '1:0'
+                };
+            }
+            break;
+            
+        case '1:0': // Konum seçimi
+            if (lowerMessage.includes('nerede') || lowerMessage.includes('konum')) {
+                return {
+                    message: "Konumunuzu seçmeniz gerekiyor: restoran içi, paket servis veya adrese teslim. Hangisini tercih edersiniz?",
+                    confidence: 0.8,
+                    action: 'show_location_modal'
+                };
+            }
+            break;
+            
+        case '2:0': // Mağaza tipi
+            if (lowerMessage.includes('ne var') || lowerMessage.includes('seçenek')) {
+                const availableTypes = storeTypes.map(st => st.name).join(', ');
+                return {
+                    message: `Mevcut mağaza tipleri: ${availableTypes}. Hangisini seçmek istersiniz?`,
+                    confidence: 0.9
+                };
+            }
+            break;
+            
+        case '3:0': // Satıcı seçimi
+            if (lowerMessage.includes('liste') || lowerMessage.includes('satıcı')) {
+                const sellerList = sellers.slice(0, 3).map((s, i) => `${i+1}. ${s.business_name}`).join(', ');
+                return {
+                    message: `Mevcut satıcılar: ${sellerList}. Numara söyleyerek seçim yapabilirsiniz.`,
+                    confidence: 0.8
+                };
+            }
+            break;
+            
+        case '4:0': // Kategori seçimi
+            if (lowerMessage.includes('kategori') || lowerMessage.includes('reyon')) {
+                const categoryList = categories.slice(0, 5).map(c => c.name).join(', ');
+                return {
+                    message: `Mevcut kategoriler: ${categoryList}. Bir kategori seçin.`,
+                    confidence: 0.8
+                };
+            }
+            break;
+            
+        case '5:0': // Ürün seçimi
+            if (lowerMessage.includes('ürün') || lowerMessage.includes('ne var')) {
+                const productList = products.slice(0, 5).map(p => p.name).join(', ');
+                return {
+                    message: `Mevcut ürünler: ${productList}. Ürün adı ve miktar söyleyerek sepete ekleyebilirsiniz.`,
+                    confidence: 0.8
+                };
+            }
+            break;
+            
+        case '6:0': // Sepet yönetimi
+            if (lowerMessage.includes('sepet') || lowerMessage.includes('ödeme')) {
+                const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+                const total = calculateTotal();
+                return {
+                    message: `Sepetinizde ${itemCount} ürün bulunuyor. Toplam tutar: ${money(total)}. Ödeme yapmak için 'ödeme yap' diyebilirsiniz.`,
+                    confidence: 0.9,
+                    action: 'manage_cart'
+                };
+            }
+            break;
+    }
+    
+    // Genel komutlar
+    if (lowerMessage.includes('geri') || lowerMessage.includes('back')) {
+        return {
+            message: "Bir önceki adıma dönülüyor.",
+            confidence: 0.8,
+            action: 'navigate_back'
+        };
+    }
+    
+    if (lowerMessage.includes('yardım') || lowerMessage.includes('help')) {
+        return {
+            message: "Sesli komutlarla alışveriş yapabilirsiniz. 'market seç', 'ilk satıcı', 'meyve sebze reyonu', 'iki ekmek' gibi komutlar kullanabilirsiniz.",
+            confidence: 0.9
+        };
+    }
+    
+    if (lowerMessage.includes('teşekkür') || lowerMessage.includes('thanks')) {
+        return {
+            message: "Rica ederim! Size nasıl yardımcı olabilirim?",
+            confidence: 0.9
+        };
+    }
+    
+    // Anlaşılamayan mesaj
+    return {
+        message: "Üzgünüm, bu komutu anlayamadım. Lütfen farklı şekilde ifade edin veya 'yardım' diyerek destek alın.",
+        confidence: 0.3
+    };
+}   
+
+// Bağlamsal yardım mesajları
+function getContextualHelpMessage(root) {
+    const helpMessages = {
+        '0:0': "Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen konumunuzu seçin.",
+        '1:0': "Lütfen konumunuzu seçin: restoran içi, paket servis veya adrese teslim.",
+        '2:0': "Hangi mağaza tipinden alışveriş yapmak istersiniz? Market, restoran, eczane gibi.",
+        '3:0': "Lütfen bir satıcı seçin. 'birinci satıcı' veya satıcı ismi söyleyebilirsiniz.",
+        '4:0': "Hangi reyondan alışveriş yapmak istersiniz? Meyve sebze, süt ürünleri gibi.",
+        '5:0': "Ürün siparişi verebilirsiniz. Örneğin: 'iki ekmek', 'bir kilo domates'.",
+        '6:0': "Sepetinizi yönetebilir veya ödeme yapabilirsiniz.",
+        '7:0': "Lütfen ödeme yöntemi seçin: nakit, kart veya bonus."
+    };
+    
+    return helpMessages[root] || "Nasıl yardımcı olabilirim? Sesli olarak sipariş verebilirsiniz.";
+}
+
+        // Askıdaki yanıtı işleme
+async function handlePendingDynamicResponse(message) {
+    if (!pendingResponse) return;
+    
+    const { nextRoot, context } = pendingResponse;
+    pendingResponse = null;
+    
+    // Basit onay/red mantığı
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('evet') || lowerMessage.includes('tamam') || lowerMessage.includes('onay')) {
+        currentRoot = nextRoot.split('?')[0]; // Soru işaretinden sonrasını kaldır
+        speakToUser("Tamam, devam ediyorum.");
+    } else if (lowerMessage.includes('hayır') || lowerMessage.includes('iptal') || lowerMessage.includes('geri')) {
+        speakToUser("Anladım, iptal edildi.");
+    } else {
+        speakToUser("Lütfen evet veya hayır şeklinde yanıt verin.");
+        pendingResponse = { nextRoot, context }; // Yanıt beklemeye devam et
+    }
+}
         function testVoiceProductAdd() {
     const testCases = [
         "5 kilo domates",
@@ -3503,6 +3675,191 @@ async function handleUnknownDynamicAction(actionName, data) {
     }
 }
 
+// Başarılı ürün eşleşmesini kaydetme
+async function saveSuccessfulProductMatch(spokenText, matchedProduct) {
+    try {
+        // Öğrenme verisini kaydet (gerçek uygulamada veritabanına kaydedebilirsiniz)
+        const learningData = {
+            spoken_text: spokenText,
+            matched_product: matchedProduct,
+            timestamp: new Date().toISOString(),
+            root_code: currentRoot
+        };
+        
+        console.log('📚 Öğrenme verisi kaydedildi:', learningData);
+        
+        // localStorage'a kaydet (geçici çözüm)
+        const existingData = JSON.parse(localStorage.getItem('voice_learning_data') || '[]');
+        existingData.push(learningData);
+        localStorage.setItem('voice_learning_data', JSON.stringify(existingData));
+        
+    } catch (error) {
+        console.error('Öğrenme verisi kaydetme hatası:', error);
+    }
+}
+
+// Mağaza tipi çıkarımı
+async function extractStoreTypeFromMessage(message) {
+    const lowerMessage = message.toLowerCase();
+    
+    const typeMappings = {
+        'market': 'Market',
+        'süpermarket': 'Market',
+        'bakkal': 'Market',
+        'restoran': 'Restoran',
+        'lokanta': 'Restoran',
+        'yemek': 'Restoran',
+        'eczane': 'Eczane',
+        'fırın': 'Fırın',
+        'kafe': 'Kafe',
+        'kahve': 'Kafe'
+    };
+    
+    for (const [keyword, storeType] of Object.entries(typeMappings)) {
+        if (lowerMessage.includes(keyword)) {
+            return storeType;
+        }
+    }
+    
+    return null;
+}
+
+// Satıcı çıkarımı
+async function extractSellerFromMessage(message) {
+    // Basit satıcı ismi çıkarımı
+    const sellers = filteredSellers.length > 0 ? filteredSellers : allSellersInLocation;
+    
+    for (const seller of sellers) {
+        if (message.toLowerCase().includes(seller.business_name.toLowerCase())) {
+            return seller.business_name;
+        }
+    }
+    
+    return null;
+}
+
+// Mevcut mağaza tiplerini getir
+async function getAvailableStoreTypes() {
+    return storeTypes.map(st => st.name).join(', ');
+}
+
+// Mağaza tipi bulma
+async function findStoreTypeByName(storeTypeName) {
+    return storeTypes.find(st => 
+        st.name.toLowerCase().includes(storeTypeName.toLowerCase()) ||
+        storeTypeName.toLowerCase().includes(st.name.toLowerCase())
+    );
+}
+   // Ödeme finalizasyonu
+async function finalizeDynamicOrder(paymentMethod) {
+    if (cart.length === 0) {
+        speakToUser("Sepetiniz boş. Önce ürün ekleyin.");
+        return;
+    }
+    
+    currentPaymentMethod = paymentMethod;
+    
+    const total = calculateTotal();
+    const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+    
+    speakToUser(`${itemCount} ürün için ${money(total)} tutarındaki siparişiniz ${paymentMethod} ile ödeme yapılıyor. Siparişiniz alındı, teşekkür ederiz!`);
+    
+    // Siparişi tamamla
+    await completeDynamicOrder();
+}     
+
+
+        // Siparişi tamamlama
+async function completeDynamicOrder() {
+    try {
+        // Sipariş verilerini hazırla
+        const orderData = {
+            customer_id: currentCustomer?.id || null,
+            seller_id: selectedSellerId,
+            total_amount: calculateTotal(),
+            payment_method: currentPaymentMethod,
+            location_type: selectedLocation,
+            items: cart.map(item => ({
+                product_id: item.id,
+                quantity: item.quantity,
+                unit_price: item.price,
+                total_price: item.price * item.quantity
+            })),
+            order_date: new Date().toISOString()
+        };
+        
+        console.log('✅ Sipariş tamamlandı:', orderData);
+        
+        // Siparişi sıfırla
+        cart = [];
+        updateCartUI();
+        closeDynamicCart();
+        
+        // Kökü sıfırla
+        currentRoot = "0:0";
+        
+        speakToUser("Siparişiniz başarıyla alındı! Yeni bir sipariş vermek için konum seçebilirsiniz.");
+        
+    } catch (error) {
+        console.error('Sipariş tamamlama hatası:', error);
+        speakToUser("Sipariş işlemi sırasında bir hata oluştu. Lütfen tekrar deneyin.");
+    }
+}
+
+        // Sepet yönetimi
+async function handleDynamicCartManagement(data) {
+    openDynamicCart();
+    
+    const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+    const total = calculateTotal();
+    
+    if (itemCount === 0) {
+        speakToUser("Sepetiniz boş. Ürün eklemek için alışverişe devam edin.");
+    } else {
+        speakToUser(`Sepetinizde ${itemCount} ürün bulunuyor. Toplam tutar: ${money(total)}. Ödeme yapmak için 'ödeme yap' diyebilirsiniz.`);
+    }
+}
+
+        // Ödeme seçimi
+async function handleDynamicPaymentSelection(data) {
+    const paymentMethod = data.extractedData?.payment || data.message.toLowerCase();
+    
+    if (paymentMethod.includes('nakit') || paymentMethod.includes('para')) {
+        await finalizeDynamicOrder('nakit');
+    } else if (paymentMethod.includes('kart') || paymentMethod.includes('kredi')) {
+        await finalizeDynamicOrder('kart');
+    } else if (paymentMethod.includes('bonus')) {
+        await finalizeDynamicOrder('bonus');
+    } else {
+        speakToUser("Lütfen ödeme yöntemi seçin: nakit, kart veya bonus.");
+    }
+}
+
+
+// Navigasyon
+async function handleDynamicNavigation(data) {
+    // Basit geri navigasyonu
+    const rootParts = currentRoot.split(':');
+    const mainRoot = parseInt(rootParts[0]);
+    
+    if (mainRoot > 0) {
+        currentRoot = `${mainRoot - 1}:0`;
+        speakToUser("Bir önceki adıma dönüldü.");
+    } else {
+        speakToUser("Zaten başlangıç konumundasınız.");
+    }
+}
+
+  // Yardım
+async function handleDynamicHelp(data) {
+    const helpMessage = getContextualHelpMessage(currentRoot);
+    speakToUser(helpMessage);
+}      
+        
+// Mevcut kategorileri getir
+async function getAvailableCategories() {
+    return categories.map(c => c.name).join(', ');
+}        
 async function getDynamicContextualHelp(rootCode) {
     const { data } = await supabase
         .from('voice_context_help')
@@ -3514,6 +3871,136 @@ async function getDynamicContextualHelp(rootCode) {
     return data?.help_message || "Nasıl yardımcı olabilirim? Sesli olarak sipariş verebilir veya 'yardım' diyebilirsiniz.";
 }
 
+        // StoreTypes yükleme fonksiyonunu güncelle
+async function loadStoreTypes() {
+    try {
+        console.log('🛍️ StoreTypes yükleniyor...');
+        
+        const { data, error } = await supabase
+            .from('store_type')
+            .select('*')
+            .eq('status', 'Active')
+            .order('sort_code');
+
+        if (error) {
+            console.error('❌ StoreTypes API hatası:', error);
+            // Fallback: Demo veriler
+            storeTypes = getDemoStoreTypes();
+            displayStoreTypes(storeTypes);
+            return;
+        }
+
+        if (data && data.length > 0) {
+            storeTypes = data;
+            displayStoreTypes(storeTypes);
+            console.log(`✅ StoreTypes yüklendi: ${data.length} adet`);
+        } else {
+            // Veri yoksa demo verileri kullan
+            storeTypes = getDemoStoreTypes();
+            displayStoreTypes(storeTypes);
+            console.log('⚠️ StoreTypes bulunamadı, demo veriler kullanılıyor');
+        }
+
+    } catch (error) {
+        console.error('❌ StoreTypes yükleme hatası:', error);
+        storeTypes = getDemoStoreTypes();
+        displayStoreTypes(storeTypes);
+    }
+}
+
+// Demo store types
+function getDemoStoreTypes() {
+    return [
+        { id: 1, name: 'Market', status: 'Active', sort_code: 1 },
+        { id: 2, name: 'Restoran', status: 'Active', sort_code: 2 },
+        { id: 3, name: 'Eczane', status: 'Active', sort_code: 3 },
+        { id: 4, name: 'Fırın', status: 'Active', sort_code: 4 },
+        { id: 5, name: 'Kafe', status: 'Active', sort_code: 5 }
+    ];
+}
+
+// API hatalarını önleme
+async function safeSupabaseQuery(query, fallbackData = []) {
+    try {
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error('Supabase sorgu hatası:', error);
+            return fallbackData;
+        }
+        
+        return data || fallbackData;
+    } catch (error) {
+        console.error('Supabase sorgu istisnası:', error);
+        return fallbackData;
+    }
+}
+
+// =============================================
+// SAYFA YÜKLENDİĞİNDE TEST MODU
+// =============================================
+
+// Test butonunu ekle
+function addTestButtons() {
+    const testContainer = document.createElement('div');
+    testContainer.style.position = 'fixed';
+    testContainer.style.top = '10px';
+    testContainer.style.left = '10px';
+    testContainer.style.zIndex = '10000';
+    testContainer.style.background = 'rgba(255,255,255,0.9)';
+    testContainer.style.padding = '10px';
+    testContainer.style.borderRadius = '8px';
+    testContainer.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+    
+    testContainer.innerHTML = `
+        <div style="font-size: 12px; margin-bottom: 5px; font-weight: bold;">Test Komutları:</div>
+        <button onclick="testVoiceCommand('merhaba')" style="margin: 2px; padding: 5px; font-size: 10px;">Merhaba</button>
+        <button onclick="testVoiceCommand('market')" style="margin: 2px; padding: 5px; font-size: 10px;">Market</button>
+        <button onclick="testVoiceCommand('birinci satıcı')" style="margin: 2px; padding: 5px; font-size: 10px;">1. Satıcı</button>
+        <button onclick="testVoiceCommand('meyve sebze')" style="margin: 2px; padding: 5px; font-size: 10px;">Meyve Sebze</button>
+        <button onclick="testVoiceCommand('iki ekmek')" style="margin: 2px; padding: 5px; font-size: 10px;">2 Ekmek</button>
+        <button onclick="testSystem()" style="margin: 2px; padding: 5px; font-size: 10px; background: #ff6b00; color: white;">Sistem Test</button>
+    `;
+    
+    document.body.appendChild(testContainer);
+}
+
+// Sistem test fonksiyonu
+function testSystem() {
+    console.log('=== SİSTEM TESTİ BAŞLATILIYOR ===');
+    
+    // Test 1: Fonksiyonlar mevcut mu?
+    console.log('✅ handleDynamicAIRequest:', typeof handleDynamicAIRequest);
+    console.log('✅ processVoiceCommand:', typeof processVoiceCommand);
+    console.log('✅ speakToUser:', typeof speakToUser);
+    
+    // Test 2: State kontrolü
+    console.log('📊 State:');
+    console.log('  - currentRoot:', currentRoot);
+    console.log('  - selectedLocation:', selectedLocation);
+    console.log('  - storeTypes:', storeTypes.length);
+    console.log('  - sellers:', sellers.length);
+    console.log('  - categories:', categories.length);
+    console.log('  - products:', products.length);
+    console.log('  - cart:', cart.length);
+    
+    // Test 3: DOM elementleri
+    console.log('🎯 DOM Elements:');
+    console.log('  - microphoneToggle:', !!document.getElementById('microphoneToggle'));
+    console.log('  - locationModal:', !!document.getElementById('locationModal'));
+    console.log('  - sellerTypeGrid:', !!document.getElementById('sellerTypeGrid'));
+    
+    console.log('=== SİSTEM TESTİ TAMAMLANDI ===');
+}
+
+// Sayfa yüklendiğinde test butonlarını ekle
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        if (DEBUG_MODE) {
+            addTestButtons();
+        }
+    }, 2000);
+});
 // =============================================
 // BAŞLANGIÇ FONKSİYONLARI
 // =============================================
@@ -4403,6 +4890,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
