@@ -1,0 +1,3301 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesli Sipariş - Onur Market</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #5d3ebc;
+            --primary-light: #7849f7;
+            --secondary: #ffd300;
+            --accent: #ff6b00;
+            --dark: #1a1a1a;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+            --gray-light: #e9ecef;
+            --success: #28a745;
+            --danger: #dc3545;
+            --border-radius: 12px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light);
+            color: var(--dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.6;
+        }
+        
+        /* Header Styles */
+        header {
+            background-color: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .logo-icon::after {
+            content: "";
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--secondary);
+            border-radius: 50%;
+            bottom: 5px;
+            right: 5px;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .action-btn {
+            background: none;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: var(--transition);
+            color: var(--dark);
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .action-btn:hover {
+            background: var(--gray-light);
+        }
+        
+        .order-summary {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--primary);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .order-summary:hover {
+            background: var(--primary-light);
+            transform: translateY(-2px);
+        }
+        
+        .order-count {
+            background: var(--secondary);
+            color: var(--dark);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .language-selector {
+            position: relative;
+        }
+        
+        .language-btn {
+            background: none;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 500;
+            color: var(--dark);
+        }
+        
+        .language-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 10px 0;
+            width: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 10;
+        }
+        
+        .language-dropdown.show {
+            display: block;
+        }
+        
+        .language-option {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .language-option:hover {
+            background: var(--gray-light);
+        }
+        
+        .language-option.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        /* Banner Styles */
+        .banner {
+            position: relative;
+            height: 300px;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 0 20px;
+        }
+        
+        .banner-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.2;
+        }
+        
+        .banner-content {
+            position: relative;
+            z-index: 2;
+            max-width: 600px;
+        }
+        
+        .banner h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        
+        .banner p {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        
+        /* Main Content */
+        .main-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+            flex: 1;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title i {
+            color: var(--primary);
+        }
+        
+        /* Horizontal Scroll Containers */
+        .scroll-container {
+            position: relative;
+            margin-bottom: 30px;
+        }
+        
+        .scroll-content {
+            display: flex;
+            gap: 15px;
+            overflow-x: auto;
+            padding: 10px 0;
+            scroll-behavior: smooth;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .scroll-content::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .scroll-btn {
+            position: absolute;
+            top: 82%;
+            transform: translateY(-50%);
+            background: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            z-index: 10;
+            transition: var(--transition);
+        }
+        
+        .scroll-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .scroll-btn.left {
+            left: 50px;
+        }
+        
+        .scroll-btn.right {
+            right: 50px;
+        }
+        
+        /* Store Type Cards (Horizontal) */
+        .seller-type-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            min-width: 150px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            border: 2px solid transparent;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .seller-type-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .seller-type-card.selected {
+            border-color: var(--primary);
+            background: rgba(93, 62, 188, 0.05);
+        }
+        
+        .seller-type-icon {
+            font-size: 32px;
+            color: var(--primary);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(93, 62, 188, 0.1);
+        }
+        
+        .seller-type-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        /* Seller Cards (Horizontal) */
+        .seller-card {
+            background: white;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            border: 2px solid transparent;
+            min-width: 280px;
+            flex-shrink: 0;
+        }
+        
+        .seller-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .seller-card.selected {
+            border-color: var(--success);
+        }
+        
+        .seller-image {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+        }
+        
+        .seller-info {
+            padding: 15px;
+        }
+        
+        .seller-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 18px;
+        }
+        
+        .seller-details {
+            font-size: 14px;
+            color: var(--gray);
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .seller-rating {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--secondary);
+        }
+        
+        .delivery-info {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--gray-light);
+        }
+        
+        .delivery-fee {
+            font-size: 14px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .delivery-fee.free {
+            color: var(--success);
+        }
+        
+        .min-order {
+            font-size: 12px;
+            color: var(--gray);
+            margin-top: 2px;
+        }
+        
+        /* Category Cards (Horizontal) */
+        .category-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            min-width: 150px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            border: 2px solid transparent;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .category-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .category-card.selected {
+            border-color: var(--success);
+            background: rgba(40, 167, 69, 0.05);
+        }
+        
+        .category-icon {
+            font-size: 32px;
+            color: var(--success);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(40, 167, 69, 0.1);
+        }
+        
+        .category-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        /* Product Cards (Horizontal) */
+        .products-section {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+        
+        .products-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .product-card {
+            background: white;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--gray-light);
+            min-width: 200px;
+            flex-shrink: 0;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .product-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--accent);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .product-image {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+        }
+        
+        .product-info {
+            padding: 15px;
+        }
+        
+        .product-name {
+            font-weight: 500;
+            margin-bottom: 5px;
+            font-size: 14px;
+            height: 40px;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        
+        .product-price {
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 16px;
+        }
+        
+        .product-discount {
+            color: var(--danger);
+            font-size: 12px;
+            text-decoration: line-through;
+            margin-left: 5px;
+        }
+        
+        .add-to-cart-btn {
+            margin-top: 10px;
+            width: 100%;
+            padding: 10px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        
+        .add-to-cart-btn:hover {
+            background: var(--primary-light);
+        }
+        
+        /* Cart Section */
+        .cart-container {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100%;
+            background: white;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .cart-container.open {
+            right: 0;
+        }
+        
+        .cart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .cart-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--gray);
+        }
+        
+        .cart-items {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .cart-item-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+        
+        .cart-item-image {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+        
+        .cart-item-details {
+            font-size: 14px;
+        }
+        
+        .cart-item-name {
+            font-weight: 500;
+        }
+        
+        .cart-item-price {
+            color: var(--gray);
+            font-size: 12px;
+        }
+        
+        .cart-item-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .quantity-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1px solid var(--gray-light);
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .quantity-btn:hover {
+            background: var(--gray-light);
+        }
+        
+        .cart-totals {
+            border-top: 1px solid var(--gray-light);
+            padding: 20px;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .total-final {
+            font-weight: 600;
+            font-size: 18px;
+            border-top: 1px solid var(--gray-light);
+            padding-top: 10px;
+        }
+        
+        .payment-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+            padding: 0 20px 20px;
+        }
+        
+        .payment-btn {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .payment-btn.cash {
+            background: var(--success);
+            color: white;
+        }
+        
+        .payment-btn.card {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .payment-btn.bonus {
+            background: var(--accent);
+            color: white;
+            grid-column: 1 / -1;
+        }
+        
+        .payment-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--dark);
+            color: white;
+            padding: 40px 0 20px;
+            margin-top: auto;
+        }
+        
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+        
+        .footer-section h3 {
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: var(--secondary);
+        }
+        
+        .footer-links {
+            list-style: none;
+        }
+        
+        .footer-links li {
+            margin-bottom: 10px;
+        }
+        
+        .footer-links a {
+            color: #ccc;
+            text-decoration: none;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .footer-links a:hover {
+            color: white;
+        }
+        
+        .social-links {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .social-link {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        
+        .social-link:hover {
+            background: var(--primary);
+            transform: translateY(-3px);
+        }
+        
+        .partner-login {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        
+        .partner-login:hover {
+            background: var(--primary-light);
+        }
+        
+        .footer-bottom {
+            text-align: center;
+            padding-top: 20px;
+            margin-top: 20px;
+            border-top: 1px solid #444;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        /* Voice Assistant */
+        .voice-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            width: 300px;
+            z-index: 100;
+            display: block;
+        }
+        
+        .status-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .status-title {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .status-title i {
+            margin-right: 8px;
+            color: var(--accent);
+        }
+        
+        .status-close {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: var(--gray);
+        }
+        
+        .status-content {
+            margin-bottom: 15px;
+        }
+        
+        .assistant-message {
+            padding: 12px;
+            background: rgba(93, 62, 188, 0.1);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+        
+        .user-message {
+            padding: 12px;
+            background: rgba(255, 107, 0, 0.1);
+            border-radius: 8px;
+            text-align: right;
+            color: var(--accent);
+        }
+        
+        .voice-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 30px;
+            margin-top: 10px;
+        }
+        
+        .voice-bar {
+            width: 6px;
+            height: 10px;
+            background: #ddd;
+            margin: 0 3px;
+            border-radius: 3px;
+        }
+        
+        .listening .voice-bar {
+            animation: voiceIndicator 0.8s infinite;
+        }
+        
+        @keyframes voiceIndicator {
+            0%, 100% { height: 10px; background: #ddd; }
+            50% { height: 30px; background: var(--accent); }
+        }
+        
+        /* Location Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            max-width: 500px;
+            width: 100%;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .close-modal {
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--gray);
+        }
+        
+        .location-options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .location-option {
+            padding: 20px;
+            border: 2px solid var(--gray-light);
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .location-option:hover {
+            border-color: var(--primary);
+            background: rgba(93, 62, 188, 0.05);
+        }
+        
+        .location-option.selected {
+            border-color: var(--primary);
+            background: rgba(93, 62, 188, 0.1);
+        }
+        
+        .location-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .location-details h4 {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .location-details p {
+            color: var(--gray);
+            font-size: 14px;
+        }
+        
+        .location-detect-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 20px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: var(--transition);
+        }
+        
+        .location-detect-btn:hover {
+            background: var(--primary-light);
+        }
+        
+        .location-detect-btn:disabled {
+            background: var(--gray);
+            cursor: not-allowed;
+        }
+        
+        .location-result {
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            background: rgba(93, 62, 188, 0.05);
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-container {
+                flex-direction: column;
+                gap: 15px;
+                padding: 15px;
+            }
+            
+            .logo {
+                font-size: 20px;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .banner {
+                height: 250px;
+            }
+            
+            .banner h1 {
+                font-size: 2rem;
+            }
+            
+            .banner p {
+                font-size: 1rem;
+            }
+            
+            .scroll-btn {
+                display: none;
+            }
+            
+            .cart-container {
+                width: 100%;
+                right: -100%;
+            }
+            
+            .voice-status {
+                width: calc(100% - 40px);
+                right: 20px;
+                left: 20px;
+            }
+            
+            .footer-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+        
+        /* Animation for logo */
+        @keyframes logoPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .logo-icon {
+            animation: logoPulse 2s infinite;
+        }
+
+  #sellerTypeGrid {
+   display: flex;
+   gap: 15px;
+   overflow-x: auto;
+}
+    </style>
+
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-container">
+            <a href="#" class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <span data-translate="app_name">Sesli Sipariş</span>
+            </a>
+            
+            <div class="header-actions">
+                <div class="language-selector">
+                    <button class="language-btn" id="languageBtn">
+                        <i class="fas fa-globe"></i>
+                        <span id="currentLanguage">TR</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="language-dropdown" id="languageDropdown">
+                        <!-- Languages will be populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="location-marker action-btn" id="locationMarker">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span id="locationText" data-translate="select_location">Konum Seçin</span>
+                </div>
+                
+                <div class="order-summary" id="orderSummary" style="display: flex;">
+                    <div class="order-count" id="orderCount">0</div>
+                    <div data-translate="order">Sipariş: <span id="orderTotal">0 ₺</span></div>
+                </div>
+               
+                <div class="profile-info">
+                    <button class="action-btn" id="profileBtn">
+                        <i class="fas fa-user"></i>
+                        <span id="userName" data-translate="profile">Profilim</span>
+                    </button>
+                    <div class="profile-dropdown" id="profileDropdown">
+                        <!-- Profile dropdown content -->
+                    </div>
+                </div>
+			
+                <button id="microphoneToggle" class="action-btn">
+                    <i class="fas fa-microphone-slash"></i>
+                    <span data-translate="microphone_off">Mikrofon (Kapalı)</span>
+                </button>
+            </div>
+        </div>
+</header>
+
+
+    <!-- Banner -->
+    <div class="banner" id="banner">
+        <video class="banner-video" id="bannerVideo" loop muted autoplay>
+            <!-- Video will be set dynamically based on store type -->
+        </video>
+        <div class="banner-content">
+            <h1 id="bannerTitle" data-translate="banner_title">Sesli Sipariş ile Kolay Alışveriş</h1>
+            <p id="bannerDescription" data-translate="banner_description">Sadece konuşun, siparişiniz kapınızda!</p>
+            <button class="location-detect-btn" id="bannerLocationBtn">
+                <i class="fas fa-location-arrow"></i>
+                <span data-translate="detect_location">Konumumu Belirle</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-container">
+         <!-- Seller Type Selection -->
+        <section>
+    <h2 class="section-title">Ne yemek istersiniz?</h2>
+    <div class="seller-type-container">
+        <button class="scroll-btn left" id="scrollStoreTypesLeft">
+            <i class="fas fa-chevron-left"></i>
+			
+        </button>
+        <div class="scroll-content" id="sellerTypeGrid">
+            <!-- DB’den gelen mağaza tipleri buraya basılacak -->
+        </div>
+        <button class="scroll-btn right" id="scrollStoreTypesRight">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+    </div>
+</section>
+
+        <!-- Sellers Grid -->
+        <section id="sellersSection" style="display: none;">
+            <h2 class="section-title" data-translate="nearest_places">
+                <i class="fas fa-store"></i>
+                Size En Yakın Yerler
+            </h2>
+            <div class="scroll-container">
+                <button class="scroll-btn left" id="scrollSellersLeft">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="scroll-content" id="sellerGrid">
+                    <!-- Sellers will be loaded here -->
+                </div>
+                <button class="scroll-btn right" id="scrollSellersRight">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- Categories Grid -->
+        <section id="categoriesSection" style="display: none;">
+            <h2 class="section-title" id="categoriesTitle" data-translate="categories">
+                <i class="fas fa-layer-group"></i>
+                Kategoriler
+            </h2>
+            <div class="scroll-container">
+                <button class="scroll-btn left" id="scrollCategoriesLeft">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="scroll-content" id="categoriesGrid">
+                    <!-- Categories will be loaded here -->
+                </div>
+                <button class="scroll-btn right" id="scrollCategoriesRight">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- Products Grid -->
+        <section class="products-section" id="productsSection" style="display: none;">
+            <div class="products-header">
+                <h2 class="section-title" style="margin-bottom: 0;" data-translate="products">
+                    <i class="fas fa-box-open"></i>
+                    Ürünler
+                </h2>
+                <div id="selectedSellerInfo" class="text-gray">Satıcı seçilmedi</div>
+            </div>
+            <div class="scroll-container">
+                <button class="scroll-btn left" id="scrollProductsLeft">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="scroll-content" id="productsGrid">
+                    <!-- Products will be loaded here -->
+                </div>
+                <button class="scroll-btn right" id="scrollProductsRight">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Location Modal -->
+    <div id="locationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" data-translate="select_location">Konum Seçiniz</h3>
+                <span class="close-modal" id="closeLocationModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p data-translate="location_description">Lütfen sipariş vermek istediğiniz konumu seçin:</p>
+                <div class="location-options">
+                    <div class="location-option" data-location="inside">
+                        <div class="location-icon">
+                            <i class="fas fa-utensils"></i>
+                        </div>
+                        <div class="location-details">
+                            <h4 data-translate="inside_restaurant">Restoran içinde</h4>
+                            <p data-translate="inside_description">Yemeğinizi restoranda yiyin</p>
+                        </div>
+                    </div>
+                    <div class="location-option" data-location="takeaway">
+                        <div class="location-icon">
+                            <i class="fas fa-shopping-bag"></i>
+                        </div>
+                        <div class="location-details">
+                            <h4 data-translate="takeaway">Paket servis</h4>
+                            <p data-translate="takeaway_description">Yemeğinizi kendiniz alın</p>
+                        </div>
+                    </div>
+                    <div class="location-option" data-location="delivery">
+                        <div class="location-icon">
+                            <i class="fas fa-motorcycle"></i>
+                        </div>
+                        <div class="location-details">
+                            <h4 data-translate="delivery">Adrese teslim</h4>
+                            <p data-translate="delivery_description">Yemeğiniz adresinize gelsin</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <button id="detectLocationBtn" class="location-detect-btn">
+                    <i class="fas fa-location-arrow"></i>
+                    <span data-translate="auto_detect">Konumumu Otomatik Belirle</span>
+                </button>
+                
+                <div id="locationResult" class="location-result" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Section -->
+    <div class="cart-container" id="cartContainer">
+        <div class="cart-header">
+            <h2 data-translate="your_cart">Sepetiniz</h2>
+            <button class="cart-close" id="cartClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="cart-items" id="cartItems">
+            <div class="text-center" style="padding: 30px; color: var(--gray);">
+                <i class="fas fa-shopping-cart fa-2x mb-3"></i>
+                <p data-translate="empty_cart">Sepetiniz boş</p>
+            </div>
+        </div>
+        <div class="cart-totals">
+            <div class="total-row">
+                <span data-translate="subtotal">Ara Toplam:</span>
+                <span id="subtotal">0 ₺</span>
+            </div>
+            <div class="total-row">
+                <span data-translate="discount">İndirim:</span>
+                <span id="discount">0 ₺</span>
+            </div>
+            <div class="total-row">
+                <span data-translate="vat">KDV (%18):</span>
+                <span id="vatAmount">0 ₺</span>
+            </div>
+            <div class="total-row total-final">
+                <span data-translate="total">Toplam:</span>
+                <span id="totalAmount">0 ₺</span>
+            </div>
+        </div>
+        <div class="payment-buttons">
+            <button class="payment-btn cash" id="payCash" data-translate="pay_cash">Nakit Öde</button>
+            <button class="payment-btn card" id="payCard" data-translate="pay_card">Kartla Öde</button>
+            <button class="payment-btn bonus" id="payBonus" data-translate="pay_bonus">Bonus ile Öde</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-section">
+                <h3 data-translate="app_name">Sesli Sipariş</h3>
+                <p data-translate="footer_description">Sesli komutlarla kolayca sipariş verin. Hızlı, güvenli ve pratik alışveriş deneyimi.</p>
+                <div class="social-links">
+                    <a href="#" class="social-link"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="social-link"><i class="fab fa-twitter"></i></a>
+                    <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
+                    <a href="https://wa.me/?text=Merhaba!%20Sesli%20Sipariş%20sisteminden%20alışveriş%20yapmak%20istiyorum." class="social-link" target="_blank"><i class="fab fa-whatsapp"></i></a>
+                </div>
+            </div>
+            
+            <div class="footer-section">
+                <h3 data-translate="quick_links">Hızlı Bağlantılar</h3>
+                <ul class="footer-links">
+                    <li><a href="#" id="referralLink"><i class="fas fa-link"></i> <span data-translate="referral_link">Referans Linki</span></a></li>
+                    <li><a href="#" id="whatsappOrder"><i class="fab fa-whatsapp"></i> <span data-translate="whatsapp_order">WhatsApp ile Sipariş</span></a></li>
+                    <li><a href="#"><i class="fas fa-shopping-bag"></i> <span data-translate="my_orders">Siparişlerim</span></a></li>
+                    <li><a href="#"><i class="fas fa-question-circle"></i> <span data-translate="help">Yardım</span></a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h3 data-translate="contact">İletişim</h3>
+                <ul class="footer-links">
+                    <li><a href="tel:08501234567"><i class="fas fa-phone"></i> 0850 123 45 67</a></li>
+                    <li><a href="mailto:info@seslisiparis.com"><i class="fas fa-envelope"></i> info@seslisiparis.com</a></li>
+                    <li><a href="#"><i class="fas fa-map-marker-alt"></i> <span data-translate="location">İstanbul, Türkiye</span></a></li>
+                </ul>
+                <a href="#" class="partner-login" data-translate="partner_login">Partner Girişi</a>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <p>&copy; 2023 Sesli Sipariş Sistemi. <span data-translate="all_rights_reserved">Tüm hakları saklıdır.</span></p>
+        </div>
+    </footer>
+
+    <!-- Voice Assistant -->
+    <div class="voice-status" id="voiceStatusPanel">
+        <div class="status-header">
+            <div class="status-title">
+                <i class="fas fa-microphone"></i>
+                <span data-translate="voice_assistant">Sesli Asistan</span>
+            </div>
+            <button class="status-close" id="closeVoiceStatus">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="status-content">
+            <div class="assistant-message" id="assistantMessage" data-translate="welcome_message">Merhaba! Sipariş vermek için mikrofonu açın ve konuşun.</div>
+            <div class="user-message" id="userMessage"></div>
+        </div>
+        <div class="voice-indicator" id="voiceIndicator">
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+        </div>
+    </div>
+<script>
+        // =============================================
+        // ÇOKLU DİL DESTEĞİ
+        // =============================================
+        
+        const translations = {
+            tr: {
+                app_name: "Sesli Sipariş",
+                select_location: "Konum Seçin",
+                order: "Sipariş:",
+                profile: "Profilim",
+                microphone_off: "Mikrofon (Kapalı)",
+                banner_title: "Sesli Sipariş ile Kolay Alışveriş",
+                banner_description: "Sadece konuşun, siparişiniz kapınızda!",
+                detect_location: "Konumumu Belirle",
+                what_to_eat: "Ne yemek istersiniz?",
+                nearest_places: "Size En Yakın Yerler",
+                categories: "Kategoriler",
+                products: "Ürünler",
+                inside_restaurant: "Restoran içinde",
+                inside_description: "Yemeğinizi restoranda yiyin",
+                takeaway: "Paket servis",
+                takeaway_description: "Yemeğinizi kendiniz alın",
+                delivery: "Adrese teslim",
+                delivery_description: "Yemeğiniz adresinize gelsin",
+                auto_detect: "Konumumu Otomatik Belirle",
+                your_cart: "Sepetiniz",
+                empty_cart: "Sepetiniz boş",
+                subtotal: "Ara Toplam:",
+                discount: "İndirim:",
+                vat: "KDV (%18):",
+                total: "Toplam:",
+                pay_cash: "Nakit Öde",
+                pay_card: "Kartla Öde",
+                pay_bonus: "Bonus ile Öde",
+                footer_description: "Sesli komutlarla kolayca sipariş verin. Hızlı, güvenli ve pratik alışveriş deneyimi.",
+                quick_links: "Hızlı Bağlantılar",
+                referral_link: "Referans Linki",
+                whatsapp_order: "WhatsApp ile Sipariş",
+                my_orders: "Siparişlerim",
+                help: "Yardım",
+                contact: "İletişim",
+                location: "İstanbul, Türkiye",
+                partner_login: "Partner Girişi",
+                all_rights_reserved: "Tüm hakları saklıdır.",
+                voice_assistant: "Sesli Asistan",
+                welcome_message: "Merhaba! Sipariş vermek için mikrofonu açın ve konuşun.",
+                location_description: "Lütfen sipariş vermek istediğiniz konumu seçin:"
+            },
+            en: {
+                app_name: "Voice Order",
+                select_location: "Select Location",
+                order: "Order:",
+                profile: "My Profile",
+                microphone_off: "Microphone (Off)",
+                banner_title: "Easy Shopping with Voice Order",
+                banner_description: "Just speak, your order is at your door!",
+                detect_location: "Detect My Location",
+                what_to_eat: "What would you like to eat?",
+                nearest_places: "Nearest Places to You",
+                categories: "Categories",
+                products: "Products",
+                inside_restaurant: "Inside Restaurant",
+                inside_description: "Eat your meal at the restaurant",
+                takeaway: "Takeaway",
+                takeaway_description: "Pick up your meal yourself",
+                delivery: "Home Delivery",
+                delivery_description: "Your meal delivered to your address",
+                auto_detect: "Auto Detect My Location",
+                your_cart: "Your Cart",
+                empty_cart: "Your cart is empty",
+                subtotal: "Subtotal:",
+                discount: "Discount:",
+                vat: "VAT (%18):",
+                total: "Total:",
+                pay_cash: "Pay Cash",
+                pay_card: "Pay by Card",
+                pay_bonus: "Pay with Bonus",
+                footer_description: "Order easily with voice commands. Fast, secure and practical shopping experience.",
+                quick_links: "Quick Links",
+                referral_link: "Referral Link",
+                whatsapp_order: "Order via WhatsApp",
+                my_orders: "My Orders",
+                help: "Help",
+                contact: "Contact",
+                location: "Istanbul, Turkey",
+                partner_login: "Partner Login",
+                all_rights_reserved: "All rights reserved.",
+                voice_assistant: "Voice Assistant",
+                welcome_message: "Hello! Turn on the microphone to place an order and start speaking.",
+                location_description: "Please select the location where you want to place your order:"
+            },
+            ge: {
+                app_name: "ხმოვანი შეკვეთა",
+                select_location: "აირჩიეთ მდებარეობა",
+                order: "შეკვეთა:",
+                profile: "ჩემი პროფილი",
+                microphone_off: "მიკროფონი (გამორთულია)",
+                banner_title: "მარტივი შოპინგი ხმოვანი შეკვეთით",
+                banner_description: "უბრალოდ ლაპარაკი, თქვენი შეკვეთა თქვენს კარზეა!",
+                detect_location: "განსაზღვრეთ ჩემი მდებარეობა",
+                what_to_eat: "რა გინდათ ჭამოთ?",
+                nearest_places: "უახლოესი ადგილები თქვენთან",
+                categories: "კატეგორიები",
+                products: "პროდუქტები",
+                inside_restaurant: "რესტორნის შიგნით",
+                inside_description: "მიირთვით თქვენი კვება რესტორნში",
+                takeaway: "Takeaway",
+                takeaway_description: "თავად წაიღეთ თქვენი კვება",
+                delivery: "სახლის მიტანა",
+                delivery_description: "თქვენი კვება მიიტანება თქვენს მისამართზე",
+                auto_detect: "ავტომატურად განსაზღვრეთ ჩემი მდებარეობა",
+                your_cart: "თქვენი კალათა",
+                empty_cart: "თქვენი კალათა ცარიელია",
+                subtotal: "შუალედური ჯამი:",
+                discount: "ფასდაკლება:",
+                vat: "დღგ (%18):",
+                total: "სულ:",
+                pay_cash: "გადაიხადეთ ნაღდი ანგარიშსწორებით",
+                pay_card: "გადაიხადეთ ბარათით",
+                pay_bonus: "გადაიხადეთ ბონუსით",
+                footer_description: "მარტივად შეუკვეთეთ ხმოვანი ბრძანებებით. სწრაფი, უსაფრთხო და პრაქტიკული შოპინგის გამოცდილება.",
+                quick_links: "სწრაფი ბმულები",
+                referral_link: "რეფერალური ბმული",
+                whatsapp_order: "შეუკვეთეთ WhatsApp-ით",
+                my_orders: "ჩემი შეკვეთები",
+                help: "დახმარება",
+                contact: "კონტაქტი",
+                location: "თბილისი, საქართველო",
+                partner_login: "პარტნიორის შესვლა",
+                all_rights_reserved: "ყველა უფლება დაცულია.",
+                voice_assistant: "ხმოვანი ასისტენტი",
+                welcome_message: "გამარჯობა! ჩართეთ მიკროფონი შეკვეთის განსახორციელებლად და დაიწყეთ საუბარი.",
+                location_description: "გთხოვთ, აირჩიოთ მდებარეობა, სადაც გსურთ შეკვეთის განთავსება:"
+            },
+            ru: {
+                app_name: "Голосовой Заказ",
+                select_location: "Выберите Местоположение",
+                order: "Заказ:",
+                profile: "Мой Профиль",
+                microphone_off: "Микрофон (Выключен)",
+                banner_title: "Легкий Шоппинг с Голосовым Заказом",
+                banner_description: "Просто говорите, ваш заказ у вашей двери!",
+                detect_location: "Определить Мое Местоположение",
+                what_to_eat: "Что бы вы хотели поесть?",
+                nearest_places: "Ближайшие Места к Вам",
+                categories: "Категории",
+                products: "Продукты",
+                inside_restaurant: "Внутри Ресторана",
+                inside_description: "Поешьте вашу еду в ресторане",
+                takeaway: "На Вынос",
+                takeaway_description: "Заберите вашу еду сами",
+                delivery: "Доставка на Дом",
+                delivery_description: "Ваша еда доставляется по вашему адресу",
+                auto_detect: "Автоопределение Моего Местоположения",
+                your_cart: "Ваша Корзина",
+                empty_cart: "Ваша корзина пуста",
+                subtotal: "Промежуточный итог:",
+                discount: "Скидка:",
+                vat: "НДС (%18):",
+                total: "Всего:",
+                pay_cash: "Оплатить Наличными",
+                pay_card: "Оплатить Картой",
+                pay_bonus: "Оплатить Бонусами",
+                footer_description: "Легко заказывайте с помощью голосовых команд. Быстрый, безопасный и практичный опыт покупок.",
+                quick_links: "Быстрые Ссылки",
+                referral_link: "Реферальная Ссылка",
+                whatsapp_order: "Заказ через WhatsApp",
+                my_orders: "Мои Заказы",
+                help: "Помощь",
+                contact: "Контакт",
+                location: "Стамбул, Турция",
+                partner_login: "Вход для Партнеров",
+                all_rights_reserved: "Все права защищены.",
+                voice_assistant: "Голосовой Помощник",
+                welcome_message: "Здравствуйте! Включите микрофон, чтобы сделать заказ, и начинайте говорить.",
+                location_description: "Пожалуйста, выберите местоположение, где вы хотите разместить заказ:"
+            },
+            az: {
+                app_name: "Səsli Sifariş",
+                select_location: "Yeri Seçin",
+                order: "Sifariş:",
+                profile: "Profilim",
+                microphone_off: "Mikrofon (Söndürülmüş)",
+                banner_title: "Səsli Sifariş ilə Asan Alış-veriş",
+                banner_description: "Sadəcə danışın, sifarişiniz qapınızda!",
+                detect_location: "Mənim Yerimi Müəyyənləşdir",
+                what_to_eat: "Nə yemək istəyirsiniz?",
+                nearest_places: "Sizə Ən Yaxın Yerlər",
+                categories: "Kateqoriyalar",
+                products: "Məhsullar",
+                inside_restaurant: "Restoran Daxilində",
+                inside_description: "Yeməyinizi restoranda yeyin",
+                takeaway: "Paket Xidməti",
+                takeaway_description: "Yeməyinizi özünüz götürün",
+                delivery: "Ünvana Çatdırılma",
+                delivery_description: "Yeməyiniz ünvanınıza çatdırılsın",
+                auto_detect: "Yerimi Avtomatik Müəyyənləşdir",
+                your_cart: "Səbətiniz",
+                empty_cart: "Səbətiniz boşdur",
+                subtotal: "Ara Cəmi:",
+                discount: "Endirim:",
+                vat: "ƏDV (%18):",
+                total: "Ümumi:",
+                pay_cash: "Nağd Ödə",
+                pay_card: "Kartla Ödə",
+                pay_bonus: "Bonusla Ödə",
+                footer_description: "Səsli əmrlərlə asanlıqla sifariş verin. Sürətli, təhlükəsiz və praktik alış-veriş təcrübəsi.",
+                quick_links: "Sürətli Keçidlər",
+                referral_link: "Referans Linki",
+                whatsapp_order: "WhatsApp ilə Sifariş",
+                my_orders: "Sifarişlərim",
+                help: "Yardım",
+                contact: "Əlaqə",
+                location: "İstanbul, Türkiyə",
+                partner_login: "Partner Girişi",
+                all_rights_reserved: "Bütün hüquqlar qorunur.",
+                voice_assistant: "Səsli Köməkçi",
+                welcome_message: "Salam! Sifariş vermək üçün mikrofonu açın və danışmağa başlayın.",
+                location_description: "Zəhmət olmasa sifariş vermək istədiyiniz yeri seçin:"
+            },
+            de: {
+                app_name: "Sprachbestellung",
+                select_location: "Standort auswählen",
+                order: "Bestellung:",
+                profile: "Mein Profil",
+                microphone_off: "Mikrofon (Aus)",
+                banner_title: "Einfaches Einkaufen mit Sprachbestellung",
+                banner_description: "Einfach sprechen, Ihre Bestellung ist vor Ihrer Tür!",
+                detect_location: "Meinen Standort ermitteln",
+                what_to_eat: "Was möchten Sie essen?",
+                nearest_places: "Nächste Orte zu Ihnen",
+                categories: "Kategorien",
+                products: "Produkte",
+                inside_restaurant: "Im Restaurant",
+                inside_description: "Essen Sie Ihre Mahlzeit im Restaurant",
+                takeaway: "Takeaway",
+                takeaway_description: "Holen Sie Ihre Mahlzeit selbst ab",
+                delivery: "Lieferung nach Hause",
+                delivery_description: "Ihre Mahlzeit wird zu Ihrer Adresse geliefert",
+                auto_detect: "Automatische Standortermittlung",
+                your_cart: "Ihr Warenkorb",
+                empty_cart: "Ihr Warenkorb ist leer",
+                subtotal: "Zwischensumme:",
+                discount: "Rabatt:",
+                vat: "MwSt (%18):",
+                total: "Gesamt:",
+                pay_cash: "Bar bezahlen",
+                pay_card: "Mit Karte bezahlen",
+                pay_bonus: "Mit Bonus bezahlen",
+                footer_description: "Bestellen Sie einfach mit Sprachbefehlen. Schnelles, sicheres und praktisches Einkaufserlebnis.",
+                quick_links: "Schnelllinks",
+                referral_link: "Empfehlungslink",
+                whatsapp_order: "Bestellung per WhatsApp",
+                my_orders: "Meine Bestellungen",
+                help: "Hilfe",
+                contact: "Kontakt",
+                location: "Istanbul, Türkei",
+                partner_login: "Partner-Login",
+                all_rights_reserved: "Alle Rechte vorbehalten.",
+                voice_assistant: "Sprachassistent",
+                welcome_message: "Hallo! Schalten Sie das Mikrofon ein, um eine Bestellung aufzugeben, und beginnen Sie zu sprechen.",
+                location_description: "Bitte wählen Sie den Standort aus, an dem Sie Ihre Bestellung aufgeben möchten:"
+            },
+            it: {
+                app_name: "Ordine Vocale",
+                select_location: "Seleziona Posizione",
+                order: "Ordine:",
+                profile: "Mio Profilo",
+                microphone_off: "Microfono (Spento)",
+                banner_title: "Shopping Facile con Ordine Vocale",
+                banner_description: "Parla e basta, il tuo ordine è alla tua porta!",
+                detect_location: "Rileva la Mia Posizione",
+                what_to_eat: "Cosa vorresti mangiare?",
+                nearest_places: "Luoghi Più Vicini a Te",
+                categories: "Categorie",
+                products: "Prodotti",
+                inside_restaurant: "All'interno del Ristorante",
+                inside_description: "Mangia il tuo pasto al ristorante",
+                takeaway: "Takeaway",
+                takeaway_description: "Ritira tu stesso il tuo pasto",
+                delivery: "Consegna a Domicilio",
+                delivery_description: "Il tuo pasto consegnato al tuo indirizzo",
+                auto_detect: "Rilevamento Automatico della Mia Posizione",
+                your_cart: "Il Tuo Carrello",
+                empty_cart: "Il tuo carrello è vuoto",
+                subtotal: "Subtotale:",
+                discount: "Sconto:",
+                vat: "IVA (%18):",
+                total: "Totale:",
+                pay_cash: "Paga in Contanti",
+                pay_card: "Paga con Carta",
+                pay_bonus: "Paga con Bonus",
+                footer_description: "Ordina facilmente con comandi vocali. Esperienza di shopping veloce, sicura e pratica.",
+                quick_links: "Link Rapidi",
+                referral_link: "Link di Referral",
+                whatsapp_order: "Ordina tramite WhatsApp",
+                my_orders: "I Miei Ordini",
+                help: "Aiuto",
+                contact: "Contatto",
+                location: "Istanbul, Turchia",
+                partner_login: "Accesso Partner",
+                all_rights_reserved: "Tutti i diritti riservati.",
+                voice_assistant: "Assistente Vocale",
+                welcome_message: "Ciao! Accendi il microfono per effettuare un ordine e inizia a parlare.",
+                location_description: "Seleziona la posizione in cui desideri effettuare l'ordine:"
+            }
+        };
+        
+        const languages = [
+            { code: 'tr', name: 'Türkçe', flag: '🇹🇷' },
+            { code: 'en', name: 'English', flag: '🇺🇸' },
+            { code: 'ge', name: 'ქართული', flag: '🇬🇪' },
+            { code: 'ru', name: 'Русский', flag: '🇷🇺' },
+            { code: 'az', name: 'Azərbaycanca', flag: '🇦🇿' },
+            { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+            { code: 'it', name: 'Italiano', flag: '🇮🇹' }
+        ];
+        
+        let currentLanguage = 'tr';
+        
+        // Tarayıcı dilini algıla
+        function detectBrowserLanguage() {
+            const browserLang = navigator.language || navigator.userLanguage;
+            const langCode = browserLang.split('-')[0];
+            
+            // Desteklenen dillerden birini bul
+            const supportedLang = languages.find(lang => lang.code === langCode);
+            if (supportedLang) {
+                return supportedLang.code;
+            }
+            
+            return 'tr'; // Varsayılan dil
+        }
+        
+        // Dil seçeneklerini oluştur
+        function populateLanguageOptions() {
+            const dropdown = document.getElementById('languageDropdown');
+            dropdown.innerHTML = '';
+            
+            languages.forEach(lang => {
+                const option = document.createElement('div');
+                option.className = `language-option ${lang.code === currentLanguage ? 'active' : ''}`;
+                option.setAttribute('data-lang', lang.code);
+                
+                option.innerHTML = `
+                    <span class="flag">${lang.flag}</span>
+                    <span>${lang.name}</span>
+                    ${lang.code === currentLanguage ? '<i class="fas fa-check"></i>' : ''}
+                `;
+                
+                dropdown.appendChild(option);
+            });
+        }
+        
+        // Sayfayı çevir
+        function translatePage(lang) {
+            currentLanguage = lang;
+            document.querySelectorAll('[data-translate]').forEach(element => {
+                const key = element.getAttribute('data-translate');
+                if (translations[lang] && translations[lang][key]) {
+                    if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                        element.placeholder = translations[lang][key];
+                    } else {
+                        element.textContent = translations[lang][key];
+                    }
+                }
+            });
+            
+            // Dil düğmesini güncelle
+            const currentLang = languages.find(l => l.code === lang);
+            document.getElementById('currentLanguage').textContent = currentLang.flag;
+            
+            // Sesli asistan dilini güncelle
+            if (recognition) {
+                recognition.lang = getSpeechRecognitionLang(lang);
+            }
+            
+            // Dil seçeneklerini güncelle
+            populateLanguageOptions();
+            
+            // Banner'ı güncelle
+            updateBanner(currentStoreType);
+        }
+        
+        // Konuşma tanıma dili
+        function getSpeechRecognitionLang(lang) {
+            const langMap = {
+                'tr': 'tr-TR',
+                'en': 'en-US',
+                'ge': 'ka-GE',
+                'ru': 'ru-RU',
+                'az': 'az-AZ',
+                'de': 'de-DE',
+                'it': 'it-IT'
+            };
+            
+            return langMap[lang] || 'tr-TR';
+        }
+        
+        // =============================================
+        // DİNAMİK BANNER SİSTEMİ
+        // =============================================
+        
+        const bannerVideos = {
+            market: "https://assets.mixkit.co/videos/preview/mixkit-people-shopping-in-a-supermarket-43244-large.mp4",
+            restaurant: "https://assets.mixkit.co/videos/preview/mixkit-cooking-a-meal-in-a-restaurant-kitchen-43239-large.mp4",
+            bakery: "https://assets.mixkit.co/videos/preview/mixkit-baker-preparing-bread-in-a-traditional-oven-43237-large.mp4",
+            pharmacy: "https://assets.mixkit.co/videos/preview/mixkit-pharmacist-preparing-medicine-in-a-pharmacy-43236-large.mp4"
+        };
+        
+        const bannerTitles = {
+            tr: {
+                market: "Market Alışverişini Sesinle Yap",
+                restaurant: "Lezzetli Yemekler Sesinle Kapında",
+                bakery: "Taze Fırın Ürünleri Sesinle Gelsin",
+                pharmacy: "İlaçların Sesinle Kapında"
+            },
+            en: {
+                market: "Do Your Grocery Shopping with Your Voice",
+                restaurant: "Delicious Food at Your Door with Your Voice",
+                bakery: "Fresh Bakery Products with Your Voice",
+                pharmacy: "Your Medications at Your Door with Your Voice"
+            },
+            ge: {
+                market: "გამოიყენეთ თქვენი ხმა სასურსათო შოპინგისთვის",
+                restaurant: "გემრიელი საჭმელი თქვენს კარზე თქვენი ხმით",
+                bakery: "ახალი საცხობი პროდუქტები თქვენი ხმით",
+                pharmacy: "თქვენი მედიკამენტები თქვენს კარზე თქვენი ხმით"
+            },
+            ru: {
+                market: "Делайте покупки в супермаркете с помощью своего голоса",
+                restaurant: "Вкусная еда у вашей двери с вашим голосом",
+                bakery: "Свежая выпечка с вашим голосом",
+                pharmacy: "Ваши лекарства у вашей двери с вашим голосом"
+            },
+            az: {
+                market: "Market Alış-verişini Səsinlə Et",
+                restaurant: "Ləzzətli Yeməklər Səsinlə Qapında",
+                bakery: "Təzə Fırın Məhsulları Səsinlə Gəlsin",
+                pharmacy: "Dərmanların Səsinlə Qapında"
+            },
+            de: {
+                market: "Machen Sie Ihren Lebensmitteleinkauf mit Ihrer Stimme",
+                restaurant: "Leckeres Essen an Ihrer Tür mit Ihrer Stimme",
+                bakery: "Frische Backwaren mit Ihrer Stimme",
+                pharmacy: "Ihre Medikamente an Ihrer Tür mit Ihrer Stimme"
+            },
+            it: {
+                market: "Fai la tua spesa alimentare con la tua voce",
+                restaurant: "Cibo delizioso alla tua porta con la tua voce",
+                bakery: "Prodotti da forno freschi con la tua voce",
+                pharmacy: "I tuoi farmaci alla tua porta con la tua voce"
+            }
+        };
+        
+        const bannerDescriptions = {
+            tr: {
+                market: "Market ürünlerini sesinle sipariş et, kapına gelsin!",
+                restaurant: "Restoran lezzetlerini sesinle keşfet!",
+                bakery: "Taze ekmek ve pastane ürünleri sesinle kapında!",
+                pharmacy: "İlaçlarını sesinle sipariş et, zaman kazan!"
+            },
+            en: {
+                market: "Order grocery products with your voice, delivered to your door!",
+                restaurant: "Discover restaurant flavors with your voice!",
+                bakery: "Fresh bread and bakery products with your voice at your door!",
+                pharmacy: "Order your medications with your voice, save time!"
+            },
+            ge: {
+                market: "შეუკვეთეთ სასურსათო პროდუქტები თქვენი ხმით, მიიტანეთ თქვენს კარზე!",
+                restaurant: "აღმოაჩინეთ რესტორნის გემოები თქვენი ხმით!",
+                bakery: "ახალი პური და საცხობი პროდუქტები თქვენი ხმით თქვენს კარზე!",
+                pharmacy: "შეუკვეთეთ თქვენი მედიკამენტები თქვენი ხმით, დაზოგეთ დრო!"
+            },
+            ru: {
+                market: "Заказывайте продукты с помощью своего голоса, доставка к вашей двери!",
+                restaurant: "Откройте для себя вкусы ресторанов с вашим голосом!",
+                bakery: "Свежий хлеб и выпечка с вашим голосом у вашей двери!",
+                pharmacy: "Заказывайте свои лекарства с вашим голосом, экономьте время!"
+            },
+            az: {
+                market: "Market məhsullarını səsinlə sifariş et, qapına gəlsin!",
+                restaurant: "Restoran ləzzətlərini səsinlə kəşf et!",
+                bakery: "Təzə çörək və pastaxana məhsulları səsinlə qapında!",
+                pharmacy: "Dərmanlarını səsinlə sifariş et, vaxt qazan!"
+            },
+            de: {
+                market: "Bestellen Sie Lebensmittel mit Ihrer Stimme, liefern Sie an Ihre Tür!",
+                restaurant: "Entdecken Sie Restaurantaromen mit Ihrer Stimme!",
+                bakery: "Frisches Brot und Backwaren mit Ihrer Stimme an Ihrer Tür!",
+                pharmacy: "Bestellen Sie Ihre Medikamente mit Ihrer Stimme, sparen Sie Zeit!"
+            },
+            it: {
+                market: "Ordina prodotti alimentari con la tua voce, consegnati alla tua porta!",
+                restaurant: "Scopri i sapori del ristorante con la tua voce!",
+                bakery: "Pane fresco e prodotti da forno con la tua voce alla tua porta!",
+                pharmacy: "Ordina i tuoi farmaci con la tua voce, risparmia tempo!"
+            }
+        };
+        
+        let currentStoreType = 'market';
+        
+        function updateBanner(storeType) {
+            const banner = document.getElementById('banner');
+            const bannerVideo = document.getElementById('bannerVideo');
+            const bannerTitle = document.getElementById('bannerTitle');
+            const bannerDescription = document.getElementById('bannerDescription');
+            
+            // Varsayılan değerler
+            let videoSrc = bannerVideos.market;
+            let title = bannerTitles[currentLanguage].market;
+            let description = bannerDescriptions[currentLanguage].market;
+            
+            // Store type'a göre içerikleri belirle
+            if (storeType && bannerVideos[storeType]) {
+                videoSrc = bannerVideos[storeType];
+                title = bannerTitles[currentLanguage][storeType];
+                description = bannerDescriptions[currentLanguage][storeType];
+                currentStoreType = storeType;
+            }
+            
+            // Banner'ı güncelle
+            bannerVideo.src = videoSrc;
+            bannerVideo.load();
+            bannerVideo.play().catch(e => console.log("Video autoplay prevented:", e));
+            
+            bannerTitle.textContent = title;
+            bannerDescription.textContent = description;
+        }
+        
+        // =============================================
+        // YATAY KAYDIRMA FONKSİYONLARI
+        // =============================================
+        
+        function setupHorizontalScrolling() {
+            
+            // Sellers kaydırma
+            document.getElementById('scrollSellersLeft').addEventListener('click', () => {
+                document.getElementById('sellerGrid').scrollBy({ left: -200, behavior: 'smooth' });
+            });
+            
+            document.getElementById('scrollSellersRight').addEventListener('click', () => {
+                document.getElementById('sellerGrid').scrollBy({ left: 200, behavior: 'smooth' });
+            });
+            
+            // Categories kaydırma
+            document.getElementById('scrollCategoriesLeft').addEventListener('click', () => {
+                document.getElementById('categoriesGrid').scrollBy({ left: -200, behavior: 'smooth' });
+            });
+            
+            document.getElementById('scrollCategoriesRight').addEventListener('click', () => {
+                document.getElementById('categoriesGrid').scrollBy({ left: 200, behavior: 'smooth' });
+            });
+            
+            // Products kaydırma
+            document.getElementById('scrollProductsLeft').addEventListener('click', () => {
+                document.getElementById('productsGrid').scrollBy({ left: -200, behavior: 'smooth' });
+            });
+            
+            document.getElementById('scrollProductsRight').addEventListener('click', () => {
+                document.getElementById('productsGrid').scrollBy({ left: 200, behavior: 'smooth' });
+            });
+        }
+        
+        // =============================================
+        // ÖRNEK VERİ YÜKLEME
+        // =============================================
+        
+        function loadSampleData() {
+            // Store types
+            const storeTypesx = [
+                { id: 1, name: 'Market', type: 'market', icon: 'fas fa-store' },
+                { id: 2, name: 'Restoran', type: 'restaurant', icon: 'fas fa-utensils' },
+                { id: 3, name: 'Fırın', type: 'bakery', icon: 'fas fa-bread-slice' },
+                { id: 4, name: 'Eczane', type: 'pharmacy', icon: 'fas fa-prescription-bottle' },
+                { id: 5, name: 'Kafe', type: 'cafe', icon: 'fas fa-coffee' },
+                { id: 6, name: 'Fast Food', type: 'fastfood', icon: 'fas fa-hamburger' }
+            ];
+            
+            const sellerTypeGrid = document.getElementById('sellerTypeGrid');
+            storeTypes.forEach(store => {
+                const card = document.createElement('div');
+                card.className = 'store-type-card';
+                card.setAttribute('data-store-type', store.type);
+                
+                card.innerHTML = `
+                    <div class="store-type-icon">
+                        <i class="${store.icon}"></i>
+                    </div>
+                    <div class="store-type-name">${store.name}</div>
+                `;
+                
+                card.addEventListener('click', function() {
+                    // Tüm kartlardan seçimi kaldır
+                    document.querySelectorAll('.store-type-card').forEach(c => {
+                        c.classList.remove('selected');
+                    });
+                    
+                    // Bu kartı seçili yap
+                    this.classList.add('selected');
+                    
+                    // Banner'ı güncelle
+                    updateBanner(store.type);
+                    
+                    // Satıcıları göster
+                    document.getElementById('sellersSection').style.display = 'block';
+                    loadSampleSellers();
+                });
+                
+                storeTypeGrid.appendChild(card);
+            });
+        }
+        
+        function loadSampleSellers() {
+            const sellers = [
+                { 
+                    id: 1, 
+                    name: 'Örnek Market', 
+                    image: 'https://images.unsplash.com/photo-1604719312566-8912e221a99f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+                    rating: 4.5,
+                    deliveryFee: 5.99,
+                    minOrder: 50,
+                    freeDelivery: false
+                },
+                { 
+                    id: 2, 
+                    name: 'Lezzet Restoran', 
+                    image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+                    rating: 4.8,
+                    deliveryFee: 0,
+                    minOrder: 75,
+                    freeDelivery: true
+                },
+                { 
+                    id: 3, 
+                    name: 'Taze Fırın', 
+                    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+                    rating: 4.7,
+                    deliveryFee: 3.99,
+                    minOrder: 25,
+                    freeDelivery: false
+                }
+            ];
+            
+            const sellerGrid = document.getElementById('sellerGrid');
+            sellerGrid.innerHTML = '';
+            
+            sellers.forEach(seller => {
+                const card = document.createElement('div');
+                card.className = 'seller-card';
+                
+                card.innerHTML = `
+                    <img src="${seller.image}" alt="${seller.name}" class="seller-image">
+                    <div class="seller-info">
+                        <div class="seller-name">${seller.name}</div>
+                        <div class="seller-details">
+                            <span><i class="fas fa-map-marker-alt"></i> 1.2 km</span>
+                            <span class="seller-rating">
+                                <i class="fas fa-star"></i>
+                                ${seller.rating}
+                            </span>
+                        </div>
+                        <div class="delivery-info">
+                            <div class="delivery-fee ${seller.freeDelivery ? 'free' : ''}">
+                                <i class="fas fa-motorcycle"></i>
+                                ${seller.freeDelivery ? 'Ücretsiz Teslimat' : `Teslimat: ${seller.deliveryFee} ₺`}
+                            </div>
+                            ${seller.minOrder ? `<div class="min-order">Min. Sipariş: ${seller.minOrder} ₺</div>` : ''}
+                        </div>
+                    </div>
+                `;
+                
+                card.addEventListener('click', function() {
+                    // Kategorileri göster
+                    document.getElementById('categoriesSection').style.display = 'block';
+                    loadSampleCategories();
+                    
+                    // Satıcı bilgisini güncelle
+                    document.getElementById('selectedSellerInfo').textContent = seller.name;
+                });
+                
+                sellerGrid.appendChild(card);
+            });
+        }
+        
+        function loadSampleCategories() {
+            const categories = [
+                { id: 1, name: 'Meyve & Sebze', icon: 'fas fa-apple-alt' },
+                { id: 2, name: 'Süt Ürünleri', icon: 'fas fa-cheese' },
+                { id: 3, name: 'Et & Tavuk', icon: 'fas fa-drumstick-bite' },
+                { id: 4, name: 'Temel Gıda', icon: 'fas fa-wheat-alt' },
+                { id: 5, name: 'İçecekler', icon: 'fas fa-wine-bottle' },
+                { id: 6, name: 'Atıştırmalık', icon: 'fas fa-cookie' }
+            ];
+            
+            const categoriesGrid = document.getElementById('categoriesGrid');
+            categoriesGrid.innerHTML = '';
+            
+            categories.forEach(category => {
+                const card = document.createElement('div');
+                card.className = 'category-card';
+                
+                card.innerHTML = `
+                    <div class="category-icon">
+                        <i class="${category.icon}"></i>
+                    </div>
+                    <div class="category-name">${category.name}</div>
+                `;
+                
+                card.addEventListener('click', function() {
+                    // Ürünleri göster
+                    document.getElementById('productsSection').style.display = 'block';
+                    loadSampleProducts();
+                });
+                
+                categoriesGrid.appendChild(card);
+            });
+        }
+        
+        function loadSampleProducts() {
+            const products = [
+                { 
+                    id: 1, 
+                    name: 'Süt 1L', 
+                    image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80',
+                    price: 15.90,
+                    discountPrice: 12.90,
+                    hasDiscount: true
+                },
+                { 
+                    id: 2, 
+                    name: 'Ekmek', 
+                    image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80',
+                    price: 5.50,
+                    discountPrice: null,
+                    hasDiscount: false
+                },
+                { 
+                    id: 3, 
+                    name: 'Yumurta 10\'lu', 
+                    image: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80',
+                    price: 32.00,
+                    discountPrice: 28.00,
+                    hasDiscount: true
+                },
+                { 
+                    id: 4, 
+                    name: 'Peynir 500g', 
+                    image: 'https://images.unsplash.com/photo-1552767059-ce182ead6c1b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80',
+                    price: 45.00,
+                    discountPrice: null,
+                    hasDiscount: false
+                },
+                { 
+                    id: 5, 
+                    name: 'Domates 1kg', 
+                    image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80',
+                    price: 18.00,
+                    discountPrice: 15.00,
+                    hasDiscount: true
+                }
+            ];
+            
+            const productsGrid = document.getElementById('productsGrid');
+            productsGrid.innerHTML = '';
+            
+            products.forEach(product => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                
+                card.innerHTML = `
+                    ${product.hasDiscount ? '<div class="product-badge">İndirim</div>' : ''}
+                    <img src="${product.image}" alt="${product.name}" class="product-image">
+                    <div class="product-info">
+                        <div class="product-name">${product.name}</div>
+                        <div class="product-price">
+                            ${product.hasDiscount ? `
+                                <span>${product.discountPrice} ₺</span>
+                                <span class="product-discount">${product.price} ₺</span>
+                            ` : `
+                                <span>${product.price} ₺</span>
+                            `}
+                        </div>
+                        <button class="add-to-cart-btn" data-translate="add_to_cart">Sepete Ekle</button>
+                    </div>
+                `;
+                
+                productsGrid.appendChild(card);
+            });
+        }
+        
+        // =============================================
+        // UYGULAMA BAŞLATMA
+        // =============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Dil seçeneklerini oluştur
+            populateLanguageOptions();
+            
+            // Tarayıcı dilini algıla ve çevir
+            const browserLang = detectBrowserLanguage();
+            translatePage(browserLang);
+            
+            // Varsayılan banner'ı yükle
+            updateBanner('market');
+            
+            // Yatay kaydırma ayarlarını yap
+            setupHorizontalScrolling();
+            
+            // Örnek verileri yükle
+            loadSampleData();
+            
+            // Dil değiştirme event'leri
+            document.getElementById('languageBtn').addEventListener('click', function() {
+                document.getElementById('languageDropdown').classList.toggle('show');
+            });
+            
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.language-selector')) {
+                    document.getElementById('languageDropdown').classList.remove('show');
+                }
+                
+                if (e.target.closest('.language-option')) {
+                    const lang = e.target.closest('.language-option').getAttribute('data-lang');
+                    translatePage(lang);
+                    document.getElementById('languageDropdown').classList.remove('show');
+                }
+            });
+            
+            // Banner konum butonu
+            document.getElementById('bannerLocationBtn').addEventListener('click', function() {
+                showLocationModal();
+            });
+            
+            // Konum modalı event'leri
+            document.getElementById('closeLocationModal').addEventListener('click', hideLocationModal);
+            
+            document.querySelectorAll('.location-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    // Tüm seçeneklerden seçimi kaldır
+                    document.querySelectorAll('.location-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    
+                    // Bu seçeneği seçili yap
+                    this.classList.add('selected');
+                    
+                    // Konum türünü seç
+                    const locationType = this.getAttribute('data-location');
+                    
+                    // Modal'ı kapat
+                    setTimeout(hideLocationModal, 500);
+                });
+            });
+            
+            // Konum tespit butonu
+            document.getElementById('detectLocationBtn').addEventListener('click', function() {
+                // Konum tespit simülasyonu
+                const resultDiv = document.getElementById('locationResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div style="color: var(--success);">
+                        <i class="fas fa-check-circle"></i> 
+                        <strong>Konumunuz Belirlendi!</strong>
+                        <div style="font-size: 12px; margin-top: 5px;">
+                            Kadıköy, İstanbul
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Dışarı tıklayınca modal'ı kapat
+            window.addEventListener('click', function(e) {
+                if (e.target === document.getElementById('locationModal')) {
+                    hideLocationModal();
+                }
+            });
+        });
+        
+        // Konum modalını göster
+        function showLocationModal() {
+            document.getElementById('locationModal').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        // Konum modalını gizle
+        function hideLocationModal() {
+            document.getElementById('locationModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+  
+
+        // =============================================
+        // BAŞLANGIÇ KODLARI - 1. BÖLÜM ÖNCESİ
+        // =============================================
+
+        // Supabase configuration
+        const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+
+        // Initialize Supabase client
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
+
+
+
+// =============================================
+// TAMAMEN DİNAMİK SESLİ SİPARİŞ SİSTEMİ
+// =============================================
+
+// Global state - Dinamik
+let currentCustomer = null;
+let sellers = [];
+let products = [];
+let categories = [];
+let storeTypes = [];
+let cart = [];
+let recognition = null;
+let isListening = false;
+let isMicrophoneEnabled = false;
+let conversationStep = 0;
+let currentPaymentMethod = null;
+let selectedSellerId = null;
+let selectedSellerType = null;
+let selectedStoreTypeId = null;
+let selectedStoreTypeName = null;
+let selectedCategoryId = null;
+let isSellerLocked = false;
+let selectedLocation = null;
+let referralCode = null;
+let referralGroupCode = null;
+let allSellersInLocation = [];
+let filteredSellers = [];
+let pendingCart = [];
+let isGuestMode = false;
+let pendingOrder = null;
+let currentRoot = "0:0";
+let pendingResponse = null;
+let commandRules = new Map();
+
+// Konum state
+let userLocation = {
+    latitude: null,
+    longitude: null,
+    address: null,
+    city: null,
+    district: null
+};
+let isLocationDetected = false;
+
+
+  // DOM Elements
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        const profileAvatar = document.getElementById('profileAvatar');
+        const profileName = document.getElementById('profileName');
+        const profilePhone = document.getElementById('profilePhone');
+        const profileCity = document.getElementById('profileCity');
+        const profileAddress = document.getElementById('profileAddress');
+        const profileBonus = document.getElementById('profileBonus');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userName = document.getElementById('userName');
+        const microphoneToggle = document.getElementById('microphoneToggle');
+        const sellerTypeGrid = document.getElementById('sellerTypeGrid');
+        const scrollSellerTypesLeft = document.getElementById('scrollSellerTypesLeft');
+        const scrollSellerTypesRight = document.getElementById('scrollSellerTypesRight');
+        const categoriesSection = document.getElementById('categoriesSection');
+        const categoriesTitle = document.getElementById('categoriesTitle');
+        const categoriesGrid = document.getElementById('categoriesGrid');
+        const scrollCategoriesLeft = document.getElementById('scrollCategoriesLeft');
+        const scrollCategoriesRight = document.getElementById('scrollCategoriesRight');
+        const sellersSection = document.getElementById('sellersSection');
+        const sellerGrid = document.getElementById('sellerGrid');
+        const scrollSellersLeft = document.getElementById('scrollSellersLeft');
+        const scrollSellersRight = document.getElementById('scrollSellersRight');
+        const productsSection = document.getElementById('productsSection');
+        const selectedSellerInfo = document.getElementById('selectedSellerInfo');
+        const productsGrid = document.getElementById('productsGrid');
+        const cartContainer = document.getElementById('cartContainer');
+        const cartClose = document.getElementById('cartClose');
+        const cartItems = document.getElementById('cartItems');
+        const orderSummary = document.getElementById('orderSummary');
+        const orderCount = document.getElementById('orderCount');
+        const orderTotal = document.getElementById('orderTotal');
+        const subtotalEl = document.getElementById('subtotal');
+        const discountEl = document.getElementById('discount');
+        const vatAmountEl = document.getElementById('vatAmount');
+        const totalAmountEl = document.getElementById('totalAmount');
+        const payCashBtn = document.getElementById('payCash');
+        const payCardBtn = document.getElementById('payCard');
+        const payBonusBtn = document.getElementById('payBonus');
+        const assistantMessage = document.getElementById('assistantMessage');
+        const userMessage = document.getElementById('userMessage');
+        const voiceIndicator = document.getElementById('voiceIndicator');
+        const closeVoiceStatus = document.getElementById('closeVoiceStatus');
+        const voiceStatusPanel = document.getElementById('voiceStatusPanel');
+        const howItWorks = document.getElementById('howItWorks');
+        const locationMarker = document.getElementById('locationMarker');
+        const locationText = document.getElementById('locationText');
+        const locationModal = document.getElementById('locationModal');
+        const referralLink = document.getElementById('referralLink');
+        const whatsappOrder = document.getElementById('whatsappOrder');
+
+        // Utility functions
+        function money(n) { 
+            return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; 
+        }
+
+        // Debug modu
+        const DEBUG_MODE = true;
+
+        // Debug fonksiyonu
+        function debugLog(message, data = null) {
+            if (DEBUG_MODE) {
+                console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
+            }
+        }
+
+// =============================================
+// ANA UYGULAMA BAŞLATMA - DİNAMİK
+// =============================================
+
+async function initApp() {
+    try {
+        debugLog('🚀 === DİNAMİK UYGULAMA BAŞLATILIYOR ===');
+        
+        // 1. Tüm dinamik verileri yükle
+        await loadAllDynamicData();
+        
+        // 2. DOM hazır olana kadar bekle
+        await waitForDOMElements();
+        
+        // 3. Dinamik event handler'ları ayarla
+        setupDynamicEventHandlers();
+        
+        // 4. Oturumu geri yükle
+        await restoreSession();
+        
+        // 5. Konum yönetimini başlat
+        initializeDynamicLocation();
+        
+        // 6. UI'ı güncelle
+        updateUIAfterDynamicLogin();
+        
+        debugLog('🎉 === DİNAMİK UYGULAMA BAŞLATMA TAMAMLANDI ===');
+
+    } catch (error) {
+        console.error('💥 Dinamik uygulama başlatma hatası:', error);
+        dynamicEmergencyFallback();
+    }
+}
+
+// Tüm dinamik verileri yükle
+async function loadAllDynamicData() {
+    await loadCommandRules();
+    await loadStoreTypes();
+    await loadLanguageOptions();
+    debugLog('✅ Tüm dinamik veriler yüklendi');
+}
+
+// =============================================
+// DİNAMİK KOMUT SİSTEMİ - VERİTABANI ODAKLI
+// =============================================
+
+async function loadCommandRules() {
+    try {
+        const { data, error } = await supabase
+            .from('voice_command_rules')
+            .select('*')
+            .eq('is_active', true)
+            .order('priority', { ascending: false });
+
+        if (error) throw error;
+
+        commandRules.clear();
+        data.forEach(rule => {
+            if (!commandRules.has(rule.root_code)) {
+                commandRules.set(rule.root_code, []);
+            }
+            commandRules.get(rule.root_code).push(rule);
+        });
+
+        debugLog(`✅ ${data.length} komut kuralı yüklendi`);
+    } catch (error) {
+        console.error('Komut kuralları yükleme hatası:', error);
+        await createDefaultCommandRules();
+    }
+}
+
+// Varsayılan komut kurallarını oluştur
+async function createDefaultCommandRules() {
+    const defaultRules = [
+        // Başlangıç komutları
+        {
+            root_code: '0:0',
+            input_patterns: 'merhaba|selam|başla|hello|start',
+            output_text: 'Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen konumunuzu seçin.',
+            next_root: '1:0',
+            action_name: 'show_location_modal',
+            priority: 10
+        },
+        
+        // Konum komutları
+        {
+            root_code: '1:0',
+            input_patterns: 'restoran içi|içerde|yerinde',
+            output_text: 'Restoran içi seçildi.',
+            next_root: '2:0',
+            action_name: 'select_location',
+            priority: 10
+        },
+        {
+            root_code: '1:0',
+            input_patterns: 'paket servis|paket|götür',
+            output_text: 'Paket servis seçildi.',
+            next_root: '2:0',
+            action_name: 'select_location',
+            priority: 10
+        },
+        {
+            root_code: '1:0',
+            input_patterns: 'adrese teslim|teslimat|evime',
+            output_text: 'Adrese teslim seçildi.',
+            next_root: '2:0',
+            action_name: 'select_location',
+            priority: 10
+        },
+        
+        // Mağaza tipi komutları
+        {
+            root_code: '2:0',
+            input_patterns: 'regex:(?<storeType>market|restoran|eczane|fırın|kafe)',
+            output_text: '{storeType} seçiliyor...',
+            next_root: '3:0',
+            action_name: 'select_store_type',
+            priority: 10
+        },
+        
+        // Satıcı komutları
+        {
+            root_code: '3:0',
+            input_patterns: 'regex:birinci|ilk|1',
+            output_text: 'Birinci satıcı seçiliyor...',
+            next_root: '4:0',
+            action_name: 'select_seller',
+            priority: 10
+        },
+        {
+            root_code: '3:0',
+            input_patterns: 'regex:ikinci|2',
+            output_text: 'İkinci satıcı seçiliyor...',
+            next_root: '4:0',
+            action_name: 'select_seller',
+            priority: 9
+        },
+        
+        // Reyon komutları
+        {
+            root_code: '4:0',
+            input_patterns: 'meyve|sebze|meyve sebze',
+            output_text: 'Meyve ve sebze reyonu seçildi.',
+            next_root: '5:0',
+            action_name: 'select_category',
+            priority: 10
+        },
+        {
+            root_code: '4:0',
+            input_patterns: 'süt|peynir|yoğurt|süt ürün',
+            output_text: 'Süt ürünleri reyonu seçildi.',
+            next_root: '5:0',
+            action_name: 'select_category',
+            priority: 10
+        },
+        
+        // Ürün komutları
+        {
+            root_code: '5:0',
+            input_patterns: 'regex:(?<quantity>\d+)\s*(?<product>.*)',
+            output_text: '{quantity} adet {product} sepete ekleniyor...',
+            next_root: '5:0',
+            action_name: 'add_to_cart',
+            priority: 10
+        },
+        {
+            root_code: '5:0',
+            input_patterns: 'sepete git|sepetim|sepet',
+            output_text: 'Sepetiniz açılıyor...',
+            next_root: '6:0',
+            action_name: 'manage_cart',
+            priority: 9
+        },
+        
+        // Sepet komutları
+        {
+            root_code: '6:0',
+            input_patterns: 'ödeme yap|öde|satın al',
+            output_text: 'Ödeme yöntemi seçiliyor...',
+            next_root: '7:0',
+            action_name: 'select_payment',
+            priority: 10
+        },
+        
+        // Ödeme komutları
+        {
+            root_code: '7:0',
+            input_patterns: 'nakit|para',
+            output_text: 'Nakit ödeme seçildi.',
+            next_root: '8:0',
+            action_name: 'select_payment',
+            priority: 10
+        },
+        {
+            root_code: '7:0',
+            input_patterns: 'kart|kredi|bank',
+            output_text: 'Kart ile ödeme seçildi.',
+            next_root: '8:0',
+            action_name: 'select_payment',
+            priority: 10
+        }
+    ];
+
+    // Varsayılan kuralları veritabanına kaydet
+    for (const rule of defaultRules) {
+        const { error } = await supabase
+            .from('voice_command_rules')
+            .insert([rule]);
+        
+        if (error) {
+            console.error('Varsayılan kural ekleme hatası:', error);
+        }
+    }
+
+    // Belleğe yükle
+    defaultRules.forEach(rule => {
+        if (!commandRules.has(rule.root_code)) {
+            commandRules.set(rule.root_code, []);
+        }
+        commandRules.get(rule.root_code).push(rule);
+    });
+}
+
+// =============================================
+// DİNAMİK SES KOMUT İŞLEME
+// =============================================
+
+async function processVoiceCommand(transcript) {
+    const message = transcript.toLowerCase().trim();
+    if (userMessage) userMessage.textContent = transcript;
+
+    debugLog(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot}`);
+
+    // 1. Askıda cevap varsa, onu işle
+    if (pendingResponse) {
+        return handlePendingDynamicResponse(message);
+    }
+
+    // 2. Mevcut kök için kuralları ara
+    const match = await findDynamicRuleMatch(message, currentRoot);
+    
+    if (match) {
+        await executeDynamicMatchedRule(match, message);
+    } else {
+        // 3. Eşleşme yoksa AI'ya yönlendir
+        await handleDynamicAIRequest(message, currentRoot);
+    }
+}
+
+// Dinamik kural eşleştirme
+async function findDynamicRuleMatch(message, root) {
+    const rules = commandRules.get(root) || [];
+    
+    for (const rule of rules) {
+        const patterns = rule.input_patterns.split('|');
+        for (const pattern of patterns) {
+            const matchResult = matchesDynamicPattern(message, pattern);
+            if (matchResult.matches) {
+                return { 
+                    rule, 
+                    pattern, 
+                    extractedData: matchResult.extractedData 
+                };
+            }
+        }
+    }
+    return null;
+}
+
+// Dinamik pattern eşleştirme
+function matchesDynamicPattern(message, pattern) {
+    const result = { matches: false, extractedData: {} };
+    
+    if (pattern.startsWith('regex:')) {
+        const regexPattern = pattern.replace('regex:', '');
+        const regex = new RegExp(regexPattern, 'i');
+        const match = message.match(regex);
+        
+        if (match) {
+            result.matches = true;
+            if (match.groups) {
+                result.extractedData = match.groups;
+            }
+        }
+    } else if (message.includes(pattern)) {
+        result.matches = true;
+        result.extractedData = { text: pattern };
+    }
+    
+    return result;
+}
+
+// Eşleşen kuralı çalıştır
+async function executeDynamicMatchedRule(match, message) {
+    const { rule, extractedData } = match;
+    
+    // Dinamik çıktı hazırla
+    let output = rule.output_text;
+    for (const [key, value] of Object.entries(extractedData)) {
+        output = output.replace(`{${key}}`, value);
+    }
+    
+    // Sesli cevap ver
+    speakToUser(output);
+    
+    // Dinamik aksiyonu çalıştır
+    if (rule.action_name) {
+        await executeDynamicAction(rule.action_name, { 
+            extractedData, 
+            message 
+        });
+    }
+    
+    // Kök geçişini yönet
+    if (rule.next_root) {
+        if (rule.next_root.includes('?')) {
+            pendingResponse = { nextRoot: rule.next_root, context: extractedData };
+        } else {
+            currentRoot = rule.next_root;
+        }
+    }
+}
+
+// =============================================
+// DİNAMİK AKSİYON FONKSİYONLARI
+// =============================================
+
+async function executeDynamicAction(actionName, data) {
+    console.log(`⚡ Dinamik Aksiyon: ${actionName}`, data);
+    
+    try {
+        switch(actionName) {
+            // KONUM AKSİYONLARI
+            case 'show_location_modal':
+                showDynamicLocationModal();
+                break;
+                
+            case 'select_location':
+                await handleDynamicLocationSelection(data);
+                break;
+                
+            // MAĞAZA TİPİ AKSİYONLARI
+            case 'select_store_type':
+                await handleDynamicStoreTypeSelection(data);
+                break;
+                
+            // SATICI AKSİYONLARI
+            case 'select_seller':
+                await handleDynamicSellerSelection(data);
+                break;
+                
+            // REYON AKSİYONLARI
+            case 'select_category':
+                await handleDynamicCategorySelection(data);
+                break;
+                
+            // ÜRÜN AKSİYONLARI
+            case 'add_to_cart':
+                await handleDynamicAddToCart(data);
+                break;
+                
+            // SEPET AKSİYONLARI
+            case 'manage_cart':
+                await handleDynamicCartManagement(data);
+                break;
+                
+            // ÖDEME AKSİYONLARI
+            case 'select_payment':
+                await handleDynamicPaymentSelection(data);
+                break;
+                
+            // SİSTEM AKSİYONLARI
+            case 'navigate_back':
+                await handleDynamicNavigation(data);
+                break;
+                
+            case 'show_help':
+                await handleDynamicHelp(data);
+                break;
+                
+            default:
+                await handleUnknownDynamicAction(actionName, data);
+        }
+    } catch (error) {
+        console.error(`Dinamik aksiyon hatası (${actionName}):`, error);
+        speakToUser("Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.");
+    }
+}
+
+// =============================================
+// DİNAMİK KONUM SİSTEMİ
+// =============================================
+
+function showDynamicLocationModal() {
+    const modal = document.getElementById('locationModal');
+    if (!modal) return;
+
+    document.body.classList.add('modal-open');
+    modal.style.display = 'flex';
+    modal.style.zIndex = '10000';
+    
+    updateDynamicLocationModal();
+    setupDynamicModalCloseEvents();
+    
+    debugLog('📍 Dinamik konum modalı gösterildi');
+    speakToUser("Lütfen konumunuzu seçin: restoran içi, paket servis veya adrese teslim.");
+}
+
+function updateDynamicLocationModal() {
+    const locationModal = document.getElementById('locationModal');
+    if (!locationModal) return;
+    
+    locationModal.querySelector('.modal-body').innerHTML = `
+        <div class="modal-header">
+            <h3>Konum Seçiniz</h3>
+            <span class="close-modal" id="closeLocationModal">&times;</span>
+        </div>
+        <p>Siparişiniz için lütfen konumunuzu belirleyin:</p>
+        
+        <div class="location-options">
+            <div class="location-option" data-location="inside">
+                <div class="location-icon">
+                    <i class="fas fa-utensils"></i>
+                </div>
+                <div class="location-details">
+                    <h4>Restoran içinde</h4>
+                    <p>Yemeğinizi restoranda yiyin</p>
+                </div>
+            </div>
+            
+            <div class="location-option" data-location="takeaway">
+                <div class="location-icon">
+                    <i class="fas fa-shopping-bag"></i>
+                </div>
+                <div class="location-details">
+                    <h4>Paket servis</h4>
+                    <p>Yemeğinizi kendiniz alın</p>
+                </div>
+            </div>
+            
+            <div class="location-option" data-location="delivery">
+                <div class="location-icon">
+                    <i class="fas fa-motorcycle"></i>
+                </div>
+                <div class="location-details">
+                    <h4>Adrese teslim</h4>
+                    <p>Yemeğiniz adresinize gelsin</p>
+                </div>
+            </div>
+        </div>
+
+        <button id="detectLocationBtn" class="location-detect-btn">
+            <i class="fas fa-location-arrow"></i>
+            Konumumu Otomatik Belirle
+        </button>
+        
+        <div id="locationResult" class="location-result" style="display: none;"></div>
+    `;
+    
+    setupDynamicLocationOptionEvents();
+}
+
+async function handleDynamicLocationSelection(data) {
+    const locationType = data.extractedData?.location;
+    
+    if (!locationType) {
+        speakToUser("Konum tipi belirtilmedi. Lütfen restoran içi, paket servis veya adrese teslim seçin.");
+        return;
+    }
+    
+    // Adrese teslim için konum tespiti gerekli
+    if (locationType === 'delivery' && !isLocationDetected) {
+        const success = await detectUserLocation();
+        if (!success) {
+            speakToUser("Adrese teslim için konumunuzu tespit edemiyorum. Lütfen manuel olarak konumunuzu belirleyin.");
+            return;
+        }
+    }
+    
+    selectDynamicLocation(locationType);
+}
+
+function selectDynamicLocation(locationType) {
+    selectedLocation = locationType;
+    localStorage.setItem('selectedLocation', locationType);
+    
+    if (userLocation) {
+        localStorage.setItem('userLocation', JSON.stringify(userLocation));
+    }
+    
+    updateDynamicLocationText();
+    hideDynamicLocationModal();
+    currentRoot = "2:0";
+    
+    // Konum seçildiğinde tüm satıcıları yükle
+    loadAllSellersByLocation();
+    
+    const locationNames = {
+        'inside': 'Restoran içinde',
+        'takeaway': 'Paket servis',
+        'delivery': 'Adrese teslim'
+    };
+    
+    let locationMessage = `${locationNames[locationType]} seçildi.`;
+    if (locationType === 'delivery' && userLocation.city) {
+        locationMessage += ` Konumunuz: ${userLocation.district}, ${userLocation.city}.`;
+    }
+    
+    locationMessage += " Hangi mağaza tipinden alışveriş yapmak istersiniz?";
+    
+    speakToUser(locationMessage);
+}
+
+// =============================================
+// DİNAMİK MAĞAZA TİPİ SİSTEMİ
+// =============================================
+
+async function handleDynamicStoreTypeSelection(data) {
+    const storeTypeName = data.extractedData?.storeType || await extractStoreTypeFromMessage(data.message);
+    
+    if (!storeTypeName) {
+        const availableStoreTypes = await getAvailableStoreTypes();
+        speakToUser(`Hangi mağaza tipini seçmek istiyorsunuz? ${availableStoreTypes}`);
+        return;
+    }
+    
+    const storeType = await findStoreTypeByName(storeTypeName);
+    if (storeType) {
+        await onStoreTypeSelected(storeType.id, storeType.name);
+    } else {
+        const availableStoreTypes = await getAvailableStoreTypes();
+        speakToUser(`"${storeTypeName}" bulunamadı. Mevcut mağaza tipleri: ${availableStoreTypes}`);
+    }
+}
+
+async function onStoreTypeSelected(storeTypeId, storeTypeName) {
+    debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
+   
+    selectedStoreTypeId = storeTypeId;
+    selectedStoreTypeName = storeTypeName;
+    currentRoot = "3:0";
+    
+    filterSellersByStoreType(storeTypeId);
+    
+    selectedCategoryId = null;
+    products = [];
+    resetProductAndCategoryUI();
+    
+    speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu. Lütfen bir satıcı seçin.`);
+}
+
+// =============================================
+// DİNAMİK SATICI SİSTEMİ
+// =============================================
+
+async function handleDynamicSellerSelection(data) {
+    if (!selectedStoreTypeId) {
+        speakToUser("Önce bir mağaza tipi seçmelisiniz.");
+        return;
+    }
+    
+    const seller = await findDynamicSeller(data.extractedData, data.message);
+    if (seller) {
+        await selectDynamicSeller(seller);
+        currentRoot = "4:0";
+    } else {
+        speakToUser("Satıcı bulunamadı. Lütfen numarasını veya ismini söyleyin.");
+    }
+}
+
+async function selectDynamicSeller(seller) {
+    debugLog(`🎯 Satıcı seçiliyor: ${seller.business_name}`);
+    
+    // Teslimat kontrolü
+    if (selectedLocation === 'delivery' && seller.delivery_available === false) {
+        speakToUser("Bu satıcı konumunuza teslimat yapmıyor. Lütfen başka bir satıcı seçin.");
+        return;
+    }
+    
+    // Önceki seçimleri temizle
+    document.querySelectorAll('.seller-card, .category-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    const sellerCard = document.querySelector(`[data-seller-id="${seller.id}"]`);
+    if (sellerCard) {
+        sellerCard.classList.add('selected');
+    }
+    
+    selectedSellerId = seller.id;
+    selectedCategoryId = null;
+    products = [];
+    
+    // UI temizleme
+    if (categoriesGrid) {
+        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
+    }
+    if (productsGrid) {
+        productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
+    }
+    
+    // Satıcı bilgisini güncelle
+    if (selectedSellerInfo) {
+        selectedSellerInfo.innerHTML = `
+            <i class="fas fa-store"></i> ${seller.business_name} 
+            <small style="color: var(--gray);">- ${seller.city || ''}</small>
+        `;
+    }
+    
+    // Reyonaları yükle
+    await loadReyonsBySeller(seller.id);
+    
+    // Bölüm görünürlüğünü ayarla
+    if (categoriesSection) categoriesSection.style.display = 'block';
+    if (productsSection) productsSection.style.display = 'none';
+    
+    debugLog(`✅ Satıcı seçildi: ${seller.business_name}`);
+    
+    // Teslimat durumuna göre mesaj
+    let deliveryMsg = "";
+    if (selectedLocation === 'delivery' && seller.delivery_available !== false) {
+        deliveryMsg = seller.delivery_fee > 0 ? 
+            ` Teslimat ücreti: ${money(seller.delivery_fee)}.` : 
+            " Ücretsiz teslimat.";
+    }
+    
+    speakToUser(`${seller.business_name} seçildi.${deliveryMsg} Şimdi bir reyon seçin.`);
+}
+
+// =============================================
+// DİNAMİK REYON SİSTEMİ
+// =============================================
+
+async function handleDynamicCategorySelection(data) {
+    if (!selectedSellerId) {
+        speakToUser("Önce bir satıcı seçmelisiniz.");
+        return;
+    }
+    
+    const category = await findDynamicCategory(data.extractedData, data.message);
+    if (category) {
+        await selectDynamicCategory(category);
+        currentRoot = "5:0";
+    } else {
+        const availableCategories = await getAvailableCategories();
+        speakToUser(`Reyon bulunamadı. Mevcut reyonlar: ${availableCategories}`);
+    }
+}
+
+async function selectDynamicCategory(category) {
+    const categoryCard = document.querySelector(`[data-category-id="${category.id}"]`);
+    if (categoryCard) {
+        document.querySelectorAll('.category-card').forEach(c => {
+            c.classList.remove('selected');
+        });
+        
+        categoryCard.classList.add('selected');
+        selectedCategoryId = category.id;
+        
+        await loadProductsByReyon(category.id);
+        
+        debugLog(`🛒 Reyon seçildi: ${category.name}`);
+        speakToUser(`${category.name} reyonu seçildi. Ürünler listeleniyor. Sesli olarak ürün siparişi verebilirsiniz.`);
+    }
+}
+
+// =============================================
+// DİNAMİK ÜRÜN SİSTEMİ
+// =============================================
+
+async function handleDynamicAddToCart(data) {
+    if (!selectedSellerId) {
+        speakToUser("Önce bir satıcı seçmelisiniz.");
+        return;
+    }
+    
+    if (products.length === 0) {
+        speakToUser("Henüz ürün yüklenmedi. Lütfen bir reyon seçin.");
+        return;
+    }
+    
+    const productInfo = extractDynamicProductInfo(data.extractedData, data.message);
+    if (!productInfo) {
+        speakToUser("Ürün ismini anlayamadım. Lütfen 'iki ekmek' veya 'süt ekle' gibi söyleyin.");
+        return;
+    }
+    
+    const { productName, quantity } = productInfo;
+    const product = findProductByName(productName);
+    
+    if (product) {
+        addToCart(product, quantity);
+        speakToUser(`${quantity} ${product.unit_type || 'adet'} ${product.name} sepete eklendi.`);
+        
+        // AI öğrenmesi için kaydet
+        await saveSuccessfulProductMatch(data.message, product.name);
+    } else {
+        handleDynamicProductNotFound(data.message, productName);
+    }
+}
+
+// =============================================
+// DİNAMİK YARDIMCI FONKSİYONLAR
+// =============================================
+
+// Dinamik satıcı bulma
+async  (extractedData, message) {
+    // Index ile arama
+    if (extractedData?.sellerIndex) {
+        const index = parseInt(extractedData.sellerIndex) - 1;
+        if (index >= 0 && index < sellers.length) {
+            return sellers[index];
+        }
+    }
+    
+    // İsim ile arama
+    if (extractedData?.sellerName) {
+        return sellers.find(s => 
+            s.business_name.toLowerCase().includes(extractedData.sellerName.toLowerCase())
+        );
+    }
+    
+    // Mesajdan çıkarım
+    const sellerName = await extractSellerFromMessage(message);
+    if (sellerName) {
+        return sellers.find(s => 
+            s.business_name.toLowerCase().includes(sellerName.toLowerCase())
+        );
+    }
+    
+    return null;
+}
+
+// Dinamik reyon bulma
+async function findDynamicCategory(extractedData, message) {
+    // Index ile arama
+    if (extractedData?.categoryIndex) {
+        const index = parseInt(extractedData.categoryIndex) - 1;
+        if (index >= 0 && index < categories.length) {
+            return categories[index];
+        }
+    }
+    
+    // İsim ile arama
+    if (extractedData?.categoryName) {
+        return categories.find(c => 
+            c.name.toLowerCase().includes(extractedData.categoryName.toLowerCase())
+        );
+    }
+    
+    return null;
+}
+
+// Dinamik ürün bilgisi çıkarımı
+function extractDynamicProductInfo(extractedData, message) {
+    // Öncelikle extractedData'dan al
+    if (extractedData?.product && extractedData?.quantity) {
+        return {
+            productName: extractedData.product,
+            quantity: parseInt(extractedData.quantity)
+        };
+    }
+    
+    // Fallback: mesajdan çıkar
+    return extractProductInfoFromCommand(message);
+}
+
+// =============================================
+// DİNAMİK EVENT HANDLER'LAR
+// =============================================
+
+function setupDynamicEventHandlers() {
+    // Mikrofon
+    if (microphoneToggle) {
+        microphoneToggle.addEventListener('click', handleDynamicMicrophoneToggle);
+    }
+    
+    // Konum
+    setupDynamicLocationEvents();
+    
+    // Sepet
+    if (orderSummary) {
+        orderSummary.addEventListener('click', toggleDynamicCart);
+    }
+    if (cartClose) {
+        cartClose.addEventListener('click', closeDynamicCart);
+    }
+    
+    // Ödeme butonları
+    if (payCashBtn) payCashBtn.addEventListener('click', () => finalizeDynamicOrder('nakit'));
+    if (payCardBtn) payCardBtn.addEventListener('click', () => finalizeDynamicOrder('kart'));
+    if (payBonusBtn) payBonusBtn.addEventListener('click', () => finalizeDynamicOrder('bonus'));
+}
+
+function handleDynamicMicrophoneToggle() {
+    if (!selectedLocation) {
+        showDynamicLocationModal();
+        speakToUser("Lütfen önce bir konum seçiniz.");
+        return;
+    }
+    
+    if (isListening) {
+        disableDynamicMicrophone();
+    } else {
+        enableDynamicMicrophone();
+    }
+}
+
+// =============================================
+// DİNAMİK FALLBACK ve AI SİSTEMİ
+// =============================================
+
+async function handleUnknownDynamicAction(actionName, data) {
+    const aiResponse = await queryDynamicAI(data.message, currentRoot);
+    
+    if (aiResponse.confidence > 0.7) {
+        speakToUser(aiResponse.message);
+        if (aiResponse.suggestedAction) {
+            await executeDynamicAction(aiResponse.suggestedAction, data);
+        }
+    } else {
+        const contextualHelp = await getDynamicContextualHelp(currentRoot);
+        speakToUser(contextualHelp);
+    }
+}
+
+async function getDynamicContextualHelp(rootCode) {
+    const { data } = await supabase
+        .from('voice_context_help')
+        .select('help_message')
+        .eq('root_code', rootCode)
+        .eq('is_active', true)
+        .single();
+        
+    return data?.help_message || "Nasıl yardımcı olabilirim? Sesli olarak sipariş verebilir veya 'yardım' diyebilirsiniz.";
+}
+
+// =============================================
+// BAŞLANGIÇ FONKSİYONLARI
+// =============================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM yüklendi, dinamik uygulama başlatılıyor...');
+    initApp();
+});
+
+// Dinamik acil durum modu
+function dynamicEmergencyFallback() {
+    debugLog('🆘 Dinamik acil durum modu aktif');
+    setupDynamicLocationEvents();
+    
+    if (!selectedLocation) {
+        setTimeout(() => {
+            showDynamicLocationModal();
+        }, 2000);
+    }
+}
+</script>	
+</body>
+
+</html>
