@@ -2322,45 +2322,47 @@
         // Initialize Supabase client
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Global state - Dinamik
-let currentCustomer = null;
-let sellers = [];
-let products = [];
-let categories = [];
-let storeTypes = [];
-let cart = [];
-let recognition = null;
-let isListening = false;
-let isMicrophoneEnabled = false;
-let conversationStep = 0;
-let currentPaymentMethod = null;
-let selectedSellerId = null;
-let selectedSellerType = null;
-let selectedStoreTypeId = null;
-let selectedStoreTypeName = null;
-let selectedCategoryId = null;
-let isSellerLocked = false;
-let selectedLocation = null;
-let referralCode = null;
-let referralGroupCode = null;
-let allSellersInLocation = [];
-let filteredSellers = [];
-let pendingCart = [];
-let isGuestMode = false;
-let pendingOrder = null;
-let currentRoot = "0:0";
-let pendingResponse = null;
-let commandRules = new Map();
+        // Global state
+        let currentCustomer = null;
+        let sellers = [];
+        let products = [];
+        let categories = [];
+        let storeTypes = [];
+        let cart = [];
+        let recognition = null;
+        let isListening = false;
+        let isMicrophoneEnabled = false;
+        let conversationStep = 0;
+        let currentPaymentMethod = null;
+        let selectedSellerId = null;
+        let selectedSellerType = null;
+        let selectedCategoryId = null;
+        let isSellerLocked = false;
+        let selectedLocation = null;
+        let referralCode = null;
+        let referralGroupCode = null;
+	let selectedStoreTypeId = null;
+	let selectedStoreTypeName = null;
+	let allSellersInLocation = []; // Konumdaki tüm satıcılar (store type filtresi olmadan)
+	let filteredSellers = []; // Store type'a göre filtrelenmiş satıcılar
+	let pendingCart = []; // Oturum açılana kadar bekleyen sepet
+	let isGuestMode = false; // Misafir modu
+	let pendingOrder = null; // Bekleyen sipariş
+	let currentRoot = "0:0"; // Mevcut kök durumu
+	let pendingResponse = null; // Askıda cevap
+	let commandRules = new Map(); // Komut kuralları
+	
+	// Global state'e ekle
+	let userLocation = {
+   	 latitude: null,
+   	 longitude: null,
+  	  address: null,
+ 	   city: null,
+   	 district: null
+	};
+	
+	let isLocationDetected = false;
 
-// Konum state
-let userLocation = {
-    latitude: null,
-    longitude: null,
-    address: null,
-    city: null,
-    district: null
-};
-let isLocationDetected = false;
 
 
         // DOM Elements
@@ -2511,849 +2513,6 @@ async function initApp() {
         });
 
 	document.addEventListener('DOMContentLoaded', initApp);
-
-
-
-
-
-
-
-
-
-
-// =============================================
-// TAMAMEN DİNAMİK SESLİ SİPARİŞ SİSTEMİ
-// =============================================
-
-// =============================================
-// ANA UYGULAMA BAŞLATMA - DİNAMİK
-// =============================================
-
-
-
-// Tüm dinamik verileri yükle
-async function loadAllDynamicData() {
-    await loadCommandRules();
-    await loadStoreTypes();
-    await loadLanguageOptions();
-    debugLog('✅ Tüm dinamik veriler yüklendi');
-}
-
-// =============================================
-// DİNAMİK KOMUT SİSTEMİ - VERİTABANI ODAKLI
-// =============================================
-
-async function loadCommandRules() {
-    try {
-        const { data, error } = await supabase
-            .from('voice_command_rules')
-            .select('*')
-            .eq('is_active', true)
-            .order('priority', { ascending: false });
-
-        if (error) throw error;
-
-        commandRules.clear();
-        data.forEach(rule => {
-            if (!commandRules.has(rule.root_code)) {
-                commandRules.set(rule.root_code, []);
-            }
-            commandRules.get(rule.root_code).push(rule);
-        });
-
-        debugLog(`✅ ${data.length} komut kuralı yüklendi`);
-    } catch (error) {
-        console.error('Komut kuralları yükleme hatası:', error);
-        await createDefaultCommandRules();
-    }
-}
-
-// Varsayılan komut kurallarını oluştur
-async function createDefaultCommandRules() {
-    const defaultRules = [
-        // Başlangıç komutları
-        {
-            root_code: '0:0',
-            input_patterns: 'merhaba|selam|başla|hello|start',
-            output_text: 'Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen konumunuzu seçin.',
-            next_root: '1:0',
-            action_name: 'show_location_modal',
-            priority: 10
-        },
-        
-        // Konum komutları
-        {
-            root_code: '1:0',
-            input_patterns: 'restoran içi|içerde|yerinde',
-            output_text: 'Restoran içi seçildi.',
-            next_root: '2:0',
-            action_name: 'select_location',
-            priority: 10
-        },
-        {
-            root_code: '1:0',
-            input_patterns: 'paket servis|paket|götür',
-            output_text: 'Paket servis seçildi.',
-            next_root: '2:0',
-            action_name: 'select_location',
-            priority: 10
-        },
-        {
-            root_code: '1:0',
-            input_patterns: 'adrese teslim|teslimat|evime',
-            output_text: 'Adrese teslim seçildi.',
-            next_root: '2:0',
-            action_name: 'select_location',
-            priority: 10
-        },
-        
-        // Mağaza tipi komutları
-        {
-            root_code: '2:0',
-            input_patterns: 'regex:(?<storeType>market|restoran|eczane|fırın|kafe)',
-            output_text: '{storeType} seçiliyor...',
-            next_root: '3:0',
-            action_name: 'select_store_type',
-            priority: 10
-        },
-        
-        // Satıcı komutları
-        {
-            root_code: '3:0',
-            input_patterns: 'regex:birinci|ilk|1',
-            output_text: 'Birinci satıcı seçiliyor...',
-            next_root: '4:0',
-            action_name: 'select_seller',
-            priority: 10
-        },
-        {
-            root_code: '3:0',
-            input_patterns: 'regex:ikinci|2',
-            output_text: 'İkinci satıcı seçiliyor...',
-            next_root: '4:0',
-            action_name: 'select_seller',
-            priority: 9
-        },
-        
-        // Reyon komutları
-        {
-            root_code: '4:0',
-            input_patterns: 'meyve|sebze|meyve sebze',
-            output_text: 'Meyve ve sebze reyonu seçildi.',
-            next_root: '5:0',
-            action_name: 'select_category',
-            priority: 10
-        },
-        {
-            root_code: '4:0',
-            input_patterns: 'süt|peynir|yoğurt|süt ürün',
-            output_text: 'Süt ürünleri reyonu seçildi.',
-            next_root: '5:0',
-            action_name: 'select_category',
-            priority: 10
-        },
-        
-        // Ürün komutları
-        {
-            root_code: '5:0',
-            input_patterns: 'regex:(?<quantity>\d+)\s*(?<product>.*)',
-            output_text: '{quantity} adet {product} sepete ekleniyor...',
-            next_root: '5:0',
-            action_name: 'add_to_cart',
-            priority: 10
-        },
-        {
-            root_code: '5:0',
-            input_patterns: 'sepete git|sepetim|sepet',
-            output_text: 'Sepetiniz açılıyor...',
-            next_root: '6:0',
-            action_name: 'manage_cart',
-            priority: 9
-        },
-        
-        // Sepet komutları
-        {
-            root_code: '6:0',
-            input_patterns: 'ödeme yap|öde|satın al',
-            output_text: 'Ödeme yöntemi seçiliyor...',
-            next_root: '7:0',
-            action_name: 'select_payment',
-            priority: 10
-        },
-        
-        // Ödeme komutları
-        {
-            root_code: '7:0',
-            input_patterns: 'nakit|para',
-            output_text: 'Nakit ödeme seçildi.',
-            next_root: '8:0',
-            action_name: 'select_payment',
-            priority: 10
-        },
-        {
-            root_code: '7:0',
-            input_patterns: 'kart|kredi|bank',
-            output_text: 'Kart ile ödeme seçildi.',
-            next_root: '8:0',
-            action_name: 'select_payment',
-            priority: 10
-        }
-    ];
-
-    // Varsayılan kuralları veritabanına kaydet
-    for (const rule of defaultRules) {
-        const { error } = await supabase
-            .from('voice_command_rules')
-            .insert([rule]);
-        
-        if (error) {
-            console.error('Varsayılan kural ekleme hatası:', error);
-        }
-    }
-
-    // Belleğe yükle
-    defaultRules.forEach(rule => {
-        if (!commandRules.has(rule.root_code)) {
-            commandRules.set(rule.root_code, []);
-        }
-        commandRules.get(rule.root_code).push(rule);
-    });
-}
-
-// =============================================
-// DİNAMİK SES KOMUT İŞLEME
-// =============================================
-
-async function processVoiceCommand(transcript) {
-    const message = transcript.toLowerCase().trim();
-    if (userMessage) userMessage.textContent = transcript;
-
-    debugLog(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot}`);
-
-    // 1. Askıda cevap varsa, onu işle
-    if (pendingResponse) {
-        return handlePendingDynamicResponse(message);
-    }
-
-    // 2. Mevcut kök için kuralları ara
-    const match = await findDynamicRuleMatch(message, currentRoot);
-    
-    if (match) {
-        await executeDynamicMatchedRule(match, message);
-    } else {
-        // 3. Eşleşme yoksa AI'ya yönlendir
-        await handleDynamicAIRequest(message, currentRoot);
-    }
-}
-
-// Dinamik kural eşleştirme
-async function findDynamicRuleMatch(message, root) {
-    const rules = commandRules.get(root) || [];
-    
-    for (const rule of rules) {
-        const patterns = rule.input_patterns.split('|');
-        for (const pattern of patterns) {
-            const matchResult = matchesDynamicPattern(message, pattern);
-            if (matchResult.matches) {
-                return { 
-                    rule, 
-                    pattern, 
-                    extractedData: matchResult.extractedData 
-                };
-            }
-        }
-    }
-    return null;
-}
-
-// Dinamik pattern eşleştirme
-function matchesDynamicPattern(message, pattern) {
-    const result = { matches: false, extractedData: {} };
-    
-    if (pattern.startsWith('regex:')) {
-        const regexPattern = pattern.replace('regex:', '');
-        const regex = new RegExp(regexPattern, 'i');
-        const match = message.match(regex);
-        
-        if (match) {
-            result.matches = true;
-            if (match.groups) {
-                result.extractedData = match.groups;
-            }
-        }
-    } else if (message.includes(pattern)) {
-        result.matches = true;
-        result.extractedData = { text: pattern };
-    }
-    
-    return result;
-}
-
-// Eşleşen kuralı çalıştır
-async function executeDynamicMatchedRule(match, message) {
-    const { rule, extractedData } = match;
-    
-    // Dinamik çıktı hazırla
-    let output = rule.output_text;
-    for (const [key, value] of Object.entries(extractedData)) {
-        output = output.replace(`{${key}}`, value);
-    }
-    
-    // Sesli cevap ver
-    speakToUser(output);
-    
-    // Dinamik aksiyonu çalıştır
-    if (rule.action_name) {
-        await executeDynamicAction(rule.action_name, { 
-            extractedData, 
-            message 
-        });
-    }
-    
-    // Kök geçişini yönet
-    if (rule.next_root) {
-        if (rule.next_root.includes('?')) {
-            pendingResponse = { nextRoot: rule.next_root, context: extractedData };
-        } else {
-            currentRoot = rule.next_root;
-        }
-    }
-}
-
-// =============================================
-// DİNAMİK AKSİYON FONKSİYONLARI
-// =============================================
-
-async function executeDynamicAction(actionName, data) {
-    console.log(`⚡ Dinamik Aksiyon: ${actionName}`, data);
-    
-    try {
-        switch(actionName) {
-            // KONUM AKSİYONLARI
-            case 'show_location_modal':
-                showDynamicLocationModal();
-                break;
-                
-            case 'select_location':
-                await handleDynamicLocationSelection(data);
-                break;
-                
-            // MAĞAZA TİPİ AKSİYONLARI
-            case 'select_store_type':
-                await handleDynamicStoreTypeSelection(data);
-                break;
-                
-            // SATICI AKSİYONLARI
-            case 'select_seller':
-                await handleDynamicSellerSelection(data);
-                break;
-                
-            // REYON AKSİYONLARI
-            case 'select_category':
-                await handleDynamicCategorySelection(data);
-                break;
-                
-            // ÜRÜN AKSİYONLARI
-            case 'add_to_cart':
-                await handleDynamicAddToCart(data);
-                break;
-                
-            // SEPET AKSİYONLARI
-            case 'manage_cart':
-                await handleDynamicCartManagement(data);
-                break;
-                
-            // ÖDEME AKSİYONLARI
-            case 'select_payment':
-                await handleDynamicPaymentSelection(data);
-                break;
-                
-            // SİSTEM AKSİYONLARI
-            case 'navigate_back':
-                await handleDynamicNavigation(data);
-                break;
-                
-            case 'show_help':
-                await handleDynamicHelp(data);
-                break;
-                
-            default:
-                await handleUnknownDynamicAction(actionName, data);
-        }
-    } catch (error) {
-        console.error(`Dinamik aksiyon hatası (${actionName}):`, error);
-        speakToUser("Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.");
-    }
-}
-
-// =============================================
-// DİNAMİK KONUM SİSTEMİ
-// =============================================
-
-function showDynamicLocationModal() {
-    const modal = document.getElementById('locationModal');
-    if (!modal) return;
-
-    document.body.classList.add('modal-open');
-    modal.style.display = 'flex';
-    modal.style.zIndex = '10000';
-    
-    updateDynamicLocationModal();
-    setupDynamicModalCloseEvents();
-    
-    debugLog('📍 Dinamik konum modalı gösterildi');
-    speakToUser("Lütfen konumunuzu seçin: restoran içi, paket servis veya adrese teslim.");
-}
-
-function updateDynamicLocationModal() {
-    const locationModal = document.getElementById('locationModal');
-    if (!locationModal) return;
-    
-    locationModal.querySelector('.modal-body').innerHTML = `
-        <div class="modal-header">
-            <h3>Konum Seçiniz</h3>
-            <span class="close-modal" id="closeLocationModal">&times;</span>
-        </div>
-        <p>Siparişiniz için lütfen konumunuzu belirleyin:</p>
-        
-        <div class="location-options">
-            <div class="location-option" data-location="inside">
-                <div class="location-icon">
-                    <i class="fas fa-utensils"></i>
-                </div>
-                <div class="location-details">
-                    <h4>Restoran içinde</h4>
-                    <p>Yemeğinizi restoranda yiyin</p>
-                </div>
-            </div>
-            
-            <div class="location-option" data-location="takeaway">
-                <div class="location-icon">
-                    <i class="fas fa-shopping-bag"></i>
-                </div>
-                <div class="location-details">
-                    <h4>Paket servis</h4>
-                    <p>Yemeğinizi kendiniz alın</p>
-                </div>
-            </div>
-            
-            <div class="location-option" data-location="delivery">
-                <div class="location-icon">
-                    <i class="fas fa-motorcycle"></i>
-                </div>
-                <div class="location-details">
-                    <h4>Adrese teslim</h4>
-                    <p>Yemeğiniz adresinize gelsin</p>
-                </div>
-            </div>
-        </div>
-
-        <button id="detectLocationBtn" class="location-detect-btn">
-            <i class="fas fa-location-arrow"></i>
-            Konumumu Otomatik Belirle
-        </button>
-        
-        <div id="locationResult" class="location-result" style="display: none;"></div>
-    `;
-    
-    setupDynamicLocationOptionEvents();
-}
-
-async function handleDynamicLocationSelection(data) {
-    const locationType = data.extractedData?.location;
-    
-    if (!locationType) {
-        speakToUser("Konum tipi belirtilmedi. Lütfen restoran içi, paket servis veya adrese teslim seçin.");
-        return;
-    }
-    
-    // Adrese teslim için konum tespiti gerekli
-    if (locationType === 'delivery' && !isLocationDetected) {
-        const success = await detectUserLocation();
-        if (!success) {
-            speakToUser("Adrese teslim için konumunuzu tespit edemiyorum. Lütfen manuel olarak konumunuzu belirleyin.");
-            return;
-        }
-    }
-    
-    selectDynamicLocation(locationType);
-}
-
-function selectDynamicLocation(locationType) {
-    selectedLocation = locationType;
-    localStorage.setItem('selectedLocation', locationType);
-    
-    if (userLocation) {
-        localStorage.setItem('userLocation', JSON.stringify(userLocation));
-    }
-    
-    updateDynamicLocationText();
-    hideDynamicLocationModal();
-    currentRoot = "2:0";
-    
-    // Konum seçildiğinde tüm satıcıları yükle
-    loadAllSellersByLocation();
-    
-    const locationNames = {
-        'inside': 'Restoran içinde',
-        'takeaway': 'Paket servis',
-        'delivery': 'Adrese teslim'
-    };
-    
-    let locationMessage = `${locationNames[locationType]} seçildi.`;
-    if (locationType === 'delivery' && userLocation.city) {
-        locationMessage += ` Konumunuz: ${userLocation.district}, ${userLocation.city}.`;
-    }
-    
-    locationMessage += " Hangi mağaza tipinden alışveriş yapmak istersiniz?";
-    
-    speakToUser(locationMessage);
-}
-
-// =============================================
-// DİNAMİK MAĞAZA TİPİ SİSTEMİ
-// =============================================
-
-async function handleDynamicStoreTypeSelection(data) {
-    const storeTypeName = data.extractedData?.storeType || await extractStoreTypeFromMessage(data.message);
-    
-    if (!storeTypeName) {
-        const availableStoreTypes = await getAvailableStoreTypes();
-        speakToUser(`Hangi mağaza tipini seçmek istiyorsunuz? ${availableStoreTypes}`);
-        return;
-    }
-    
-    const storeType = await findStoreTypeByName(storeTypeName);
-    if (storeType) {
-        await onStoreTypeSelected(storeType.id, storeType.name);
-    } else {
-        const availableStoreTypes = await getAvailableStoreTypes();
-        speakToUser(`"${storeTypeName}" bulunamadı. Mevcut mağaza tipleri: ${availableStoreTypes}`);
-    }
-}
-
-async function onStoreTypeSelected(storeTypeId, storeTypeName) {
-    debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
-   
-    selectedStoreTypeId = storeTypeId;
-    selectedStoreTypeName = storeTypeName;
-    currentRoot = "3:0";
-    
-    filterSellersByStoreType(storeTypeId);
-    
-    selectedCategoryId = null;
-    products = [];
-    resetProductAndCategoryUI();
-    
-    speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu. Lütfen bir satıcı seçin.`);
-}
-
-// =============================================
-// DİNAMİK SATICI SİSTEMİ
-// =============================================
-
-async function handleDynamicSellerSelection(data) {
-    if (!selectedStoreTypeId) {
-        speakToUser("Önce bir mağaza tipi seçmelisiniz.");
-        return;
-    }
-    
-    const seller = await findDynamicSeller(data.extractedData, data.message);
-    if (seller) {
-        await selectDynamicSeller(seller);
-        currentRoot = "4:0";
-    } else {
-        speakToUser("Satıcı bulunamadı. Lütfen numarasını veya ismini söyleyin.");
-    }
-}
-
-async function selectDynamicSeller(seller) {
-    debugLog(`🎯 Satıcı seçiliyor: ${seller.business_name}`);
-    
-    // Teslimat kontrolü
-    if (selectedLocation === 'delivery' && seller.delivery_available === false) {
-        speakToUser("Bu satıcı konumunuza teslimat yapmıyor. Lütfen başka bir satıcı seçin.");
-        return;
-    }
-    
-    // Önceki seçimleri temizle
-    document.querySelectorAll('.seller-card, .category-card').forEach(card => {
-        card.classList.remove('selected');
-    });
-    
-    const sellerCard = document.querySelector(`[data-seller-id="${seller.id}"]`);
-    if (sellerCard) {
-        sellerCard.classList.add('selected');
-    }
-    
-    selectedSellerId = seller.id;
-    selectedCategoryId = null;
-    products = [];
-    
-    // UI temizleme
-    if (categoriesGrid) {
-        categoriesGrid.innerHTML = '<div class="text-center">Yükleniyor...</div>';
-    }
-    if (productsGrid) {
-        productsGrid.innerHTML = '<div class="text-center">Bir reyon seçin</div>';
-    }
-    
-    // Satıcı bilgisini güncelle
-    if (selectedSellerInfo) {
-        selectedSellerInfo.innerHTML = `
-            <i class="fas fa-store"></i> ${seller.business_name} 
-            <small style="color: var(--gray);">- ${seller.city || ''}</small>
-        `;
-    }
-    
-    // Reyonaları yükle
-    await loadReyonsBySeller(seller.id);
-    
-    // Bölüm görünürlüğünü ayarla
-    if (categoriesSection) categoriesSection.style.display = 'block';
-    if (productsSection) productsSection.style.display = 'none';
-    
-    debugLog(`✅ Satıcı seçildi: ${seller.business_name}`);
-    
-    // Teslimat durumuna göre mesaj
-    let deliveryMsg = "";
-    if (selectedLocation === 'delivery' && seller.delivery_available !== false) {
-        deliveryMsg = seller.delivery_fee > 0 ? 
-            ` Teslimat ücreti: ${money(seller.delivery_fee)}.` : 
-            " Ücretsiz teslimat.";
-    }
-    
-    speakToUser(`${seller.business_name} seçildi.${deliveryMsg} Şimdi bir reyon seçin.`);
-}
-
-// =============================================
-// DİNAMİK REYON SİSTEMİ
-// =============================================
-
-async function handleDynamicCategorySelection(data) {
-    if (!selectedSellerId) {
-        speakToUser("Önce bir satıcı seçmelisiniz.");
-        return;
-    }
-    
-    const category = await findDynamicCategory(data.extractedData, data.message);
-    if (category) {
-        await selectDynamicCategory(category);
-        currentRoot = "5:0";
-    } else {
-        const availableCategories = await getAvailableCategories();
-        speakToUser(`Reyon bulunamadı. Mevcut reyonlar: ${availableCategories}`);
-    }
-}
-
-async function selectDynamicCategory(category) {
-    const categoryCard = document.querySelector(`[data-category-id="${category.id}"]`);
-    if (categoryCard) {
-        document.querySelectorAll('.category-card').forEach(c => {
-            c.classList.remove('selected');
-        });
-        
-        categoryCard.classList.add('selected');
-        selectedCategoryId = category.id;
-        
-        await loadProductsByReyon(category.id);
-        
-        debugLog(`🛒 Reyon seçildi: ${category.name}`);
-        speakToUser(`${category.name} reyonu seçildi. Ürünler listeleniyor. Sesli olarak ürün siparişi verebilirsiniz.`);
-    }
-}
-
-// =============================================
-// DİNAMİK ÜRÜN SİSTEMİ
-// =============================================
-
-async function handleDynamicAddToCart(data) {
-    if (!selectedSellerId) {
-        speakToUser("Önce bir satıcı seçmelisiniz.");
-        return;
-    }
-    
-    if (products.length === 0) {
-        speakToUser("Henüz ürün yüklenmedi. Lütfen bir reyon seçin.");
-        return;
-    }
-    
-    const productInfo = extractDynamicProductInfo(data.extractedData, data.message);
-    if (!productInfo) {
-        speakToUser("Ürün ismini anlayamadım. Lütfen 'iki ekmek' veya 'süt ekle' gibi söyleyin.");
-        return;
-    }
-    
-    const { productName, quantity } = productInfo;
-    const product = findProductByName(productName);
-    
-    if (product) {
-        addToCart(product, quantity);
-        speakToUser(`${quantity} ${product.unit_type || 'adet'} ${product.name} sepete eklendi.`);
-        
-        // AI öğrenmesi için kaydet
-        await saveSuccessfulProductMatch(data.message, product.name);
-    } else {
-        handleDynamicProductNotFound(data.message, productName);
-    }
-}
-
-// =============================================
-// DİNAMİK YARDIMCI FONKSİYONLAR
-// =============================================
-
-// Dinamik satıcı bulma
-async function findDynamicSeller(extractedData, message) {
-    // Index ile arama
-    if (extractedData?.sellerIndex) {
-        const index = parseInt(extractedData.sellerIndex) - 1;
-        if (index >= 0 && index < sellers.length) {
-            return sellers[index];
-        }
-    }
-    
-    // İsim ile arama
-    if (extractedData?.sellerName) {
-        return sellers.find(s => 
-            s.business_name.toLowerCase().includes(extractedData.sellerName.toLowerCase())
-        );
-    }
-    
-    // Mesajdan çıkarım
-    const sellerName = await extractSellerFromMessage(message);
-    if (sellerName) {
-        return sellers.find(s => 
-            s.business_name.toLowerCase().includes(sellerName.toLowerCase())
-        );
-    }
-    
-    return null;
-}
-
-// Dinamik reyon bulma
-async function findDynamicCategory(extractedData, message) {
-    // Index ile arama
-    if (extractedData?.categoryIndex) {
-        const index = parseInt(extractedData.categoryIndex) - 1;
-        if (index >= 0 && index < categories.length) {
-            return categories[index];
-        }
-    }
-    
-    // İsim ile arama
-    if (extractedData?.categoryName) {
-        return categories.find(c => 
-            c.name.toLowerCase().includes(extractedData.categoryName.toLowerCase())
-        );
-    }
-    
-    return null;
-}
-
-// Dinamik ürün bilgisi çıkarımı
-function extractDynamicProductInfo(extractedData, message) {
-    // Öncelikle extractedData'dan al
-    if (extractedData?.product && extractedData?.quantity) {
-        return {
-            productName: extractedData.product,
-            quantity: parseInt(extractedData.quantity)
-        };
-    }
-    
-    // Fallback: mesajdan çıkar
-    return extractProductInfoFromCommand(message);
-}
-
-// =============================================
-// DİNAMİK EVENT HANDLER'LAR
-// =============================================
-
-function setupDynamicEventHandlers() {
-    // Mikrofon
-    if (microphoneToggle) {
-        microphoneToggle.addEventListener('click', handleDynamicMicrophoneToggle);
-    }
-    
-    // Konum
-    setupDynamicLocationEvents();
-    
-    // Sepet
-    if (orderSummary) {
-        orderSummary.addEventListener('click', toggleDynamicCart);
-    }
-    if (cartClose) {
-        cartClose.addEventListener('click', closeDynamicCart);
-    }
-    
-    // Ödeme butonları
-    if (payCashBtn) payCashBtn.addEventListener('click', () => finalizeDynamicOrder('nakit'));
-    if (payCardBtn) payCardBtn.addEventListener('click', () => finalizeDynamicOrder('kart'));
-    if (payBonusBtn) payBonusBtn.addEventListener('click', () => finalizeDynamicOrder('bonus'));
-}
-
-function handleDynamicMicrophoneToggle() {
-    if (!selectedLocation) {
-        showDynamicLocationModal();
-        speakToUser("Lütfen önce bir konum seçiniz.");
-        return;
-    }
-    
-    if (isListening) {
-        disableDynamicMicrophone();
-    } else {
-        enableDynamicMicrophone();
-    }
-}
-
-// =============================================
-// DİNAMİK FALLBACK ve AI SİSTEMİ
-// =============================================
-
-async function handleUnknownDynamicAction(actionName, data) {
-    const aiResponse = await queryDynamicAI(data.message, currentRoot);
-    
-    if (aiResponse.confidence > 0.7) {
-        speakToUser(aiResponse.message);
-        if (aiResponse.suggestedAction) {
-            await executeDynamicAction(aiResponse.suggestedAction, data);
-        }
-    } else {
-        const contextualHelp = await getDynamicContextualHelp(currentRoot);
-        speakToUser(contextualHelp);
-    }
-}
-
-async function getDynamicContextualHelp(rootCode) {
-    const { data } = await supabase
-        .from('voice_context_help')
-        .select('help_message')
-        .eq('root_code', rootCode)
-        .eq('is_active', true)
-        .single();
-        
-    return data?.help_message || "Nasıl yardımcı olabilirim? Sesli olarak sipariş verebilir veya 'yardım' diyebilirsiniz.";
-}
-
-// =============================================
-// BAŞLANGIÇ FONKSİYONLARI
-// =============================================
-
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM yüklendi, dinamik uygulama başlatılıyor...');
-    initApp();
-});
-
-// Dinamik acil durum modu
-function dynamicEmergencyFallback() {
-    debugLog('🆘 Dinamik acil durum modu aktif');
-    setupDynamicLocationEvents();
-    
-    if (!selectedLocation) {
-        setTimeout(() => {
-            showDynamicLocationModal();
-        }, 2000);
-    }
-}
 
         // =============================================
         // LOKASYON SEÇİM SİSTEMİ
@@ -4283,6 +3442,437 @@ async function reverseGeocode(lat, lon) {
 
 
 
+	
+// =============================================
+// VERİTABANI ODAKLI ASİSTAN SİSTEMİ
+// =============================================
+	
+// Veritabanından kök kurallarını yükle
+// Komut kurallarını veritabanından yükle
+async function loadCommandRules() {
+    try {
+        const { data, error } = await supabase
+            .from('voice_command_rules')
+            .select('*')
+            .eq('is_active', true)
+            .order('priority', { ascending: false });
+
+        if (error) throw error;
+
+        commandRules.clear();
+        data.forEach(rule => {
+            if (!commandRules.has(rule.root_code)) {
+                commandRules.set(rule.root_code, []);
+            }
+            commandRules.get(rule.root_code).push(rule);
+        });
+
+        console.log(`✅ ${data.length} komut kuralı yüklendi`);
+    } catch (error) {
+        console.error('Komut kuralları yükleme hatası:', error);
+        // Fallback: Temel kuralları elle yükle
+        loadFallbackCommandRules();
+    }
+}
+
+
+// Fallback komut kuralları
+function loadFallbackCommandRules() {
+    commandRules.clear();
+    
+    // Temel kuralları elle ekle
+    const fallbackRules = [
+        {
+            root_code: '0:0',
+            input_patterns: 'merhaba|selam|başla',
+            output_text: 'Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen konumunuzu seçin.',
+            next_root: '1:0',
+            action_name: 'show_location_modal'
+        },
+        {
+            root_code: '1:0', 
+            input_patterns: 'market',
+            output_text: 'Market seçildi. Size en yakın marketler listeleniyor.',
+            next_root: '2:0',
+            action_name: 'select_market'
+        }
+        // Diğer temel kuralları buraya ekleyebilirsiniz
+    ];
+    
+    fallbackRules.forEach(rule => {
+        if (!commandRules.has(rule.root_code)) {
+            commandRules.set(rule.root_code, []);
+        }
+        commandRules.get(rule.root_code).push(rule);
+    });
+    
+    console.log('🔄 Fallback komut kuralları yüklendi');
+}
+
+// Ana komut işleme fonksiyonu (SADECE 50 SATIR!)
+async function processVoiceCommand(transcript) {
+    const message = transcript.toLowerCase().trim();
+    if (userMessage) userMessage.textContent = transcript;
+
+    debugLog(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot}`);
+
+    // 1. Askıda cevap varsa, onu işle
+    if (pendingResponse) {
+        return handlePendingResponse(message);
+    }
+
+    // 2. Mevcut kök için kuralları ara
+    const match = await findRuleMatch(message, currentRoot);
+    
+    if (match) {
+        await executeMatchedRule(match, message);
+    } else {
+        // 3. Eşleşme yoksa AI'ya yönlendir
+        await handleAIRequest(message, currentRoot);
+    }
+}
+
+// Kök komut eşleştirme
+async function findRuleMatch(message, root) {
+    const rules = commandRules.get(root) || [];
+    
+    for (const rule of rules) {
+        const patterns = rule.input_patterns.split('|');
+        for (const pattern of patterns) {
+            if (matchesPattern(message, pattern)) {
+                return { rule, pattern, extractedData: extractData(message, pattern) };
+            }
+        }
+    }
+    return null;
+}
+
+// Pattern eşleştirme
+function matchesPattern(message, pattern) {
+    if (pattern.startsWith('regex:')) {
+        const regex = new RegExp(pattern.replace('regex:', ''));
+        return regex.test(message);
+    }
+    return message.includes(pattern);
+}
+
+// Veri çıkarma
+function extractData(message, pattern) {
+    const data = {};
+    
+    if (pattern.startsWith('regex:')) {
+        const regex = new RegExp(pattern.replace('regex:', ''));
+        const match = message.match(regex);
+        if (match && match.groups) {
+            return match.groups;
+        }
+    }
+    
+    // Telefon numarası çıkarma
+    const phoneMatch = message.match(/\d+/g);
+    if (phoneMatch && phoneMatch.join('').length >= 10) {
+        data.phone = phoneMatch.join('');
+    }
+    
+    return data;
+}
+
+// Eşleşen kuralı çalıştır
+async function executeMatchedRule(match, message) {
+    const { rule, extractedData } = match;
+    
+    // Çıktıyı hazırla
+    let output = rule.output_text;
+    if (extractedData.phone) output = output.replace('{phone}', extractedData.phone);
+    
+    // Sesli cevap ver
+    speakToUser(output);
+    
+    // Aksiyonu çalıştır
+    if (rule.action_name) {
+        await executeAction(rule.action_name, { 
+            extractedData, 
+            message 
+        });
+    }
+    
+    // Askıda cevap bekliyorsa
+    if (rule.next_root && rule.next_root.includes('?')) {
+        pendingResponse = { nextRoot: rule.next_root, context: extractedData };
+    } else {
+        currentRoot = rule.next_root || currentRoot;
+    }
+}
+
+// AI isteği işleme (10 satır)
+// AI isteği işleme - ÖĞRENME EKLENDİ
+async function handleAIRequest(message, root) {
+    speakToUser("Anlıyorum...");
+    
+    const aiResult = await queryAI(message, root);
+    
+    if (aiResult.confidence > 0.7) {
+        speakToUser(aiResult.response);
+        currentRoot = aiResult.suggested_root;
+        
+        // Öğrenmeyi kaydet
+        await saveToAILearningCache(message, aiResult.response, root, aiResult.confidence);
+    } else {
+        speakToUser("Üzgünüm, tam anlayamadım. Lütfen tekrar söyler misiniz?");
+    }
+}
+
+// Askıda cevap işleme
+async function handlePendingResponse(message) {
+    if (!pendingResponse) return;
+    
+    const { nextRoot, context } = pendingResponse;
+    pendingResponse = null;
+    
+    if (message.includes('evet') || !message.includes('hayır')) {
+        currentRoot = nextRoot.replace('?', '');
+        speakToUser("Tamam, devam ediyorum...");
+    } else {
+        speakToUser("Anladım, başka nasıl yardımcı olabilirim?");
+        currentRoot = "0:0";
+    }
+}
+
+// AI sorgusu (8 satır - mock)
+async function queryAI(message, contextRoot) {
+    // Gerçek implementasyon için API endpoint
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve({
+                response: "Anladım, siparişinizi tamamlamak için ödeme yöntemi seçin.",
+                suggested_root: "5:1",
+                confidence: 0.8
+            });
+        }, 1000);
+    });
+}
+
+// Öğrenmeyi kaydet (5 satır)
+async function saveAILearning(originalRoot, userInput, aiResult) {
+    await supabase.from('ai_learning_log').insert([{
+        original_root: originalRoot,
+        user_input: userInput,
+        ai_response: aiResult.response,
+        resolved_root: aiResult.suggested_root,
+        confidence_score: aiResult.confidence
+    }]);
+}
+
+async function saveToAILearningCache(userInput, aiResponse, rootCode, confidence) {
+    try {
+        const { error } = await supabase
+            .from('ai_learning_cache')
+            .insert([{
+                user_input: userInput,
+                ai_response: aiResponse,
+                root_code: rootCode,
+                confidence_score: confidence,
+                created_at: new Date().toISOString()
+            }]);
+
+        if (error) throw error;
+        debugLog('✅ AI öğrenme verisi kaydedildi');
+    } catch (error) {
+        console.error('❌ AI öğrenme kaydetme hatası:', error);
+    }
+}
+
+// =============================================
+// YENİ KÖK SIRALAMASI İÇİN AKSİYON FONKSİYONLARI
+// =============================================
+
+async function executeAction(actionName, data) {
+    console.log(`⚡ Aksiyon: ${actionName}`, data);
+    
+    switch(actionName) {
+        // Mağaza tipi seçim aksiyonları
+        case 'select_market':
+            await selectStoreTypeByName('Market');
+            break;
+        case 'select_restaurant':
+            await selectStoreTypeByName('Restoran');
+            break;
+        case 'select_pharmacy':
+            await selectStoreTypeByName('Eczane');
+            break;
+        case 'select_bakery':
+            await selectStoreTypeByName('Fırın');
+            break;
+        case 'select_cafe':
+            await selectStoreTypeByName('Kafe');
+            break;
+            
+        // Satıcı seçim aksiyonları
+        case 'select_seller_by_index':
+            await selectSellerByIndex(extractNumber(data.message));
+            break;
+        case 'go_back_store_type':
+            currentRoot = "1:0";
+            speakToUser("Mağaza tipi seçimine dönülüyor.");
+            break;
+            
+        // Reyon seçim aksiyonları
+        case 'select_category_fruits':
+            await selectCategoryByName('Meyve & Sebze');
+            break;
+        case 'select_category_dairy':
+            await selectCategoryByName('Süt Ürünleri');
+            break;
+        case 'select_category_meat':
+            await selectCategoryByName('Et & Tavuk');
+            break;
+        case 'select_category_drinks':
+            await selectCategoryByName('İçecekler');
+            break;
+        case 'select_category_by_index':
+            await selectCategoryByIndex(extractNumber(data.message));
+            break;
+        case 'go_back_seller':
+            currentRoot = "2:0";
+            speakToUser("Satıcı seçimine dönülüyor.");
+            break;
+            
+        // Ürün seçim aksiyonları
+         case 'add_to_cart_voice':
+            await handleAddToCartCommand(data.message || '');
+            break;
+
+	case 'add_specific_product':
+            await handleSpecificProduct(data.extractedData?.product || '');
+            break;
+
+        case 'add_product_by_index':
+            await addProductByIndex(extractNumberFromMessage(data.message));
+            break;
+
+        case 'show_cart':
+            openCart();
+            currentRoot = "5:0";
+            break;
+        case 'go_back_category':
+            currentRoot = "3:0";
+            speakToUser("Reyon seçimine dönülüyor.");
+            break;
+            
+        // Sepet aksiyonları
+        case 'start_payment':
+            currentRoot = "6:0";
+            speakToUser("Ödeme yöntemi seçin: nakit, kart veya bonus.");
+            break;
+
+	case 'start_payment_session_check':
+            await startPaymentWithSessionCheck();
+            break;
+
+	case 'set_payment_cash_session':
+            await setPaymentWithSessionCheck('nakit');
+            break;
+
+	case 'set_payment_card_session':
+            await setPaymentWithSessionCheck('kart');
+            break;
+
+	case 'set_payment_bonus_session':
+            await setPaymentWithSessionCheck('bonus');
+            break;
+
+	case 'show_cart_session':
+            await showCartWithSessionStatus();
+            break;
+
+        case 'continue_shopping':
+            closeCart();
+            currentRoot = "4:0";
+            speakToUser("Alışverişe devam ediliyor.");
+            break;
+        case 'clear_cart':
+            cart = [];
+            updateCartUI();
+            speakToUser("Sepetiniz temizlendi.");
+            break;
+        case 'go_back_products':
+            closeCart();
+            currentRoot = "4:0";
+            break;
+            
+        // Ödeme aksiyonları
+        case 'set_payment_cash':
+            currentPaymentMethod = 'nakit';
+            currentRoot = "7:0";
+            speakToUser("Nakit ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'set_payment_card':
+            currentPaymentMethod = 'kart';
+            currentRoot = "7:0";
+            speakToUser("Kart ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'set_payment_bonus':
+            currentPaymentMethod = 'bonus';
+            currentRoot = "7:0";
+            speakToUser("Bonus ile ödeme seçildi. Teslimat adresiniz: " + (currentCustomer?.address || userLocation?.fullAddress || "Belirtilmemiş") + ". Doğru mu?");
+            break;
+        case 'go_back_payment':
+            currentRoot = "6:0";
+            speakToUser("Ödeme yöntemi seçimine dönülüyor.");
+            break;
+            
+        // Adres aksiyonları
+        case 'confirm_address':
+            currentRoot = "8:0";
+            speakToUser("Teslimat adresiniz onaylandı. Lütfen telefon numaranızı söyleyin.");
+            break;
+        case 'request_new_address':
+            currentRoot = "7:1";
+            speakToUser("Lütfen yeni teslimat adresinizi söyleyin.");
+            break;
+        case 'save_new_address':
+            if (currentCustomer) {
+                currentCustomer.address = data.extractedData.address;
+            }
+            userLocation.fullAddress = data.extractedData.address;
+            currentRoot = "8:0";
+            speakToUser("Yeni adresiniz kaydedildi. Lütfen telefon numaranızı söyleyin.");
+            break;
+        case 'go_back_address':
+            currentRoot = "7:0";
+            break;
+            
+        // Telefon aksiyonları
+        case 'set_phone':
+            currentCustomer = { ...currentCustomer, phone: data.extractedData.phone };
+            break;
+        case 'check_phone':
+            await checkCustomerByPhone(data.extractedData.phone);
+            break;
+        case 'retry_phone':
+            currentRoot = "8:0";
+            speakToUser("Lütfen telefon numaranızı tekrar söyleyin.");
+            break;
+        case 'go_back_phone':
+            currentRoot = "8:0";
+            break;
+            
+        // Sipariş onay aksiyonları
+        case 'confirm_order':
+            await finalizeOrder(currentPaymentMethod);
+            currentRoot = "0:0";
+            break;
+        case 'cancel_order':
+            cart = [];
+            updateCartUI();
+            currentRoot = "0:0";
+            speakToUser("Siparişiniz iptal edildi. Yeni bir siparişe başlayabilirsiniz.");
+            break;
+            
+        default:
+            console.warn(`Bilinmeyen aksiyon: ${actionName}`);
+    }
+}
 
 // =============================================
 // SAYFA YÜKLENDİĞİNDE SESLİ ÜRÜN SİSTEMİNİ AKTİF ET
@@ -7660,14 +7250,6 @@ function scrollElement(element, amount) {
         element.scrollBy({ left: amount, behavior: 'smooth' });
     }
 }	
-	
 </script>	
 </body>
-
-
 </html>
-
-
-
-
-
