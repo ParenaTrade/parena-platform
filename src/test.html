@@ -2582,8 +2582,8 @@ async function selectDynamicSeller(seller) {
         `;
     }
     
-    // Reyonaları yükle
-    await loadReyonsBySeller(seller.id);
+    // KATEGORİLERİ YÜKLE - DÜZELTİLMİŞ
+    await loadCategoriesBySeller(seller.id);
     
     // Bölüm görünürlüğünü ayarla
     if (categoriesSection) categoriesSection.style.display = 'block';
@@ -2602,6 +2602,317 @@ async function selectDynamicSeller(seller) {
     speakToUser(`${seller.business_name} seçildi.${deliveryMsg} Şimdi bir reyon seçin.`);
 }
 
+  async function loadCategoriesBySeller(sellerId) {
+    try {
+        debugLog(`📦 Satıcıya göre kategoriler yükleniyor: ${sellerId}`);
+        
+        // Önce satıcının ürünlerinden kategorileri bul
+        const { data: productsData, error: productsError } = await supabase
+            .from('products')
+            .select('reyon_id, reyon(name)')
+            .eq('is_active', true)
+            .not('reyon_id', 'is', null);
+
+        if (productsError) throw productsError;
+
+        // Benzersiz kategorileri topla
+        const uniqueCategories = [];
+        const seenCategoryIds = new Set();
+        
+        if (productsData && productsData.length > 0) {
+            productsData.forEach(item => {
+                if (item.reyon && item.reyon_id && !seenCategoryIds.has(item.reyon_id)) {
+                    seenCategoryIds.add(item.reyon_id);
+                    uniqueCategories.push({
+                        id: item.reyon_id,
+                        name: item.reyon.name
+                    });
+                }
+            });
+        }
+
+        // Eğer kategori bulunamazsa tüm kategorileri getir
+        if (uniqueCategories.length === 0) {
+            const { data: allCategories, error: categoriesError } = await supabase
+                .from('reyon')
+                .select('*')
+                .eq('is_active', true)
+                .order('name');
+                
+            if (categoriesError) throw categoriesError;
+            
+            categories = allCategories || [];
+        } else {
+            categories = uniqueCategories;
+        }
+
+        debugLog(`📊 KATEGORİ SONUÇ: ${categories.length} kategori bulundu`);
+        
+        // Kategorileri göster
+        displayCategories(categories);
+        
+        debugLog(`✅ Satıcı kategorileri yüklendi: ${categories.length} adet`);
+        
+        if (categories.length === 0) {
+            speakToUser("Bu satıcıda kategori bulunamadı.");
+        }
+
+    } catch (error) {
+        console.error('❌ Kategori yükleme hatası:', error);
+        categories = getDemoCategories();
+        displayCategories(categories);
+        speakToUser("Kategoriler yüklenirken hata oluştu. Demo kategoriler gösteriliyor.");
+    }
+}
+
+// =============================================
+// KATEGORİ SEÇİMİNDE ÜRÜNLERİ YÜKLE
+// =============================================
+
+async function selectDynamicCategory(category) {
+    const categoryCard = document.querySelector(`[data-category-id="${category.id}"]`);
+    if (categoryCard) {
+        // Tüm kartlardan seçimi kaldır
+        document.querySelectorAll('.category-card').forEach(c => {
+            c.classList.remove('selected');
+        });
+        
+        // Bu kartı seçili yap
+        categoryCard.classList.add('selected');
+        
+        selectedCategoryId = category.id;
+        
+        // KATEGORİ SEÇİLDİĞİNDE ÜRÜNLERİ YÜKLE - DÜZELTİLMİŞ
+        await loadProductsByCategory(category.id);
+        
+        debugLog(`🛒 Kategori seçildi: ${category.name}`);
+        speakToUser(`${category.name} kategorisi seçildi. Ürünler listeleniyor.`);
+    }
+}      
+
+
+// =============================================
+// KATEGORİYE GÖRE ÜRÜNLERİ YÜKLE
+// =============================================
+
+async function loadProductsByCategory(categoryId) {
+    try {
+        debugLog(`🛒 Kategoriye göre ürünler yükleniyor: ${categoryId}, Satıcı: ${selectedSellerId}`);
+        
+        if (!selectedSellerId) {
+            speakToUser("Önce bir satıcı seçmelisiniz.");
+            return;
+        }
+        
+        // Önce kategoriye göre ürünleri getir
+        const { data: categoryProducts, error: categoryError } = await supabase
+            .from('products')
+            .select('*')
+            .eq('reyon_id', categoryId)
+            .eq('is_active', true)
+            .order('name');
+
+        if (categoryError) throw categoryError;
+
+        debugLog(`📊 KATEGORİ ÜRÜNLERİ: ${categoryProducts?.length || 0} ürün bulundu`);
+
+        // Eğer kategoriye göre ürün bulunamazsa, satıcının tüm ürünlerini getir
+        if (!categoryProducts || categoryProducts.length === 0) {
+            speakToUser("Bu kategoride ürün bulunamadı. Tüm ürünler listeleniyor.");
+            await loadAllProductsBySeller();
+            return;
+        }
+
+        products = categoryProducts.map(product => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            discount_price: product.discount_price,
+            imgurl: product.imgurl,
+            reyon_id: product.reyon_id,
+            unit_type: product.unit_type || 'adet',
+            description: product.description
+        }));
+
+        debugLog(`✅ Kategori ürünleri yüklendi: ${products.length} adet`);
+        
+        // Ürünleri göster
+        displayProducts(products);
+        
+        // Bölüm görünürlüğünü ayarla
+        if (productsSection) productsSection.style.display = 'block';
+        if (categoriesSection) categoriesSection.style.display = 'none';
+        
+        if (products.length === 0) {
+            speakToUser("Bu kategoride ürün bulunamadı.");
+        } else {
+            speakToUser(`${products.length} ürün bulundu. Sesli olarak sipariş verebilirsiniz.`);
+        }
+
+    } catch (error) {
+        console.error('❌ Kategori ürün yükleme hatası:', error);
+        products = getDemoProducts();
+        displayProducts(products);
+        speakToUser("Ürünler yüklenirken hata oluştu. Demo ürünler gösteriliyor.");
+    }
+}
+
+// =============================================
+// SATICININ TÜM ÜRÜNLERİNİ YÜKLE (YEDEK)
+// =============================================
+
+async function loadAllProductsBySeller() {
+    try {
+        debugLog(`🛒 Satıcının tüm ürünleri yükleniyor: ${selectedSellerId}`);
+        
+        const { data: allProducts, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('is_active', true)
+            .order('name');
+
+        if (error) throw error;
+
+        products = (allProducts || []).map(product => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            discount_price: product.discount_price,
+            imgurl: product.imgurl,
+            reyon_id: product.reyon_id,
+            unit_type: product.unit_type || 'adet',
+            description: product.description
+        }));
+
+        debugLog(`✅ Tüm ürünler yüklendi: ${products.length} adet`);
+        
+        displayProducts(products);
+        
+        if (productsSection) productsSection.style.display = 'block';
+        if (categoriesSection) categoriesSection.style.display = 'none';
+
+    } catch (error) {
+        console.error('❌ Tüm ürün yükleme hatası:', error);
+        products = getDemoProducts();
+        displayProducts(products);
+    }
+}
+
+// =============================================
+// YARDIMCI FONKSİYONLAR
+// =============================================
+
+// Demo kategoriler
+function getDemoCategories() {
+    return [
+        { id: 1, name: 'Meyve & Sebze' },
+        { id: 2, name: 'Süt Ürünleri' },
+        { id: 3, name: 'Et & Tavuk' },
+        { id: 4, name: 'Temel Gıda' },
+        { id: 5, name: 'İçecekler' }
+    ];
+}
+
+// Kategori ismine göre seçim
+async function selectCategoryByName(categoryName) {
+    const category = categories.find(cat => cat.name === categoryName);
+    if (category) {
+        await selectDynamicCategory(category);
+    }
+}
+
+// Ürün ismine göre bulma
+function findProductByName(productName) {
+    if (!products || products.length === 0) {
+        debugLog('❌ Ürün listesi boş');
+        return null;
+    }
+    
+    const cleanProductName = productName.toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    debugLog(`🔍 Ürün aranıyor: "${cleanProductName}" - Toplam ${products.length} ürün`);
+    
+    // Tam eşleşme
+    let found = products.find(p => 
+        p.name.toLowerCase().replace(/[^\w\s]/g, '') === cleanProductName
+    );
+    if (found) {
+        debugLog(`✅ Tam eşleşme: ${found.name}`);
+        return found;
+    }
+    
+    // Kısmi eşleşme
+    found = products.find(product => 
+        product.name.toLowerCase().includes(cleanProductName) ||
+        cleanProductName.includes(product.name.toLowerCase())
+    );
+    if (found) {
+        debugLog(`✅ Kısmi eşleşme: ${found.name}`);
+        return found;
+    }
+    
+    debugLog(`❌ Ürün bulunamadı: ${cleanProductName}`);
+    return null;
+}
+
+// Ürün bilgisi çıkarımı
+function extractProductInfoFromCommand(message) {
+    debugLog(`🔍 Ürün bilgisi çıkarılıyor: "${message}"`);
+    
+    let cleanMessage = message
+        .replace(/ekle|sepete|al|istiyorum|lütfen|bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    // Sayıları bul
+    const numbers = message.match(/\d+/g);
+    let quantity = 1;
+    
+    if (numbers && numbers.length > 0) {
+        quantity = parseInt(numbers[0]);
+        cleanMessage = cleanMessage.replace(numbers[0], '').trim();
+    } else {
+        // Yazılı sayıları kontrol et
+        const textNumbers = {
+            'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5,
+            'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10
+        };
+        
+        for (const [text, num] of Object.entries(textNumbers)) {
+            if (message.includes(text)) {
+                quantity = num;
+                cleanMessage = cleanMessage.replace(text, '').trim();
+                break;
+            }
+        }
+    }
+    
+    const productName = cleanMessage.trim();
+    
+    if (!productName) {
+        debugLog('❌ Ürün ismi çıkarılamadı');
+        return null;
+    }
+    
+    debugLog(`✅ Ürün bilgisi: "${productName}" x ${quantity}`);
+    return { productName, quantity };
+}
+
+// Ürün bulunamadı durumu
+function handleDynamicProductNotFound(message, attemptedName) {
+    debugLog(`❌ Ürün bulunamadı: "${attemptedName}"`);
+    
+    const availableProducts = products.slice(0, 5).map(p => p.name);
+    
+    if (availableProducts.length > 0) {
+        speakToUser(`"${attemptedName}" bulunamadı. Mevcut ürünler: ${availableProducts.join(', ')}`);
+    } else {
+        speakToUser("Henüz ürün yüklenmedi. Lütfen bir kategori seçin.");
+    }
+}    
 // =============================================
 // DİNAMİK REYON SİSTEMİ
 // =============================================
@@ -3521,3 +3832,4 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
