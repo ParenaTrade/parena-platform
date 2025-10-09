@@ -4310,45 +4310,6 @@ async function handleDynamicCategorySelection(data) {
 
    
  
-    // Miktar karışıklığını kaydet
-    async recordQuantityConfusion(userInput, correctProduct, incorrectQuantity) {
-        try {
-            const lowerInput = userInput.toLowerCase().trim();
-            
-            const { error } = await supabase
-                .from('product_voice_matches')
-                .insert([{
-                    user_input: lowerInput,
-                    matched_product: correctProduct,
-                    attempted_match: incorrectQuantity,
-                    success: true,
-                    quantity_confusion: true,
-                    correction_pattern: `"${userInput}" -> "${correctProduct}" (miktar düzeltildi)`,
-                    match_count: 1,
-                    success_count: 1,
-                    created_at: new Date().toISOString()
-                }]);
-
-            if (error) throw error;
-
-            // Cache'e ekle
-            this.cache.set(lowerInput, {
-                correctedProduct: correctProduct,
-                productId: null,
-                quantityConfusion: true,
-                correctionPattern: `"${userInput}" -> "${correctProduct}"`,
-                successRate: 1.0,
-                matchCount: 1
-            });
-
-            console.log(`🔧 Miktar karışıklığı kaydedildi: "${userInput}" -> "${correctProduct}"`);
-        } catch (error) {
-            console.error('❌ Miktar karışıklığı kaydetme hatası:', error);
-        }
-    }
-}
-
-    
         
 // =============================================
 // DİNAMİK ÜRÜN SİSTEMİ
@@ -5823,6 +5784,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
