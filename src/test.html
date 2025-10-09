@@ -4195,83 +4195,7 @@ class VoiceRecognitionLearner {
         return false;
     }
 
-    // Başarılı eşleşmeyi kaydet
-    async recordSuccess(userInput, matchedProduct, productId = null) {
-        try {
-            const lowerInput = userInput.toLowerCase().trim();
-            
-            // Önce bu girdi için kayıt var mı kontrol et
-            const { data: existing, error: findError } = await supabase
-                .from('product_voice_matches')
-                .select('*')
-                .eq('user_input', lowerInput)
-                .single();
-
-            if (findError && findError.code !== 'PGRST116') {
-                console.error('Kayıt arama hatası:', findError);
-                return;
-            }
-
-            if (existing) {
-                // Mevcut kaydı güncelle
-                const { error } = await supabase
-                    .from('product_voice_matches')
-                    .update({
-                        matched_product: matchedProduct,
-                        product_id: productId,
-                        success: true,
-                        match_count: (existing.match_count || 0) + 1,
-                        success_count: (existing.success_count || 0) + 1,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', existing.id);
-
-                if (error) throw error;
-                
-                // Cache'i güncelle
-                this.cache.set(lowerInput, {
-                    correctedProduct: matchedProduct,
-                    productId: productId,
-                    quantityConfusion: existing.quantity_confusion,
-                    correctionPattern: existing.correction_pattern,
-                    successRate: ((existing.success_count || 0) + 1) / ((existing.match_count || 0) + 1),
-                    matchCount: (existing.match_count || 0) + 1
-                });
-
-            } else {
-                // Yeni kayıt oluştur
-                const { error } = await supabase
-                    .from('product_voice_matches')
-                    .insert([{
-                        user_input: lowerInput,
-                        matched_product: matchedProduct,
-                        product_id: productId,
-                        attempted_match: matchedProduct,
-                        success: true,
-                        match_count: 1,
-                        success_count: 1,
-                        created_at: new Date().toISOString()
-                    }]);
-
-                if (error) throw error;
-
-                // Cache'e ekle
-                this.cache.set(lowerInput, {
-                    correctedProduct: matchedProduct,
-                    productId: productId,
-                    quantityConfusion: false,
-                    correctionPattern: null,
-                    successRate: 1.0,
-                    matchCount: 1
-                });
-            }
-
-            console.log(`✅ Başarılı eşleşme kaydedildi: "${userInput}" -> "${matchedProduct}"`);
-        } catch (error) {
-            console.error('❌ Başarı kaydetme hatası:', error);
-        }
-    }
-
+   
     // Başarısız eşleşmeyi kaydet
     async recordFailure(userInput, attemptedMatch = null) {
         try {
@@ -5975,6 +5899,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
