@@ -3307,34 +3307,127 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu. Lütfen bir satıcı seçin.`);
 }
 
-// Basit ve etkili sesli mağaza seçimi
+// GÜNCELLENMİŞ SESLİ MAĞAZA SEÇİM FONKSİYONU
 async function handleVoiceStoreTypeSelection(message) {
-    console.log('🏪 Sesli mağaza seçimi:', message);
+    console.log('🏪 Sesli mağaza seçimi başlatılıyor:', message);
     
-    const mağazaKartları = document.querySelectorAll('.seller-type-card');
-    if (mağazaKartları.length === 0) {
-        speakToUser("Mağaza listesi yüklenmedi. Lütfen bekleyin.");
-        return false;
-    }
+    // 1. Önce DOM'un hazır olmasını bekle
+    await waitForDOM('.seller-type-card, [class*="seller"], [class*="store"]');
     
-    let bulunanKart = null;
+    // 2. Tüm olası seçicileri dene
+    const selectors = [
+        '.seller-type-card',
+        '.seller-card', 
+        '.store-card',
+        '.shop-card',
+        '[class*="seller"]',
+        '[class*="store"]',
+        '[class*="merchant"]',
+        '.card'
+    ];
     
-    // 1. İsimle eşleştirme
-    for (const kart of mağazaKartları) {
-        const mağazaİsmi = kart.querySelector('.seller-type-name').textContent.toLowerCase();
-        const temizİsim = mağazaİsmi.replace(/[^a-zğüşıöç]/g, '');
-        const temizMesaj = message.replace(/[^a-zğüşıöç]/g, '');
-        
-        if (mağazaİsmi.includes(message) || message.includes(mağazaİsmi) || 
-            temizİsim.includes(temizMesaj) || temizMesaj.includes(temizİsim)) {
-            bulunanKart = kart;
-            console.log(`✅ İsim eşleşmesi: "${message}" -> "${mağazaİsmi}"`);
+    let mağazaKartları = [];
+    
+    for (const selector of selectors) {
+        const kartlar = document.querySelectorAll(selector);
+        if (kartlar.length > 0) {
+            console.log(`✅ ${selector} seçici ile ${kartlar.length} kart bulundu`);
+            mağazaKartları = Array.from(kartlar);
             break;
         }
     }
     
-    // 2. Sayısal seçim
-    if (!bulunanKart) {
+    // 3. Debug: Tüm kartları listele
+    console.log('📋 Tüm bulunan kartlar:', mağazaKartları);
+    
+    if (mağazaKartları.length === 0) {
+        console.log('❌ Hiç mağaza kartı bulunamadı');
+        speakToUser("Mağaza listesi henüz yüklenmedi. Lütfen bekleyin.");
+        return false;
+    }
+    
+    // 4. Kart isimlerini debug et
+    mağazaKartları.forEach((kart, index) => {
+        const isimElementi = kart.querySelector('.seller-type-name, .seller-name, .store-name, [class*="name"], h3, h4, .name');
+        const isim = isimElementi ? isimElementi.textContent : 'İsimsiz';
+        console.log(`  ${index + 1}. ${isim} - Class: ${kart.className}`);
+    });
+    
+    // 5. Eşleşme algoritması
+    let bulunanKart = findMatchingCard(mağazaKartları, message);
+    
+    if (bulunanKart) {
+        await selectAndHighlightCard(bulunanKart);
+        return true;
+    }
+    
+    // 6. Bulunamazsa yardım mesajı göster
+    showAvailableOptions(mağazaKartları, message);
+    return false;
+}
+
+// DOM'u bekleyen yardımcı fonksiyon
+function waitForDOM(selector, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        
+        function check() {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+                console.log(`✅ DOM hazır: ${selector} ile ${elements.length} element bulundu`);
+                resolve(elements);
+                return;
+            }
+            
+            if (Date.now() - startTime > timeout) {
+                console.log(`❌ DOM timeout: ${selector} bulunamadı`);
+                reject(new Error('DOM timeout'));
+                return;
+            }
+            
+            setTimeout(check, 100);
+        }
+        
+        check();
+    });
+}
+
+// Eşleşen kartı bulan fonksiyon
+function findMatchingCard(kartlar, message) {
+    const cleanMessage = message.toLowerCase().replace(/[^a-zğüşıöç]/g, '');
+    
+    for (const kart of kartlar) {
+        const isimElementi = kart.querySelector('.seller-type-name, .seller-name, .store-name, [class*="name"], h3, h4, .name');
+        if (!isimElementi) continue;
+        
+        const kartİsmi = isimElementi.textContent.toLowerCase();
+        const cleanKartİsmi = kartİsmi.replace(/[^a-zğüşıöç]/g, '');
+        
+        console.log(`🔍 Karşılaştırma: "${cleanMessage}" vs "${cleanKartİsmi}"`);
+        
+        // 1. Tam eşleşme
+        if (cleanKartİsmi === cleanMessage || kartİsmi.includes(cleanMessage) || cleanMessage.includes(kartİsmi)) {
+            console.log(`✅ Tam eşleşme: "${kartİsmi}"`);
+            return kart;
+        }
+        
+        // 2. Anahtar kelime eşleşmesi
+        const anahtarKelimeler = {
+            'market': ['market', 'süpermarket', 'bakkal'],
+            'restoran': ['restoran', 'lokanta', 'yemek'],
+            'eczane': ['eczane', 'eczanesi'],
+            'fırın': ['fırın', 'fırını'],
+            'kafe': ['kafe', 'kahve', 'cafe']
+        };
+        
+        for (const [anahtar, değerler] of Object.entries(anahtarKelimeler)) {
+            if (değerler.some(kelime => cleanMessage.includes(kelime)) && cleanKartİsmi.includes(anahtar)) {
+                console.log(`✅ Anahtar kelime eşleşmesi: "${anahtar}" -> "${kartİsmi}"`);
+                return kart;
+            }
+        }
+        
+        // 3. Sayısal seçim
         const sayıEşleşmesi = message.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|1\.|2\.|3\.|4\.|5\.|1|2|3|4|5)/);
         if (sayıEşleşmesi) {
             const sayılar = {
@@ -3345,65 +3438,111 @@ async function handleVoiceStoreTypeSelection(message) {
                 'beşinci': 4, '5.': 4, '5': 4
             };
             const indeks = sayılar[sayıEşleşmesi[0]];
-            if (indeks < mağazaKartları.length) {
-                bulunanKart = mağazaKartları[indeks];
-                console.log(`✅ Sayısal seçim: ${indeks + 1}. kart -> "${bulunanKart.querySelector('.seller-type-name').textContent}"`);
+            if (indeks < kartlar.length && kartlar[indeks] === kart) {
+                console.log(`✅ Sayısal seçim: ${indeks + 1}. kart`);
+                return kart;
             }
         }
     }
     
-    // 3. Anahtar kelime eşleştirme
-    if (!bulunanKart) {
-        const anahtarKelimeler = {
-            'market': 'Market',
-            'restoran': 'Restoran',
-            'eczane': 'Eczane', 
-            'fırın': 'Fırın',
-            'kafe': 'Kafe',
-            'manav': 'Manav',
-            'kasap': 'Kasap'
-        };
-        
-        for (const [kelime, mağazaTipi] of Object.entries(anahtarKelimeler)) {
-            if (message.includes(kelime)) {
-                for (const kart of mağazaKartları) {
-                    const mağazaİsmi = kart.querySelector('.seller-type-name').textContent;
-                    if (mağazaİsmi === mağazaTipi) {
-                        bulunanKart = kart;
-                        console.log(`✅ Anahtar kelime: "${kelime}" -> "${mağazaİsmi}"`);
-                        break;
-                    }
-                }
-                if (bulunanKart) break;
-            }
-        }
-    }
+    return null;
+}
+
+// Kartı seç ve vurgula
+async function selectAndHighlightCard(kart) {
+    console.log('🎯 Kart seçiliyor:', kart);
     
-    if (bulunanKart) {
-        // Kartı tıkla ve seçili yap
-        bulunanKart.click();
+    // 1. Tıklama event'ini tetikle
+    kart.click();
+    
+    // 2. Görsel feedback
+    kart.style.transform = 'scale(1.1)';
+    kart.style.boxShadow = '0 0 20px var(--primary)';
+    kart.style.transition = 'all 0.3s ease';
+    
+    // 3. Sesli onay
+    const isimElementi = kart.querySelector('.seller-type-name, .seller-name, .store-name, [class*="name"]');
+    const isim = isimElementi ? isimElementi.textContent : 'Mağaza';
+    speakToUser(`${isim} seçildi.`);
+    
+    // 4. Animasyonu sıfırla
+    setTimeout(() => {
+        kart.style.transform = 'scale(1)';
+        kart.style.boxShadow = '';
+    }, 1000);
+    
+    // 5. UI güncellemesi için kısa bekleme
+    await new Promise(resolve => setTimeout(resolve, 500));
+}
+
+// Mevcut seçenekleri göster
+function showAvailableOptions(kartlar, message) {
+    const mevcutMağazalar = kartlar.slice(0, 3).map((kart, index) => {
+        const isimElementi = kart.querySelector('.seller-type-name, .seller-name, .store-name, [class*="name"]');
+        const isim = isimElementi ? isimElementi.textContent : `${index + 1}. mağaza`;
+        return isim;
+    }).join(', ');
+    
+    console.log(`❌ Eşleşme bulunamadı: "${message}"`);
+    console.log(`📋 Mevcut mağazalar: ${mevcutMağazalar}`);
+    
+    speakToUser(`"${message}" bulunamadı. Mevcut mağazalar: ${mevcutMağazalar}. Veya "birinci mağaza" gibi söyleyebilirsiniz.`);
+}
+
+// TEST FONKSİYONU - Console'da denemek için
+function testMağazaSeçimi() {
+    console.log('🧪 Mağaza seçim testi başlatılıyor...');
+    
+    // Test komutları
+    const testKomutları = ['market', 'restoran', 'birinci', '1', 'ikinci mağaza'];
+    
+    testKomutları.forEach(komut => {
+        console.log(`\n🔍 Test: "${komut}"`);
+        handleVoiceStoreTypeSelection(komut).then(result => {
+            console.log(`✅ Test sonucu: ${result ? 'Başarılı' : 'Başarısız'}`);
+        });
+    });
+}
+
+// Sayfa yüklendiğinde test butonu ekle (debug için)
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        // Debug butonu ekle
+        if (!document.getElementById('debugMağazaBtn')) {
+            const debugBtn = document.createElement('button');
+            debugBtn.id = 'debugMağazaBtn';
+            debugBtn.textContent = '🧪 Mağaza Seçim Testi';
+            debugBtn.style.cssText = `
+                position: fixed;
+                bottom: 100px;
+                right: 20px;
+                background: var(--primary);
+                color: white;
+                padding: 10px;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                z-index: 10000;
+            `;
+            debugBtn.onclick = testMağazaSeçimi;
+            document.body.appendChild(debugBtn);
+        }
         
-        // Görsel feedback
-        bulunanKart.style.transform = 'scale(1.05)';
-        bulunanKart.style.boxShadow = '0 0 20px var(--primary)';
+        // Mevcut kartları listele
         setTimeout(() => {
-            bulunanKart.style.transform = 'scale(1)';
-            bulunanKart.style.boxShadow = '';
-        }, 1000);
+            console.log('🔍 Sayfa yüklendi, mevcut kar
+                        tlar aranıyor...');
+            const selectors = ['.seller-type-card', '.seller-card', '[class*="seller"]', '[class*="store"]'];
+            selectors.forEach(selector => {
+                const elements = document.querySelectorAll(selector);
+                if (elements.length > 0) {
+                    console.log(`✅ ${selector}: ${elements.length} element bulundu`);
+                }
+            });
+        }, 2000);
         
-        speakToUser(`${bulunanKart.querySelector('.seller-type-name').textContent} seçildi.`);
-        return true;
-    }
-    
-    // Bulunamadı
-    const mevcutMağazalar = Array.from(mağazaKartları)
-        .slice(0, 3)
-        .map(kart => kart.querySelector('seller-type-name').textContent)
-        .join(', ');
-    
-    speakToUser(`Hangi mağazayı istiyorsunuz? Örneğin: ${mevcutMağazalar}. Veya "birinci mağaza" gibi söyleyebilirsiniz.`);
-    return false;
-}        
+    }, 3000);
+});
 // =============================================
 // DİNAMİK SATICI SİSTEMİ
 // =============================================
@@ -6690,6 +6829,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
