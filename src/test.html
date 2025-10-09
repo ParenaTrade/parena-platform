@@ -2733,6 +2733,12 @@ async function createDefaultCommandRules() {
 async function processVoiceCommand(transcript) {
     const message = transcript.toLowerCase().trim();
     console.log(`🔊 Sesli komut: "${message}" | Mevcut kök: ${currentRoot}`);
+     // SATICI SEÇİMİ için özel entegrasyon
+    if (currentRoot === "3:0" || message.includes('satıcı') || message.includes('yer') || message.includes('dükkan')) {
+        console.log('🎯 Satıcı seçim komutu algılandı');
+        const success = await handleVoiceSellerSelection(message);
+        if (success) return;
+    }
     // SESLİ MAĞAZA SEÇİMİ için özel entegrasyon
     if (currentRoot === "2:0" || message.includes('mağaza') || message.includes('market') || message.includes('restoran') || message.includes('Fast Food') || message.includes('Fırın') || message.includes('Eczane') || message.includes('Pet Shop') || message.includes('Çiçekçi')) {
         console.log('🎯 Mağaza seçim komutu algılandı');
@@ -3836,64 +3842,89 @@ async function selectDynamicSeller(seller) {
     }
 }
 
-        // Basit sesli satıcı seçimi
+// SESLİ SATICI SEÇİM FONKSİYONU
 async function handleVoiceSellerSelection(message) {
     console.log('🏬 Sesli satıcı seçimi:', message);
     
-    const satıcıKartları = document.querySelectorAll('.seller-card');
+    // Satıcı kartlarını bul (tüm olası seçicileri dene)
+    const satıcıKartları = document.querySelectorAll('.seller-card, .merchant-card, .store-card, [class*="seller"], [class*="merchant"]');
+    
     if (satıcıKartları.length === 0) {
+        console.error('❌ Satıcı kartları bulunamadı. Mevcut elementler:', document.querySelectorAll('*[class*="card"]'));
         speakToUser("Satıcı listesi yüklenmedi. Lütfen önce mağaza tipi seçin.");
         return false;
     }
     
     let bulunanKart = null;
+    const temizMesaj = message.toLowerCase().replace(/[^a-zğüşıöç\s]/g, '').trim();
     
-    // 1. İsimle eşleştirme
+    console.log('🔍 Aranan satıcı:', temizMesaj);
+    console.log('📋 Mevcut satıcılar:', Array.from(satıcıKartları).map(kart => 
+        kart.querySelector('.seller-name, .business-name, .store-name, .card-title')?.textContent
+    ));
+
+    // 1. GELİŞTİRİLMİŞ İSİM EŞLEŞTİRME
     for (const kart of satıcıKartları) {
-        const satıcıİsmi = kart.querySelector('.seller-name').textContent.toLowerCase();
-        const temizİsim = satıcıİsmi.replace(/[^a-zğüşıöç]/g, '');
-        const temizMesaj = message.replace(/[^a-zğüşıöç]/g, '');
+        const isimElement = kart.querySelector('.seller-name, .business-name, .store-name, .card-title, [class*="name"]');
+        if (!isimElement) continue;
         
-        if (satıcıİsmi.includes(message) || message.includes(satıcıİsmi) || 
-            temizİsim.includes(temizMesaj) || temizMesaj.includes(temizİsim)) {
+        const satıcıİsmi = isimElement.textContent.toLowerCase();
+        const temizİsim = satıcıİsmi.replace(/[^a-zğüşıöç\s]/g, '').trim();
+        
+        console.log(`🔍 Satıcı kontrol: "${temizİsim}" vs "${temizMesaj}"`);
+        
+        // Çeşitli eşleştirme yöntemleri
+        if (satıcıİsmi.includes(temizMesaj) || 
+            temizİsim.includes(temizMesaj) || 
+            temizMesaj.includes(temizİsim) ||
+            calculateSimilarity(temizİsim, temizMesaj) > 0.6) {
+            
             bulunanKart = kart;
-            console.log(`✅ Satıcı isim eşleşmesi: "${message}" -> "${satıcıİsmi}"`);
+            console.log(`✅ Satıcı eşleşmesi: "${satıcıİsmi}"`);
             break;
         }
     }
     
-    // 2. Sayısal seçim
+    // 2. SAYISAL SEÇİM (SATICI LİSTESİ)
     if (!bulunanKart) {
-        const sayıEşleşmesi = message.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|1\.|2\.|3\.|4\.|5\.|1|2|3|4|5)/);
+        const sayıEşleşmesi = message.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|altıncı|yedinci|sekizinci|1\.|2\.|3\.|4\.|5\.|6\.|7\.|8\.|1|2|3|4|5|6|7|8)/i);
         if (sayıEşleşmesi) {
             const sayılar = {
                 'birinci': 0, '1.': 0, '1': 0,
                 'ikinci': 1, '2.': 1, '2': 1,
                 'üçüncü': 2, '3.': 2, '3': 2,
                 'dördüncü': 3, '4.': 3, '4': 3,
-                'beşinci': 4, '5.': 4, '5': 4
+                'beşinci': 4, '5.': 4, '5': 4,
+                'altıncı': 5, '6.': 5, '6': 5,
+                'yedinci': 6, '7.': 6, '7': 6,
+                'sekizinci': 7, '8.': 7, '8': 7
             };
-            const indeks = sayılar[sayıEşleşmesi[0]];
-            if (indeks < satıcıKartları.length) {
+            
+            const arananSayı = sayıEşleşmesi[0].toLowerCase();
+            const indeks = sayılar[arananSayı];
+            
+            if (indeks !== undefined && indeks < satıcıKartları.length) {
                 bulunanKart = satıcıKartları[indeks];
-                console.log(`✅ Sayısal satıcı seçim: ${indeks + 1}. satıcı`);
+                const satıcıAdı = bulunanKart.querySelector('.seller-name, .business-name, .store-name')?.textContent || 'Bilinmeyen Satıcı';
+                console.log(`✅ Sayısal satıcı seçim: ${indeks + 1}. satıcı -> "${satıcıAdı}"`);
             }
         }
     }
     
-    // 3. Özel komutlar
+    // 3. ÖZEL SATICI FİLTRELERİ
     if (!bulunanKart) {
-        if (message.includes('yakın') || message.includes('yakınım')) {
-            bulunanKart = satıcıKartları[0]; // İlk kart en yakın varsayalım
+        // En yakın satıcı
+        if (temizMesaj.includes('yakın') || temizMesaj.includes('yakınım') || temizMesaj.includes('en yakın')) {
+            bulunanKart = satıcıKartları[0]; // İlk kart en yakın varsayılıyor
             console.log('📍 En yakın satıcı seçildi');
         }
-        else if (message.includes('ucuz') || message.includes('ekonomik')) {
-            // Teslimat ücreti en düşük olanı bul
+        // En ucuz teslimat
+        else if (temizMesaj.includes('ucuz') || temizMesaj.includes('ekonomik') || temizMesaj.includes('düşük')) {
             let enUcuzKart = null;
             let enDüşükÜcret = Infinity;
             
             satıcıKartları.forEach(kart => {
-                const teslimatÜcreti = kart.querySelector('.delivery-fee');
+                const teslimatÜcreti = kart.querySelector('.delivery-fee, .delivery-price, [class*="delivery"]');
                 if (teslimatÜcreti) {
                     const ücretMetni = teslimatÜcreti.textContent;
                     const ücretSayı = ücretMetni.match(/(\d+[,.]\d+)/);
@@ -3903,44 +3934,161 @@ async function handleVoiceSellerSelection(message) {
                             enDüşükÜcret = ücret;
                             enUcuzKart = kart;
                         }
+                    } else if (ücretMetni.includes('Ücretsiz') || ücretMetni.includes('ücretsiz')) {
+                        enUcuzKart = kart; // Ücretsiz teslimat
+                        enDüşükÜcret = 0;
                     }
                 }
             });
             
             if (enUcuzKart) {
                 bulunanKart = enUcuzKart;
-                console.log('💰 En ucuz satıcı seçildi');
+                console.log('💰 En ucuz teslimatlı satıcı seçildi');
+            }
+        }
+        // En yüksek puan
+        else if (temizMesaj.includes('iyi') || temizMesaj.includes('yüksek') || temizMesaj.includes('puan')) {
+            let enYüksekPuanKart = null;
+            let enYüksekPuan = 0;
+            
+            satıcıKartları.forEach(kart => {
+                const puanElement = kart.querySelector('.seller-rating, .rating, .stars, [class*="rating"]');
+                if (puanElement) {
+                    const puanMetni = puanElement.textContent;
+                    const puanSayı = puanMetni.match(/(\d+[,.]\d+)/);
+                    if (puanSayı) {
+                        const puan = parseFloat(puanSayı[1].replace(',', '.'));
+                        if (puan > enYüksekPuan) {
+                            enYüksekPuan = puan;
+                            enYüksekPuanKart = kart;
+                        }
+                    }
+                }
+            });
+            
+            if (enYüksekPuanKart) {
+                bulunanKart = enYüksekPuanKart;
+                console.log('⭐ En yüksek puanlı satıcı seçildi');
             }
         }
     }
     
+    // 4. SATICI SEÇİMİNİ UYGULA
     if (bulunanKart) {
-        // Satıcı kartını tıkla
-        bulunanKart.click();
-        
-        // Görsel feedback
-        bulunanKart.style.transform = 'scale(1.05)';
-        bulunanKart.style.boxShadow = '0 0 20px var(--success)';
-        setTimeout(() => {
-            bulunanKart.style.transform = 'scale(1)';
-            bulunanKart.style.boxShadow = '';
-        }, 1000);
-        
-        const satıcıİsmi = bulunanKart.querySelector('.seller-name').textContent;
-        speakToUser(`${satıcıİsmi} seçildi.`);
-        return true;
+        try {
+            console.log('🎯 Satıcı kartı tıklanıyor:', bulunanKart);
+            
+            // Kartı tıkla
+            bulunanKart.click();
+            
+            // Seçimi doğrula ve güçlendir
+            setTimeout(() => {
+                if (!bulunanKart.classList.contains('selected')) {
+                    bulunanKart.classList.add('selected', 'active');
+                    bulunanKart.style.border = '2px solid var(--success)';
+                }
+            }, 150);
+            
+            // GÖRSEL FEEDBACK
+            bulunanKart.style.transform = 'scale(1.05)';
+            bulunanKart.style.boxShadow = '0 0 25px var(--success)';
+            bulunanKart.style.transition = 'all 0.3s ease';
+            
+            setTimeout(() => {
+                bulunanKart.style.transform = 'scale(1)';
+                bulunanKart.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+            }, 1000);
+            
+            const satıcıAdı = bulunanKart.querySelector('.seller-name, .business-name, .store-name')?.textContent || 'Satıcı';
+            
+            // Teslimat bilgisi ekle
+            let teslimatBilgisi = '';
+            const teslimatElement = bulunanKart.querySelector('.delivery-fee, .delivery-info');
+            if (teslimatElement) {
+                teslimatBilgisi = `. ${teslimatElement.textContent}`;
+            }
+            
+            speakToUser(`${satıcıAdı} seçildi${teslimatBilgisi}. Şimdi bir reyon seçin.`);
+            
+            // Satıcı seçildiğinde kökü güncelle
+            currentRoot = "4:0";
+            console.log(`🔄 Kök güncellendi: 3:0 -> 4:0 (Satıcı seçildi: ${satıcıAdı})`);
+            
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Satıcı kartı tıklama hatası:', error);
+            speakToUser("Satıcı seçiminde hata oluştu.");
+            return false;
+        }
     }
     
-    // Bulunamadı
+    // BULUNAMADIYSA YARDIM MESAJI
     const mevcutSatıcılar = Array.from(satıcıKartları)
         .slice(0, 3)
-        .map(kart => kart.querySelector('.seller-name').textContent)
+        .map(kart => {
+            const isim = kart.querySelector('.seller-name, .business-name, .store-name')?.textContent || 'Satıcı';
+            const konum = kart.querySelector('.seller-details, .location, [class*="city"]')?.textContent || '';
+            return `${isim} ${konum}`;
+        })
         .join(', ');
     
-    speakToUser(`Hangi satıcıyı istiyorsunuz? Örneğin: ${mevcutSatıcılar}. Veya "birinci satıcı", "en yakın" gibi söyleyebilirsiniz.`);
+    speakToUser(`Hangi satıcıyı istiyorsunuz? Örneğin: ${mevcutSatıcılar}. Veya "birinci satıcı", "en yakın", "en ucuz" gibi söyleyebilirsiniz.`);
     return false;
 }
 
+// BENZERLİK HESAPLAMA FONKSİYONU (mevcut kodunuzda varsa kullanın)
+function calculateSimilarity(str1, str2) {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const distance = levenshteinDistance(longer, shorter);
+    return (longer.length - distance) / parseFloat(longer.length);
+}
+
+function levenshteinDistance(a, b) {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i-1) === a.charAt(j-1)) {
+                matrix[i][j] = matrix[i-1][j-1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i-1][j-1] + 1,
+                    matrix[i][j-1] + 1,
+                    matrix[i-1][j] + 1
+                );
+            }
+        }
+    }
+    return matrix[b.length][a.length];
+}
+
+// TEST FONKSİYONU
+function testSatıcıSeçimi() {
+    console.log('🧪 Satıcı seçim testi başlatılıyor...');
+    
+    const testKomutları = [
+        'birinci satıcı',
+        'ikinci',
+        'en yakın',
+        'en ucuz',
+        'Migros',
+        'Şok'
+    ];
+    
+    testKomutları.forEach(komut => {
+        console.log(`\n🔍 Test: "${komut}"`);
+        handleVoiceSellerSelection(komut).then(result => {
+            console.log(`✅ Test sonucu: ${result ? 'Başarılı' : 'Başarısız'}`);
+        });
+    });
+}
 // =============================================
 // KATEGORİ SEÇİMİNDE ÜRÜNLERİ YÜKLE
 // =============================================
@@ -6911,6 +7059,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
