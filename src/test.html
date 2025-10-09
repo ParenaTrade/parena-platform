@@ -2429,8 +2429,13 @@ async function initApp() {
         
         // 6. UI'ı güncelle
         updateUIAfterDynamicLogin();
-        
+
+           // Kilit durumunu kontrol et
+        if (cart.length > 0 && selectedSellerId) {
+            lockStoreAndSeller();
+        }
         debugLog('🎉 === DİNAMİK UYGULAMA BAŞLATMA TAMAMLANDI ===');
+          
 
     } catch (error) {
         console.error('💥 Dinamik uygulama başlatma hatası:', error);
@@ -5997,6 +6002,7 @@ function closeDynamicCart() {
 }
 
 // Oturum yönetimi
+// Güncellenmiş restoreSession
 async function restoreSession() {
     try {
         const savedCustomer = localStorage.getItem('currentCustomer');
@@ -6010,12 +6016,20 @@ async function restoreSession() {
             updateCartUI();
         }
         
+        // Kilit durumunu geri yükle
+        const savedLock = localStorage.getItem('isSellerLocked');
+        isSellerLocked = savedLock === 'true';
+        
+        if (isSellerLocked) {
+            console.log('🔒 Önceki oturumdan kilit durumu geri yüklendi');
+            updateLockUI();
+        }
+        
         debugLog('✅ Oturum geri yüklendi');
     } catch (error) {
         console.error('Oturum geri yükleme hatası:', error);
     }
 }
-
 // UI güncelleme
 function updateUIAfterDynamicLogin() {
     if (currentCustomer) {
@@ -6025,6 +6039,24 @@ function updateUIAfterDynamicLogin() {
     updateDynamicLocationText();
 }
 
+// Sesli komutlara sepeti boşaltma ekle
+function setupClearCartVoiceCommand() {
+    // handleDynamicAIRequest içinde veya ayrı bir fonksiyonda
+    const clearCartCommands = [
+        'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+        'clear cart', 'empty cart', 'reset cart'
+    ];
+    
+    // processVoiceCommand içinde kontrol et
+    if (clearCartCommands.some(cmd => message.includes(cmd))) {
+        clearCart();
+        return true;
+    }
+    
+    return false;
+}
+
+        
 // Acil durum modu
 function dynamicEmergencyFallback() {
     debugLog('🆘 Dinamik acil durum modu aktif');
@@ -6101,6 +6133,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
