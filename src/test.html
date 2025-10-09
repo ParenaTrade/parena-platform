@@ -3319,89 +3319,165 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
 
 // GÜNCELLENMİŞ SESLİ MAĞAZA SEÇİM FONKSİYONU
 async function handleVoiceStoreTypeSelection(message) {
-    console.log('🏪 Sesli mağaza seçimi başlatılıyor:', message);
+    console.log('🏪 Sesli mağaza seçimi:', message);
     
-    // 1. Önce DOM'un hazır olmasını bekle
-    await waitForDOM('.seller-type-card, [class*="seller"], [class*="store"]');
-    
-    // 2. Tüm olası seçicileri dene
-    const selectors = [
-        '.seller-type-card',
-        '.seller-card', 
-        '.store-card',
-        '.shop-card',
-        '[class*="seller"]',
-        '[class*="store"]',
-        '[class*="merchant"]',
-        '.card'
-    ];
-    
-    let mağazaKartları = [];
-    
-    for (const selector of selectors) {
-        const kartlar = document.querySelectorAll(selector);
-        if (kartlar.length > 0) {
-            console.log(`✅ ${selector} seçici ile ${kartlar.length} kart bulundu`);
-            mağazaKartları = Array.from(kartlar);
-            break;
-        }
-    }
-    
-    // 3. Debug: Tüm kartları listele
-    console.log('📋 Tüm bulunan kartlar:', mağazaKartları);
-    
+    const mağazaKartları = document.querySelectorAll('.seller-type-card, .store-card, .card');
     if (mağazaKartları.length === 0) {
-        console.log('❌ Hiç mağaza kartı bulunamadı');
-        speakToUser("Mağaza listesi henüz yüklenmedi. Lütfen bekleyin.");
+        console.error('❌ Mağaza kartları bulunamadı');
+        speakToUser("Mağaza listesi yüklenmedi. Lütfen bekleyin.");
         return false;
     }
     
-    // 4. Kart isimlerini debug et
-    mağazaKartları.forEach((kart, index) => {
-        const isimElementi = kart.querySelector('.seller-type-name, .seller-name, .store-name, [class*="name"], h3, h4, .name');
-        const isim = isimElementi ? isimElementi.textContent : 'İsimsiz';
-        console.log(`  ${index + 1}. ${isim} - Class: ${kart.className}`);
-    });
+    let bulunanKart = null;
+    const temizMesaj = message.toLowerCase().replace(/[^a-zğüşıöç\s]/g, '').trim();
     
-    // 5. Eşleşme algoritması
-    let bulunanKart = findMatchingCard(mağazaKartları, message);
-    
-    if (bulunanKart) {
-        await selectAndHighlightCard(bulunanKart);
-        return true;
+    console.log('🔍 Aranan:', temizMesaj);
+    console.log('📋 Tüm mağazalar:', Array.from(mağazaKartları).map(kart => 
+        kart.querySelector('.seller-type-name, .store-name, .card-title')?.textContent
+    ));
+
+    // TAM ANAHTAR KELİME LİSTESİ
+    const anahtarKelimeler = {
+        'Market': ['market', 'süpermarket', 'marketçi', 'bakkal', 'süper', 'marketten', 'alışveriş'],
+        'Restoran': ['restoran', 'lokanta', 'yemekhane', 'yemek', 'yemeği', 'restorant', 'yemekyeri'],
+        'Fast Food': ['fast food', 'fastfood', 'hızlı', 'burger', 'pizza', 'döner', 'hamburger', 'lahmacun'],
+        'Fırın': ['fırın', 'ekmek', 'pastane', 'fırını', 'ekmeği', 'simit', 'poğaça', 'börek', 'açma'],
+        'Eczane': ['eczane', 'eczacı', 'ilaç', 'ecza', 'eczaneden', 'ilaçları', 'hap', 'şurup'],
+        'Pet Shop': ['pet shop', 'petshop', 'pet', 'hayvan', 'mama', 'köpek', 'kedi', 'kuş', 'balık'],
+        'Çiçekçi': ['çiçekçi', 'çiçek', 'buket', 'gül', 'çiçekçiden', 'çiçekleri', 'orkide', 'papatya']
+    };
+
+    // 1. ÖNCE ANAHTAR KELİME EŞLEŞTİRMESİ (EN GÜÇLÜ)
+    for (const [mağazaTipi, kelimeler] of Object.entries(anahtarKelimeler)) {
+        for (const kelime of kelimeler) {
+            if (temizMesaj.includes(kelime)) {
+                console.log(`🔑 Anahtar kelime bulundu: "${kelime}" -> "${mağazaTipi}"`);
+                
+                for (const kart of mağazaKartları) {
+                    const mağazaİsmi = kart.querySelector('.seller-type-name, .store-name, .card-title')?.textContent;
+                    if (mağazaİsmi && mağazaİsmi.trim() === mağazaTipi) {
+                        bulunanKart = kart;
+                        console.log(`✅ Anahtar kelime eşleşmesi: "${kelime}" -> "${mağazaİsmi}"`);
+                        break;
+                    }
+                }
+                if (bulunanKart) break;
+            }
+        }
+        if (bulunanKart) break;
+    }
+
+    // 2. İSİM EŞLEŞTİRMESİ
+    if (!bulunanKart) {
+        for (const kart of mağazaKartları) {
+            const isimElement = kart.querySelector('.seller-type-name, .store-name, .card-title, [class*="name"]');
+            if (!isimElement) continue;
+            
+            const mağazaİsmi = isimElement.textContent.toLowerCase();
+            const temizİsim = mağazaİsmi.replace(/[^a-zğüşıöç\s]/g, '').trim();
+            
+            console.log(`🔍 İsim kontrol: "${temizİsim}" vs "${temizMesaj}"`);
+            
+            if (mağazaİsmi.includes(temizMesaj) || 
+                temizİsim.includes(temizMesaj) || 
+                temizMesaj.includes(temizİsim) ||
+                calculateSimilarity(temizİsim, temizMesaj) > 0.5) {
+                
+                bulunanKart = kart;
+                console.log(`✅ İsim eşleşmesi: "${mağazaİsmi}"`);
+                break;
+            }
+        }
     }
     
-    // 6. Bulunamazsa yardım mesajı göster
-    showAvailableOptions(mağazaKartları, message);
+    // 3. SAYISAL SEÇİM
+    if (!bulunanKart) {
+        const sayıEşleşmesi = message.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|altıncı|yedinci|sekizinci|1\.|2\.|3\.|4\.|5\.|6\.|7\.|8\.|1|2|3|4|5|6|7|8)/i);
+        if (sayıEşleşmesi) {
+            const sayılar = {
+                'birinci': 0, '1.': 0, '1': 0,
+                'ikinci': 1, '2.': 1, '2': 1,
+                'üçüncü': 2, '3.': 2, '3': 2,
+                'dördüncü': 3, '4.': 3, '4': 3,
+                'beşinci': 4, '5.': 4, '5': 4,
+                'altıncı': 5, '6.': 5, '6': 5,
+                'yedinci': 6, '7.': 6, '7': 6,
+                'sekizinci': 7, '8.': 7, '8': 7
+            };
+            
+            const arananSayı = sayıEşleşmesi[0].toLowerCase();
+            const indeks = sayılar[arananSayı];
+            
+            if (indeks !== undefined && indeks < mağazaKartları.length) {
+                bulunanKart = mağazaKartları[indeks];
+                const mağazaAdı = bulunanKart.querySelector('.seller-type-name, .store-name, .card-title')?.textContent || 'Bilinmeyen';
+                console.log(`✅ Sayısal seçim: ${indeks + 1}. kart -> "${mağazaAdı}"`);
+            }
+        }
+    }
+    
+    // 4. KART SEÇİMİNİ UYGULA
+    if (bulunanKart) {
+        try {
+            // Kartı tıkla
+            bulunanKart.click();
+            
+            // Seçimi doğrula
+            setTimeout(() => {
+                if (!bulunanKart.classList.contains('selected')) {
+                    bulunanKart.classList.add('selected', 'active');
+                    bulunanKart.setAttribute('aria-selected', 'true');
+                }
+            }, 100);
+            
+            // Görsel feedback
+            bulunanKart.style.transform = 'scale(1.05)';
+            bulunanKart.style.boxShadow = '0 0 20px var(--primary)';
+            bulunanKart.style.transition = 'all 0.3s ease';
+            
+            setTimeout(() => {
+                bulunanKart.style.transform = 'scale(1)';
+                bulunanKart.style.boxShadow = '';
+            }, 1000);
+            
+            const mağazaAdı = bulunanKart.querySelector('.seller-type-name, .store-name, .card-title')?.textContent || 'Mağaza';
+            speakToUser(`${mağazaAdı} seçildi.`);
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Kart tıklama hatası:', error);
+            speakToUser("Mağaza seçiminde hata oluştu.");
+            return false;
+        }
+    }
+    
+    // BULUNAMADIYSA YARDIM MESAJI
+    const mevcutMağazalar = Array.from(mağazaKartları)
+        .slice(0, 5)
+        .map(kart => kart.querySelector('.seller-type-name, .store-name, .card-title')?.textContent || 'Mağaza')
+        .join(', ');
+    
+    speakToUser(`Hangi mağazayı istiyorsunuz? Örneğin: ${mevcutMağazalar}. Veya "birinci mağaza", "fırın", "eczane" gibi söyleyebilirsiniz.`);
     return false;
 }
 
-// DOM'u bekleyen yardımcı fonksiyon
-function waitForDOM(selector, timeout = 5000) {
-    return new Promise((resolve, reject) => {
-        const startTime = Date.now();
-        
-        function check() {
-            const elements = document.querySelectorAll(selector);
-            if (elements.length > 0) {
-                console.log(`✅ DOM hazır: ${selector} ile ${elements.length} element bulundu`);
-                resolve(elements);
-                return;
-            }
-            
-            if (Date.now() - startTime > timeout) {
-                console.log(`❌ DOM timeout: ${selector} bulunamadı`);
-                reject(new Error('DOM timeout'));
-                return;
-            }
-            
-            setTimeout(check, 100);
-        }
-        
-        check();
+// TEST FONKSİYONU - TÜM MAĞAZALAR İÇİN
+function testTümMağazalar() {
+    console.log('🧪 TÜM MAĞAZALAR TESTİ');
+    
+    const testKomutları = [
+        'market', 'restoran', 'fast food', 'fırın', 'eczane', 
+        'pet shop', 'çiçekçi', 'birinci', 'ikinci', 'üçüncü',
+        'ekmek', 'ilaç', 'kahve', 'pizza', 'çiçek', 'hayvan'
+    ];
+    
+    testKomutları.forEach(komut => {
+        console.log(`\n🔍 Test: "${komut}"`);
+        handleVoiceStoreTypeSelection(komut).then(result => {
+            console.log(`✅ "${komut}" -> ${result ? 'Başarılı' : 'Başarısız'}`);
+        });
     });
 }
-
 // Eşleşen kartı bulan fonksiyon
 function findMatchingCard(kartlar, message) {
     const cleanMessage = message.toLowerCase().replace(/[^a-zğüşıöç]/g, '');
@@ -6779,6 +6855,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
