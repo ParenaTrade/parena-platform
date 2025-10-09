@@ -4106,12 +4106,13 @@ function handleDynamicProductNotFound(message, attemptedName) {
     }
 }    
 
-// Global öğrenen sistem - CLASS versiyonu
-class VoiceRecognitionLearner {
-    constructor() {
-        this.cache = new Map();
-        this.initialized = false;
-    }
+}
+   
+   
+ // Global öğrenen sistem - BASİT OBJECT versiyonu
+const voiceLearner = {
+    cache: new Map(),
+    initialized: false,
 
     async correctUserInput(userInput) {
         if (!this.initialized) return userInput;
@@ -4120,13 +4121,13 @@ class VoiceRecognitionLearner {
         
         // Cache'den düzeltme ara
         if (this.cache.has(lowerInput)) {
-            const rule = this.cache.get(lowerInput);
-            console.log(`🔄 Öğrenilmiş kural: "${userInput}" -> "${rule.correctedProduct}"`);
-            return rule.correctedProduct;
+            const corrected = this.cache.get(lowerInput);
+            console.log(`🔄 Öğrenilmiş kural: "${userInput}" -> "${corrected}"`);
+            return corrected;
         }
         
         return userInput;
-    }
+    },
 
     async recordSuccess(userInput, matchedProduct, productId = null) {
         try {
@@ -4145,11 +4146,29 @@ class VoiceRecognitionLearner {
         } catch (error) {
             console.error('Başarı kaydetme hatası:', error);
         }
-    }
+    },
+
+    async recordFailure(userInput, attemptedMatch = null) {
+        try {
+            const { error } = await supabase
+                .from('product_voice_matches')
+                .insert([{
+                    user_input: userInput.toLowerCase(),
+                    matched_product: null,
+                    attempted_match: attemptedMatch,
+                    success: false,
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (error) throw error;
+            console.log(`❌ Başarısızlık kaydedildi: "${userInput}"`);
+        } catch (error) {
+            console.error('Başarısızlık kaydetme hatası:', error);
+        }
+    },
 
     async initialize() {
         try {
-            // Tablodan kuralları yükle
             const { data: rules, error } = await supabase
                 .from('product_voice_matches')
                 .select('*')
@@ -4159,10 +4178,7 @@ class VoiceRecognitionLearner {
 
             this.cache.clear();
             rules.forEach(rule => {
-                this.cache.set(rule.user_input.toLowerCase(), {
-                    correctedProduct: rule.matched_product,
-                    productId: rule.product_id
-                });
+                this.cache.set(rule.user_input.toLowerCase(), rule.matched_product);
             });
 
             this.initialized = true;
@@ -4171,10 +4187,7 @@ class VoiceRecognitionLearner {
             console.error('❌ Öğrenen sistem başlatma hatası:', error);
         }
     }
-}
-   
-   
-    
+};   
 
 // Güncellenmiş extractProductInfoFromCommand
 async function extractProductInfoFromCommand(message) {
@@ -4328,77 +4341,18 @@ async function handleDynamicAddToCart(data) {
 }        
 
 
-        // İlk kurulum için örnek veriler
-// Çarliston Biber sorununu çözmek için başlangıç verileri
+  // Tabloyu başlangıç verileriyle doldurma (isteğe bağlı)
 async function initializeVoiceMatchTable() {
     try {
         const initialCorrections = [
-            // ÇARLİSTON BİBER SORUNLARI
-            {
-                user_input: 'çarliston',
-                matched_product: 'Çarliston Biber',
-                attempted_match: 'Çarliston Biber', 
-                success: true
-            },
-            {
-                user_input: 'viber',
-                matched_product: 'Çarliston Biber',
-                attempted_match: 'Çarliston Biber',
-                success: true
-            },
-            {
-                user_input: 'çarliston on',
-                matched_product: 'Çarliston Biber',
-                attempted_match: 'Çarliston Biber',
-                success: true
-            },
-            {
-                user_input: 'on çarliston',
-                matched_product: 'Çarliston Biber',
-                attempted_match: 'Çarliston Biber',
-                success: true
-            },
-            {
-                user_input: 'çarlistonbiber',
-                matched_product: 'Çarliston Biber',
-                attempted_match: 'Çarliston Biber',
-                success: true
-            },
-            
-            // DİĞER YAYGIN HATALAR
-            {
-                user_input: 'domat',
-                matched_product: 'Domates',
-                attempted_match: 'Domates',
-                success: true
-            },
-            {
-                user_input: 'sogan',
-                matched_product: 'Soğan',
-                attempted_match: 'Soğan',
-                success: true
-            },
-            {
-                user_input: 'biberr', 
-                matched_product: 'Biber',
-                attempted_match: 'Biber',
-                success: true
-            },
-            {
-                user_input: 'salatalik',
-                matched_product: 'Salatalık',
-                attempted_match: 'Salatalık',
-                success: true
-            },
-            {
-                user_input: 'patat',
-                matched_product: 'Patates',
-                attempted_match: 'Patates',
-                success: true
-            }
+            { user_input: 'çarliston', matched_product: 'Çarliston Biber', success: true },
+            { user_input: 'viber', matched_product: 'Çarliston Biber', success: true },
+            { user_input: 'çarliston on', matched_product: 'Çarliston Biber', success: true },
+            { user_input: 'on çarliston', matched_product: 'Çarliston Biber', success: true },
+            { user_input: 'domat', matched_product: 'Domates', success: true },
+            { user_input: 'sogan', matched_product: 'Soğan', success: true }
         ];
 
-        // Tabloya ekle (sadece yoksa)
         for (const correction of initialCorrections) {
             const { data: existing } = await supabase
                 .from('product_voice_matches')
@@ -4407,24 +4361,32 @@ async function initializeVoiceMatchTable() {
                 .single();
 
             if (!existing) {
-                const { error } = await supabase
+                await supabase
                     .from('product_voice_matches')
                     .insert([{
                         ...correction,
+                        attempted_match: correction.matched_product,
                         created_at: new Date().toISOString()
                     }]);
-
-                if (error) {
-                    console.error('Ekleme hatası:', error);
-                }
             }
         }
 
         console.log('✅ Tablo başlangıç verileri ile dolduruldu');
+        
+        // Öğrenen sistemi yeniden yükle
+        await voiceLearner.initialize();
+        
     } catch (error) {
         console.error('❌ Tablo doldurma hatası:', error);
     }
 }
+
+// İlk kurulum için (isteğe bağlı)
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        initializeVoiceMatchTable();
+    }, 3000);
+});
         
 // =============================================
 // DİNAMİK YARDIMCI FONKSİYONLAR
@@ -5766,6 +5728,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
