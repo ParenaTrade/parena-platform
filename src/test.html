@@ -2292,8 +2292,11 @@ let isLocationDetected = false;
 // =============================================
 
 async function initApp() {
-    try {
-        debugLog('🚀 === DİNAMİK UYGULAMA BAŞLATILIYOR ===');
+      try {
+        console.log('🚀 Uygulama başlatılıyor...');
+        
+        // Önce öğrenen sistemi başlat
+        await voiceLearner.initialize();
         
         // 1. Tüm dinamik verileri yükle
         await loadAllDynamicData();
@@ -2545,34 +2548,38 @@ async function createDefaultCommandRules() {
 // DİNAMİK SES KOMUT İŞLEME
 // =============================================
 
+// Güncellenmiş ses komut işleme
 async function processVoiceCommand(transcript) {
     const message = transcript.toLowerCase().trim();
     if (userMessage) userMessage.textContent = transcript;
 
-    debugLog(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot} | Satıcı: ${selectedSellerId} | Kategori: ${selectedCategoryId}`);
+    console.log(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot}`);
 
-    // 1. Askıda cevap varsa, onu işle
-    if (pendingResponse) {
-        return handlePendingDynamicResponse(message);
-    }
-
-    // 2. Mevcut kök için kuralları ara
-    const match = await findDynamicRuleMatch(message, currentRoot);
-    
-    if (match) {
-        await executeDynamicMatchedRule(match, message);
-    } else {
-        // 3. Bağlamsal komut işleme - mevcut duruma göre
+    try {
+        // Önce bağlamsal komut işleme
         const contextualMatch = await handleContextualCommand(message);
         if (contextualMatch) {
+            // Başarılı eşleşmeyi kaydet
+            await voiceLearner.recordSuccess(message, 'contextual_command');
             return;
         }
+
+        // Mevcut kök için kuralları ara
+        const match = await findDynamicRuleMatch(message, currentRoot);
         
-        // 4. Eşleşme yoksa AI'ya yönlendir
-        await handleDynamicAIRequest(message, currentRoot);
+        if (match) {
+            await executeDynamicMatchedRule(match, message);
+            await voiceLearner.recordSuccess(message, 'rule_match');
+        } else {
+            // AI'ya yönlendir
+            await handleDynamicAIRequest(message, currentRoot);
+        }
+
+    } catch (error) {
+        console.error('❌ Komut işleme hatası:', error);
+        await voiceLearner.recordFailure(message, 'processing_error');
     }
 }
-
 // Bağlamsal komut işleme
 async function handleContextualCommand(message) {
     debugLog(`🔍 Bağlamsal komut kontrolü: "${message}"`);
@@ -3296,8 +3303,17 @@ async function selectCategoryByName(categoryName) {
     }
 }
 
-// Ürün ismine göre bulma
+// Ürün ismine göre bulma (Güncellenmiş findProductByName)
 function findProductByName(productName) {
+    console.log('🔍 findProductByName çağrıldı:', productName);
+    
+    // Önce öğrenilmiş kuralları kontrol et
+    const correctedProductName = voiceLearner.correctUserInput(productName);
+    if (correctedProductName !== productName) {
+        console.log(`🔄 Öğrenilmiş ürün eşleşmesi: "${productName}" -> "${correctedProductName}"`);
+        productName = correctedProductName;
+    }
+    
     console.log('🔍 findProductByName çağrıldı:', productName);
     console.log('📊 Mevcut ürün sayısı:', products.length);
     
@@ -3867,21 +3883,64 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 3000);
 });       
 // Ürün bilgisi çıkarımı
+// Güncellenmiş extractProductInfoFromCommand
 function extractProductInfoFromCommand(message) {
-    console.log('🔍 extractProductInfoFromCommand çağrıldı:', message);
+      console.log('🔍 extractProductInfoFromCommand çağrıldı:', message);
     
     if (!message || message.trim() === '') {
-        console.log('❌ Boş mesaj');
         return null;
     }
+
+    // ÖNEMLİ: Önce tablodan düzeltmeleri uygula
+    const applyCorrections = async (input) => {
+        try {
+            const { data: corrections, error } = await supabase
+                .from('product_voice_matches')
+                .select('matched_product')
+                .eq('user_input', input.toLowerCase())
+                .eq('success', true)
+                .single();
+
+            if (error || !corrections) return input;
+            
+            console.log(`🔄 Tablodan düzeltme: "${input}" -> "${corrections.matched_product}"`);
+            return corrections.matched_product;
+        } catch (error) {
+            return input;
+        }
+    };
+
+    // Düzeltmeleri uygula (async olarak beklememiz gerekiyor)
+    // Bu kısmı biraz değiştirelim:
+    let correctedMessage = message;
     
-    // Temizleme ve normalize etme
-    let cleanMessage = message.toLowerCase()
+    // Basit senkron düzeltmeler (async için Promise kullanacağız)
+    const quickCorrections = {
+        'çarliston': 'Çarliston Biber',
+        'viber': 'Çarliston Biber',
+        'çarliston on': 'Çarliston Biber',
+        'on çarliston': 'Çarliston Biber',
+        'çarlistonbiber': 'Çarliston Biber',
+        'domat': 'Domates',
+        'sogan': 'Soğan',
+        'biberr': 'Biber',
+        'salatalik': 'Salatalık',
+        'patat': 'Patates'
+    };
+
+    if (quickCorrections[message.toLowerCase()]) {
+        correctedMessage = quickCorrections[message.toLowerCase()];
+        console.log(`🔄 Hızlı düzeltme: "${message}" -> "${correctedMessage}"`);
+    }
+
+    // Orijinal çıkarım işlemi (önceki kodunuz)
+    let cleanMessage = message
         .replace(/ekle|sepete|al|istiyorum|lütfen|rica|ediyorum|tane|adet/g, '')
         .replace(/\s+/g, ' ')
         .trim();
-    
+
     console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
+
     
     // Birim ve miktar çıkarımı
     const unitPatterns = [
@@ -3976,6 +4035,64 @@ function extractProductInfoFromCommand(message) {
     
     return { productName, quantity, unit };
 }
+
+// Hemen kullanabileceğiniz basit versiyon
+function setupVoiceRecognitionLearning() {
+    console.log('🔧 Ses tanıma öğrenme sistemi kuruluyor...');
+    
+    // Başlangıç verilerini yükle
+    initializeVoiceMatchTable();
+    
+    // Global fonksiyonları güncelle
+    const originalProcessVoiceCommand = processVoiceCommand;
+    
+    processVoiceCommand = async function(transcript) {
+        const message = transcript.toLowerCase().trim();
+        
+        try {
+            // Önce tablodan düzeltme var mı kontrol et
+            const { data: correction, error } = await supabase
+                .from('product_voice_matches')
+                .select('matched_product')
+                .eq('user_input', message)
+                .eq('success', true)
+                .single();
+
+            if (!error && correction) {
+                console.log(`🎯 Tablo düzeltmesi: "${message}" -> "${correction.matched_product}"`);
+                // Düzeltilmiş mesajla işleme devam et
+                await originalProcessVoiceCommand.call(this, correction.matched_product);
+                
+                // Başarıyı kaydet (match_count artırmak için)
+                await supabase
+                    .from('product_voice_matches')
+                    .update({ 
+                        attempted_match: correction.matched_product,
+                        created_at: new Date().toISOString()
+                    })
+                    .eq('user_input', message);
+                    
+                return;
+            }
+            
+            // Normal işleme devam et
+            await originalProcessVoiceCommand.call(this, transcript);
+            
+        } catch (error) {
+            console.error('Öğrenen sistem hatası:', error);
+            await originalProcessVoiceCommand.call(this, transcript);
+        }
+    };
+    
+    console.log('✅ Ses tanıma öğrenme sistemi hazır');
+}
+
+// Uygulama başlangıcında çağır
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        setupVoiceRecognitionLearning();
+    }, 2000);
+});
         
 // Ürün bulunamadı durumu
 function handleDynamicProductNotFound(message, attemptedName) {
@@ -3989,6 +4106,74 @@ function handleDynamicProductNotFound(message, attemptedName) {
         speakToUser("Henüz ürün yüklenmedi. Lütfen bir kategori seçin.");
     }
 }    
+
+        // Global öğrenen sistem
+const voiceLearner = {
+    async correctUserInput(userInput) {
+        try {
+            // Tablodan düzeltme kurallarını al
+            const { data: rules, error } = await supabase
+                .from('product_voice_matches')
+                .select('*')
+                .eq('user_input', userInput.toLowerCase())
+                .eq('success', true);
+
+            if (error) throw error;
+            
+            if (rules && rules.length > 0) {
+                console.log(`🔄 Tablodan düzeltme: "${userInput}" -> "${rules[0].matched_product}"`);
+                return rules[0].matched_product;
+            }
+            
+            return userInput;
+        } catch (error) {
+            console.error('Düzeltme hatası:', error);
+            return userInput;
+        }
+    },
+
+    async recordSuccess(userInput, matchedProduct, productId = null) {
+        try {
+            // Tabloya başarılı eşleşmeyi kaydet
+            const { error } = await supabase
+                .from('product_voice_matches')
+                .insert([{
+                    user_input: userInput.toLowerCase(),
+                    matched_product: matchedProduct,
+                    attempted_match: matchedProduct,
+                    success: true,
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (error) throw error;
+            console.log(`✅ Başarı kaydedildi: "${userInput}" -> "${matchedProduct}"`);
+        } catch (error) {
+            console.error('Başarı kaydetme hatası:', error);
+        }
+    },
+
+    async recordFailure(userInput, attemptedMatch = null) {
+        try {
+            // Tabloya başarısız eşleşmeyi kaydet
+            const { error } = await supabase
+                .from('product_voice_matches')
+                .insert([{
+                    user_input: userInput.toLowerCase(),
+                    matched_product: null,
+                    attempted_match: attemptedMatch,
+                    success: false,
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (error) throw error;
+            console.log(`❌ Başarısızlık kaydedildi: "${userInput}"`);
+        } catch (error) {
+            console.error('Başarısızlık kaydetme hatası:', error);
+        }
+    }
+};
+
+        
 // =============================================
 // DİNAMİK REYON SİSTEMİ
 // =============================================
@@ -4026,51 +4211,397 @@ async function selectDynamicCategory(category) {
     }
 }
 
+
+
+
+// Öğrenen ses tanıma sistemi
+class VoiceRecognitionLearner {
+    constructor() {
+        this.cache = new Map();
+        this.initialized = false;
+    }
+
+    async initialize() {
+        try {
+            // Öncelikle öğrenilmiş kuralları yükle
+            await this.loadLearnedRules();
+            this.initialized = true;
+            console.log('✅ Öğrenen ses tanıma sistemi hazır');
+        } catch (error) {
+            console.error('❌ Öğrenen sistem başlatma hatası:', error);
+        }
+    }
+async loadLearnedRules() {
+        try {
+            const { data: rules, error } = await supabase
+                .from('product_voice_matches')
+                .select('*')
+                .or('success.eq.true,quantity_confusion.eq.true')
+                .order('success_count', { ascending: false });
+
+            if (error) throw error;
+
+            // Cache'e yükle
+            this.cache.clear();
+            rules.forEach(rule => {
+                this.cache.set(rule.user_input.toLowerCase(), {
+                    correctedProduct: rule.matched_product,
+                    productId: rule.product_id,
+                    quantityConfusion: rule.quantity_confusion,
+                    correctionPattern: rule.correction_pattern,
+                    successRate: rule.success_count / rule.match_count,
+                    matchCount: rule.match_count
+                });
+            });
+
+            console.log(`📚 ${rules.length} öğrenilmiş kural yüklendi`);
+        } catch (error) {
+            console.error('❌ Öğrenilmiş kurallar yükleme hatası:', error);
+        }
+    }
+
+    // Ses girdisini düzelt
+    correctUserInput(userInput) {
+        if (!this.initialized) return userInput;
+
+        const lowerInput = userInput.toLowerCase().trim();
+        
+        // Önce tam eşleşme ara
+        if (this.cache.has(lowerInput)) {
+            const rule = this.cache.get(lowerInput);
+            console.log(`🔄 Öğrenilmiş kural uygulandı: "${userInput}" -> "${rule.correctedProduct}"`);
+            return rule.correctedProduct;
+        }
+
+        // Kısmi eşleşme ara
+        for (const [pattern, rule] of this.cache.entries()) {
+            if (lowerInput.includes(pattern) || pattern.includes(lowerInput)) {
+                console.log(`🔄 Kısmi kural uygulandı: "${userInput}" -> "${rule.correctedProduct}"`);
+                return rule.correctedProduct;
+            }
+        }
+
+        return userInput;
+    }
+
+    // Miktar karışıklığını kontrol et
+    hasQuantityConfusion(userInput) {
+        if (!this.initialized) return false;
+
+        const lowerInput = userInput.toLowerCase().trim();
+        
+        for (const [pattern, rule] of this.cache.entries()) {
+            if (rule.quantityConfusion && 
+                (lowerInput.includes(pattern) || pattern.includes(lowerInput))) {
+                console.log(`⚠️ Miktar karışıklığı tespit edildi: "${userInput}"`);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+// Başarılı eşleşmeyi kaydet
+    async recordSuccess(userInput, matchedProduct, productId = null) {
+        try {
+            const lowerInput = userInput.toLowerCase().trim();
+            
+            // Önce bu girdi için kayıt var mı kontrol et
+            const { data: existing, error: findError } = await supabase
+                .from('product_voice_matches')
+                .select('*')
+                .eq('user_input', lowerInput)
+                .single();
+
+            if (findError && findError.code !== 'PGRST116') {
+                console.error('Kayıt arama hatası:', findError);
+                return;
+            }
+
+            if (existing) {
+                // Mevcut kaydı güncelle
+                const { error } = await supabase
+                    .from('product_voice_matches')
+                    .update({
+                        matched_product: matchedProduct,
+                        product_id: productId,
+                        success: true,
+                        match_count: (existing.match_count || 0) + 1,
+                        success_count: (existing.success_count || 0) + 1,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id);
+
+                if (error) throw error;
+                
+                // Cache'i güncelle
+                this.cache.set(lowerInput, {
+                    correctedProduct: matchedProduct,
+                    productId: productId,
+                    quantityConfusion: existing.quantity_confusion,
+                    correctionPattern: existing.correction_pattern,
+                    successRate: ((existing.success_count || 0) + 1) / ((existing.match_count || 0) + 1),
+                    matchCount: (existing.match_count || 0) + 1
+                });
+
+            } else {
+                // Yeni kayıt oluştur
+                const { error } = await supabase
+                    .from('product_voice_matches')
+                    .insert([{
+                        user_input: lowerInput,
+                        matched_product: matchedProduct,
+                        product_id: productId,
+                        attempted_match: matchedProduct,
+                        success: true,
+                        match_count: 1,
+                        success_count: 1,
+                        created_at: new Date().toISOString()
+                    }]);
+
+                if (error) throw error;
+
+                // Cache'e ekle
+                this.cache.set(lowerInput, {
+                    correctedProduct: matchedProduct,
+                    productId: productId,
+                    quantityConfusion: false,
+                    correctionPattern: null,
+                    successRate: 1.0,
+                    matchCount: 1
+                });
+            }
+
+            console.log(`✅ Başarılı eşleşme kaydedildi: "${userInput}" -> "${matchedProduct}"`);
+        } catch (error) {
+            console.error('❌ Başarı kaydetme hatası:', error);
+        }
+    }
+ // Başarısız eşleşmeyi kaydet
+    async recordFailure(userInput, attemptedMatch = null) {
+        try {
+            const lowerInput = userInput.toLowerCase().trim();
+            
+            const { data: existing, error: findError } = await supabase
+                .from('product_voice_matches')
+                .select('*')
+                .eq('user_input', lowerInput)
+                .single();
+
+            if (findError && findError.code !== 'PGRST116') {
+                console.error('Kayıt arama hatası:', findError);
+                return;
+            }
+
+            if (existing) {
+                // Mevcut kaydı güncelle
+                const { error } = await supabase
+                    .from('product_voice_matches')
+                    .update({
+                        attempted_match: attemptedMatch,
+                        success: false,
+                        match_count: (existing.match_count || 0) + 1,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id);
+
+                if (error) throw error;
+
+            } else {
+                // Yeni kayıt oluştur
+                const { error } = await supabase
+                    .from('product_voice_matches')
+                    .insert([{
+                        user_input: lowerInput,
+                        matched_product: null,
+                        attempted_match: attemptedMatch,
+                        success: false,
+                        match_count: 1,
+                        success_count: 0,
+                        created_at: new Date().toISOString()
+                    }]);
+
+                if (error) throw error;
+            }
+
+            console.log(`❌ Başarısız eşleşme kaydedildi: "${userInput}"`);
+        } catch (error) {
+            console.error('❌ Başarısızlık kaydetme hatası:', error);
+        }
+    }
+
+    // Miktar karışıklığını kaydet
+    async recordQuantityConfusion(userInput, correctProduct, incorrectQuantity) {
+        try {
+            const lowerInput = userInput.toLowerCase().trim();
+            
+            const { error } = await supabase
+                .from('product_voice_matches')
+                .insert([{
+                    user_input: lowerInput,
+                    matched_product: correctProduct,
+                    attempted_match: incorrectQuantity,
+                    success: true,
+                    quantity_confusion: true,
+                    correction_pattern: `"${userInput}" -> "${correctProduct}" (miktar düzeltildi)`,
+                    match_count: 1,
+                    success_count: 1,
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (error) throw error;
+
+            // Cache'e ekle
+            this.cache.set(lowerInput, {
+                correctedProduct: correctProduct,
+                productId: null,
+                quantityConfusion: true,
+                correctionPattern: `"${userInput}" -> "${correctProduct}"`,
+                successRate: 1.0,
+                matchCount: 1
+            });
+
+            console.log(`🔧 Miktar karışıklığı kaydedildi: "${userInput}" -> "${correctProduct}"`);
+        } catch (error) {
+            console.error('❌ Miktar karışıklığı kaydetme hatası:', error);
+        }
+    }
+}
+
+// Global öğrenen sistem instance'ı
+const voiceLearner = new VoiceRecognitionLearner();
+    
+        
 // =============================================
 // DİNAMİK ÜRÜN SİSTEMİ
 // =============================================
 
+// Güncellenmiş ürün ekleme
 async function handleDynamicAddToCart(data) {
     console.log('🎯 handleDynamicAddToCart çağrıldı:', data);
     
-    if (!selectedSellerId) {
-        console.log('❌ Satıcı seçili değil');
-        speakToUser("Önce bir satıcı seçmelisiniz.");
-        return;
-    }
-    
-    if (products.length === 0) {
-        console.log('❌ Ürün listesi boş');
-        speakToUser("Henüz ürün yüklenmedi. Lütfen bir kategori seçin.");
-        return;
-    }
-    
-    console.log('🔍 Ürün çıkarımı başlıyor...');
     const productInfo = extractProductInfoFromCommand(data.message);
     console.log('📦 Çıkarılan ürün bilgisi:', productInfo);
     
     if (!productInfo) {
-        console.log('❌ Ürün bilgisi çıkarılamadı');
-        speakToUser("Ürün ismini anlayamadım. Lütfen '5 kilo domates' veya '3 ekmek' gibi söyleyin.");
+        await voiceLearner.recordFailure(data.message, 'extraction_failed');
+        speakToUser("Ürün ismini anlayamadım.");
         return;
     }
-    
+
     const { productName, quantity, unit } = productInfo;
-    console.log(`🔍 Ürün aranıyor: "${productName}" - ${quantity} ${unit}`);
-    
     const product = findProductByName(productName);
-    console.log('✅ Bulunan ürün:', product);
     
     if (product) {
-        console.log(`🛒 Sepete ekleniyor: ${quantity} ${unit} ${product.name}`);
         addToCart(product, quantity);
         speakToUser(`${quantity} ${unit} ${product.name} sepete eklendi.`);
         
-        // AI öğrenmesi için kaydet
-        await saveSuccessfulProductMatch(data.message, product.name);
+        // BAŞARI KAYDET
+        await voiceLearner.recordSuccess(data.message, product.name, product.id);
+        
     } else {
-        console.log('❌ Ürün bulunamadı');
+        // BAŞARISIZLIK KAYDET
+        await voiceLearner.recordFailure(data.message, productName);
         handleDynamicProductNotFound(data.message, productName);
+    }
+}        
+
+
+        // İlk kurulum için örnek veriler
+// Çarliston Biber sorununu çözmek için başlangıç verileri
+async function initializeVoiceMatchTable() {
+    try {
+        const initialCorrections = [
+            // ÇARLİSTON BİBER SORUNLARI
+            {
+                user_input: 'çarliston',
+                matched_product: 'Çarliston Biber',
+                attempted_match: 'Çarliston Biber', 
+                success: true
+            },
+            {
+                user_input: 'viber',
+                matched_product: 'Çarliston Biber',
+                attempted_match: 'Çarliston Biber',
+                success: true
+            },
+            {
+                user_input: 'çarliston on',
+                matched_product: 'Çarliston Biber',
+                attempted_match: 'Çarliston Biber',
+                success: true
+            },
+            {
+                user_input: 'on çarliston',
+                matched_product: 'Çarliston Biber',
+                attempted_match: 'Çarliston Biber',
+                success: true
+            },
+            {
+                user_input: 'çarlistonbiber',
+                matched_product: 'Çarliston Biber',
+                attempted_match: 'Çarliston Biber',
+                success: true
+            },
+            
+            // DİĞER YAYGIN HATALAR
+            {
+                user_input: 'domat',
+                matched_product: 'Domates',
+                attempted_match: 'Domates',
+                success: true
+            },
+            {
+                user_input: 'sogan',
+                matched_product: 'Soğan',
+                attempted_match: 'Soğan',
+                success: true
+            },
+            {
+                user_input: 'biberr', 
+                matched_product: 'Biber',
+                attempted_match: 'Biber',
+                success: true
+            },
+            {
+                user_input: 'salatalik',
+                matched_product: 'Salatalık',
+                attempted_match: 'Salatalık',
+                success: true
+            },
+            {
+                user_input: 'patat',
+                matched_product: 'Patates',
+                attempted_match: 'Patates',
+                success: true
+            }
+        ];
+
+        // Tabloya ekle (sadece yoksa)
+        for (const correction of initialCorrections) {
+            const { data: existing } = await supabase
+                .from('product_voice_matches')
+                .select('id')
+                .eq('user_input', correction.user_input)
+                .single();
+
+            if (!existing) {
+                const { error } = await supabase
+                    .from('product_voice_matches')
+                    .insert([{
+                        ...correction,
+                        created_at: new Date().toISOString()
+                    }]);
+
+                if (error) {
+                    console.error('Ekleme hatası:', error);
+                }
+            }
+        }
+
+        console.log('✅ Tablo başlangıç verileri ile dolduruldu');
+    } catch (error) {
+        console.error('❌ Tablo doldurma hatası:', error);
     }
 }
         
@@ -5414,6 +5945,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
