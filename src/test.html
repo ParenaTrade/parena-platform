@@ -2271,6 +2271,7 @@ let isLocationDetected = false;
         const locationModal = document.getElementById('locationModal');
         const referralLink = document.getElementById('referralLink');
         const whatsappOrder = document.getElementById('whatsappOrder');
+        const voiceLearner = new VoiceRecognitionLearner();
 
         // Utility functions
         function money(n) { 
@@ -4106,24 +4107,72 @@ function handleDynamicProductNotFound(message, attemptedName) {
     }
 }    
 
-// Öğrenen ses tanıma sistemi
+// Global öğrenen sistem - CLASS versiyonu
 class VoiceRecognitionLearner {
     constructor() {
         this.cache = new Map();
         this.initialized = false;
     }
 
+    async correctUserInput(userInput) {
+        if (!this.initialized) return userInput;
+        
+        const lowerInput = userInput.toLowerCase().trim();
+        
+        // Cache'den düzeltme ara
+        if (this.cache.has(lowerInput)) {
+            const rule = this.cache.get(lowerInput);
+            console.log(`🔄 Öğrenilmiş kural: "${userInput}" -> "${rule.correctedProduct}"`);
+            return rule.correctedProduct;
+        }
+        
+        return userInput;
+    }
+
+    async recordSuccess(userInput, matchedProduct, productId = null) {
+        try {
+            const { error } = await supabase
+                .from('product_voice_matches')
+                .insert([{
+                    user_input: userInput.toLowerCase(),
+                    matched_product: matchedProduct,
+                    attempted_match: matchedProduct,
+                    success: true,
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (error) throw error;
+            console.log(`✅ Başarı kaydedildi: "${userInput}" -> "${matchedProduct}"`);
+        } catch (error) {
+            console.error('Başarı kaydetme hatası:', error);
+        }
+    }
+
     async initialize() {
         try {
-            // Öncelikle öğrenilmiş kuralları yükle
-            await this.loadLearnedRules();
+            // Tablodan kuralları yükle
+            const { data: rules, error } = await supabase
+                .from('product_voice_matches')
+                .select('*')
+                .eq('success', true);
+
+            if (error) throw error;
+
+            this.cache.clear();
+            rules.forEach(rule => {
+                this.cache.set(rule.user_input.toLowerCase(), {
+                    correctedProduct: rule.matched_product,
+                    productId: rule.product_id
+                });
+            });
+
             this.initialized = true;
-            console.log('✅ Öğrenen ses tanıma sistemi hazır');
+            console.log(`✅ ${rules.length} öğrenilmiş kural yüklendi`);
         } catch (error) {
             console.error('❌ Öğrenen sistem başlatma hatası:', error);
         }
     }
-
+}
     async loadLearnedRules() {
         try {
             const { data: rules, error } = await supabase
@@ -4286,7 +4335,100 @@ class VoiceRecognitionLearner {
     }
 }
 
+// Güncellenmiş extractProductInfoFromCommand
+async function extractProductInfoFromCommand(message) {
+    console.log('🔍 extractProductInfoFromCommand çağrıldı:', message);
+    
+    if (!message || message.trim() === '') {
+        return null;
+    }
 
+    // ÖNEMLİ: Önce öğrenen sistemden düzeltmeyi al
+    let correctedMessage = message;
+    if (voiceLearner.initialized) {
+        correctedMessage = await voiceLearner.correctUserInput(message);
+        if (correctedMessage !== message) {
+            console.log(`🔄 Öğrenen sistem düzeltmesi: "${message}" -> "${correctedMessage}"`);
+        }
+    }
+
+    // Hızlı düzeltmeler (fallback)
+    const quickCorrections = {
+        'çarliston': 'Çarliston Biber',
+        'viber': 'Çarliston Biber',
+        'çarliston on': 'Çarliston Biber',
+        'on çarliston': 'Çarliston Biber',
+        'çarlistonbiber': 'Çarliston Biber',
+        'domat': 'Domates',
+        'sogan': 'Soğan',
+        'biberr': 'Biber',
+        'salatalik': 'Salatalık',
+        'patat': 'Patates'
+    };
+
+    const lowerMessage = correctedMessage.toLowerCase();
+    if (quickCorrections[lowerMessage]) {
+        correctedMessage = quickCorrections[lowerMessage];
+        console.log(`🔄 Hızlı düzeltme: "${message}" -> "${correctedMessage}"`);
+    }
+
+    // Orijinal çıkarım işlemi
+    let cleanMessage = correctedMessage
+        .replace(/ekle|sepete|al|istiyorum|lütfen|rica|ediyorum|tane|adet/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
+
+    // ... mevcut çıkarım kodunuz burada devam eder
+    // [BURAYA MEVCUT extractProductInfoFromCommand KODUNUZ]
+    
+    return { productName, quantity, unit };
+}
+
+// Güncellenmiş ürün ekleme
+async function handleDynamicAddToCart(data) {
+    console.log('🎯 handleDynamicAddToCart çağrıldı:', data);
+    
+    const productInfo = await extractProductInfoFromCommand(data.message);
+    
+    if (!productInfo) {
+        await voiceLearner.recordFailure(data.message, 'extraction_failed');
+        speakToUser("Ürün ismini anlayamadım.");
+        return;
+    }
+
+    const { productName, quantity, unit } = productInfo;
+    const product = findProductByName(productName);
+    
+    if (product) {
+        addToCart(product, quantity);
+        speakToUser(`${quantity} ${unit} ${product.name} sepete eklendi.`);
+        
+        // BAŞARI KAYDET
+        await voiceLearner.recordSuccess(data.message, product.name, product.id);
+        
+    } else {
+        // BAŞARISIZLIK KAYDET
+        await voiceLearner.recordFailure(data.message, productName);
+        handleDynamicProductNotFound(data.message, productName);
+    }
+}
+
+        // Test fonksiyonu
+async function testVoiceLearner() {
+    console.log('🧪 Öğrenen Sistem Testi');
+    
+    const testCases = ['çarliston', 'viber', 'domat', 'sogan', 'testürünü'];
+    
+    for (const testCase of testCases) {
+        const corrected = await voiceLearner.correctUserInput(testCase);
+        console.log(`🧪 "${testCase}" -> "${corrected}"`);
+    }
+}
+
+// Console'da test etmek için:
+// testVoiceLearner();
 // =============================================
 // DİNAMİK REYON SİSTEMİ
 // =============================================
@@ -5783,6 +5925,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
