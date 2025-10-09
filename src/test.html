@@ -1789,6 +1789,8 @@ function updateLockUI() {
                         updateCartUI();
                     });
                 });
+                     // Temizleme butonunu ekle
+                        addClearCartButton();
             }, 100);
         }
 
@@ -2764,6 +2766,60 @@ async function handleContextualCommand(message) {
         return false;
     }
 }
+
+// Sepeti tamamen boşaltma fonksiyonu
+function clearCart() {
+    console.log('🗑️ Sepet boşaltılıyor...');
+    
+    cart = [];
+    updateCartUI();
+    unlockStoreAndSeller();
+    
+    speakToUser("Sepet boşaltıldı. Artık başka mağazalardan alışveriş yapabilirsiniz.");
+    
+    // Sepet kapatılsın
+    closeDynamicCart();
+}
+
+// Sepet UI'sına temizleme butonu ekle
+// Sepet UI'sına temizleme butonu ekle
+function addClearCartButton() {
+    const cartItems = document.getElementById('cartItems');
+    if (!cartItems) return;
+    
+    // Temizleme butonu yoksa ekle
+    if (!document.getElementById('clearCartBtn') && cart.length > 0) {
+        const clearBtn = document.createElement('button');
+        clearBtn.id = 'clearCartBtn';
+        clearBtn.innerHTML = '<i class="fas fa-trash"></i> Sepeti Boşalt';
+        clearBtn.style.cssText = `
+            width: 100%;
+            padding: 12px;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-weight: 600;
+        `;
+        
+        clearBtn.addEventListener('click', function() {
+            if (confirm('Sepeti tamamen boşaltmak istediğinizden emin misiniz?')) {
+                clearCart();
+            }
+        });
+        
+        cartItems.parentNode.insertBefore(clearBtn, cartItems.nextSibling);
+    }
+    
+    // Sepet boşsa butonu kaldır
+    if (document.getElementById('clearCartBtn') && cart.length === 0) {
+        document.getElementById('clearCartBtn').remove();
+    }
+}
+
+        
 
         // Kategori ismine göre bulma
 function findCategoryByName(categoryName) {
@@ -6045,6 +6101,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
