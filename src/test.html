@@ -1561,9 +1561,22 @@
         // SEPET YÖNETİM FONKSİYONLARI
         // =============================================
 
-      function addToCart(product, quantity, productCard = null) {
+    function addToCart(product, quantity, productCard = null) {
     console.log('🛒 addToCart çağrıldı:', product.name, quantity);
     console.log('📊 Önceki sepet durumu:', cart.length, 'ürün');
+    console.log('🔒 Kilit durumu:', isSellerLocked);
+    console.log('🏪 Seçili satıcı:', selectedSellerId);
+    
+    // KİLİT KONTROLÜ - farklı satıcıdan ürün eklenmeye çalışılıyorsa
+    if (isSellerLocked && cart.length > 0) {
+        const firstCartItem = cart[0];
+        if (firstCartItem && firstCartItem.seller_id !== selectedSellerId) {
+            const currentSeller = sellers.find(s => s.id === firstCartItem.seller_id);
+            console.log('❌ Farklı satıcıdan ürün eklenmeye çalışılıyor');
+            speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut satıcı'} ile alışverişe devam edebilirsiniz.`);
+            return; // İşlemi durdur
+        }
+    }
     
     // Sepet durumunu kontrol et (kilit mekanizması için)
     const wasCartEmpty = cart.length === 0;
@@ -1582,13 +1595,13 @@
             unit_type: product.unit_type || 'adet',
             image: product.imgurl,
             product_price_id: product.product_price_id,
-            seller_id: selectedSellerId,
+            seller_id: selectedSellerId, // Mevcut satıcıyı kaydet
             category_id: selectedCategoryId
         });
         console.log('✅ Yeni ürün eklendi:', product.name);
     }
     
-    // HEMEN GÜNCELLE - bekleme yok
+    // HEMEN GÜNCELLE
     updateCartUI();
     
     // ÖNEMLİ: İlk ürün eklendiğinde kilit mekanizmasını aktif et
@@ -1624,12 +1637,13 @@ function lockStoreAndSeller() {
     // UI'da kilidi göster
     updateLockUI();
     
-    // Kullanıcıya bilgi ver
-    speakToUser("İlk ürün sepete eklendi. Artık sadece bu mağazadan alışveriş yapabilirsiniz. Sepeti boşaltarak kilidi kaldırabilirsiniz.");
+    // Daha açık mesaj
+    const currentSeller = sellers.find(s => s.id === selectedSellerId);
+    speakToUser(`İlk ürün sepete eklendi. Artık sadece ${currentSeller?.business_name || 'bu mağaza'} ile alışveriş yapabilirsiniz. Başka mağaza seçmek için "sepeti boşalt" diyebilirsiniz.`);
     
     console.log('✅ Mağaza ve satıcı kilitlendi:', selectedSellerId);
 }
-
+        
 // Kilidi kaldırma fonksiyonu
 function unlockStoreAndSeller() {
     console.log('🔓 Mağaza ve satıcı kilidi kaldırılıyor...');
@@ -2715,24 +2729,12 @@ async function createDefaultCommandRules() {
 // DİNAMİK SES KOMUT İŞLEME
 // =============================================
 
-// DÜZELTİLMİŞ processVoiceCommand
+// Güncellenmiş processVoiceCommand - daha net kilit mesajı
 async function processVoiceCommand(transcript) {
     const message = transcript.toLowerCase().trim();
-    
-    // Kilit kontrolü - mağaza/satıcı değiştirme komutlarını engelle
-    if (isSellerLocked && isStoreChangeCommand(message)) {
-        const currentSeller = sellers.find(s => s.id === selectedSellerId);
-        speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut mağaza'} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
-        return;
-    }
-    if (!transcript || typeof transcript !== 'string') {
-        console.log('❌ Geçersiz transcript:', transcript);
-        return;
-    }
-    
     if (userMessage) userMessage.textContent = transcript;
 
-    console.log(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot}`);
+    console.log(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot} | Kilit: ${isSellerLocked}`);
 
     try {
         // 1. Askıda cevap varsa, onu işle
@@ -2740,68 +2742,108 @@ async function processVoiceCommand(transcript) {
             return await handlePendingDynamicResponse(message);
         }
 
-        // 2. Bağlamsal komut işleme
+        // 2. Sepet temizleme komutlarını kontrol et
+        if (isClearCartCommand(message)) {
+            clearCart();
+            return;
+        }
+
+        // 3. Kilit durumunda mağaza değiştirme komutlarını engelle
+        if (isSellerLocked && isStoreChangeCommand(message)) {
+            const firstCartItem = cart[0];
+            const currentSeller = firstCartItem ? sellers.find(s => s.id === firstCartItem.seller_id) : null;
+            speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut mağaza'} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
+            return;
+        }
+
+        // 4. Bağlamsal komut işleme (ürün ekleme vs.)
         const contextualMatch = await handleContextualCommand(message);
         if (contextualMatch) {
             return;
         }
 
-        // 3. Mevcut kök için kuralları ara
+        // 5. Mevcut kök için kuralları ara
         const match = await findDynamicRuleMatch(message, currentRoot);
         
         if (match) {
             await executeDynamicMatchedRule(match, message);
         } else {
-            // 4. Eşleşme yoksa AI'ya yönlendir
+            // 6. Eşleşme yoksa AI'ya yönlendir
             await handleDynamicAIRequest(message, currentRoot);
         }
 
     } catch (error) {
         console.error('❌ Komut işleme hatası:', error);
-        // Hata durumunda bile kaydetmeye çalış
         try {
             await voiceLearner.recordFailure(message, 'processing_error');
         } catch (e) {
             console.error('Hata kaydetme hatası:', e);
         }
-        // Mağaza değiştirme komutlarını tespit et
-    function isStoreChangeCommand(message) {
+    }
+}
+
+// Sepet temizleme komutlarını tespit et
+function isClearCartCommand(message) {
+    const clearCommands = [
+        'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+        'clear cart', 'empty cart', 'reset cart', 'temizle'
+    ];
+    
+    return clearCommands.some(cmd => message.includes(cmd));
+}
+
+// Mağaza değiştirme komutlarını tespit et
+function isStoreChangeCommand(message) {
     const changeCommands = [
         'market', 'restoran', 'eczane', 'fırın', 'kafe',
         'mağaza', 'dükkan', 'satıcı', 'yer',
-        'değiştir', 'başka', 'diğer', 'farklı',
-        'birinci', 'ikinci', 'üçüncü', 'dördüncü'
+        'değiştir', 'başka', 'diğer', 'farklı', 'yeni',
+        'birinci', 'ikinci', 'üçüncü', 'dördüncü',
+        '1.', '2.', '3.', '4.', '1 ', '2 ', '3 ', '4 '
     ];
     
     return changeCommands.some(cmd => message.includes(cmd));
 }
-    }
-}
 
-// DÜZELTİLMİŞ handleContextualCommand
 // Güncellenmiş handleContextualCommand
+// DÜZELTİLMİŞ handleContextualCommand - kilit kontrolünü kaldır
 async function handleContextualCommand(message) {
     console.log(`🔍 Bağlamsal komut kontrolü: "${message}"`);
     
-    // Kilit kontrolü - başka satıcıdan ürün eklenmeye çalışılıyorsa
-    if (isSellerLocked && !selectedSellerId) {
-        speakToUser("Sepet dolu. Lütfen önce mevcut siparişi tamamlayın veya sepeti boşaltın.");
-        return true;
+    // Kilit kontrolünü BURADAN KALDIRIYORUZ - sadece gerekli kontroller
+    if (!selectedSellerId) {
+        console.log('⚠️ Satıcı seçili değil');
+        speakToUser("Önce bir satıcı seçmelisiniz.");
+        return false;
     }
     
-    // ÖNEMLİ: Gerekli kontroller
-    if (!selectedCategoryId || !products || products.length === 0) {
+    if (!selectedCategoryId || products.length === 0) {
+        console.log('⚠️ Kategori veya ürün yok');
+        speakToUser("Önce bir kategori seçmelisiniz.");
         return false;
     }
     
     try {
         const productInfo = await extractProductInfoFromCommand(message);
         if (!productInfo || !productInfo.productName) {
+            console.log('❌ Ürün bilgisi çıkarılamadı');
             return false;
         }
 
         const product = findProductByName(productInfo.productName);
         if (product) {
+            // KİLİT KONTROLÜNÜ BURADA YAPIYORUZ - aynı satıcı mı?
+            if (isSellerLocked) {
+                // Sepetteki ilk ürünün satıcısını al
+                const firstCartItem = cart[0];
+                if (firstCartItem && firstCartItem.seller_id !== selectedSellerId) {
+                    const currentSeller = sellers.find(s => s.id === firstCartItem.seller_id);
+                    speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut satıcı'} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
+                    return true; // İşlemi durdur ama başarısız değil
+                }
+            }
+            
+            // Aynı satıcıdan ürün ekle
             addToCart(product, productInfo.quantity);
             speakToUser(`${productInfo.quantity} ${productInfo.unit} ${product.name} sepete eklendi.`);
             
@@ -2819,7 +2861,7 @@ async function handleContextualCommand(message) {
         return false;
     }
 }
-
+        
 // Sepeti tamamen boşaltma fonksiyonu
 function clearCart() {
     console.log('🗑️ Sepet tamamen boşaltılıyor...');
@@ -3955,7 +3997,20 @@ async function handleDynamicAIRequest(message, root) {
 
     // Basit AI işleme mantığı
 async function processAILogic(message, root) {
+   // Güncellenmiş AI yardım mesajı
+async function processAILogic(message, root) {
     const lowerMessage = message.toLowerCase();
+    
+    // Kilit durumunda özel yardım mesajı
+    if (isSellerLocked && lowerMessage.includes('yardım')) {
+        const firstCartItem = cart[0];
+        const currentSeller = firstCartItem ? sellers.find(s => s.id === firstCartItem.seller_id) : null;
+        
+        return {
+            message: `Sepet dolu ve ${currentSeller?.business_name || 'mevcut mağaza'} kilitli. Sadece bu mağazadan ürün ekleyebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilir veya ödeme yaparak siparişi tamamlayabilirsiniz.`,
+            confidence: 0.9
+        };
+    }
     
     debugLog(`🤖 AI İşleme: "${message}" | Kök: ${root} | Satıcı: ${selectedSellerId} | Kategori: ${selectedCategoryId}`);
     
@@ -4002,6 +4057,67 @@ async function processAILogic(message, root) {
             };
         }
     }
+
+    // Kilit durumunu gösteren debug paneli
+function addLockStatusPanel() {
+    if (document.getElementById('lockStatusPanel')) return;
+    
+    const panel = document.createElement('div');
+    panel.id = 'lockStatusPanel';
+    panel.style.cssText = `
+        position: fixed;
+        top: 60px;
+        right: 20px;
+        background: ${isSellerLocked ? '#ff6b6b' : '#51cf66'};
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        z-index: 10000;
+        font-weight: bold;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    `;
+    
+    panel.innerHTML = `
+        ${isSellerLocked ? '🔒 KİLİTLİ' : '🔓 AÇIK'} 
+        | Sepet: ${cart.length} ürün
+        <br>Satıcı: ${selectedSellerId ? 'Seçili' : 'Yok'}
+    `;
+    
+    document.body.appendChild(panel);
+    
+    // Her UI güncellemesinde paneli yenile
+    setInterval(() => {
+        if (document.getElementById('lockStatusPanel')) {
+            document.getElementById('lockStatusPanel').innerHTML = `
+                ${isSellerLocked ? '🔒 KİLİTLİ' : '🔓 AÇIK'} 
+                | Sepet: ${cart.length} ürün
+                <br>Satıcı: ${selectedSellerId ? 'Seçili' : 'Yok'}
+            `;
+            document.getElementById('lockStatusPanel').style.background = 
+                isSellerLocked ? '#ff6b6b' : '#51cf66';
+        }
+    }, 2000);
+}
+
+    // Kilit durumunu test etmek için sesli komutlar
+function testLockVoiceCommands() {
+    console.log('🎯 Kilit Test Komutları:');
+    console.log('1. "iki ekmek" - Aynı satıcıdan ürün ekle');
+    console.log('2. "market" - Mağaza değiştirmeye çalış (kilitliyse engellenecek)');
+    console.log('3. "sepeti boşalt" - Kilidi kaldır');
+    console.log('4. "yardım" - Kilit durumu hakkında bilgi');
+}
+
+// Console'da test etmek için:
+// testLockVoiceCommands()
+
+// Sayfa yüklendiğinde debug panelini ekle
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        addLockStatusPanel();
+    }, 3000);
+});
     
     // Kök bazlı AI yanıtları
     switch(root) {
@@ -6250,6 +6366,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
