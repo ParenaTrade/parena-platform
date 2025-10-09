@@ -1562,49 +1562,161 @@
         // =============================================
 
         function addToCart(product, quantity, productCard = null) {
-            const existingItem = cart.find(item => item.id === product.id);
-            
-            if (existingItem) {
-                existingItem.quantity += quantity;
-            } else {
-                cart.push({
-                    id: product.id,
-                    name: product.name,
-                    price: product.discount_price || product.price,
-                    quantity: quantity,
-                    unit_type: product.unit_type || 'adet',
-                    image: product.imgurl,
-                    product_price_id: product.product_price_id
-                });
-            }
-            
-            updateCartUI();
-            
-            if (productCard) {
-                // Animasyon efekti
-                productCard.style.transform = 'scale(1.05)';
-                setTimeout(() => {
-                    productCard.style.transform = 'scale(1)';
-                }, 300);
-            }
-        }
+    console.log('🛒 addToCart çağrıldı:', product.name, quantity);
+    
+    // Sepet durumunu kontrol et (kilit mekanizması için)
+    const wasCartEmpty = cart.length === 0;
+    
+    const existingItem = cart.find(item => item.id === product.id);
+    
+    if (existingItem) {
+        existingItem.quantity += quantity;
+    } else {
+        cart.push({
+            id: product.id,
+            name: product.name,
+            price: product.discount_price || product.price,
+            quantity: quantity,
+            unit_type: product.unit_type || 'adet',
+            image: product.imgurl,
+            product_price_id: product.product_price_id,
+            seller_id: selectedSellerId, // Satıcı ID'sini de kaydet
+            category_id: selectedCategoryId // Kategori ID'sini de kaydet
+        });
+    }
+    
+    updateCartUI();
+    
+    // ÖNEMLİ: İlk ürün eklendiğinde kilit mekanizmasını aktif et
+    if (wasCartEmpty && cart.length > 0) {
+        lockStoreAndSeller();
+    }
+    
+    if (productCard) {
+        // Animasyon efekti
+        productCard.style.transform = 'scale(1.05)';
+        setTimeout(() => {
+            productCard.style.transform = 'scale(1)';
+        }, 300);
+    }
+    
+    console.log(`✅ Sepete eklendi: ${quantity} ${product.name} | Sepet: ${cart.length} ürün`);
+}
 
+// Mağaza ve satıcı kilitleme fonksiyonu
+function lockStoreAndSeller() {
+    console.log('🔒 Mağaza ve satıcı kilitleniyor...');
+    
+    if (!selectedSellerId) {
+        console.log('⚠️ Kilitlenecek satıcı yok');
+        return;
+    }
+    
+    // Kilit durumunu global değişkende sakla
+    isSellerLocked = true;
+    localStorage.setItem('isSellerLocked', 'true');
+    
+    // UI'da kilidi göster
+    updateLockUI();
+    
+    // Kullanıcıya bilgi ver
+    speakToUser("İlk ürün sepete eklendi. Artık sadece bu mağazadan alışveriş yapabilirsiniz. Sepeti boşaltarak kilidi kaldırabilirsiniz.");
+    
+    console.log('✅ Mağaza ve satıcı kilitlendi:', selectedSellerId);
+}
+
+// Kilidi kaldırma fonksiyonu
+function unlockStoreAndSeller() {
+    console.log('🔓 Mağaza ve satıcı kilidi kaldırılıyor...');
+    
+    isSellerLocked = false;
+    localStorage.setItem('isSellerLocked', 'false');
+    
+    // UI'dan kilidi kaldır
+    updateLockUI();
+    
+    console.log('✅ Mağaza ve satıcı kilidi kaldırıldı');
+}
+
+// UI güncelleme fonksiyonu
+function updateLockUI() {
+    const sellerTypeGrid = document.getElementById('sellerTypeGrid');
+    const sellerGrid = document.getElementById('sellerGrid');
+    
+    if (isSellerLocked) {
+        // Kilitli durum - diğer mağazaları gri göster
+        document.querySelectorAll('.seller-type-card:not(.selected)').forEach(card => {
+            card.style.opacity = '0.5';
+            card.style.pointerEvents = 'none';
+            card.title = 'Sepet dolu - sadece seçili mağaza kullanılabilir';
+        });
+        
+        document.querySelectorAll('.seller-card:not(.selected)').forEach(card => {
+            card.style.opacity = '0.5';
+            card.style.pointerEvents = 'none';
+            card.title = 'Sepet dolu - sadece seçili satıcı kullanılabilir';
+        });
+        
+        // Seçili olanları normal göster
+        document.querySelectorAll('.seller-type-card.selected, .seller-card.selected').forEach(card => {
+            card.style.opacity = '1';
+            card.style.pointerEvents = 'auto';
+            card.style.border = '2px solid var(--success)';
+        });
+        
+        // Kilit ikonu ekle
+        if (!document.getElementById('lockIndicator')) {
+            const lockIndicator = document.createElement('div');
+            lockIndicator.id = 'lockIndicator';
+            lockIndicator.innerHTML = `
+                <div style="position: fixed; top: 100px; right: 20px; background: var(--success); color: white; padding: 10px; border-radius: 8px; z-index: 1000; box-shadow: var(--shadow);">
+                    <i class="fas fa-lock"></i> Sepet Aktif - Mağaza Kilitli
+                </div>
+            `;
+            document.body.appendChild(lockIndicator);
+        }
+        
+    } else {
+        // Kilitli değil - tümü aktif
+        document.querySelectorAll('.seller-type-card, .seller-card').forEach(card => {
+            card.style.opacity = '1';
+            card.style.pointerEvents = 'auto';
+            card.style.border = '';
+            card.title = '';
+        });
+        
+        // Kilit ikonunu kaldır
+        const lockIndicator = document.getElementById('lockIndicator');
+        if (lockIndicator) {
+            lockIndicator.remove();
+        }
+    }
+}
         function updateCartUI() {
-            // Sepet sayacı
-            const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-            if (orderCount) orderCount.textContent = totalItems;
-            
-            // Toplam tutar
-            const total = calculateTotal();
-            if (orderTotal) orderTotal.textContent = money(total);
-            
-            // Sepet içeriği
-            updateCartItems();
-            
-            // Ödeme özeti
-            updateCartTotals();
-        }
-
+    // Sepet sayacı
+    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+    if (orderCount) orderCount.textContent = totalItems;
+    
+    // Toplam tutar
+    const total = calculateTotal();
+    if (orderTotal) orderTotal.textContent = money(total);
+    
+    // Sepet içeriği
+    updateCartItems();
+    
+    // Ödeme özeti
+    updateCartTotals();
+    
+    // ÖNEMLİ: Sepet boşaldığında kilidi kaldır
+    if (totalItems === 0 && isSellerLocked) {
+        unlockStoreAndSeller();
+    }
+    
+    // ÖNEMLİ: Sepet doluysa ama kilit yoksa kilitle
+    if (totalItems > 0 && !isSellerLocked && selectedSellerId) {
+        lockStoreAndSeller();
+    }
+}
         function updateCartItems() {
             const cartItems = document.getElementById('cartItems');
             if (!cartItems) return;
@@ -2550,7 +2662,14 @@ async function createDefaultCommandRules() {
 
 // DÜZELTİLMİŞ processVoiceCommand
 async function processVoiceCommand(transcript) {
-    // ÖNEMLİ: transcript kontrolü
+    const message = transcript.toLowerCase().trim();
+    
+    // Kilit kontrolü - mağaza/satıcı değiştirme komutlarını engelle
+    if (isSellerLocked && isStoreChangeCommand(message)) {
+        const currentSeller = sellers.find(s => s.id === selectedSellerId);
+        speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut mağaza'} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
+        return;
+    }
     if (!transcript || typeof transcript !== 'string') {
         console.log('❌ Geçersiz transcript:', transcript);
         return;
@@ -2591,12 +2710,42 @@ async function processVoiceCommand(transcript) {
         } catch (e) {
             console.error('Hata kaydetme hatası:', e);
         }
+
+        
+    } catch (error) {
+        console.error('❌ Komut işleme hatası:', error);
+        // Hata durumunda bile kaydetmeye çalış
+        try {
+            await voiceLearner.recordFailure(message, 'processing_error');
+        } catch (e) {
+            console.error('Hata kaydetme hatası:', e);
+        }
+        // Mağaza değiştirme komutlarını tespit et
+    function isStoreChangeCommand(message) {
+    const changeCommands = [
+        'market', 'restoran', 'eczane', 'fırın', 'kafe',
+        'mağaza', 'dükkan', 'satıcı', 'yer',
+        'değiştir', 'başka', 'diğer', 'farklı',
+        'birinci', 'ikinci', 'üçüncü', 'dördüncü'
+    ];
+    
+    return changeCommands.some(cmd => message.includes(cmd));
+}
+    }
+}
     }
 }
 
 // DÜZELTİLMİŞ handleContextualCommand
+// Güncellenmiş handleContextualCommand
 async function handleContextualCommand(message) {
     console.log(`🔍 Bağlamsal komut kontrolü: "${message}"`);
+    
+    // Kilit kontrolü - başka satıcıdan ürün eklenmeye çalışılıyorsa
+    if (isSellerLocked && !selectedSellerId) {
+        speakToUser("Sepet dolu. Lütfen önce mevcut siparişi tamamlayın veya sepeti boşaltın.");
+        return true;
+    }
     
     // ÖNEMLİ: Gerekli kontroller
     if (!selectedCategoryId || !products || products.length === 0) {
@@ -2988,8 +3137,15 @@ async function handleDynamicStoreTypeSelection(data) {
     }
 }
 
-// Store type seçildiğinde kökü güncelle
+// Güncellenmiş onStoreTypeSelected
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
+    // Kilit kontrolü
+    if (isSellerLocked) {
+        const currentSeller = sellers.find(s => s.id === selectedSellerId);
+        speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut mağaza'} ile alışverişe devam edebilirsiniz.`);
+        return;
+    }
+    
     debugLog("🛍️ Store type seçildi:", storeTypeName, "ID:", storeTypeId);
    
     selectedStoreTypeId = storeTypeId;
@@ -3028,6 +3184,13 @@ async function handleDynamicSellerSelection(data) {
 
 // Satıcı seçildiğinde kökü güncelle
 async function selectDynamicSeller(seller) {
+    // Kilit kontrolü
+    if (isSellerLocked && seller.id !== selectedSellerId) {
+        const currentSeller = sellers.find(s => s.id === selectedSellerId);
+        speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut satıcı'} ile alışverişe devam edebilirsiniz. Sepeti boşaltarak başka bir satıcı seçebilirsiniz.`);
+        return;
+    }
+    
     debugLog(`🎯 Satıcı seçiliyor: ${seller.business_name}`);
     
     // Teslimat kontrolü
@@ -5895,6 +6058,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
