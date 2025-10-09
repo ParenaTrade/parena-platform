@@ -1561,8 +1561,9 @@
         // SEPET YÖNETİM FONKSİYONLARI
         // =============================================
 
-        function addToCart(product, quantity, productCard = null) {
+      function addToCart(product, quantity, productCard = null) {
     console.log('🛒 addToCart çağrıldı:', product.name, quantity);
+    console.log('📊 Önceki sepet durumu:', cart.length, 'ürün');
     
     // Sepet durumunu kontrol et (kilit mekanizması için)
     const wasCartEmpty = cart.length === 0;
@@ -1571,6 +1572,7 @@
     
     if (existingItem) {
         existingItem.quantity += quantity;
+        console.log('✅ Mevcut ürün güncellendi:', existingItem.name, existingItem.quantity);
     } else {
         cart.push({
             id: product.id,
@@ -1580,15 +1582,18 @@
             unit_type: product.unit_type || 'adet',
             image: product.imgurl,
             product_price_id: product.product_price_id,
-            seller_id: selectedSellerId, // Satıcı ID'sini de kaydet
-            category_id: selectedCategoryId // Kategori ID'sini de kaydet
+            seller_id: selectedSellerId,
+            category_id: selectedCategoryId
         });
+        console.log('✅ Yeni ürün eklendi:', product.name);
     }
     
+    // HEMEN GÜNCELLE - bekleme yok
     updateCartUI();
     
     // ÖNEMLİ: İlk ürün eklendiğinde kilit mekanizmasını aktif et
     if (wasCartEmpty && cart.length > 0) {
+        console.log('🎯 İlk ürün eklendi, kilit aktif ediliyor...');
         lockStoreAndSeller();
     }
     
@@ -1600,7 +1605,7 @@
         }, 300);
     }
     
-    console.log(`✅ Sepete eklendi: ${quantity} ${product.name} | Sepet: ${cart.length} ürün`);
+    console.log(`✅ Sepet güncellendi: ${cart.length} ürün`);
 }
 
 // Mağaza ve satıcı kilitleme fonksiyonu
@@ -1692,10 +1697,17 @@ function updateLockUI() {
         }
     }
 }
-        function updateCartUI() {
-    // Sepet sayacı
-    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    if (orderCount) orderCount.textContent = totalItems;
+   function updateCartUI() {
+    console.log('🔄 updateCartUI çağrıldı, sepet durumu:', cart.length, 'ürün');
+    
+    // Sepet sayacı - CANLI HESAPLAMA
+    const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    console.log('📊 Sepet toplam ürün sayısı:', totalItems);
+    
+    if (orderCount) {
+        orderCount.textContent = totalItems;
+        console.log('✅ Sepet sayacı güncellendi:', totalItems);
+    }
     
     // Toplam tutar
     const total = calculateTotal();
@@ -1707,93 +1719,121 @@ function updateLockUI() {
     // Ödeme özeti
     updateCartTotals();
     
-    // ÖNEMLİ: Sepet boşaldığında kilidi kaldır
-    if (totalItems === 0 && isSellerLocked) {
-        unlockStoreAndSeller();
+    // ÖNEMLİ DÜZELTME: Sepet durumuna göre kilit yönetimi
+    console.log('🔍 Kilit kontrolü - Sepet:', totalItems, 'ürün, Kilitli mi:', isSellerLocked);
+    
+    if (totalItems === 0) {
+        // Sepet BOŞSA kesinlikle kilidi kaldır
+        if (isSellerLocked) {
+            console.log('🗑️ Sepet boş, kilidi kaldırılıyor...');
+            unlockStoreAndSeller();
+        }
+    } else {
+        // Sepet DOLUYSA ve kilit yoksa kilitle
+        if (!isSellerLocked && selectedSellerId) {
+            console.log('🛒 Sepet dolu, kilitleme aktif ediliyor...');
+            lockStoreAndSeller();
+        }
     }
     
-    // ÖNEMLİ: Sepet doluysa ama kilit yoksa kilitle
-    if (totalItems > 0 && !isSellerLocked && selectedSellerId) {
-        lockStoreAndSeller();
-    }
+    // Kilit UI'ını güncelle
+    updateLockUI();
 }
+        
         function updateCartItems() {
-            const cartItems = document.getElementById('cartItems');
-            if (!cartItems) return;
+    const cartItems = document.getElementById('cartItems');
+    if (!cartItems) return;
+    
+    console.log('📦 updateCartItems çağrıldı, sepet:', cart.length, 'ürün');
+    
+    if (cart.length === 0) {
+        cartItems.innerHTML = `
+            <div class="text-center" style="padding: 30px; color: var(--gray);">
+                <i class="fas fa-shopping-cart fa-2x mb-3"></i>
+                <p>Sepetiniz boş</p>
+            </div>
+        `;
+        console.log('🛒 Sepet görseli: BOŞ');
+    } else {
+        cartItems.innerHTML = '';
+        
+        cart.forEach((item, index) => {
+            const cartItem = document.createElement('div');
+            cartItem.className = 'cart-item';
             
-            if (cart.length === 0) {
-                cartItems.innerHTML = `
-                    <div class="text-center" style="padding: 30px; color: var(--gray);">
-                        <i class="fas fa-shopping-cart fa-2x mb-3"></i>
-                        <p>Sepetiniz boş</p>
+            cartItem.innerHTML = `
+                <div class="cart-item-info">
+                    <img src="${item.image || 'https://via.placeholder.com/50x50?text=Ürün'}" 
+                         alt="${item.name}" 
+                         class="cart-item-image">
+                    <div class="cart-item-details">
+                        <div class="cart-item-name">${item.name}</div>
+                        <div class="cart-item-price">${money(item.price)} / ${item.unit_type}</div>
                     </div>
-                `;
-                return;
-            }
+                </div>
+                <div class="cart-item-controls">
+                    <button class="quantity-btn decrease" data-index="${index}">-</button>
+                    <span class="quantity">${item.quantity}</span>
+                    <button class="quantity-btn increase" data-index="${index}">+</button>
+                    <button class="quantity-btn remove" data-index="${index}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
             
-            cartItems.innerHTML = '';
-            
-            cart.forEach((item, index) => {
-                const cartItem = document.createElement('div');
-                cartItem.className = 'cart-item';
-                
-                cartItem.innerHTML = `
-                    <div class="cart-item-info">
-                        <img src="${item.image || 'https://via.placeholder.com/50x50?text=Ürün'}" 
-                             alt="${item.name}" 
-                             class="cart-item-image">
-                        <div class="cart-item-details">
-                            <div class="cart-item-name">${item.name}</div>
-                            <div class="cart-item-price">${money(item.price)} / ${item.unit_type}</div>
-                        </div>
-                    </div>
-                    <div class="cart-item-controls">
-                        <button class="quantity-btn decrease" data-index="${index}">-</button>
-                        <span class="quantity">${item.quantity}</span>
-                        <button class="quantity-btn increase" data-index="${index}">+</button>
-                        <button class="quantity-btn remove" data-index="${index}">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                `;
-                
-                cartItems.appendChild(cartItem);
-            });
-            
-            // Event listener'ları ekle
-            setTimeout(() => {
-                document.querySelectorAll('.quantity-btn.decrease').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const index = parseInt(this.dataset.index);
-                        if (cart[index].quantity > 1) {
-                            cart[index].quantity--;
-                        } else {
-                            cart.splice(index, 1);
-                        }
-                        updateCartUI();
-                    });
-                });
-                
-                document.querySelectorAll('.quantity-btn.increase').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const index = parseInt(this.dataset.index);
-                        cart[index].quantity++;
-                        updateCartUI();
-                    });
-                });
-                
-                document.querySelectorAll('.quantity-btn.remove').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const index = parseInt(this.dataset.index);
-                        cart.splice(index, 1);
-                        updateCartUI();
-                    });
-                });
-                     // Temizleme butonunu ekle
-                        addClearCartButton();
-            }, 100);
-        }
+            cartItems.appendChild(cartItem);
+        });
+        
+        console.log('🛒 Sepet görseli:', cart.length, 'ürün listelendi');
+        
+        // Event listener'ları ekle
+        setTimeout(() => {
+            setupCartItemEvents();
+        }, 100);
+    }
+    
+    // Temizleme butonunu kontrol et
+    addClearCartButton();
+}
 
+// Sepet item event'lerini ayarla
+function setupCartItemEvents() {
+    console.log('🎯 Sepet event listenerları kuruluyor...');
+    
+    document.querySelectorAll('.quantity-btn.decrease').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const index = parseInt(this.dataset.index);
+            console.log('➖ Azalt butonu:', index);
+            
+            if (cart[index].quantity > 1) {
+                cart[index].quantity--;
+            } else {
+                cart.splice(index, 1);
+            }
+            updateCartUI(); // HEMEN GÜNCELLE
+        });
+    });
+    
+    document.querySelectorAll('.quantity-btn.increase').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const index = parseInt(this.dataset.index);
+            console.log('➕ Artır butonu:', index);
+            
+            cart[index].quantity++;
+            updateCartUI(); // HEMEN GÜNCELLE
+        });
+    });
+    
+    document.querySelectorAll('.quantity-btn.remove').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const index = parseInt(this.dataset.index);
+            console.log('🗑️ Sil butonu:', index, cart[index].name);
+            
+            cart.splice(index, 1);
+            updateCartUI(); // HEMEN GÜNCELLE
+        });
+    });
+}
         function updateCartTotals() {
             const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             const vat = subtotal * 0.18;
@@ -1804,9 +1844,17 @@ function updateLockUI() {
             if (totalAmountEl) totalAmountEl.textContent = money(total);
         }
 
-        function calculateTotal() {
-            return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        }
+       function calculateTotal() {
+    const total = cart.reduce((sum, item) => {
+        const quantity = item.quantity || 0;
+        const price = item.price || 0;
+        return sum + (price * quantity);
+    }, 0);
+    
+    console.log('💰 Sepet toplamı hesaplandı:', total, '| Ürün sayısı:', cart.length);
+    return total;
+}
+
 
         // =============================================
         // YARDIMCI FONKSİYONLAR
@@ -2774,18 +2822,24 @@ async function handleContextualCommand(message) {
 
 // Sepeti tamamen boşaltma fonksiyonu
 function clearCart() {
-    console.log('🗑️ Sepet boşaltılıyor...');
+    console.log('🗑️ Sepet tamamen boşaltılıyor...');
+    console.log('📊 Önceki sepet:', cart.length, 'ürün');
     
     cart = [];
+    
+    // HEMEN GÜNCELLE
     updateCartUI();
+    
+    // Kilidi kesinlikle kaldır
     unlockStoreAndSeller();
     
     speakToUser("Sepet boşaltıldı. Artık başka mağazalardan alışveriş yapabilirsiniz.");
     
     // Sepet kapatılsın
     closeDynamicCart();
+    
+    console.log('✅ Sepet tamamen boşaltıldı');
 }
-
 // Sepet UI'sına temizleme butonu ekle
 // Sepet UI'sına temizleme butonu ekle
 function addClearCartButton() {
@@ -2824,7 +2878,65 @@ function addClearCartButton() {
     }
 }
 
-        
+      // Sepet durumunu test etmek için
+function testCartSystem() {
+    console.log('🧪 SEPET SİSTEMİ TESTİ');
+    console.log('📊 Sepet array:', cart);
+    console.log('🔢 Sepet uzunluğu:', cart.length);
+    console.log('🔒 Kilit durumu:', isSellerLocked);
+    console.log('🏪 Seçili satıcı:', selectedSellerId);
+    
+    const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    console.log('🎯 Gerçek ürün sayısı:', totalItems);
+    
+    // Manuel olarak kilidi kaldır
+    if (totalItems === 0 && isSellerLocked) {
+        console.log('⚠️ HATA TESPİT EDİLDİ: Sepet boş ama kilitli!');
+        console.log('🔄 Manuel olarak kilidi kaldırılıyor...');
+        unlockStoreAndSeller();
+    }
+}
+
+// Console'da test etmek için:
+// testCartSystem();
+
+     // Acil durum için manuel kilidi açma butonu
+function addEmergencyUnlockButton() {
+    if (document.getElementById('emergencyUnlockBtn')) return;
+    
+    const unlockBtn = document.createElement('button');
+    unlockBtn.id = 'emergencyUnlockBtn';
+    unlockBtn.innerHTML = '🔓 Manuel Kilidi Aç';
+    unlockBtn.style.cssText = `
+        position: fixed;
+        bottom: 220px;
+        right: 20px;
+        z-index: 10000;
+        padding: 10px;
+        background: var(--danger);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 12px;
+    `;
+    
+    unlockBtn.addEventListener('click', function() {
+        console.log('🆘 Manuel kilidi açma butonuna tıklandı');
+        testCartSystem();
+        unlockStoreAndSeller();
+        speakToUser("Manuel olarak kilidi açtım.");
+    });
+    
+    document.body.appendChild(unlockBtn);
+}
+
+// Sayfa yüklendiğinde emergency butonu ekle
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        addEmergencyUnlockButton();
+    }, 5000);
+});   
 
         // Kategori ismine göre bulma
 function findCategoryByName(categoryName) {
@@ -6001,7 +6113,6 @@ function closeDynamicCart() {
     }
 }
 
-// Oturum yönetimi
 // Güncellenmiş restoreSession
 async function restoreSession() {
     try {
@@ -6013,24 +6124,30 @@ async function restoreSession() {
         const savedCart = localStorage.getItem('cart');
         if (savedCart) {
             cart = JSON.parse(savedCart);
-            updateCartUI();
+            console.log('📦 Oturumdan sepet yüklendi:', cart.length, 'ürün');
+        } else {
+            cart = []; // Emin olmak için boş array
+            console.log('📦 Sepet oturumda bulunamadı, boş array oluşturuldu');
         }
         
         // Kilit durumunu geri yükle
         const savedLock = localStorage.getItem('isSellerLocked');
         isSellerLocked = savedLock === 'true';
         
-        if (isSellerLocked) {
-            console.log('🔒 Önceki oturumdan kilit durumu geri yüklendi');
-            updateLockUI();
-        }
+        console.log('🔒 Oturum kilit durumu:', isSellerLocked);
+        
+        // HEMEN GÜNCELLE - oturum yüklendikten sonra
+        updateCartUI();
         
         debugLog('✅ Oturum geri yüklendi');
     } catch (error) {
         console.error('Oturum geri yükleme hatası:', error);
+        cart = []; // Hata durumunda boş sepet
+        isSellerLocked = false; // Hata durumunda kilit kapalı
     }
 }
-// UI güncelleme
+        
+        // UI güncelleme
 function updateUIAfterDynamicLogin() {
     if (currentCustomer) {
         if (userName) userName.textContent = currentCustomer.name || 'Profilim';
@@ -6133,6 +6250,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
