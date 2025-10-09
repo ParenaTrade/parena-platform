@@ -4203,110 +4203,207 @@ async function loadProductsByCategory(categoryId) {
         speakToUser("Ürünler yüklenirken hata oluştu. Lütfen tekrar deneyin.");
     }
 }
-        // Basit sesli reyon seçimi
+// DÜZELTİLMİŞ - REYON NAME İLE KATEGORİ SEÇİMİ
 async function handleVoiceCategorySelection(message) {
-    console.log('📦 Sesli reyon seçimi:', message);
+    console.log('📦 Sesli kategori seçimi:', message);
     
     const reyonKartları = document.querySelectorAll('.category-card');
     if (reyonKartları.length === 0) {
-        speakToUser("Reyon listesi yüklenmedi. Lütfen önce satıcı seçin.");
+        speakToUser("Kategori listesi yüklenmedi. Lütfen önce satıcı seçin.");
         return false;
     }
     
     let bulunanKart = null;
+    const temizMesaj = message.toLowerCase().replace(/[^a-zğüşıöç\s]/g, '').trim();
     
-    // 1. İsimle eşleştirme
-    for (const kart of reyonKartları) {
-        const reyonİsmi = kart.querySelector('.category-name').textContent.toLowerCase();
-        const temizİsim = reyonİsmi.replace(/[^a-zğüşıöç]/g, '');
-        const temizMesaj = message.replace(/[^a-zğüşıöç]/g, '');
+    console.log('🔍 Aranan kategori:', temizMesaj);
+    console.log('📋 Mevcut kategoriler:', Array.from(reyonKartları).map(kart => 
+        kart.querySelector('.category-name').textContent
+    ));
+
+    try {
+        // 1. SATICININ ÜRÜNLERİNDEN REYONLARI ÇEK
+        const availableReyons = await getSellerReyonsFromProducts();
         
-        if (reyonİsmi.includes(message) || message.includes(reyonİsmi) || 
-            temizİsim.includes(temizMesaj) || temizMesaj.includes(temizİsim)) {
-            bulunanKart = kart;
-            console.log(`✅ Reyon isim eşleşmesi: "${message}" -> "${reyonİsmi}"`);
-            break;
-        }
-    }
-    
-    // 2. Sayısal seçim
-    if (!bulunanKart) {
-        const sayıEşleşmesi = message.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|1\.|2\.|3\.|4\.|5\.|1|2|3|4|5)/);
-        if (sayıEşleşmesi) {
-            const sayılar = {
-                'birinci': 0, '1.': 0, '1': 0,
-                'ikinci': 1, '2.': 1, '2': 1,
-                'üçüncü': 2, '3.': 2, '3': 2,
-                'dördüncü': 3, '4.': 3, '4': 3,
-                'beşinci': 4, '5.': 4, '5': 4
-            };
-            const indeks = sayılar[sayıEşleşmesi[0]];
-            if (indeks < reyonKartları.length) {
-                bulunanKart = reyonKartları[indeks];
-                console.log(`✅ Sayısal reyon seçim: ${indeks + 1}. reyon`);
+        if (availableReyons.length > 0) {
+            const reyonMatch = await findReyonFromProducts(availableReyons, temizMesaj, reyonKartları);
+            if (reyonMatch) {
+                console.log(`✅ Ürünlerden reyon eşleşmesi: "${reyonMatch.keyword}" -> "${reyonMatch.reyonName}"`);
+                return await selectAndHighlightCategoryCard(reyonMatch.kart, reyonMatch.reyonName);
             }
         }
+    } catch (error) {
+        console.log('⚠️ Ürünlerden reyon çekme başarısız:', error);
     }
-    
-    // 3. Anahtar kelime eşleştirme
-    if (!bulunanKart) {
-        const anahtarKelimeler = {
-            'manav': 'Manav',
-            'meyve': 'Manav',
-            'sebze': 'Manav',
-            'süt': 'Süt Ürünleri',
-            'peynir': 'Süt Ürünleri',
-            'yoğurt': 'Süt Ürünleri',
-            'et': 'Kasap',
-            'tavuk': 'Kasap',
-            'içecek': 'İçecekler',
-            'su': 'İçecekler'
-        };
-        
-        for (const [kelime, reyonİsmi] of Object.entries(anahtarKelimeler)) {
-            if (message.includes(kelime)) {
-                for (const kart of reyonKartları) {
-                    const kartİsmi = kart.querySelector('.category-name').textContent;
-                    if (kartİsmi === reyonİsmi) {
-                        bulunanKart = kart;
-                        console.log(`✅ Reyon anahtar kelime: "${kelime}" -> "${reyonİsmi}"`);
-                        break;
-                    }
-                }
-                if (bulunanKart) break;
-            }
-        }
+
+    // 2. ESKİ SİSTEMLE DEVAM ET
+    const oldMatch = await findCategoryWithOldSystem(reyonKartları, temizMesaj, message);
+    if (oldMatch) {
+        return await selectAndHighlightCategoryCard(oldMatch.kart, oldMatch.categoryName);
     }
-    
-    if (bulunanKart) {
-        // Reyon kartını tıkla
-        bulunanKart.click();
-        
-        // Görsel feedback
-        bulunanKart.style.transform = 'scale(1.05)';
-        bulunanKart.style.boxShadow = '0 0 20px var(--accent)';
-        setTimeout(() => {
-            bulunanKart.style.transform = 'scale(1)';
-            bulunanKart.style.boxShadow = '';
-        }, 1000);
-        
-        const reyonİsmi = bulunanKart.querySelector('.category-name').textContent;
-        speakToUser(`${reyonİsmi} reyonu seçildi.`);
-        return true;
-    }
-    
-    // Bulunamadı
-    const mevcutReyonlar = Array.from(reyonKartları)
-        .slice(0, 3)
-        .map(kart => kart.querySelector('.category-name').textContent)
-        .join(', ');
-    
-    speakToUser(`Hangi reyondan alışveriş yapmak istiyorsunuz? Örneğin: ${mevcutReyonlar}. Veya "birinci reyon" gibi söyleyebilirsiniz.`);
+
+    // 3. BULUNAMADIYSA YARDIM MESAJI
+    await showCategoryHelpMessage(reyonKartları, message);
     return false;
 }
 
+// SATICININ ÜRÜNLERİNDEN REYONLARI ÇEK
+async function getSellerReyonsFromProducts() {
+    try {
+        if (!selectedSellerId) {
+            console.log('❌ Satıcı seçili değil');
+            return [];
+        }
 
+        // SATICIYA ve REYONA GÖRE ÜRÜNLERİ ÇEK + REYON NAME
+        const { data: sellerProducts, error } = await supabase
+            .from('products')
+            .select(`
+                id,
+                name,
+                reyon_id,
+                reyon:reyon_id (
+                    id,
+                    name
+                )
+            `)
+            .eq('is_active', true);
 
+        if (error) {
+            console.error('❌ Ürün-reyon sorgu hatası:', error);
+            return [];
+        }
+
+        if (!sellerProducts || sellerProducts.length === 0) {
+            console.log('⚠️ Satıcıya ait ürün bulunamadı');
+            return [];
+        }
+
+        // BENZERSİZ REYONLARI TOPLA
+        const uniqueReyons = [];
+        const seenReyonIds = new Set();
+        
+        sellerProducts.forEach(product => {
+            if (product.reyon && product.reyon.id && !seenReyonIds.has(product.reyon.id)) {
+                seenReyonIds.add(product.reyon.id);
+                uniqueReyons.push({
+                    reyonId: product.reyon.id,
+                    reyonName: product.reyon.name,
+                    productCount: 1
+                });
+            }
+        });
+
+        console.log(`✅ Satıcı reyonları: ${uniqueReyons.length} adet`, uniqueReyons.map(r => r.reyonName));
+        return uniqueReyons;
+
+    } catch (error) {
+        console.error('❌ Reyon çekme hatası:', error);
+        return [];
+    }
+}
+ // ÜRÜNLERDEN REYON EŞLEŞTİRME
+async function findReyonFromProducts(availableReyons, searchTerm, reyonKartları) {
+    // REYON KEYWORD LİSTESİ (Veritabanından çekilebilir)
+    const reyonKeywords = {
+        'Manav': ['manav', 'meyve', 'sebze', 'yeşillik', 'salata', 'marul', 'domates', 'biber', 'soğan', 'meyve sebze', 'manava'],
+        'Süt Ürünleri': ['süt', 'peynir', 'yoğurt', 'tereyağ', 'kaymak', 'ayran', 'lor', 'kaşar', 'süt ürünü', 'süte'],
+        'Kasap': ['kasap', 'et', 'tavuk', 'kırmızı et', 'beyaz et', 'kıyma', 'kuşbaşı', 'pirzola', 'biftek', 'et ürünü', 'etçi'],
+        'Şarküteri': ['şarküteri', 'salam', 'sosis', 'sucuk', 'pastırma', 'jambon', 'kavurma', 'şarküteri ürünü'],
+        'Balık': ['balık', 'deniz', 'levrek', 'çupra', 'somon', 'ton', 'karides', 'midye', 'deniz ürünü', 'balıkçı'],
+        'İçecekler': ['içecek', 'su', 'meyve suyu', 'soda', 'kola', 'gazoz', 'çay', 'kahve', 'limonata', 'meşrubat', 'içeceğe'],
+        'Temel Gıda': ['temel', 'gıda', 'makarna', 'pirinç', 'bulgur', 'un', 'yağ', 'zeytin', 'salça', 'bakliyat', 'temel gıda'],
+        'Kahvaltılık': ['kahvaltı', 'zeytin', 'bal', 'reçel', 'pekmez', 'tahin', 'helva', 'kahvaltılık'],
+        'Atıştırmalık': ['atıştırmalık', 'bisküvi', 'kraker', 'çikolata', 'cips', 'kuru yemiş', 'leblebi', 'abur cubur'],
+        'Dondurulmuş': ['dondurulmuş', 'dondurma', 'buz', 'meyveli', 'sütlü', 'dondurulmuş gıda'],
+        'Unlu Mamüller': ['unlu', 'ekmek', 'simit', 'poğaça', 'açma', 'börek', 'pasta', 'kek', 'unlu mamul', 'fırın']
+    };
+
+    // 1. ANAHTAR KELİME EŞLEŞMESİ
+    for (const [reyonName, keywords] of Object.entries(reyonKeywords)) {
+        for (const keyword of keywords) {
+            if (searchTerm.includes(keyword)) {
+                // Bu reyon satıcıda mevcut mu?
+                const availableReyon = availableReyons.find(r => 
+                    r.reyonName.toLowerCase() === reyonName.toLowerCase()
+                );
+                
+                if (availableReyon) {
+                    // Kategori kartını bul
+                    for (const kart of reyonKartları) {
+                        const kartReyonName = kart.querySelector('.category-name').textContent;
+                        if (kartReyonName === reyonName) {
+                            return {
+                                kart: kart,
+                                keyword: keyword,
+                                reyonName: reyonName
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. REYON İSİM EŞLEŞMESİ
+    for (const reyon of availableReyons) {
+        const cleanReyonName = reyon.reyonName.toLowerCase().replace(/[^a-zğüşıöç\s]/g, '').trim();
+        
+        if (cleanReyonName.includes(searchTerm) || 
+            searchTerm.includes(cleanReyonName) ||
+            calculateSimilarity(cleanReyonName, searchTerm) > 0.6) {
+            
+            // Kategori kartını bul
+            for (const kart of reyonKartları) {
+                const kartReyonName = kart.querySelector('.category-name').textContent;
+                if (kartReyonName === reyon.reyonName) {
+                    return {
+                        kart: kart,
+                        keyword: searchTerm,
+                        reyonName: reyon.reyonName
+                    };
+                }
+            }
+        }
+    }
+
+    return null;
+}    
+
+// KATEGORİ YARDIM MESAJI (Güncellenmiş)
+async function showCategoryHelpMessage(reyonKartları, message) {
+    try {
+        // Satıcının reyonlarını al
+        const availableReyons = await getSellerReyonsFromProducts();
+        
+        let helpMessage = `"${message}" kategorisi bulunamadı. `;
+        
+        if (availableReyons.length > 0) {
+            const reyonNames = availableReyons.map(r => r.reyonName).slice(0, 4);
+            helpMessage += `Satıcının kategorileri: ${reyonNames.join(', ')}. `;
+        } else {
+            const mevcutKategoriler = Array.from(reyonKartları)
+                .slice(0, 3)
+                .map(kart => kart.querySelector('.category-name').textContent)
+                .join(', ');
+            helpMessage += `Mevcut kategoriler: ${mevcutKategoriler}. `;
+        }
+        
+        helpMessage += `Veya "birinci kategori" gibi söyleyebilirsiniz.`;
+        
+        speakToUser(helpMessage);
+        
+    } catch (error) {
+        console.error('Yardım mesajı hatası:', error);
+        // Fallback mesaj
+        const mevcutKategoriler = Array.from(reyonKartları)
+            .slice(0, 3)
+            .map(kart => kart.querySelector('.category-name').textContent)
+            .join(', ');
+        
+        speakToUser(`"${message}" bulunamadı. Mevcut kategoriler: ${mevcutKategoriler}. Veya "birinci kategori" gibi söyleyebilirsiniz.`);
+    }
+}        
         // ÜRÜN TEMEL İSMİNİ ÇIKAR (KEYWORD DESTEKLİ)
 // ÜRÜN TEMEL İSMİNİ ÇIKAR (KEYWORD DESTEKLİ)
 function extractProductBaseName(productName, keywords = []) {
@@ -7282,6 +7379,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
