@@ -4108,34 +4108,30 @@ function handleDynamicProductNotFound(message, attemptedName) {
     }
 }    
 
-        // Global öğrenen sistem
-const voiceLearner = {
-    async correctUserInput(userInput) {
-        try {
-            // Tablodan düzeltme kurallarını al
-            const { data: rules, error } = await supabase
-                .from('product_voice_matches')
-                .select('*')
-                .eq('user_input', userInput.toLowerCase())
-                .eq('success', true);
+     // Global öğrenen sistem - CLASS versiyonu
+class VoiceRecognitionLearner {
+    constructor() {
+        this.cache = new Map();
+        this.initialized = false;
+    }
 
-            if (error) throw error;
-            
-            if (rules && rules.length > 0) {
-                console.log(`🔄 Tablodan düzeltme: "${userInput}" -> "${rules[0].matched_product}"`);
-                return rules[0].matched_product;
-            }
-            
-            return userInput;
-        } catch (error) {
-            console.error('Düzeltme hatası:', error);
-            return userInput;
+    async correctUserInput(userInput) {
+        if (!this.initialized) return userInput;
+        
+        const lowerInput = userInput.toLowerCase().trim();
+        
+        // Cache'den düzeltme ara
+        if (this.cache.has(lowerInput)) {
+            const rule = this.cache.get(lowerInput);
+            console.log(`🔄 Öğrenilmiş kural: "${userInput}" -> "${rule.correctedProduct}"`);
+            return rule.correctedProduct;
         }
-    },
+        
+        return userInput;
+    }
 
     async recordSuccess(userInput, matchedProduct, productId = null) {
         try {
-            // Tabloya başarılı eşleşmeyi kaydet
             const { error } = await supabase
                 .from('product_voice_matches')
                 .insert([{
@@ -4151,8 +4147,33 @@ const voiceLearner = {
         } catch (error) {
             console.error('Başarı kaydetme hatası:', error);
         }
-    },
+    }
 
+    async initialize() {
+        try {
+            // Tablodan kuralları yükle
+            const { data: rules, error } = await supabase
+                .from('product_voice_matches')
+                .select('*')
+                .eq('success', true);
+
+            if (error) throw error;
+
+            this.cache.clear();
+            rules.forEach(rule => {
+                this.cache.set(rule.user_input.toLowerCase(), {
+                    correctedProduct: rule.matched_product,
+                    productId: rule.product_id
+                });
+            });
+
+            this.initialized = true;
+            console.log(`✅ ${rules.length} öğrenilmiş kural yüklendi`);
+        } catch (error) {
+            console.error('❌ Öğrenen sistem başlatma hatası:', error);
+        }
+    }
+}
     async recordFailure(userInput, attemptedMatch = null) {
         try {
             // Tabloya başarısız eşleşmeyi kaydet
@@ -4378,58 +4399,7 @@ async loadLearnedRules() {
             console.error('❌ Başarı kaydetme hatası:', error);
         }
     }
- // Başarısız eşleşmeyi kaydet
-    async recordFailure(userInput, attemptedMatch = null) {
-        try {
-            const lowerInput = userInput.toLowerCase().trim();
-            
-            const { data: existing, error: findError } = await supabase
-                .from('product_voice_matches')
-                .select('*')
-                .eq('user_input', lowerInput)
-                .single();
-
-            if (findError && findError.code !== 'PGRST116') {
-                console.error('Kayıt arama hatası:', findError);
-                return;
-            }
-
-            if (existing) {
-                // Mevcut kaydı güncelle
-                const { error } = await supabase
-                    .from('product_voice_matches')
-                    .update({
-                        attempted_match: attemptedMatch,
-                        success: false,
-                        match_count: (existing.match_count || 0) + 1,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', existing.id);
-
-                if (error) throw error;
-
-            } else {
-                const { error } = await supabase
-                    .from('product_voice_matches')
-                    .insert([{
-                        user_input: lowerInput,
-                        matched_product: null,
-                        attempted_match: attemptedMatch,
-                        success: false,
-                        match_count: 1,
-                        success_count: 0,
-                        created_at: new Date().toISOString()
-                    }]);
-
-                if (error) throw error;
-            }
-
-            console.log(`❌ Başarısız eşleşme kaydedildi: "${userInput}"`);
-        } catch (error) {
-            console.error('❌ Başarısızlık kaydetme hatası:', error);
-        }
-    }
-
+ 
     // Miktar karışıklığını kaydet
     async recordQuantityConfusion(userInput, correctProduct, incorrectQuantity) {
         try {
@@ -5943,6 +5913,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
