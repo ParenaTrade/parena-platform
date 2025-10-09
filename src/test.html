@@ -4173,167 +4173,9 @@ class VoiceRecognitionLearner {
         }
     }
 }
-    async loadLearnedRules() {
-        try {
-            const { data: rules, error } = await supabase
-                .from('product_voice_matches')
-                .select('*')
-                .or('success.eq.true,quantity_confusion.eq.true')
-                .order('success_count', { ascending: false });
-
-            if (error) throw error;
-
-            // Cache'e yükle
-            this.cache.clear();
-            rules.forEach(rule => {
-                this.cache.set(rule.user_input.toLowerCase(), {
-                    correctedProduct: rule.matched_product,
-                    productId: rule.product_id,
-                    quantityConfusion: rule.quantity_confusion,
-                    correctionPattern: rule.correction_pattern,
-                    successRate: rule.success_count / rule.match_count,
-                    matchCount: rule.match_count
-                });
-            });
-
-            console.log(`📚 ${rules.length} öğrenilmiş kural yüklendi`);
-        } catch (error) {
-            console.error('❌ Öğrenilmiş kurallar yükleme hatası:', error);
-        }
-    }
-
-    // Ses girdisini düzelt
-    correctUserInput(userInput) {
-        if (!this.initialized) return userInput;
-
-        const lowerInput = userInput.toLowerCase().trim();
-        
-        // Önce tam eşleşme ara
-        if (this.cache.has(lowerInput)) {
-            const rule = this.cache.get(lowerInput);
-            console.log(`🔄 Öğrenilmiş kural uygulandı: "${userInput}" -> "${rule.correctedProduct}"`);
-            return rule.correctedProduct;
-        }
-
-        // Kısmi eşleşme ara
-        for (const [pattern, rule] of this.cache.entries()) {
-            if (lowerInput.includes(pattern) || pattern.includes(lowerInput)) {
-                console.log(`🔄 Kısmi kural uygulandı: "${userInput}" -> "${rule.correctedProduct}"`);
-                return rule.correctedProduct;
-            }
-        }
-
-        return userInput;
-    }
-
-    // Miktar karışıklığını kontrol et
-    hasQuantityConfusion(userInput) {
-        if (!this.initialized) return false;
-
-        const lowerInput = userInput.toLowerCase().trim();
-        
-        for (const [pattern, rule] of this.cache.entries()) {
-            if (rule.quantityConfusion && 
-                (lowerInput.includes(pattern) || pattern.includes(lowerInput))) {
-                console.log(`⚠️ Miktar karışıklığı tespit edildi: "${userInput}"`);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
    
-    // Başarısız eşleşmeyi kaydet
-    async recordFailure(userInput, attemptedMatch = null) {
-        try {
-            const lowerInput = userInput.toLowerCase().trim();
-            
-            const { data: existing, error: findError } = await supabase
-                .from('product_voice_matches')
-                .select('*')
-                .eq('user_input', lowerInput)
-                .single();
-
-            if (findError && findError.code !== 'PGRST116') {
-                console.error('Kayıt arama hatası:', findError);
-                return;
-            }
-
-            if (existing) {
-                // Mevcut kaydı güncelle
-                const { error } = await supabase
-                    .from('product_voice_matches')
-                    .update({
-                        attempted_match: attemptedMatch,
-                        success: false,
-                        match_count: (existing.match_count || 0) + 1,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', existing.id);
-
-                if (error) throw error;
-
-            } else {
-                // Yeni kayıt oluştur
-                const { error } = await supabase
-                    .from('product_voice_matches')
-                    .insert([{
-                        user_input: lowerInput,
-                        matched_product: null,
-                        attempted_match: attemptedMatch,
-                        success: false,
-                        match_count: 1,
-                        success_count: 0,
-                        created_at: new Date().toISOString()
-                    }]);
-
-                if (error) throw error;
-            }
-
-            console.log(`❌ Başarısız eşleşme kaydedildi: "${userInput}"`);
-        } catch (error) {
-            console.error('❌ Başarısızlık kaydetme hatası:', error);
-        }
-    }
-
-    // Miktar karışıklığını kaydet
-    async recordQuantityConfusion(userInput, correctProduct, incorrectQuantity) {
-        try {
-            const lowerInput = userInput.toLowerCase().trim();
-            
-            const { error } = await supabase
-                .from('product_voice_matches')
-                .insert([{
-                    user_input: lowerInput,
-                    matched_product: correctProduct,
-                    attempted_match: incorrectQuantity,
-                    success: true,
-                    quantity_confusion: true,
-                    correction_pattern: `"${userInput}" -> "${correctProduct}" (miktar düzeltildi)`,
-                    match_count: 1,
-                    success_count: 1,
-                    created_at: new Date().toISOString()
-                }]);
-
-            if (error) throw error;
-
-            // Cache'e ekle
-            this.cache.set(lowerInput, {
-                correctedProduct: correctProduct,
-                productId: null,
-                quantityConfusion: true,
-                correctionPattern: `"${userInput}" -> "${correctProduct}"`,
-                successRate: 1.0,
-                matchCount: 1
-            });
-
-            console.log(`🔧 Miktar karışıklığı kaydedildi: "${userInput}" -> "${correctProduct}"`);
-        } catch (error) {
-            console.error('❌ Miktar karışıklığı kaydetme hatası:', error);
-        }
-    }
-}
+   
+    
 
 // Güncellenmiş extractProductInfoFromCommand
 async function extractProductInfoFromCommand(message) {
@@ -5925,6 +5767,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
