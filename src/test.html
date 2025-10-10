@@ -4396,22 +4396,33 @@ function extractProductInfoFromCommand(message) {
     
     // Özel birimleri kontrol et
     for (const unitPattern of unitPatterns) {
-        const match = cleanMessage.match(unitPattern.pattern);
-        console.log(`🔍 Pattern: ${unitPattern.pattern}, Match:`, match);
-        
-        if (match) {
-            if (unitPattern.quantity) {
-                quantity = unitPattern.quantity;
-                productName = match[1].trim();
-            } else {
-                quantity = parseInt(match[1]);
-                productName = match[2].trim();
+    const match = cleanMessage.match(unitPattern.pattern);
+    console.log(`🔍 Pattern: ${unitPattern.pattern}, Match:`, match);
+
+    if (match) {
+        if (unitPattern.quantity) {
+            quantity = unitPattern.quantity;
+            productName = match[1] ? match[1].trim() : cleanMessage; // boşsa tüm mesajı al
+        } else {
+            // Eğer ilk grup sayı değilse yazılı sayıyı kontrol et
+            const num = parseInt(match[1]);
+            if (!isNaN(num)) quantity = num;
+            else {
+                const textNumbers = {
+                    'bir':1,'iki':2,'üç':3,'dört':4,'beş':5,
+                    'altı':6,'yedi':7,'sekiz':8,'dokuz':9,'on':10
+                };
+                const lower = match[1].toLowerCase();
+                quantity = textNumbers[lower] || 1;
             }
-            unit = unitPattern.unit;
-            console.log(`✅ Pattern eşleşti: ${quantity} ${unit} ${productName}`);
-            break;
+            productName = match[2] ? match[2].trim() : cleanMessage;
         }
+
+        unit = unitPattern.unit;
+        console.log(`✅ Pattern eşleşti: ${quantity} ${unit} ${productName}`);
+        break;
     }
+}
     
     // Eğer özel birim bulunamazsa, standart çıkarım
     if (!productName) {
@@ -6289,6 +6300,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
