@@ -3333,97 +3333,69 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
 
 
 
-// Sesli gelen metni kullanarak ekrandaki kartı bul ve tıkla
-async function handleVoiceStoreSelection(message) {
-  console.log("🎙️ Sesli komut:", message);
-  
-  // Aranacak kartlar (mağaza, satıcı veya reyon olabilir)
-  const cards = document.querySelectorAll(
-    ".seller-type-card, .seller-card, .category-card, .store-card, .card"
-  );
+function handleVoiceStoreSelection(command) {
+  const text = command.toLowerCase().trim();
+  console.log("🎙️ Komut:", text);
 
-  if (cards.length === 0) {
-    speakToUser("Listede seçim yapılacak kart bulunamadı.");
-    return false;
+  const cards = document.querySelectorAll(".seller-type-card");
+  if (!cards.length) {
+    speakToUser("Henüz mağaza listesi yüklenmedi.");
+    return;
   }
 
-  const cleaned = message.toLowerCase().replace(/[^a-z0-9ğüşıöç\s]/g, "").trim();
-
-  // 1️⃣ Kartlarda sıra numarası (birinci, ikinci...) ile eşleşme
+  // Türkçe sıra numaraları
   const numbers = {
-    "birinci": 0, "1": 0, "1.": 0,
-    "ikinci": 1, "2": 1, "2.": 1,
-    "üçüncü": 2, "3": 2, "3.": 2,
-    "dördüncü": 3, "4": 3, "4.": 3,
-    "beşinci": 4, "5": 4, "5.": 4
+    "birinci": 1, "ikinci": 2, "üçüncü": 3,
+    "dördüncü": 4, "beşinci": 5, "altıncı": 6,
+    "yedinci": 7, "sekizinci": 8, "dokuzuncu": 9, "onuncu": 10
   };
-  const numMatch = Object.keys(numbers).find(k => cleaned.includes(k));
-  if (numMatch && cards[numbers[numMatch]]) {
-    const card = cards[numbers[numMatch]];
-    clickAndHighlightCard(card);
-    return true;
-  }
 
-  // 2️⃣ Kart isimleriyle eşleşme (örnek: “Market”, “Ayşe Market”)
-  for (const card of cards) {
-    const nameEl = card.querySelector(
-      ".seller-type-name, .seller-name, .category-name, .store-name, .card-title, [class*='name']"
-    );
-    const name = nameEl?.textContent?.toLowerCase()?.trim();
-    if (!name) continue;
-
-    if (cleaned.includes(name) || name.includes(cleaned)) {
-      clickAndHighlightCard(card);
-      return true;
+  // 🔹 1. Sayı ile arama (“birinci market” veya “2. mağaza”)
+  for (const [word, num] of Object.entries(numbers)) {
+    if (text.includes(word) || text.includes(num.toString())) {
+      const card = cards[num - 1];
+      if (card && card.style.pointerEvents !== "none") {
+        return clickStoreCard(card);
+      } else {
+        speakToUser("Bu mağaza şu anda seçilemiyor.");
+        return;
+      }
     }
   }
 
-  // 3️⃣ data-id veya data-type-id üzerinden eşleşme
+  // 🔹 2. İsme göre arama (“Market”, “Fırın”, “Eczane” vs)
   for (const card of cards) {
-    const id = (card.dataset.id || card.dataset.typeId || "").toLowerCase();
-    if (id && cleaned.includes(id)) {
-      clickAndHighlightCard(card);
-      return true;
+    const name = card.dataset.typeName?.toLowerCase();
+    if (name && (text.includes(name) || name.includes(text))) {
+      if (card.style.pointerEvents === "none") {
+        speakToUser("Bu mağaza şu anda kilitli.");
+        return;
+      }
+      return clickStoreCard(card);
     }
   }
 
-  // 4️⃣ Bulunamadıysa kullanıcıya bilgi ver
-  const firstFew = Array.from(cards)
-    .slice(0, 3)
-    .map(c => c.querySelector(".seller-type-name, .seller-name, .store-name")?.textContent || "Mağaza")
-    .join(", ");
-  speakToUser(`"${message}" bulunamadı. Örnek: ${firstFew} gibi söyleyebilirsin.`);
-  return false;
+  // 🔹 Hiçbiri bulunmadıysa
+  speakToUser(`"${command}" isminde bir mağaza bulunamadı.`);
 }
 
-// Kartı tıklayıp görsel geri bildirim ve sesli onay veren sade fonksiyon
-function clickAndHighlightCard(card) {
-  try {
-    const nameEl = card.querySelector(
-      ".seller-type-name, .seller-name, .category-name, .store-name, .card-title, [class*='name']"
-    );
-    const name = nameEl?.textContent?.trim() || "Seçim";
+function clickStoreCard(card) {
+  const name = card.dataset.typeName;
+  card.click();
+  card.classList.add("selected");
 
-    // Tıklama
-    card.click();
+  // Görsel vurgu efekti
+  card.style.transition = "transform 0.2s ease, box-shadow 0.2s ease";
+  card.style.transform = "scale(1.05)";
+  card.style.boxShadow = "0 0 15px var(--success)";
 
-    // Görsel efekt
-    card.style.transition = "transform 0.2s ease, box-shadow 0.2s ease";
-    card.style.transform = "scale(1.05)";
-    card.style.boxShadow = "0 0 15px var(--primary, #007bff)";
+  setTimeout(() => {
+    card.style.transform = "scale(1)";
+    card.style.boxShadow = "";
+  }, 800);
 
-    setTimeout(() => {
-      card.style.transform = "scale(1)";
-      card.style.boxShadow = "";
-    }, 800);
-
-    // Sesli onay
-    speakToUser(`${name} seçildi.`);
-    console.log(`✅ "${name}" kartı tıklandı`);
-  } catch (err) {
-    console.error("Kart tıklama hatası:", err);
-    speakToUser("Seçim sırasında bir hata oluştu.");
-  }
+  speakToUser(`${name} seçildi.`);
+  console.log(`✅ ${name} mağazası tıklandı`);
 }
 
 
@@ -6386,6 +6358,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
