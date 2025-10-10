@@ -2733,33 +2733,33 @@ async function createDefaultCommandRules() {
 async function processVoiceCommand(transcript) {
     const message = transcript.toLowerCase().trim();
     console.log(`🔊 Sesli komut: "${message}" | Mevcut kök: ${currentRoot}`);
-     // SATICI SEÇİMİ için özel entegrasyon
+
+    // SATICI SEÇİMİ için özel entegrasyon
     if (currentRoot === "3:0" || message.includes('satıcı') || message.includes('yer') || message.includes('dükkan')) {
         console.log('🎯 Satıcı seçim komutu algılandı');
-        const success = await handleVoiceSellerSelection(command);
+        const success = await handleVoiceSellerSelection(message); // ← burada command yerine message
         if (success) return;
     }
 
-if (
-  currentRoot === "2:0" ||
-  /(mağaza|market|restoran|fırın|eczane|pet shop|çiçekçi)/i.test(message)
-) {
-  console.log('🎯 Sesli mağaza seçimi komutu algılandı');
+    // SESLİ MAĞAZA SEÇİMİ için özel entegrasyon
+    if (currentRoot === "2:0" || /(mağaza|market|restoran|fırın|eczane|pet shop|çiçekçi)/i.test(message)) {
+        console.log('🎯 Sesli mağaza seçimi komutu algılandı');
 
-  // Sepet kilit kontrolü (benim koddan)
-  if (cartHasItems()) {
-    speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
-    return;
-  }
+        // Sepet kilit kontrolü
+        if (cartHasItems()) {
+            speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
+            return;
+        }
 
-  const success = await handleVoiceStoreSelection(command);
-  if (success) return;
-}
+        const success = await handleVoiceStoreSelection(message); // ← burada da command yerine message
+        if (success) return;
+    }
 
+    // Kullanıcı mesajı UI'ya yazdır
     if (userMessage) userMessage.textContent = transcript;
 
     console.log(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot} | Kilit: ${isSellerLocked}`);
-
+    
     try {
         // 1. Askıda cevap varsa, onu işle
         if (pendingResponse) {
@@ -6348,6 +6348,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
