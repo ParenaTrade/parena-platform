@@ -3333,63 +3333,51 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
 
 
  //SESLİ MAĞAZA SEÇİMİ       
- async function handleVoiceStoreSelection(command) {
-    const temizKomut = command.toLowerCase().trim();
-    console.log('🎯 Sesli mağaza komutu:', temizKomut);
+ async function handleVoiceStoreSelection(message) {
+    console.log('🎯 Sesli mağaza seçimi:', message);
 
-    const mağazaKartları = document.querySelectorAll('.seller-type-card, .store-card, .card');
-    if (mağazaKartları.length === 0) {
+    // Sepet dolumu kontrolü
+    if (cartHasItems()) {
+        speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
+        return false;
+    }
+
+    // Mağaza kartlarını bul
+    const storeCards = document.querySelectorAll('.seller-type-card, .store-card, .card');
+    if (storeCards.length === 0) {
+        console.error('❌ Mağaza kartları bulunamadı');
         speakToUser("Mağaza listesi yüklenmedi. Lütfen bekleyin.");
         return false;
     }
 
-    // 🔒 Sepet kilidi kontrolü
-    if (cart.length > 0) {
-        const firstCartItem = cart[0];
-        const currentSeller = firstCartItem ? sellers.find(s => s.id === firstCartItem.seller_id) : null;
-        if (currentSeller) {
-            speakToUser(`Sepet dolu. Sadece ${currentSeller.business_name} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
-            return false;
-        }
-    }
+    // Komutu eşleştir (isim veya sayı)
+    const temizMesaj = message.toLowerCase().trim();
+    let selectedCard = null;
 
-    // Mağaza ismine göre eşleştirme
-    let seçilenKart = null;
-    mağazaKartları.forEach((kart, index) => {
-        const isim = kart.getAttribute('data-type-name')?.toLowerCase();
-        if (!isim) return;
-        if (temizKomut.includes(isim)) {
-            seçilenKart = kart;
-        }
-        // Sayısal seçim (birinci, ikinci, 1, 2, vb.)
-        const sayıEşleşmesi = temizKomut.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|1|2|3|4|5)/i);
-        if (!seçilenKart && sayıEşleşmesi) {
-            const sayılar = {'birinci':0,'1':0,'ikinci':1,'2':1,'üçüncü':2,'3':2,'dördüncü':3,'4':3,'beşinci':4,'5':4};
-            const indeks = sayılar[sayıEşleşmesi[0].toLowerCase()];
-            if (indeks !== undefined && indeks < mağazaKartları.length) seçilenKart = mağazaKartları[indeks];
-        }
+    storeCards.forEach((card, index) => {
+        const name = card.getAttribute('data-type-name')?.toLowerCase() || '';
+        if (name === temizMesaj) selectedCard = card;
+
+        // Sayısal seçim: "birinci", "2", vb.
+        const numbers = ['birinci','ikinci','üçüncü','dördüncü','beşinci','1','2','3','4','5'];
+        if (numbers[index] && numbers[index] === temizMesaj) selectedCard = card;
     });
 
-    if (!seçilenKart) {
-        const mevcutMağazalar = Array.from(mağazaKartları).slice(0, 3).map(k => k.getAttribute('data-type-name')).join(', ');
-        speakToUser(`"${command}" bulunamadı. Örnek mağazalar: ${mevcutMağazalar}`);
+    if (!selectedCard) {
+        speakToUser(`"${message}" bulunamadı. Lütfen geçerli bir mağaza seçin.`);
         return false;
     }
 
-    // Kart seçimi ve görsel feedback
-    seçilenKart.click();
-    seçilenKart.classList.add('selected', 'active');
-    seçilenKart.style.border = '2px solid var(--primary)';
-    seçilenKart.style.transform = 'scale(1.05)';
-    seçilenKart.style.boxShadow = '0 0 25px var(--primary)';
-    setTimeout(() => {
-        seçilenKart.style.transform = 'scale(1)';
-        seçilenKart.style.boxShadow = '';
-    }, 1000);
-
-    speakToUser(`${seçilenKart.getAttribute('data-type-name')} seçildi.`);
+    // Kartı tıkla ve görsel feedback
+    selectedCard.click();
+    selectedCard.classList.add('selected', 'active');
+    selectedCard.style.border = '2px solid var(--primary)';
+    speakToUser(`${selectedCard.getAttribute('data-type-name')} seçildi.`);
+    currentRoot = "3:0"; // kök güncellemesi
     return true;
 }
+
+        
 
        
 // =============================================
@@ -3545,7 +3533,7 @@ async function selectDynamicSeller(seller) {
     }
 }
 
-
+// SESLİ SATICI SEÇİM - REYON YÜKLEME 
   async function handleVoiceSellerSelection(command) {
     const temizKomut = command.toLowerCase().trim();
     console.log('🎯 Sesli satıcı komutu:', temizKomut);
@@ -3614,8 +3602,8 @@ async function selectDynamicSeller(seller) {
 
     return true;
 }
-      
 
+      
 // =============================================
 // KATEGORİ SEÇİMİNDE ÜRÜNLERİ YÜKLE
 // =============================================
@@ -6348,6 +6336,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
