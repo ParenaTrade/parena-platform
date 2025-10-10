@@ -3323,7 +3323,87 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu. Lütfen bir satıcı seçin.`);
 }
 
-        
+ function handleVoiceStoreSelection(command) {
+  const text = command.toLowerCase().trim();
+  console.log("🎙️ Komut:", text);
+
+  // 🔹 1. Sepet kontrolü
+  if (cartHasItems()) {
+    speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
+    return;
+  }
+
+  const cards = document.querySelectorAll(".seller-type-card");
+  if (!cards.length) {
+    speakToUser("Henüz mağaza listesi yüklenmedi.");
+    return;
+  }
+
+  // Türkçe sıra numaraları
+  const numbers = {
+    "birinci": 1, "ikinci": 2, "üçüncü": 3,
+    "dördüncü": 4, "beşinci": 5, "altıncı": 6,
+    "yedinci": 7, "sekizinci": 8, "dokuzuncu": 9, "onuncu": 10
+  };
+
+  // 🔹 2. Sayı ile arama (“birinci market” veya “2. mağaza”)
+  for (const [word, num] of Object.entries(numbers)) {
+    if (text.includes(word) || text.includes(num.toString())) {
+      const card = cards[num - 1];
+      if (card && card.style.pointerEvents !== "none") {
+        return clickStoreCard(card);
+      } else {
+        speakToUser("Bu mağaza şu anda seçilemiyor.");
+        return;
+      }
+    }
+  }
+
+  // 🔹 3. İsme göre arama (“Market”, “Fırın”, “Eczane” vs)
+  for (const card of cards) {
+    const name = card.dataset.typeName?.toLowerCase();
+    if (name && (text.includes(name) || name.includes(text))) {
+      if (card.style.pointerEvents === "none") {
+        speakToUser("Bu mağaza şu anda kilitli.");
+        return;
+      }
+      return clickStoreCard(card);
+    }
+  }
+
+  // 🔹 4. Hiçbiri bulunmazsa
+  speakToUser(`"${command}" isminde bir mağaza bulunamadı.`);
+}
+
+// 🔸 Kart tıklama animasyonu ve sesli onay
+function clickStoreCard(card) {
+  const name = card.dataset.typeName;
+  card.click();
+  card.classList.add("selected");
+
+  card.style.transition = "transform 0.2s ease, box-shadow 0.2s ease";
+  card.style.transform = "scale(1.05)";
+  card.style.boxShadow = "0 0 15px var(--success)";
+
+  setTimeout(() => {
+    card.style.transform = "scale(1)";
+    card.style.boxShadow = "";
+  }, 800);
+
+  speakToUser(`${name} seçildi.`);
+  console.log(`✅ ${name} mağazası tıklandı`);
+}
+
+// 🔸 Sepet durumu kontrol fonksiyonu
+function cartHasItems() {
+  try {
+    const cart = JSON.parse(localStorage.getItem("cart")) || [];
+    return cart.length > 0;
+  } catch {
+    return false;
+  }
+}
+       
 // =============================================
 // DİNAMİK SATICI SİSTEMİ
 // =============================================
@@ -6456,6 +6536,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
