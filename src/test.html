@@ -3526,73 +3526,35 @@ async function selectDynamicSeller(seller) {
 
 // SESLİ SATICI SEÇİM - REYON YÜKLEME 
   async function handleVoiceSellerSelection(message) {
-    const temizKomut = command.toLowerCase().trim();
-    console.log('🎯 Sesli satıcı komutu:', temizKomut);
+  const sellerCards = document.querySelectorAll("#sellerGrid .seller-card");
+  if (!sellerCards.length) return false;
 
-    const satıcıKartları = document.querySelectorAll('.seller-card, .merchant-card, .store-card, [class*="seller"], [class*="merchant"]');
-    if (satıcıKartları.length === 0) {
-        speakToUser("Satıcı listesi yüklenmedi. Lütfen önce mağaza seçin.");
-        return false;
+  for (const card of sellerCards) {
+    // 🧠 Satıcı adını hem .seller-name hem de img alt'tan çekiyoruz
+    const sellerName =
+      card.querySelector(".seller-name")?.textContent.toLowerCase().trim() ||
+      card.querySelector("img.seller-image")?.alt.toLowerCase().trim();
+
+    if (!sellerName) continue;
+
+    // 👂 "onur", "onur market", "altınşehir" gibi kısmi eşleşmelere izin verelim
+    if (
+      message.includes(sellerName) ||
+      sellerName.includes(message) ||
+      message.split(" ").some((w) => sellerName.includes(w))
+    ) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.click();
+      speakToUser(`${sellerName} seçildi.`);
+      console.log(`✅ Satıcı bulundu ve tıklandı: ${sellerName}`);
+      return true;
     }
+  }
 
-    // 🔒 Sepet kilidi kontrolü: farklı satıcı ile karışmayı engelle
-    if (cart.length > 0) {
-        const firstCartItem = cart[0];
-        const currentSeller = firstCartItem ? sellers.find(s => s.id === firstCartItem.seller_id) : null;
-        if (currentSeller) {
-            speakToUser(`Sepet dolu. Sadece ${currentSeller.business_name} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
-            return false;
-        }
-    }
-
-    // Satıcı ismine veya sayısal konumuna göre eşleştirme
-    let seçilenKart = null;
-    satıcıKartları.forEach((kart, index) => {
-        const isim = kart.getAttribute('data-seller-name')?.toLowerCase() ||
-                     kart.querySelector('.seller-name, .business-name, .store-name')?.textContent.toLowerCase();
-        if (!isim) return;
-
-        if (temizKomut.includes(isim)) {
-            seçilenKart = kart;
-        }
-
-        // Sayısal seçim: birinci, ikinci, 1, 2, vb.
-        const sayıEşleşmesi = temizKomut.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|1|2|3|4|5)/i);
-        if (!seçilenKart && sayıEşleşmesi) {
-            const sayılar = {'birinci':0,'1':0,'ikinci':1,'2':1,'üçüncü':2,'3':2,'dördüncü':3,'4':3,'beşinci':4,'5':4};
-            const indeks = sayılar[sayıEşleşmesi[0].toLowerCase()];
-            if (indeks !== undefined && indeks < satıcıKartları.length) seçilenKart = satıcıKartları[indeks];
-        }
-    });
-
-    if (!seçilenKart) {
-        const mevcutSatıcılar = Array.from(satıcıKartları).slice(0, 3).map(k => k.querySelector('.seller-name, .business-name, .store-name')?.textContent).join(', ');
-        speakToUser(`"${command}" bulunamadı. Örnek satıcılar: ${mevcutSatıcılar}`);
-        return false;
-    }
-
-    // Kart seçimi ve görsel feedback
-    seçilenKart.click();
-    seçilenKart.classList.add('selected', 'active');
-    seçilenKart.style.border = '2px solid var(--primary)';
-    seçilenKart.style.transform = 'scale(1.05)';
-    seçilenKart.style.boxShadow = '0 0 25px var(--primary)';
-    setTimeout(() => {
-        seçilenKart.style.transform = 'scale(1)';
-        seçilenKart.style.boxShadow = '';
-    }, 1000);
-
-    const satıcıAdı = seçilenKart.getAttribute('data-seller-name') ||
-                      seçilenKart.querySelector('.seller-name, .business-name, .store-name')?.textContent ||
-                      'Satıcı';
-    speakToUser(`${satıcıAdı} seçildi. Şimdi bir reyon seçin.`);
-
-    // Satıcı seçildiğinde kökü güncelle
-    currentRoot = "4:0"; 
-    console.log(`🔄 Kök güncellendi: Satıcı seçildi -> ${satıcıAdı}`);
-
-    return true;
+  speakToUser(`${message} bulunamadı. Lütfen geçerli bir satıcı söyleyin.`);
+  return false;
 }
+
 
       
 // =============================================
@@ -6327,6 +6289,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
