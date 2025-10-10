@@ -2736,7 +2736,7 @@ async function processVoiceCommand(transcript) {
     console.log(`🔊 Sesli komut: "${message}" | Mevcut kök: ${currentRoot}`);
 
     try {
-        // 1️⃣ Mağaza seçimi
+        // 1️⃣ Mağaza Seç
         if (currentRoot === "2:0" || /(mağaza|market|restoran|fast\s*food|pastane|eczane|alkol|pet\s*shop|çiçek|çarşı)/i.test(message)) {
             if (cartHasItems()) {
                 speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
@@ -2751,7 +2751,7 @@ async function processVoiceCommand(transcript) {
             }
         }
 
-        // 2️⃣ Satıcı seçimi
+        // 2️⃣ Satıcı Seç
         if (currentRoot === "3:0" || /(satıcı|yer|dükkan)/i.test(message)) {
             const success = await handleVoiceSellerSelection(message);
             if (success) {
@@ -2762,12 +2762,19 @@ async function processVoiceCommand(transcript) {
             }
         }
 
-        // 3️⃣ Ürün bilgisi çıkarma
+        // 3️⃣ Ürün Bilgisi Çıkarma ve Sepete Ekleme (Reyon atlama)
         const productInfo = await extractProductInfoFromCommand(message);
-
         if (productInfo && productInfo.productName) {
-            await handleProductAddFromVoice(productInfo, message);
-            return; // sepete eklendiyse başka işleme gerek yok
+            console.log(`✅ Ürün bulundu: ${productInfo.productName}, miktar: ${productInfo.quantity || 1}, birim: ${productInfo.unit || 'adet'}`);
+            
+            // Sepete eklemeden önce geçici root ayarlayalım
+            const previousRoot = currentRoot;
+            currentRoot = "product-added"; // Reyon uyarısını atlamak için geçici
+
+            await handleProductAddFromVoice(productInfo, message); // Sepete ekleme fonksiyonu
+            currentRoot = previousRoot; // Root'u eski haline getir
+            
+            return; // Ürün eklendiyse başka işleme gerek yok
         }
 
         // 4️⃣ Bağlamsal komutlar (varsa)
@@ -2787,23 +2794,6 @@ async function processVoiceCommand(transcript) {
     } catch (error) {
         console.error('❌ Komut işleme hatası:', error);
     }
-}
-
-// Sepete ekleme fonksiyonu (sesli komut için)
-async function handleProductAddFromVoice(productInfo, message) {
-    if (!productInfo.productName) {
-        speakToUser(`"${message}" ile eşleşen bir ürün bulamadım.`);
-        return;
-    }
-
-    const quantity = productInfo.quantity || 1;
-    const unit = productInfo.unit || 'adet';
-
-    console.log(`🛒 Sepete ekleniyor: ${productInfo.productName} ${quantity} ${unit}`);
-    await addToCart(productInfo.productName, quantity, unit);
-
-    updateCartUI();
-    speakToUser(`${quantity} ${unit} ${productInfo.productName} sepete eklendi.`);
 }
 
 // 🖥️ Display mesaj fonksiyonu
@@ -6256,6 +6246,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
