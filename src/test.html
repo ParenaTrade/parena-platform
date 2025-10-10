@@ -2739,15 +2739,25 @@ async function processVoiceCommand(transcript) {
         const success = await handleVoiceSellerSelection(message);
         if (success) return;
     }
-    // SESLİ MAĞAZA SEÇİMİ için özel entegrasyon
-    if (currentRoot === "2:0" || message.includes('mağaza') || message.includes('market') || message.includes('restoran') || message.includes('Fast Food') || message.includes('Fırın') || message.includes('Eczane') || message.includes('Pet Shop') || message.includes('Çiçekçi')) {
-        console.log('🎯 Mağaza seçim komutu algılandı');
-        const success = await handleVoiceStoreTypeSelection(message);
-        if (success) {
-            console.log('✅ Sesli mağaza seçimi başarılı');
-            return; // İşlem başarılıysa diğer komutları işleme
-        }
-    }
+
+if (
+  currentRoot === "2:0" ||
+  /(mağaza|market|restoran|fırın|eczane|pet shop|çiçekçi)/i.test(message)
+) {
+  console.log('🎯 Sesli mağaza seçimi komutu algılandı');
+
+  // Sepet kilit kontrolü (benim koddan)
+  if (cartHasItems()) {
+    speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
+    return;
+  }
+
+  const success = await handleVoiceStoreSelection(message);
+  if (success) return;
+}
+
+
+    
     if (userMessage) userMessage.textContent = transcript;
 
     console.log(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot} | Kilit: ${isSellerLocked}`);
@@ -6536,6 +6546,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
