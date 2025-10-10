@@ -2756,8 +2756,6 @@ if (
   if (success) return;
 }
 
-
-    
     if (userMessage) userMessage.textContent = transcript;
 
     console.log(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot} | Kilit: ${isSellerLocked}`);
@@ -3333,86 +3331,66 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu. Lütfen bir satıcı seçin.`);
 }
 
- function handleVoiceStoreSelection(command) {
-  const text = command.toLowerCase().trim();
-  console.log("🎙️ Komut:", text);
 
-  // 🔹 1. Sepet kontrolü
-  if (cartHasItems()) {
-    speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
-    return;
-  }
+ //SESLİ MAĞAZA SEÇİMİ       
+ async function handleVoiceStoreSelection(command) {
+    const temizKomut = command.toLowerCase().trim();
+    console.log('🎯 Sesli mağaza komutu:', temizKomut);
 
-  const cards = document.querySelectorAll(".seller-type-card");
-  if (!cards.length) {
-    speakToUser("Henüz mağaza listesi yüklenmedi.");
-    return;
-  }
-
-  // Türkçe sıra numaraları
-  const numbers = {
-    "birinci": 1, "ikinci": 2, "üçüncü": 3,
-    "dördüncü": 4, "beşinci": 5, "altıncı": 6,
-    "yedinci": 7, "sekizinci": 8, "dokuzuncu": 9, "onuncu": 10
-  };
-
-  // 🔹 2. Sayı ile arama (“birinci market” veya “2. mağaza”)
-  for (const [word, num] of Object.entries(numbers)) {
-    if (text.includes(word) || text.includes(num.toString())) {
-      const card = cards[num - 1];
-      if (card && card.style.pointerEvents !== "none") {
-        return clickStoreCard(card);
-      } else {
-        speakToUser("Bu mağaza şu anda seçilemiyor.");
-        return;
-      }
+    const mağazaKartları = document.querySelectorAll('.seller-type-card, .store-card, .card');
+    if (mağazaKartları.length === 0) {
+        speakToUser("Mağaza listesi yüklenmedi. Lütfen bekleyin.");
+        return false;
     }
-  }
 
-  // 🔹 3. İsme göre arama (“Market”, “Fırın”, “Eczane” vs)
-  for (const card of cards) {
-    const name = card.dataset.typeName?.toLowerCase();
-    if (name && (text.includes(name) || name.includes(text))) {
-      if (card.style.pointerEvents === "none") {
-        speakToUser("Bu mağaza şu anda kilitli.");
-        return;
-      }
-      return clickStoreCard(card);
+    // 🔒 Sepet kilidi kontrolü
+    if (cart.length > 0) {
+        const firstCartItem = cart[0];
+        const currentSeller = firstCartItem ? sellers.find(s => s.id === firstCartItem.seller_id) : null;
+        if (currentSeller) {
+            speakToUser(`Sepet dolu. Sadece ${currentSeller.business_name} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
+            return false;
+        }
     }
-  }
 
-  // 🔹 4. Hiçbiri bulunmazsa
-  speakToUser(`"${command}" isminde bir mağaza bulunamadı.`);
+    // Mağaza ismine göre eşleştirme
+    let seçilenKart = null;
+    mağazaKartları.forEach((kart, index) => {
+        const isim = kart.getAttribute('data-type-name')?.toLowerCase();
+        if (!isim) return;
+        if (temizKomut.includes(isim)) {
+            seçilenKart = kart;
+        }
+        // Sayısal seçim (birinci, ikinci, 1, 2, vb.)
+        const sayıEşleşmesi = temizKomut.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|1|2|3|4|5)/i);
+        if (!seçilenKart && sayıEşleşmesi) {
+            const sayılar = {'birinci':0,'1':0,'ikinci':1,'2':1,'üçüncü':2,'3':2,'dördüncü':3,'4':3,'beşinci':4,'5':4};
+            const indeks = sayılar[sayıEşleşmesi[0].toLowerCase()];
+            if (indeks !== undefined && indeks < mağazaKartları.length) seçilenKart = mağazaKartları[indeks];
+        }
+    });
+
+    if (!seçilenKart) {
+        const mevcutMağazalar = Array.from(mağazaKartları).slice(0, 3).map(k => k.getAttribute('data-type-name')).join(', ');
+        speakToUser(`"${command}" bulunamadı. Örnek mağazalar: ${mevcutMağazalar}`);
+        return false;
+    }
+
+    // Kart seçimi ve görsel feedback
+    seçilenKart.click();
+    seçilenKart.classList.add('selected', 'active');
+    seçilenKart.style.border = '2px solid var(--primary)';
+    seçilenKart.style.transform = 'scale(1.05)';
+    seçilenKart.style.boxShadow = '0 0 25px var(--primary)';
+    setTimeout(() => {
+        seçilenKart.style.transform = 'scale(1)';
+        seçilenKart.style.boxShadow = '';
+    }, 1000);
+
+    speakToUser(`${seçilenKart.getAttribute('data-type-name')} seçildi.`);
+    return true;
 }
 
-// 🔸 Kart tıklama animasyonu ve sesli onay
-function clickStoreCard(card) {
-  const name = card.dataset.typeName;
-  card.click();
-  card.classList.add("selected");
-
-  card.style.transition = "transform 0.2s ease, box-shadow 0.2s ease";
-  card.style.transform = "scale(1.05)";
-  card.style.boxShadow = "0 0 15px var(--success)";
-
-  setTimeout(() => {
-    card.style.transform = "scale(1)";
-    card.style.boxShadow = "";
-  }, 800);
-
-  speakToUser(`${name} seçildi.`);
-  console.log(`✅ ${name} mağazası tıklandı`);
-}
-
-// 🔸 Sepet durumu kontrol fonksiyonu
-function cartHasItems() {
-  try {
-    const cart = JSON.parse(localStorage.getItem("cart")) || [];
-    return cart.length > 0;
-  } catch {
-    return false;
-  }
-}
        
 // =============================================
 // DİNAMİK SATICI SİSTEMİ
@@ -3567,253 +3545,77 @@ async function selectDynamicSeller(seller) {
     }
 }
 
-// SESLİ SATICI SEÇİM FONKSİYONU
-async function handleVoiceSellerSelection(message) {
-    console.log('🏬 Sesli satıcı seçimi:', message);
-    
-    // Satıcı kartlarını bul (tüm olası seçicileri dene)
+
+  async function handleVoiceSellerSelection(command) {
+    const temizKomut = command.toLowerCase().trim();
+    console.log('🎯 Sesli satıcı komutu:', temizKomut);
+
     const satıcıKartları = document.querySelectorAll('.seller-card, .merchant-card, .store-card, [class*="seller"], [class*="merchant"]');
-    
     if (satıcıKartları.length === 0) {
-        console.error('❌ Satıcı kartları bulunamadı. Mevcut elementler:', document.querySelectorAll('*[class*="card"]'));
-        speakToUser("Satıcı listesi yüklenmedi. Lütfen önce mağaza tipi seçin.");
+        speakToUser("Satıcı listesi yüklenmedi. Lütfen önce mağaza seçin.");
         return false;
     }
-    
-    let bulunanKart = null;
-    const temizMesaj = message.toLowerCase().replace(/[^a-zğüşıöç\s]/g, '').trim();
-    
-    console.log('🔍 Aranan satıcı:', temizMesaj);
-    console.log('📋 Mevcut satıcılar:', Array.from(satıcıKartları).map(kart => 
-        kart.querySelector('.seller-name, .business-name, .store-name, .card-title')?.textContent
-    ));
 
-    // 1. GELİŞTİRİLMİŞ İSİM EŞLEŞTİRME
-    for (const kart of satıcıKartları) {
-        const isimElement = kart.querySelector('.seller-name, .business-name, .store-name, .card-title, [class*="name"]');
-        if (!isimElement) continue;
-        
-        const satıcıİsmi = isimElement.textContent.toLowerCase();
-        const temizİsim = satıcıİsmi.replace(/[^a-zğüşıöç\s]/g, '').trim();
-        
-        console.log(`🔍 Satıcı kontrol: "${temizİsim}" vs "${temizMesaj}"`);
-        
-        // Çeşitli eşleştirme yöntemleri
-        if (satıcıİsmi.includes(temizMesaj) || 
-            temizİsim.includes(temizMesaj) || 
-            temizMesaj.includes(temizİsim) ||
-            calculateSimilarity(temizİsim, temizMesaj) > 0.6) {
-            
-            bulunanKart = kart;
-            console.log(`✅ Satıcı eşleşmesi: "${satıcıİsmi}"`);
-            break;
-        }
-    }
-    
-    // 2. SAYISAL SEÇİM (SATICI LİSTESİ)
-    if (!bulunanKart) {
-        const sayıEşleşmesi = message.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|altıncı|yedinci|sekizinci|1\.|2\.|3\.|4\.|5\.|6\.|7\.|8\.|1|2|3|4|5|6|7|8)/i);
-        if (sayıEşleşmesi) {
-            const sayılar = {
-                'birinci': 0, '1.': 0, '1': 0,
-                'ikinci': 1, '2.': 1, '2': 1,
-                'üçüncü': 2, '3.': 2, '3': 2,
-                'dördüncü': 3, '4.': 3, '4': 3,
-                'beşinci': 4, '5.': 4, '5': 4,
-                'altıncı': 5, '6.': 5, '6': 5,
-                'yedinci': 6, '7.': 6, '7': 6,
-                'sekizinci': 7, '8.': 7, '8': 7
-            };
-            
-            const arananSayı = sayıEşleşmesi[0].toLowerCase();
-            const indeks = sayılar[arananSayı];
-            
-            if (indeks !== undefined && indeks < satıcıKartları.length) {
-                bulunanKart = satıcıKartları[indeks];
-                const satıcıAdı = bulunanKart.querySelector('.seller-name, .business-name, .store-name')?.textContent || 'Bilinmeyen Satıcı';
-                console.log(`✅ Sayısal satıcı seçim: ${indeks + 1}. satıcı -> "${satıcıAdı}"`);
-            }
-        }
-    }
-    
-    // 3. ÖZEL SATICI FİLTRELERİ
-    if (!bulunanKart) {
-        // En yakın satıcı
-        if (temizMesaj.includes('yakın') || temizMesaj.includes('yakınım') || temizMesaj.includes('en yakın')) {
-            bulunanKart = satıcıKartları[0]; // İlk kart en yakın varsayılıyor
-            console.log('📍 En yakın satıcı seçildi');
-        }
-        // En ucuz teslimat
-        else if (temizMesaj.includes('ucuz') || temizMesaj.includes('ekonomik') || temizMesaj.includes('düşük')) {
-            let enUcuzKart = null;
-            let enDüşükÜcret = Infinity;
-            
-            satıcıKartları.forEach(kart => {
-                const teslimatÜcreti = kart.querySelector('.delivery-fee, .delivery-price, [class*="delivery"]');
-                if (teslimatÜcreti) {
-                    const ücretMetni = teslimatÜcreti.textContent;
-                    const ücretSayı = ücretMetni.match(/(\d+[,.]\d+)/);
-                    if (ücretSayı) {
-                        const ücret = parseFloat(ücretSayı[1].replace(',', '.'));
-                        if (ücret < enDüşükÜcret) {
-                            enDüşükÜcret = ücret;
-                            enUcuzKart = kart;
-                        }
-                    } else if (ücretMetni.includes('Ücretsiz') || ücretMetni.includes('ücretsiz')) {
-                        enUcuzKart = kart; // Ücretsiz teslimat
-                        enDüşükÜcret = 0;
-                    }
-                }
-            });
-            
-            if (enUcuzKart) {
-                bulunanKart = enUcuzKart;
-                console.log('💰 En ucuz teslimatlı satıcı seçildi');
-            }
-        }
-        // En yüksek puan
-        else if (temizMesaj.includes('iyi') || temizMesaj.includes('yüksek') || temizMesaj.includes('puan')) {
-            let enYüksekPuanKart = null;
-            let enYüksekPuan = 0;
-            
-            satıcıKartları.forEach(kart => {
-                const puanElement = kart.querySelector('.seller-rating, .rating, .stars, [class*="rating"]');
-                if (puanElement) {
-                    const puanMetni = puanElement.textContent;
-                    const puanSayı = puanMetni.match(/(\d+[,.]\d+)/);
-                    if (puanSayı) {
-                        const puan = parseFloat(puanSayı[1].replace(',', '.'));
-                        if (puan > enYüksekPuan) {
-                            enYüksekPuan = puan;
-                            enYüksekPuanKart = kart;
-                        }
-                    }
-                }
-            });
-            
-            if (enYüksekPuanKart) {
-                bulunanKart = enYüksekPuanKart;
-                console.log('⭐ En yüksek puanlı satıcı seçildi');
-            }
-        }
-    }
-    
-    // 4. SATICI SEÇİMİNİ UYGULA
-    if (bulunanKart) {
-        try {
-            console.log('🎯 Satıcı kartı tıklanıyor:', bulunanKart);
-            
-            // Kartı tıkla
-            bulunanKart.click();
-            
-            // Seçimi doğrula ve güçlendir
-            setTimeout(() => {
-                if (!bulunanKart.classList.contains('selected')) {
-                    bulunanKart.classList.add('selected', 'active');
-                    bulunanKart.style.border = '2px solid var(--success)';
-                }
-            }, 150);
-            
-            // GÖRSEL FEEDBACK
-            bulunanKart.style.transform = 'scale(1.05)';
-            bulunanKart.style.boxShadow = '0 0 25px var(--success)';
-            bulunanKart.style.transition = 'all 0.3s ease';
-            
-            setTimeout(() => {
-                bulunanKart.style.transform = 'scale(1)';
-                bulunanKart.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
-            }, 1000);
-            
-            const satıcıAdı = bulunanKart.querySelector('.seller-name, .business-name, .store-name')?.textContent || 'Satıcı';
-            
-            // Teslimat bilgisi ekle
-            let teslimatBilgisi = '';
-            const teslimatElement = bulunanKart.querySelector('.delivery-fee, .delivery-info');
-            if (teslimatElement) {
-                teslimatBilgisi = `. ${teslimatElement.textContent}`;
-            }
-            
-            speakToUser(`${satıcıAdı} seçildi${teslimatBilgisi}. Şimdi bir reyon seçin.`);
-            
-            // Satıcı seçildiğinde kökü güncelle
-            currentRoot = "4:0";
-            console.log(`🔄 Kök güncellendi: 3:0 -> 4:0 (Satıcı seçildi: ${satıcıAdı})`);
-            
-            return true;
-            
-        } catch (error) {
-            console.error('❌ Satıcı kartı tıklama hatası:', error);
-            speakToUser("Satıcı seçiminde hata oluştu.");
+    // 🔒 Sepet kilidi kontrolü: farklı satıcı ile karışmayı engelle
+    if (cart.length > 0) {
+        const firstCartItem = cart[0];
+        const currentSeller = firstCartItem ? sellers.find(s => s.id === firstCartItem.seller_id) : null;
+        if (currentSeller) {
+            speakToUser(`Sepet dolu. Sadece ${currentSeller.business_name} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
             return false;
         }
     }
-    
-    // BULUNAMADIYSA YARDIM MESAJI
-    const mevcutSatıcılar = Array.from(satıcıKartları)
-        .slice(0, 3)
-        .map(kart => {
-            const isim = kart.querySelector('.seller-name, .business-name, .store-name')?.textContent || 'Satıcı';
-            const konum = kart.querySelector('.seller-details, .location, [class*="city"]')?.textContent || '';
-            return `${isim} ${konum}`;
-        })
-        .join(', ');
-    
-    speakToUser(`Hangi satıcıyı istiyorsunuz? Örneğin: ${mevcutSatıcılar}. Veya "birinci satıcı", "en yakın", "en ucuz" gibi söyleyebilirsiniz.`);
-    return false;
-}
 
-// BENZERLİK HESAPLAMA FONKSİYONU (mevcut kodunuzda varsa kullanın)
-function calculateSimilarity(str1, str2) {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
-    
-    if (longer.length === 0) return 1.0;
-    
-    const distance = levenshteinDistance(longer, shorter);
-    return (longer.length - distance) / parseFloat(longer.length);
-}
+    // Satıcı ismine veya sayısal konumuna göre eşleştirme
+    let seçilenKart = null;
+    satıcıKartları.forEach((kart, index) => {
+        const isim = kart.getAttribute('data-seller-name')?.toLowerCase() ||
+                     kart.querySelector('.seller-name, .business-name, .store-name')?.textContent.toLowerCase();
+        if (!isim) return;
 
-function levenshteinDistance(a, b) {
-    const matrix = [];
-    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-    
-    for (let i = 1; i <= b.length; i++) {
-        for (let j = 1; j <= a.length; j++) {
-            if (b.charAt(i-1) === a.charAt(j-1)) {
-                matrix[i][j] = matrix[i-1][j-1];
-            } else {
-                matrix[i][j] = Math.min(
-                    matrix[i-1][j-1] + 1,
-                    matrix[i][j-1] + 1,
-                    matrix[i-1][j] + 1
-                );
-            }
+        if (temizKomut.includes(isim)) {
+            seçilenKart = kart;
         }
-    }
-    return matrix[b.length][a.length];
-}
 
-// TEST FONKSİYONU
-function testSatıcıSeçimi() {
-    console.log('🧪 Satıcı seçim testi başlatılıyor...');
-    
-    const testKomutları = [
-        'birinci satıcı',
-        'ikinci',
-        'en yakın',
-        'en ucuz',
-        'Migros',
-        'Şok'
-    ];
-    
-    testKomutları.forEach(komut => {
-        console.log(`\n🔍 Test: "${komut}"`);
-        handleVoiceSellerSelection(komut).then(result => {
-            console.log(`✅ Test sonucu: ${result ? 'Başarılı' : 'Başarısız'}`);
-        });
+        // Sayısal seçim: birinci, ikinci, 1, 2, vb.
+        const sayıEşleşmesi = temizKomut.match(/(birinci|ikinci|üçüncü|dördüncü|beşinci|1|2|3|4|5)/i);
+        if (!seçilenKart && sayıEşleşmesi) {
+            const sayılar = {'birinci':0,'1':0,'ikinci':1,'2':1,'üçüncü':2,'3':2,'dördüncü':3,'4':3,'beşinci':4,'5':4};
+            const indeks = sayılar[sayıEşleşmesi[0].toLowerCase()];
+            if (indeks !== undefined && indeks < satıcıKartları.length) seçilenKart = satıcıKartları[indeks];
+        }
     });
+
+    if (!seçilenKart) {
+        const mevcutSatıcılar = Array.from(satıcıKartları).slice(0, 3).map(k => k.querySelector('.seller-name, .business-name, .store-name')?.textContent).join(', ');
+        speakToUser(`"${command}" bulunamadı. Örnek satıcılar: ${mevcutSatıcılar}`);
+        return false;
+    }
+
+    // Kart seçimi ve görsel feedback
+    seçilenKart.click();
+    seçilenKart.classList.add('selected', 'active');
+    seçilenKart.style.border = '2px solid var(--primary)';
+    seçilenKart.style.transform = 'scale(1.05)';
+    seçilenKart.style.boxShadow = '0 0 25px var(--primary)';
+    setTimeout(() => {
+        seçilenKart.style.transform = 'scale(1)';
+        seçilenKart.style.boxShadow = '';
+    }, 1000);
+
+    const satıcıAdı = seçilenKart.getAttribute('data-seller-name') ||
+                      seçilenKart.querySelector('.seller-name, .business-name, .store-name')?.textContent ||
+                      'Satıcı';
+    speakToUser(`${satıcıAdı} seçildi. Şimdi bir reyon seçin.`);
+
+    // Satıcı seçildiğinde kökü güncelle
+    currentRoot = "4:0"; 
+    console.log(`🔄 Kök güncellendi: Satıcı seçildi -> ${satıcıAdı}`);
+
+    return true;
 }
+      
+
 // =============================================
 // KATEGORİ SEÇİMİNDE ÜRÜNLERİ YÜKLE
 // =============================================
@@ -6546,6 +6348,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
