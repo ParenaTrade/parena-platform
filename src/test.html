@@ -4658,112 +4658,94 @@ const voiceLearner = {
         
 // 🔒 Güvenli ve birleşik extractProductInfoFromCommand
 async function extractProductInfoFromCommand(message) {
-    console.log('🔍 extractProductInfoFromCommand çağrıldı:', message);
+  console.log("🎧 extractProductInfoFromCommand çağrıldı:", message);
 
-    if (!message || message.trim() === '') {
-        console.log('❌ Boş mesaj');
-        return null;
+  // 🔹 Küçük harfe çevir
+  const text = message.toLowerCase().trim();
+
+  // 🔹 Ürün isimleri listesi (örnek)
+  const productList = [
+    "domates", "çarliston biber", "salatalık", "soğan", "patates",
+    "elma", "armut", "biber", "marul", "kabak", "patlıcan", "limon"
+  ];
+
+  // 🔹 Sayı kelimeleri ile rakam karşılıkları
+  const numberWords = {
+    "bir": 1, "iki": 2, "üç": 3, "dört": 4, "beş": 5,
+    "altı": 6, "yedi": 7, "sekiz": 8, "dokuz": 9, "on": 10,
+  };
+
+  let product = null;
+  let quantity = 1;
+  let unit = "kilo";
+
+  try {
+    // 1️⃣ Ürün adı eşleşmesi
+    for (const p of productList) {
+      if (text.includes(p)) {
+        product = p;
+        break;
+      }
     }
 
-    let quantity = 1;
-    let unit = 'adet';
-    let productName = '';
-
-    // 1️⃣ Öğrenen sistemden düzeltme al
-    let correctedMessage = message;
-    if (voiceLearner && voiceLearner.initialized) {
-        correctedMessage = await voiceLearner.correctUserInput(message);
-        if (correctedMessage !== message) {
-            console.log(`🔄 Öğrenen sistem düzeltmesi: "${message}" -> "${correctedMessage}"`);
-        }
-    }
-
-    // 2️⃣ Hızlı düzeltmeler
-    const quickCorrections = {
-        'çarliston': 'Çarliston Biber',
-        'viber': 'Çarliston Biber',
-        'çarliston on': 'Çarliston Biber',
-        'on çarliston': 'Çarliston Biber',
-        'çarlistonbiber': 'Çarliston Biber',
-        'domat': 'Domates',
-        'sogan': 'Soğan',
-        'biberr': 'Biber',
-        'salatalik': 'Salatalık',
-        'patat': 'Patates'
-    };
-
-    const lowerMessage = correctedMessage.toLowerCase().trim();
-    if (quickCorrections[lowerMessage]) {
-        correctedMessage = quickCorrections[lowerMessage];
-        console.log(`🔄 Hızlı düzeltme: "${message}" -> "${correctedMessage}"`);
-    }
-
-    // 3️⃣ Temizleme işlemi (fazla kelimeler)
-    let cleanMessage = correctedMessage
-        .replace(/ekle|sepete|al|istiyorum|lütfen|rica|ediyorum|tane|adet/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
-
-    // 4️⃣ Rakamsal miktar çıkarımı
-    const numberMatch = cleanMessage.match(/(\d+(\.\d+)?)/);
-    if (numberMatch) {
-        quantity = parseFloat(numberMatch[1]);
-        // sayıyı mesajdan çıkartıyoruz
-        cleanMessage = cleanMessage.replace(numberMatch[0], '').trim();
-        console.log(`🔢 Rakamsal miktar bulundu: ${quantity}, kalan mesaj: "${cleanMessage}"`);
-    }
-
-    // 5️⃣ Birim çıkarımı
-    const unitPatterns = [
-        { pattern: /(kilo|kg)/i, unit: 'kg' },
-        { pattern: /(gram|gr)/i, unit: 'g' },
-        { pattern: /(litre|lt)/i, unit: 'lt' },
-        { pattern: /ml/i, unit: 'ml' },
-        { pattern: /paket/i, unit: 'paket' },
-        { pattern: /düzine/i, unit: 'düzine' }
-    ];
-
-    for (const u of unitPatterns) {
-        if (u.pattern.test(cleanMessage)) {
-            unit = u.unit;
-            cleanMessage = cleanMessage.replace(u.pattern, '').trim();
-            console.log(`📦 Birim bulundu: ${unit}, kalan mesaj: "${cleanMessage}"`);
-            break;
-        }
-    }
-
-    // 🔍 Ürün araması
-    const product = findProductByName(cleanMessage);
-    if (product) {
-        productName = product.name;
-        lastRecognizedProduct = productName; // ✅ Son ürünü hatırla
+    // 2️⃣ Rakam tespiti
+    const numMatch = text.match(/\b\d+\b/);
+    if (numMatch) {
+      quantity = parseInt(numMatch[0]);
     } else {
-        const words = cleanMessage.split(' ').filter(Boolean);
-        for (const w of words) {
-            const partial = findProductByName(w);
-            if (partial) {
-                productName = partial.name;
-                lastRecognizedProduct = productName; // ✅ Hatırla
-                break;
-            }
+      // 3️⃣ Sayı kelimelerini bul
+      for (const [word, num] of Object.entries(numberWords)) {
+        const regex = new RegExp(`\\b${word}\\b`, "i");
+        if (regex.test(text)) {
+          quantity = num;
+          break;
         }
+      }
     }
 
-    // 🧠 Eğer ürün yoksa, son ürünü hatırla
-    if (!productName && lastRecognizedProduct) {
-        productName = lastRecognizedProduct;
-        console.log(`🔁 Önceki ürün hatırlandı: ${productName}`);
+    // 4️⃣ Birim kontrolü
+    if (text.includes("adet")) unit = "adet";
+    else if (text.includes("kilo")) unit = "kilo";
+    else if (text.includes("gram")) unit = "gram";
+
+    // 5️⃣ “on” kelimesi rakam karışıklığı düzeltme
+    if (product && text.includes(product) && text.includes("on") && !/\d/.test(text)) {
+      const indexOfOn = text.indexOf("on");
+      const indexOfProduct = text.indexOf(product);
+      // eğer “on” ürünün içinde geçiyorsa (çarliston gibi), miktara dahil etme
+      if (indexOfOn > indexOfProduct && indexOfOn < indexOfProduct + product.length) {
+        console.log("⚠️ 'on' ürün adının parçası, miktara eklenmedi");
+        if (!numMatch) quantity = 1;
+      }
     }
 
-    if (!productName) {
-        console.log('❌ Ürün ismi çıkarılamadı');
-        return null;
+    // 6️⃣ Eşleşme yoksa Supabase geçmişinden kontrol et
+    try {
+      const encodedInput = encodeURIComponent(message.trim());
+      const decodedInput = decodeURIComponent(encodedInput);
+
+      const { data: matchData, error: matchError } = await supabase
+        .from("product_voice_matches")
+        .select("matched_product")
+        .eq("success", true)
+        .ilike("user_input", `%${decodedInput}%`);
+
+      if (matchError) {
+        console.warn("⚠️ Supabase eşleşme hatası:", matchError);
+      } else if (matchData && matchData.length > 0) {
+        product = matchData[0].matched_product;
+      }
+    } catch (err) {
+      console.warn("⚠️ Supabase bağlantı kontrolü atlandı:", err.message);
     }
 
-    console.log('🎯 Son ürün bilgisi:', { productName, quantity, unit });
-    return { productName, quantity, unit };
+    // 7️⃣ Sonuç
+    return { product, quantity, unit };
+
+  } catch (error) {
+    console.error("❌ extractProductInfoFromCommand hata:", error);
+    return { product: null, quantity: 1, unit: "kilo" };
+  }
 }
 
  
@@ -6249,6 +6231,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
