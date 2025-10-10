@@ -2729,79 +2729,77 @@ async function createDefaultCommandRules() {
 // DİNAMİK SES KOMUT İŞLEME
 // =============================================
 
-// Güncellenmiş processVoiceCommand - daha net kilit mesajı
-// 🚀 Stabil processVoiceCommand
+// 🎯 Sesli komut işleme - grid uyumlu
 async function processVoiceCommand(transcript) {
     const message = transcript.toLowerCase().trim();
     console.log(`🔊 Sesli komut: "${message}" | Mevcut kök: ${currentRoot}`);
 
     try {
-        // 1️⃣ Satıcı seçimi
-        if (currentRoot === "3:0" || /(satıcı|yer|dükkan)/i.test(message)) {
-            console.log('🎯 Satıcı seçim komutu algılandı');
-            const success = await handleVoiceSellerSelection(message);
-            if (success) return;
-        }
-
-        // 2️⃣ Mağaza seçimi
+        // 1️⃣ Mağaza Seç
         if (currentRoot === "2:0" || /(mağaza|market|restoran|fırın|eczane|pet shop|çiçekçi)/i.test(message)) {
-            console.log('🎯 Mağaza seçim komutu algılandı');
-
-            // Sepet kilit kontrolü
             if (cartHasItems()) {
                 speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
                 return;
             }
-
             const success = await handleVoiceStoreSelection(message);
-            if (success) return;
+            if (success) {
+                displayMessage("Mağaza Seç: " + message);
+                speakToUser(`"${message}" mağazası seçildi. Şimdi bir satıcı seçin.`);
+                currentRoot = "3:0"; // Satıcı seçimine geç
+                return;
+            }
         }
 
-        // 3️⃣ Kullanıcı mesajını UI'ya yaz
-        if (userMessage) userMessage.textContent = transcript;
-
-        console.log(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot} | Kilit: ${isSellerLocked}`);
-
-        // 4️⃣ Askıda cevap varsa
-        if (pendingResponse) {
-            return await handlePendingDynamicResponse(message);
+        // 2️⃣ Satıcı Seç
+        if (currentRoot === "3:0" || /(satıcı|yer|dükkan)/i.test(message)) {
+            const success = await handleVoiceSellerSelection(message);
+            if (success) {
+                displayMessage("Satıcı Seç: " + message);
+                speakToUser(`"${message}" satıcısı seçildi. Reyon seçimine geçebilirsiniz.`);
+                currentRoot = "4:0"; // Reyon seçimine geç
+                return;
+            }
         }
 
-        // 5️⃣ Sepet temizleme
-        if (isClearCartCommand(message)) {
-            clearCart();
-            return;
-        }
-
-        // 6️⃣ Kilitli satıcı ile mağaza değiştirmeyi engelle
-        if (isSellerLocked && isStoreChangeCommand(message)) {
-            const firstCartItem = cart[0];
-            const currentSeller = firstCartItem ? sellers.find(s => s.id === firstCartItem.seller_id) : null;
-            speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut mağaza'} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
-            return;
-        }
-
-        // 7️⃣ Bağlamsal komutlar (ürün ekleme vb.)
+        // 3️⃣ Reyon ve Ürün adımları (varsa bağlamsal komutlar)
         const contextualMatch = await handleContextualCommand(message);
         if (contextualMatch) return;
 
-        // 8️⃣ Mevcut kök için kurallar
+        // 4️⃣ Dinamik kural eşleşmesi
         const match = await findDynamicRuleMatch(message, currentRoot);
         if (match) {
             await executeDynamicMatchedRule(match, message);
         } else {
-            // 9️⃣ Eşleşme yoksa AI'ya gönder
             await handleDynamicAIRequest(message, currentRoot);
         }
 
+        if (userMessage) userMessage.textContent = transcript;
+
     } catch (error) {
         console.error('❌ Komut işleme hatası:', error);
-        try {
-            await voiceLearner.recordFailure(message, 'processing_error');
-        } catch (e) {
-            console.error('Hata kaydetme hatası:', e);
-        }
     }
+}
+
+// 🖥️ Display mesaj fonksiyonu
+function displayMessage(msg) {
+    const displayEl = document.getElementById('assistantDisplay');
+    if (displayEl) displayEl.textContent = msg;
+}
+
+// 🛒 Sepet kontrol
+function cartHasItems() {
+    return cart && cart.length > 0;
+}
+
+// 🖥️ Display mesaj fonksiyonu
+function displayMessage(msg) {
+    const displayEl = document.getElementById('assistantDisplay');
+    if (displayEl) displayEl.textContent = msg;
+}
+
+// 🛒 Sepet kontrol
+function cartHasItems() {
+    return cart && cart.length > 0;
 }
 
 // Sepet temizleme komutlarını tespit et
@@ -6329,6 +6327,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
