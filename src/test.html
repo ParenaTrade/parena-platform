@@ -4652,6 +4652,9 @@ const voiceLearner = {
     }
 };   
 
+
+        let lastRecognizedProduct = null;
+        
 // 🔒 Güvenli ve birleşik extractProductInfoFromCommand
 async function extractProductInfoFromCommand(message) {
     console.log('🔍 extractProductInfoFromCommand çağrıldı:', message);
@@ -4756,6 +4759,34 @@ async function extractProductInfoFromCommand(message) {
     productName = productName.replace(/\s+/g, ' ').trim();
 
     // 8️⃣ Son kontrol
+    if (!productName) {
+        console.log('❌ Ürün ismi çıkarılamadı');
+        return null;
+    }
+
+ // 🔍 Ürün araması
+    const product = findProductByName(cleanMessage);
+    if (product) {
+        productName = product.name;
+        lastRecognizedProduct = productName; // ✅ Son ürünü hatırla
+    } else {
+        const words = cleanMessage.split(' ').filter(Boolean);
+        for (const w of words) {
+            const partial = findProductByName(w);
+            if (partial) {
+                productName = partial.name;
+                lastRecognizedProduct = productName; // ✅ Hatırla
+                break;
+            }
+        }
+    }
+
+    // 🧠 Eğer ürün yoksa, son ürünü hatırla
+    if (!productName && lastRecognizedProduct) {
+        productName = lastRecognizedProduct;
+        console.log(`🔁 Önceki ürün hatırlandı: ${productName}`);
+    }
+
     if (!productName) {
         console.log('❌ Ürün ismi çıkarılamadı');
         return null;
@@ -6247,6 +6278,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
