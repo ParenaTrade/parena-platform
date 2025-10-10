@@ -4652,17 +4652,17 @@ const voiceLearner = {
     }
 };   
 
+// -----------------------------
 // Güncellenmiş extractProductInfoFromCommand
-// DÜZELTİLMİŞ extractProductInfoFromCommand
+// -----------------------------
 async function extractProductInfoFromCommand(message) {
     console.log('🔍 extractProductInfoFromCommand çağrıldı:', message);
-    
+
     if (!message || message.trim() === '') {
         console.log('❌ Boş mesaj');
         return null;
     }
 
-    // ÖNEMLİ: Değişkenleri baştan tanımla
     let quantity = 1;
     let unit = 'adet';
     let productName = '';
@@ -4704,141 +4704,63 @@ async function extractProductInfoFromCommand(message) {
 
     console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
 
-    // 4. Birim ve miktar çıkarımı
-    const unitPatterns = [
-        { pattern: /(\d+)\s*kilo?\s*(.*)/, unit: 'kg' },
-        { pattern: /(\d+)\s*kg\s*(.*)/, unit: 'kg' },
-        { pattern: /(\d+)\s*gram\s*(.*)/, unit: 'g' },
-        { pattern: /(\d+)\s*gr\s*(.*)/, unit: 'g' },
-        { pattern: /(\d+)\s*litre?\s*(.*)/, unit: 'lt' },
-        { pattern: /(\d+)\s*lt\s*(.*)/, unit: 'lt' },
-        { pattern: /(\d+)\s*ml\s*(.*)/, unit: 'ml' },
-        { pattern: /(\d+)\s*paket\s*(.*)/, unit: 'paket' },
-        { pattern: /(\d+)\s*düzine\s*(.*)/, unit: 'düzine' },
-        { pattern: /yarım\s*kilo?\s*(.*)/, unit: 'kg', quantity: 0.5 },
-        { pattern: /çeyrek\s*kilo?\s*(.*)/, unit: 'kg', quantity: 0.25 }
-    ];
-
-    console.log('🔍 Birim pattern kontrolü başlıyor...');
-    
-    // Özel birimleri kontrol et
-    for (const unitPattern of unitPatterns) {
-        const match = cleanMessage.match(unitPattern.pattern);
-        console.log(`🔍 Pattern: ${unitPattern.pattern}, Match:`, match);
-        
-        if (match) {
-            if (unitPattern.quantity) {
-                quantity = unitPattern.quantity;
-                productName = match[1].trim();
-            } else {
-                quantity = parseInt(match[1]);
-                productName = match[2].trim();
-            }
-            unit = unitPattern.unit;
-            console.log(`✅ Pattern eşleşti: ${quantity} ${unit} ${productName}`);
-            break;
-        }
+    // 4. Sayısal miktar çıkarımı
+    const numberMatch = cleanMessage.match(/\d+([.,]\d+)?/);
+    if (numberMatch) {
+        quantity = parseFloat(numberMatch[0].replace(',', '.'));
+        console.log(`🔢 Bulunan rakamsal miktar: ${quantity}`);
+        // Miktarı çıkar ve geriye kalan ürün adını al
+        cleanMessage = cleanMessage.replace(numberMatch[0], '').trim();
     }
 
-    // 5. Eğer özel birim bulunamazsa, standart çıkarım
-    if (!productName) {
-        console.log('🔍 Standart çıkarım başlıyor...');
-        
-        // Sayıları bul
-        const numbers = cleanMessage.match(/\d+/g);
-        console.log('🔍 Bulunan sayılar:', numbers);
-        
-        if (numbers && numbers.length > 0) {
-            quantity = parseInt(numbers[0]);
-            productName = cleanMessage.replace(numbers[0], '').trim();
-            console.log(`✅ Sayılı çıkarım: ${quantity} adet ${productName}`);
-        } else {
-            // Yazılı sayıları kontrol et
-            const textNumbers = {
-                'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5,
-                'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10
-            };
-            
-            console.log('🔍 Yazılı sayı kontrolü...');
-            let foundNumber = false;
-            
-            for (const [text, num] of Object.entries(textNumbers)) {
-                if (cleanMessage.includes(text)) {
-                    quantity = num;
-                    productName = cleanMessage.replace(text, '').trim();
-                    console.log(`✅ Yazılı sayı bulundu: ${text} -> ${num}`);
-                    foundNumber = true;
-                    break;
-                }
-            }
-            
-            // Sayı bulunamazsa varsayılan
-            if (!foundNumber) {
-                productName = cleanMessage.trim();
-                console.log(`✅ Varsayılan çıkarım: ${quantity} adet ${productName}`);
-            }
-        }
-    }
-
-    // 6. Ürün ismini temizle
-    productName = productName
-        .replace(/^\s*(ve|ile|\+)\s*/, '')
-        .replace(/\s*(ve|ile|\+)\s*$/, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    console.log('🎯 Son ürün bilgisi:', { productName, quantity, unit });
-    
-    // 7. Geçerlilik kontrolü
-    if (!productName || productName.trim() === '') {
-        console.log('❌ Ürün ismi çıkarılamadı');
+    // 5. Ürün kartı ile eşleşme
+    const product = findProductByName(cleanMessage);
+    if (product) {
+        productName = product.name;
+    } else {
+        // Başarısız eşleşme durumunda voiceLearner kaydı
+        await voiceLearner.recordFailure(message, cleanMessage);
+        handleDynamicProductNotFound(message, cleanMessage);
         return null;
     }
 
-    return { 
-        productName: productName, 
-        quantity: quantity, 
-        unit: unit 
-    };
+    console.log('🎯 Son ürün bilgisi:', { productName, quantity, unit });
+    return { productName, quantity, unit };
 }
-        
-// Güncellenmiş ürün ekleme
+
+// -----------------------------
+// Güncellenmiş handleDynamicAddToCart
+// -----------------------------
 async function handleDynamicAddToCart(data) {
     console.log('🎯 handleDynamicAddToCart çağrıldı:', data);
-    
+
     const productInfo = await extractProductInfoFromCommand(data.message);
-    
+
     if (!productInfo) {
-        await voiceLearner.recordFailure(data.message, 'extraction_failed');
         speakToUser("Ürün ismini anlayamadım.");
         return;
     }
 
     const { productName, quantity, unit } = productInfo;
     const product = findProductByName(productName);
-    
+
     if (product) {
         addToCart(product, quantity);
         speakToUser(`${quantity} ${unit} ${product.name} sepete eklendi.`);
-        
-        // BAŞARI KAYDET
+
+        // Başarı kaydı
         await voiceLearner.recordSuccess(data.message, product.name, product.id);
-        
-    } else {
-        // BAŞARISIZLIK KAYDET
-        await voiceLearner.recordFailure(data.message, productName);
-        handleDynamicProductNotFound(data.message, productName);
     }
 }
 
-
-        
-        // Test fonksiyonu
+// -----------------------------
+// Sesli öğrenen sistemi test fonksiyonu
+// -----------------------------
 async function testVoiceLearner() {
     console.log('🧪 Öğrenen Sistem Testi');
-    
-    const testCases = ['çarliston', 'viber', 'domat', 'sogan', 'testürünü'];
-    
+
+    const testCases = ['çarliston', 'viber', 'domat', 'sogan', '5 kilo domates'];
+
     for (const testCase of testCases) {
         const corrected = await voiceLearner.correctUserInput(testCase);
         console.log(`🧪 "${testCase}" -> "${corrected}"`);
@@ -6300,6 +6222,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
