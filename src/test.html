@@ -3332,53 +3332,103 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
 }
 
 
- //SESLİ MAĞAZA SEÇİMİ       
- async function handleVoiceStoreSelection(message) {
-    console.log('🎯 Sesli mağaza seçimi:', message);
 
-    // Sepet dolumu kontrolü
-    if (cartHasItems()) {
-        speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
-        return false;
-    }
+// Sesli gelen metni kullanarak ekrandaki kartı bul ve tıkla
+async function handleVoiceStoreSelection(message) {
+  console.log("🎙️ Sesli komut:", message);
+  
+  // Aranacak kartlar (mağaza, satıcı veya reyon olabilir)
+  const cards = document.querySelectorAll(
+    ".seller-type-card, .seller-card, .category-card, .store-card, .card"
+  );
 
-    // Mağaza kartlarını bul
-    const storeCards = document.querySelectorAll('.seller-type-card, .store-card, .card');
-    if (storeCards.length === 0) {
-        console.error('❌ Mağaza kartları bulunamadı');
-        speakToUser("Mağaza listesi yüklenmedi. Lütfen bekleyin.");
-        return false;
-    }
+  if (cards.length === 0) {
+    speakToUser("Listede seçim yapılacak kart bulunamadı.");
+    return false;
+  }
 
-    // Komutu eşleştir (isim veya sayı)
-    const temizMesaj = message.toLowerCase().trim();
-    let selectedCard = null;
+  const cleaned = message.toLowerCase().replace(/[^a-z0-9ğüşıöç\s]/g, "").trim();
 
-    storeCards.forEach((card, index) => {
-        const name = card.getAttribute('data-type-name')?.toLowerCase() || '';
-        if (name === temizMesaj) selectedCard = card;
-
-        // Sayısal seçim: "birinci", "2", vb.
-        const numbers = ['birinci','ikinci','üçüncü','dördüncü','beşinci','1','2','3','4','5'];
-        if (numbers[index] && numbers[index] === temizMesaj) selectedCard = card;
-    });
-
-    if (!selectedCard) {
-        speakToUser(`"${message}" bulunamadı. Lütfen geçerli bir mağaza seçin.`);
-        return false;
-    }
-
-    // Kartı tıkla ve görsel feedback
-    selectedCard.click();
-    selectedCard.classList.add('selected', 'active');
-    selectedCard.style.border = '2px solid var(--primary)';
-    speakToUser(`${selectedCard.getAttribute('data-type-name')} seçildi.`);
-    currentRoot = "3:0"; // kök güncellemesi
+  // 1️⃣ Kartlarda sıra numarası (birinci, ikinci...) ile eşleşme
+  const numbers = {
+    "birinci": 0, "1": 0, "1.": 0,
+    "ikinci": 1, "2": 1, "2.": 1,
+    "üçüncü": 2, "3": 2, "3.": 2,
+    "dördüncü": 3, "4": 3, "4.": 3,
+    "beşinci": 4, "5": 4, "5.": 4
+  };
+  const numMatch = Object.keys(numbers).find(k => cleaned.includes(k));
+  if (numMatch && cards[numbers[numMatch]]) {
+    const card = cards[numbers[numMatch]];
+    clickAndHighlightCard(card);
     return true;
+  }
+
+  // 2️⃣ Kart isimleriyle eşleşme (örnek: “Market”, “Ayşe Market”)
+  for (const card of cards) {
+    const nameEl = card.querySelector(
+      ".seller-type-name, .seller-name, .category-name, .store-name, .card-title, [class*='name']"
+    );
+    const name = nameEl?.textContent?.toLowerCase()?.trim();
+    if (!name) continue;
+
+    if (cleaned.includes(name) || name.includes(cleaned)) {
+      clickAndHighlightCard(card);
+      return true;
+    }
+  }
+
+  // 3️⃣ data-id veya data-type-id üzerinden eşleşme
+  for (const card of cards) {
+    const id = (card.dataset.id || card.dataset.typeId || "").toLowerCase();
+    if (id && cleaned.includes(id)) {
+      clickAndHighlightCard(card);
+      return true;
+    }
+  }
+
+  // 4️⃣ Bulunamadıysa kullanıcıya bilgi ver
+  const firstFew = Array.from(cards)
+    .slice(0, 3)
+    .map(c => c.querySelector(".seller-type-name, .seller-name, .store-name")?.textContent || "Mağaza")
+    .join(", ");
+  speakToUser(`"${message}" bulunamadı. Örnek: ${firstFew} gibi söyleyebilirsin.`);
+  return false;
 }
 
-        
+// Kartı tıklayıp görsel geri bildirim ve sesli onay veren sade fonksiyon
+function clickAndHighlightCard(card) {
+  try {
+    const nameEl = card.querySelector(
+      ".seller-type-name, .seller-name, .category-name, .store-name, .card-title, [class*='name']"
+    );
+    const name = nameEl?.textContent?.trim() || "Seçim";
 
+    // Tıklama
+    card.click();
+
+    // Görsel efekt
+    card.style.transition = "transform 0.2s ease, box-shadow 0.2s ease";
+    card.style.transform = "scale(1.05)";
+    card.style.boxShadow = "0 0 15px var(--primary, #007bff)";
+
+    setTimeout(() => {
+      card.style.transform = "scale(1)";
+      card.style.boxShadow = "";
+    }, 800);
+
+    // Sesli onay
+    speakToUser(`${name} seçildi.`);
+    console.log(`✅ "${name}" kartı tıklandı`);
+  } catch (err) {
+    console.error("Kart tıklama hatası:", err);
+    speakToUser("Seçim sırasında bir hata oluştu.");
+  }
+}
+
+
+
+        
        
 // =============================================
 // DİNAMİK SATICI SİSTEMİ
@@ -6336,6 +6386,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
