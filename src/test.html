@@ -2737,7 +2737,7 @@ async function processVoiceCommand(transcript) {
 
     try {
         // 1️⃣ Mağaza Seç
-        if (currentRoot === "2:0" || /(mağaza|market|restoran|fast\s*food|pastane|eczane|Alkol|pet\s*shop|çiçek|çarşı)/i.test(message)) {
+        if (currentRoot === "2:0" || /(mağaza|market|restoran|fast\s*food|pastane|eczane|alkol|pet\s*shop|çiçek|çarşı)/i.test(message)) {
             if (cartHasItems()) {
                 speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
                 return;
@@ -2746,7 +2746,7 @@ async function processVoiceCommand(transcript) {
             if (success) {
                 displayMessage("Mağaza Seç: " + message);
                 speakToUser(`"${message}" mağazası seçildi. Şimdi bir satıcı seçin.`);
-                currentRoot = "3:0"; // Satıcı seçimine geç
+                currentRoot = "3:0"; 
                 return;
             }
         }
@@ -2757,16 +2757,43 @@ async function processVoiceCommand(transcript) {
             if (success) {
                 displayMessage("Satıcı Seç: " + message);
                 speakToUser(`"${message}" satıcısı seçildi. Reyon seçimine geçebilirsiniz.`);
-                currentRoot = "4:0"; // Reyon seçimine geç
+                currentRoot = "4:0"; 
                 return;
             }
         }
 
-        // 3️⃣ Reyon ve Ürün adımları (varsa bağlamsal komutlar)
+        // 3️⃣ Reyon veya Ürün İşlemleri
+        if (currentRoot === "4:0") {
+            console.log("📦 Reyon veya ürün işlemi aşaması");
+
+            // Ürün veya miktar bilgisi yakala
+            const productInfo = await extractProductInfoFromCommand(message);
+
+            // ✅ Ürün bulunmuşsa doğrudan sepete ekle
+            if (productInfo && productInfo.productName) {
+                console.log("🛒 Ürün algılandı:", productInfo);
+                await handleProductAddFromVoice(productInfo, message);
+                return;
+            }
+
+            // 🔹 Ürün yok ama reyon adı olabilir
+            const reyonSuccess = await handleVoiceReyonSelection(message);
+            if (reyonSuccess) {
+                displayMessage("Reyon Seç: " + message);
+                speakToUser(`"${message}" reyonu seçildi. Şimdi ürünleri söyleyebilirsiniz.`);
+                return;
+            }
+
+            // ❌ Ne reyon ne ürün bulunamadıysa:
+            speakToUser(`"${message}" ile eşleşen bir ürün veya reyon bulamadım. Lütfen tekrar deneyin.`);
+            return;
+        }
+
+        // 4️⃣ Diğer Bağlamsal Komutlar
         const contextualMatch = await handleContextualCommand(message);
         if (contextualMatch) return;
 
-        // 4️⃣ Dinamik kural eşleşmesi
+        // 5️⃣ Dinamik AI veya Kural eşleşmesi
         const match = await findDynamicRuleMatch(message, currentRoot);
         if (match) {
             await executeDynamicMatchedRule(match, message);
@@ -6231,6 +6258,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
