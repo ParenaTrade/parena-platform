@@ -2780,9 +2780,10 @@ async function safeVoiceMatchQuery(userInput) {
 // 🎯 Sesli komut işleme - reyon dahil tam akış
 // 🎯 Sesli komut işleme - grid uyumlu
 // GÜNCELLENMİŞ processVoiceCommand
+// AKIŞ KONTROLLÜ processVoiceCommand
 async function processVoiceCommand(transcript) {
     const message = transcript.toLowerCase().trim();
-    console.log(`🔊 Sesli komut: "${message}" | Mevcut kök: ${currentRoot}`);
+    console.log(`🔊 Sesli komut: "${message}" | Mevcut kök: ${currentRoot} | StoreType: ${selectedStoreTypeId} | Seller: ${selectedSellerId} | Category: ${selectedCategoryId}`);
         
     // Kendi cevabını tekrar algılama kontrolü
     if (transcript.trim() === lastSpokenMessage.trim()) {
@@ -2791,51 +2792,57 @@ async function processVoiceCommand(transcript) {
     }
 
     try {
-        // 1. Ürün ekleme komutları (öncelikli)
-        if (currentRoot === "5:0" && hasProductKeywords(message)) {
+        // AKIŞ KONTROLLÜ KOMUT İŞLEME
+        
+        // 1. STORE TYPE SEÇİMİ (Kök 2:0)
+        if (currentRoot === "2:0" || (!selectedStoreTypeId && hasStoreTypeKeywords(message))) {
+            const success = await handleVoiceStoreSelection(message);
+            if (success) {
+                currentRoot = "3:0"; // Satıcı seçimine geç
+                return;
+            }
+        }
+
+        // 2. SATICI SEÇİMİ (Kök 3:0 - Store Type seçili ama satıcı seçili değil)
+        if ((currentRoot === "3:0" || (selectedStoreTypeId && !selectedSellerId)) && hasSellerKeywords(message)) {
+            const success = await handleVoiceSellerSelection(message);
+            if (success) {
+                currentRoot = "4:0"; // Kategori seçimine geç
+                return;
+            }
+        }
+
+        // 3. KATEGORİ SEÇİMİ (Kök 4:0 - Satıcı seçili ama kategori seçili değil)
+        if ((currentRoot === "4:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(message)) {
+            const success = await handleVoiceCategorySelection(message);
+            if (success) {
+                currentRoot = "5:0"; // Ürün eklemeye geç
+                return;
+            }
+        }
+
+        // 4. ÜRÜN EKLEME (Kök 5:0 - Tüm önkoşullar sağlandı)
+        if (currentRoot === "5:0" && selectedCategoryId && hasProductKeywords(message)) {
             const success = await handleContextualCommand(message);
             if (success) return;
         }
 
-        // 2. Reyon seçimi
-        if (currentRoot === "4:0" || /(reyon|manav|kasap|fırın|şarküteri)/i.test(message)) {
-            const success = await handleVoiceCategorySelection(message);
-            if (success) return;
-        }
-
-        // 3. Satıcı seçimi  
-        if (currentRoot === "3:0" || /(satıcı|yer|dükkan|market)/i.test(message)) {
-            const success = await handleVoiceSellerSelection(message);
-            if (success) return;
-        }
-
-        // 4. Mağaza seçimi
-        if (currentRoot === "2:0" || /(mağaza|market|restoran)/i.test(message)) {
-            if (cartHasItems()) {
-                speakToUser("Sepetinizde ürün var. Mağaza değiştiremezsiniz.");
-                return;
-            }
-            const success = await handleVoiceStoreSelection(message);
-            if (success) return;
-        }
-
-        // 5. Yardım komutları
-        if (message.includes('yardım') || message.includes('help')) {
+        // 5. YARDIM KOMUTLARI - Bağlamsal yardım
+        if (message.includes('yardım') || message.includes('help') || message.includes('ne yapabilirim')) {
             const helpMessage = getContextualHelp();
             speakToUser(helpMessage);
             return;
         }
 
-        // 6. Sepet komutları
-        if (message.includes('sepet') || message.includes('sepetim')) {
-            openDynamicCart();
-            speakToUser("Sepetiniz açılıyor.");
+        // 6. DURUM SORGULAMA
+        if (message.includes('nerede') || message.includes('durum') || message.includes('status')) {
+            speakToUser(getCurrentStatus());
             return;
         }
 
-        // 7. Fallback
-        console.log('❌ Eşleşme bulunamadı, AI fallback:', message);
-        await handleDynamicAIRequest(message, currentRoot);
+        // 7. FALLBACK - Mevcut duruma göre yardım
+        const fallbackMessage = getContextualFallback();
+        speakToUser(fallbackMessage);
 
         if (userMessage) userMessage.textContent = transcript;
 
@@ -2843,6 +2850,73 @@ async function processVoiceCommand(transcript) {
         console.error('❌ Komut işleme hatası:', error);
         speakToUser("Komut işlenirken bir hata oluştu. Lütfen tekrar deneyin.");
     }
+}
+
+// YARDIMCI FONKSİYONLAR
+function hasStoreTypeKeywords(message) {
+    const keywords = ['market', 'restoran', 'eczane', 'fırın', 'kafe', 'mağaza', 'tip'];
+    return keywords.some(keyword => message.includes(keyword));
+}
+
+function hasSellerKeywords(message) {
+    const keywords = ['satıcı', 'yer', 'dükkan', 'market', 'birinci', 'ikinci', 'üçüncü'];
+    return keywords.some(keyword => message.includes(keyword)) || 
+           /\d/.test(message); // Sayı içeriyorsa
+}
+
+function hasCategoryKeywords(message) {
+    const keywords = ['reyon', 'manav', 'kasap', 'fırın', 'şarküteri', 'içecek', 'süt', 'meyve', 'sebze'];
+    return keywords.some(keyword => message.includes(keyword));
+}
+
+function hasProductKeywords(message) {
+    const keywords = ['kilo', 'gram', 'paket', 'adet', 'tane', 'litre', 'lt', 'yarım', 'çeyrek'];
+    return keywords.some(keyword => message.includes(keyword)) || 
+           /\d+\s*\w+/.test(message);
+}
+
+function getCurrentStatus() {
+    let status = "Mevcut durum: ";
+    
+    if (!selectedStoreTypeId) {
+        status += "Mağaza tipi seçilmedi. ";
+    } else {
+        status += `Mağaza tipi: ${selectedStoreTypeName}. `;
+    }
+    
+    if (!selectedSellerId) {
+        status += "Satıcı seçilmedi. ";
+    } else {
+        const seller = sellers.find(s => s.id === selectedSellerId);
+        status += `Satıcı: ${seller?.business_name}. `;
+    }
+    
+    if (!selectedCategoryId) {
+        status += "Kategori seçilmedi.";
+    } else {
+        const category = categories.find(c => c.id === selectedCategoryId);
+        status += `Kategori: ${category?.name}.`;
+    }
+    
+    return status;
+}
+
+function getContextualFallback() {
+    if (!selectedStoreTypeId) {
+        const availableTypes = storeTypes.map(st => st.name).join(', ');
+        return `Lütfen bir mağaza tipi seçin. Örneğin: "market", "restoran". Mevcut seçenekler: ${availableTypes}`;
+    }
+    
+    if (!selectedSellerId) {
+        return `Lütfen bir satıcı seçin. "birinci satıcı" veya satıcı ismi söyleyebilirsiniz.`;
+    }
+    
+    if (!selectedCategoryId) {
+        const categoryList = categories.slice(0, 3).map(c => c.name).join(', ');
+        return `Lütfen bir kategori seçin. Örneğin: "manav", "süt ürünleri". Mevcut kategoriler: ${categoryList}`;
+    }
+    
+    return "Ürün siparişi verebilirsiniz. Örneğin: '1 kilo domates', '2 paket süt'";
 }
         
 // Yardımcı fonksiyonlar
@@ -2900,21 +2974,30 @@ function isStoreChangeCommand(message) {
     return changeCommands.some(cmd => message.includes(cmd));
 }
 
-// DÜZELTİLMİŞ handleContextualCommand - kilit kontrolünü kaldır
-// GÜNCELLENMİŞ handleContextualCommand
+// GÜNCELLENMİŞ handleContextualCommand - Store Type kontrolü ekle
 async function handleContextualCommand(message) {
     console.log(`🔍 Bağlamsal komut kontrolü: "${message}"`);
     
-    // Önce konum ve satıcı kontrolleri
-    if (!selectedSellerId) {
-        console.log('⚠️ Satıcı seçili değil');
-        speakToUser("Önce bir satıcı seçmelisiniz.");
+    // 1. Store Type kontrolü - EN ÖNEMLİ KONTROL
+    if (!selectedStoreTypeId) {
+        console.log('⚠️ Store Type seçili değil');
+        const availableTypes = storeTypes.map(st => st.name).join(', ');
+        speakToUser(`Önce bir mağaza tipi seçmelisiniz. Mevcut seçenekler: ${availableTypes}`);
         return false;
     }
     
+    // 2. Satıcı kontrolü
+    if (!selectedSellerId) {
+        console.log('⚠️ Satıcı seçili değil');
+        speakToUser(`Lütfen bir satıcı seçin. Mevcut satıcılar: ${sellers.slice(0, 3).map(s => s.business_name).join(', ')}`);
+        return false;
+    }
+    
+    // 3. Kategori kontrolü
     if (!selectedCategoryId || products.length === 0) {
         console.log('⚠️ Kategori veya ürün yok');
-        speakToUser("Önce bir kategori seçmelisiniz.");
+        const categoryList = categories.slice(0, 3).map(c => c.name).join(', ');
+        speakToUser(`Önce bir kategori seçmelisiniz. Mevcut kategoriler: ${categoryList}`);
         return false;
     }
     
@@ -2945,22 +3028,8 @@ async function handleContextualCommand(message) {
             addToCart(product, productInfo.quantity);
             speakToUser(`${productInfo.quantity} ${productInfo.unit} ${product.name} sepete eklendi.`);
             
-            // Başarıyı kaydet (güvenli versiyon)
-            try {
-                await voiceLearner.recordSuccess(message, product.name, product.id);
-            } catch (error) {
-                console.log('⚠️ Başarı kaydetme hatası:', error);
-            }
-            
             return true;
         } else {
-            // Başarısızlığı kaydet (güvenli versiyon)
-            try {
-                await voiceLearner.recordFailure(message, productInfo.productName);
-            } catch (error) {
-                console.log('⚠️ Başarısızlık kaydetme hatası:', error);
-            }
-            
             handleDynamicProductNotFound(message, productInfo.productName);
             return true;
         }
@@ -3336,6 +3405,7 @@ async function handleDynamicLocationSelection(data) {
     selectDynamicLocation(locationType);
 }
 
+// Konum seçildiğinde doğru akışı başlat
 function selectDynamicLocation(locationType) {
     selectedLocation = locationType;
     localStorage.setItem('selectedLocation', locationType);
@@ -3346,14 +3416,16 @@ function selectDynamicLocation(locationType) {
     
     updateDynamicLocationText();
     hideDynamicLocationModal();
+    
+    // DOĞRU KÖK BAŞLANGICI - Store Type seçimine yönlendir
     currentRoot = "2:0";
     
-    // Konum seçildiğinde tüm satıcıları yükle
+    // Konum seçildiğinde tüm satıcıları yükle ama store type seçimini bekle
     loadAllSellersByLocation();
     
     const locationNames = {
         'inside': 'Restoran içinde',
-        'takeaway': 'Paket servis',
+        'takeaway': 'Paket servis', 
         'delivery': 'Adrese teslim'
     };
     
@@ -3362,11 +3434,10 @@ function selectDynamicLocation(locationType) {
         locationMessage += ` Konumunuz: ${userLocation.district}, ${userLocation.city}.`;
     }
     
-    locationMessage += " Hangi mağaza tipinden alışveriş yapmak istersiniz?";
+    locationMessage += " Hangi mağaza tipinden alışveriş yapmak istersiniz? Market, restoran veya eczane diyebilirsiniz.";
     
     speakToUser(locationMessage);
 }
-
 // =============================================
 // DİNAMİK MAĞAZA TİPİ SİSTEMİ
 // =============================================
@@ -3389,7 +3460,7 @@ async function handleDynamicStoreTypeSelection(data) {
     }
 }
 
-// Güncellenmiş onStoreTypeSelected
+// Store Type seçildiğinde otomatik satıcı seçimini engelle
 async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     // Kilit kontrolü
     if (isSellerLocked) {
@@ -3403,19 +3474,22 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     selectedStoreTypeId = storeTypeId;
     selectedStoreTypeName = storeTypeName;
     
-    // KÖKÜ GÜNCELLE - STORE TYPE SEÇİLDİ
-    // currentRoot = "3:0";
-    debugLog(`🔄 Kök güncellendi: 2:0 -> 3:0 (Store type seçildi: ${storeTypeName})`);
-    
+    // SATICIYI OTOMATİK SEÇME - SADECE FİLTRELE
     filterSellersByStoreType(storeTypeId);
     
+    // KATEGORİ ve ÜRÜNLERİ TEMİZLE - yeni seçim için
+    selectedSellerId = null;
     selectedCategoryId = null;
     products = [];
     resetProductAndCategoryUI();
     
+    // KÖKÜ GÜNCELLE - STORE TYPE SEÇİLDİ, SATICI BEKLENİYOR
+    currentRoot = "3:0";
+    debugLog(`🔄 Kök güncellendi: 2:0 -> 3:0 (Store type seçildi: ${storeTypeName})`);
+    
     speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu. Lütfen bir satıcı seçin.`);
 }
-
+        
 async function handleVoiceStoreSelection(message) {
     console.log('🎯 Sesli mağaza seçimi:', message);
 
@@ -3614,34 +3688,76 @@ async function selectDynamicSeller(seller) {
 }
 
 // SESLİ SATICI SEÇİM - REYON YÜKLEME 
-  async function handleVoiceSellerSelection(message) {
-  const sellerCards = document.querySelectorAll("#sellerGrid .seller-card");
-  if (!sellerCards.length) return false;
-
-  for (const card of sellerCards) {
-    // 🧠 Satıcı adını hem .seller-name hem de img alt'tan çekiyoruz
-    const sellerName =
-      card.querySelector(".seller-name")?.textContent.toLowerCase().trim() ||
-      card.querySelector("img.seller-image")?.alt.toLowerCase().trim();
-
-    if (!sellerName) continue;
-
-    // 👂 "onur", "onur market", "altınşehir" gibi kısmi eşleşmelere izin verelim
-    if (
-      message.includes(sellerName) ||
-      sellerName.includes(message) ||
-      message.split(" ").some((w) => sellerName.includes(w))
-    ) {
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-      card.click();
-      speakToUser(`${sellerName} seçildi.`);
-      console.log(`✅ Satıcı bulundu ve tıklandı: ${sellerName}`);
-      return true;
+ // GELİŞTİRİLMİŞ handleVoiceSellerSelection
+async function handleVoiceSellerSelection(message) {
+    console.log('🎯 Sesli satıcı seçimi:', message);
+    
+    // Store Type kontrolü
+    if (!selectedStoreTypeId) {
+        speakToUser("Önce bir mağaza tipi seçmelisiniz.");
+        return false;
     }
-  }
 
-  speakToUser(`${message} bulunamadı. Lütfen geçerli bir satıcı söyleyin.`);
-  return false;
+    const sellerCards = document.querySelectorAll("#sellerGrid .seller-card");
+    if (!sellerCards.length) {
+        console.error('❌ Satıcı kartları bulunamadı');
+        speakToUser("Satıcı listesi yüklenmedi. Lütfen bekleyin.");
+        return false;
+    }
+
+    const cleanMessage = message.toLowerCase().trim();
+    let selectedCard = null;
+
+    // 1. Sayısal seçim (birinci, ikinci, 1, 2 vb.)
+    const numberMap = {
+        'birinci': 0, 'bir': 0, '1': 0, '1.': 0,
+        'ikinci': 1, 'iki': 1, '2': 1, '2.': 1,
+        'üçüncü': 2, 'üç': 2, '3': 2, '3.': 2,
+        'dördüncü': 3, 'dört': 3, '4': 3, '4.': 3,
+        'beşinci': 4, 'beş': 4, '5': 4, '5.': 4
+    };
+
+    if (numberMap[cleanMessage] !== undefined) {
+        const index = numberMap[cleanMessage];
+        if (index < sellerCards.length) {
+            selectedCard = sellerCards[index];
+        }
+    }
+
+    // 2. İsimle arama
+    if (!selectedCard) {
+        for (const card of sellerCards) {
+            const sellerName = card.querySelector('.seller-name')?.textContent.toLowerCase() || '';
+            const sellerId = card.dataset.sellerId;
+            const seller = sellers.find(s => s.id === sellerId);
+            
+            if (seller && (
+                seller.business_name.toLowerCase().includes(cleanMessage) ||
+                cleanMessage.includes(seller.business_name.toLowerCase()) ||
+                sellerName.includes(cleanMessage) ||
+                cleanMessage.includes(sellerName)
+            )) {
+                selectedCard = card;
+                break;
+            }
+        }
+    }
+
+    if (!selectedCard) {
+        speakToUser(`"${message}" bulunamadı. Lütfen geçerli bir satıcı seçin.`);
+        return false;
+    }
+
+    // Satıcıyı seç
+    const sellerId = selectedCard.dataset.sellerId;
+    const seller = sellers.find(s => s.id === sellerId);
+    
+    if (seller) {
+        await selectDynamicSeller(seller);
+        return true;
+    }
+
+    return false;
 }
 
 
@@ -6280,6 +6396,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
