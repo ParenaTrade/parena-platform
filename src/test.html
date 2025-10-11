@@ -5324,98 +5324,6 @@ async function safeSupabaseQuery(query, fallbackData = []) {
 
         
         
-// 🔒 Güvenli ve birleşik extractProductInfoFromCommand
-async function extractProductInfoFromCommand(message) {
-  console.log("🎧 extractProductInfoFromCommand çağrıldı:", message);
-
-  // 🔹 Küçük harfe çevir
-  const text = message.toLowerCase().trim();
-
-  // 🔹 Ürün isimleri listesi (örnek)
-  const productList = [
-    "domates", "çarliston biber", "salatalık", "soğan", "patates",
-    "elma", "armut", "biber", "marul", "kabak", "patlıcan", "limon"
-  ];
-
-  // 🔹 Sayı kelimeleri ile rakam karşılıkları
-  const numberWords = {
-    "bir": 1, "iki": 2, "üç": 3, "dört": 4, "beş": 5,
-    "altı": 6, "yedi": 7, "sekiz": 8, "dokuz": 9, "on": 10,
-  };
-
-  let product = null;
-  let quantity = 1;
-  let unit = "kilo";
-
-  try {
-    // 1️⃣ Ürün adı eşleşmesi
-    for (const p of productList) {
-      if (text.includes(p)) {
-        product = p;
-        break;
-      }
-    }
-
-    // 2️⃣ Rakam tespiti
-    const numMatch = text.match(/\b\d+\b/);
-    if (numMatch) {
-      quantity = parseInt(numMatch[0]);
-    } else {
-      // 3️⃣ Sayı kelimelerini bul
-      for (const [word, num] of Object.entries(numberWords)) {
-        const regex = new RegExp(`\\b${word}\\b`, "i");
-        if (regex.test(text)) {
-          quantity = num;
-          break;
-        }
-      }
-    }
-
-    // 4️⃣ Birim kontrolü
-    if (text.includes("adet")) unit = "adet";
-    else if (text.includes("kilo")) unit = "kilo";
-    else if (text.includes("gram")) unit = "gram";
-
-    // 5️⃣ “on” kelimesi rakam karışıklığı düzeltme
-    if (product && text.includes(product) && text.includes("on") && !/\d/.test(text)) {
-      const indexOfOn = text.indexOf("on");
-      const indexOfProduct = text.indexOf(product);
-      // eğer “on” ürünün içinde geçiyorsa (çarliston gibi), miktara dahil etme
-      if (indexOfOn > indexOfProduct && indexOfOn < indexOfProduct + product.length) {
-        console.log("⚠️ 'on' ürün adının parçası, miktara eklenmedi");
-        if (!numMatch) quantity = 1;
-      }
-    }
-
-    // 6️⃣ Eşleşme yoksa Supabase geçmişinden kontrol et
-    try {
-      const encodedInput = encodeURIComponent(message.trim());
-      const decodedInput = decodeURIComponent(encodedInput);
-
-      const { data: matchData, error: matchError } = await supabase
-        .from("product_voice_matches")
-        .select("matched_product")
-        .eq("success", true)
-        .ilike("user_input", `%${decodedInput}%`);
-
-      if (matchError) {
-        console.warn("⚠️ Supabase eşleşme hatası:", matchError);
-      } else if (matchData && matchData.length > 0) {
-        product = matchData[0].matched_product;
-      }
-    } catch (err) {
-      console.warn("⚠️ Supabase bağlantı kontrolü atlandı:", err.message);
-    }
-
-    // 7️⃣ Sonuç
-    return { product, quantity, unit };
-
-  } catch (error) {
-    console.error("❌ extractProductInfoFromCommand hata:", error);
-    return { product: null, quantity: 1, unit: "kilo" };
-  }
-}
-
  
 // 🔥 Güncellenmiş handleDynamicAddToCart
 async function handleDynamicAddToCart(data) {
@@ -5506,90 +5414,6 @@ async function handleDynamicCategorySelection(data) {
     }
 }
 
-   
- 
-        
-// =============================================
-// DİNAMİK ÜRÜN SİSTEMİ
-// =============================================
-
-// Güncellenmiş ürün ekleme
-async function handleDynamicAddToCart(data) {
-    console.log('🎯 handleDynamicAddToCart çağrıldı:', data);
-    
-    const productInfo = extractProductInfoFromCommand(data.message);
-    console.log('📦 Çıkarılan ürün bilgisi:', productInfo);
-    
-    if (!productInfo) {
-        await voiceLearner.recordFailure(data.message, 'extraction_failed');
-        speakToUser("Ürün ismini anlayamadım.");
-        return;
-    }
-
-    const { productName, quantity, unit } = productInfo;
-    const product = findProductByName(productName);
-    
-    if (product) {
-        addToCart(product, quantity);
-        speakToUser(`${quantity} ${unit} ${product.name} sepete eklendi.`);
-        
-        // BAŞARI KAYDET
-        await voiceLearner.recordSuccess(data.message, product.name, product.id);
-        
-    } else {
-        // BAŞARISIZLIK KAYDET
-        await voiceLearner.recordFailure(data.message, productName);
-        handleDynamicProductNotFound(data.message, productName);
-    }
-}        
-
-
-  // Tabloyu başlangıç verileriyle doldurma (isteğe bağlı)
-async function initializeVoiceMatchTable() {
-    try {
-        const initialCorrections = [
-            { user_input: 'çarliston', matched_product: 'Çarliston Biber', success: true },
-            { user_input: 'viber', matched_product: 'Çarliston Biber', success: true },
-            { user_input: 'çarliston on', matched_product: 'Çarliston Biber', success: true },
-            { user_input: 'on çarliston', matched_product: 'Çarliston Biber', success: true },
-            { user_input: 'domat', matched_product: 'Domates', success: true },
-            { user_input: 'sogan', matched_product: 'Soğan', success: true }
-        ];
-
-        for (const correction of initialCorrections) {
-            const { data: existing } = await supabase
-                .from('product_voice_matches')
-                .select('id')
-                .eq('user_input', correction.user_input)
-                .single();
-
-            if (!existing) {
-                await supabase
-                    .from('product_voice_matches')
-                    .insert([{
-                        ...correction,
-                        attempted_match: correction.matched_product,
-                        created_at: new Date().toISOString()
-                    }]);
-            }
-        }
-
-        console.log('✅ Tablo başlangıç verileri ile dolduruldu');
-        
-        // Öğrenen sistemi yeniden yükle
-        await voiceLearner.initialize();
-        
-    } catch (error) {
-        console.error('❌ Tablo doldurma hatası:', error);
-    }
-}
-
-// İlk kurulum için (isteğe bağlı)
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        initializeVoiceMatchTable();
-    }, 3000);
-});
         
 // =============================================
 // DİNAMİK YARDIMCI FONKSİYONLAR
@@ -6899,6 +6723,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
