@@ -2778,67 +2778,98 @@ async function safeVoiceMatchQuery(userInput) {
 }
         
 
+// Güncellenmiş processVoiceCommand - daha net kilit mesajı
 async function processVoiceCommand(transcript) {
     const message = transcript.toLowerCase().trim();
-    console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
-    
-    // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
-    if (transcript.trim() === lastSpokenMessage.trim()) {
-        console.log("⚠️ Kendi cevabımız tekrar algılandı, atlandı");
-        return;
+    console.log(`🔊 Sesli komut: "${message}" | Mevcut kök: ${currentRoot}`);
+     // SATICI SEÇİMİ için özel entegrasyon
+    if (currentRoot === "3:0" || message.includes('satıcı') || message.includes('yer') || message.includes('dükkan')) {
+        console.log('🎯 Satıcı seçim komutu algılandı');
+        const success = await handleVoiceSellerSelection(message);
+        if (success) return;
     }
-
-    // GEREKSİZ KELİMELERİ FİLTRELE
-    const filteredMessage = filterUnnecessaryWords(message);
-    if (!filteredMessage) {
-        console.log("🔇 Gereksiz mesaj filtrelendi");
-        return;
+    // SESLİ MAĞAZA SEÇİMİ için özel entegrasyon
+    if (currentRoot === "2:0" || message.includes('mağaza') || message.includes('market') || message.includes('restoran') || message.includes('Fast Food') || message.includes('Fırın') || message.includes('Eczane') || message.includes('Pet Shop') || message.includes('Çiçekçi')) {
+        console.log('🎯 Mağaza seçim komutu algılandı');
+        const success = await handleVoiceStoreTypeSelection(message);
+        if (success) {
+            console.log('✅ Sesli mağaza seçimi başarılı');
+            return; // İşlem başarılıysa diğer komutları işleme
+        }
     }
+    if (userMessage) userMessage.textContent = transcript;
 
-    console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
+    console.log(`🔊 Komut işleniyor: "${message}" | Kök: ${currentRoot} | Kilit: ${isSellerLocked}`);
 
     try {
-        // 1. ÜRÜN EKLEME KOMUTU - ÖNCELİKLİ
-        if (selectedCategoryId && products.length > 0) {
-            console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
-            const success = await handleVoiceProductAdd(filteredMessage);
-            if (success) {
-                console.log('✅ Ürün başarıyla eklendi');
-                return;
-            }
+        // 1. Askıda cevap varsa, onu işle
+        if (pendingResponse) {
+            return await handlePendingDynamicResponse(message);
         }
 
-        // 2. MAĞAZA TİPİ SEÇİMİ
-        if ((currentRoot === "2:0" || !selectedStoreTypeId) && hasStoreTypeKeywords(filteredMessage)) {
-            console.log('🏪 Mağaza tipi seçim komutu algılandı');
-            const success = await handleVoiceStoreSelection(filteredMessage);
-            if (success) return;
+        // 2. Sepet temizleme komutlarını kontrol et
+        if (isClearCartCommand(message)) {
+            clearCart();
+            return;
         }
 
-        // 3. SATICI SEÇİMİ
-        if ((currentRoot === "3:0" || (selectedStoreTypeId && !selectedSellerId)) && hasSellerKeywords(filteredMessage)) {
-            console.log('🏬 Satıcı seçim komutu algılandı');
-            const success = await handleVoiceSellerSelection(filteredMessage);
-            if (success) return;
+        // 3. Kilit durumunda mağaza değiştirme komutlarını engelle
+        if (isSellerLocked && isStoreChangeCommand(message)) {
+            const firstCartItem = cart[0];
+            const currentSeller = firstCartItem ? sellers.find(s => s.id === firstCartItem.seller_id) : null;
+            speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut mağaza'} ile alışverişe devam edebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilirsiniz.`);
+            return;
         }
 
-        // 4. REYON SEÇİMİ
-        if ((currentRoot === "4:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
-            console.log('📦 Reyon seçim komutu algılandı');
-            const success = await handleVoiceCategorySelection(filteredMessage);
-            if (success) return;
+        // 4. Bağlamsal komut işleme (ürün ekleme vs.)
+        const contextualMatch = await handleContextualCommand(message);
+        if (contextualMatch) {
+            return;
         }
 
-        // 5. FALLBACK MESAJI
-        console.log('❌ Hiçbir komut işlenemedi, fallback mesajı gösteriliyor');
-        const fallbackMessage = getSmartFallback();
-        speakToUser(fallbackMessage);
+        // 5. Mevcut kök için kuralları ara
+        const match = await findDynamicRuleMatch(message, currentRoot);
+        
+        if (match) {
+            await executeDynamicMatchedRule(match, message);
+        } else {
+            // 6. Eşleşme yoksa AI'ya yönlendir
+            await handleDynamicAIRequest(message, currentRoot);
+        }
 
     } catch (error) {
         console.error('❌ Komut işleme hatası:', error);
-        speakToUser("Komut işlenirken bir hata oluştu.");
+        try {
+            await voiceLearner.recordFailure(message, 'processing_error');
+        } catch (e) {
+            console.error('Hata kaydetme hatası:', e);
+        }
     }
 }
+
+// Sepet temizleme komutlarını tespit et
+function isClearCartCommand(message) {
+    const clearCommands = [
+        'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+        'clear cart', 'empty cart', 'reset cart', 'temizle'
+    ];
+    
+    return clearCommands.some(cmd => message.includes(cmd));
+}
+
+// Mağaza değiştirme komutlarını tespit et
+function isStoreChangeCommand(message) {
+    const changeCommands = [
+        'market', 'restoran', 'eczane', 'fırın', 'kafe',
+        'mağaza', 'dükkan', 'satıcı', 'yer',
+        'değiştir', 'başka', 'diğer', 'farklı', 'yeni',
+        'birinci', 'ikinci', 'üçüncü', 'dördüncü',
+        '1.', '2.', '3.', '4.', '1 ', '2 ', '3 ', '4 '
+    ];
+    
+    return changeCommands.some(cmd => message.includes(cmd));
+}
+
 // YARDIMCI FONKSİYONLAR
 function filterUnnecessaryWords(message) {
     const unnecessary = [
@@ -6855,6 +6886,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
