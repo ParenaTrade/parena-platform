@@ -147,7 +147,29 @@
             justify-content: center;
             font-weight: bold;
         }
-        
+
+        /* Mağaza tipi numaraları için stil */
+.seller-type-card {
+    position: relative; /* Numarayı konumlandırmak için */
+}
+
+.store-type-number {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--primary);
+    color: var(--secondary);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid var(--secondary);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
         .language-selector {
             position: relative;
         }
@@ -1326,54 +1348,55 @@
 
         // Store type'ları göster
         function displayStoreTypes(types) {
-            const sellerTypeGrid = document.getElementById('sellerTypeGrid');
-            if (!sellerTypeGrid) return;
-            
-            sellerTypeGrid.innerHTML = '';
-            
-            if (!types || types.length === 0) {
-                sellerTypeGrid.innerHTML = `
-                    <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
-                        <i class="fas fa-store fa-3x mb-3"></i>
-                        <p>Mağaza tipi bulunamadı</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            const iconMap = {
-                'Market': 'fas fa-store',
-                'Restoran': 'fas fa-utensils',
-                'Eczane': 'fas fa-prescription-bottle',
-                'Fırın': 'fas fa-bread-slice',
-                'Kafe': 'fas fa-coffee'
-            };
-            
-            types.forEach(type => {
-                const typeCard = document.createElement('div');
-                typeCard.className = 'seller-type-card';
-                typeCard.dataset.typeId = type.id;
-                typeCard.dataset.typeName = type.name;
-                
-                typeCard.innerHTML = `
-                    <div class="seller-type-icon">
-                        <i class="${iconMap[type.name] || 'fas fa-store'}"></i>
-                    </div>
-                    <div class="seller-type-name">${type.name}</div>
-                `;
-                
-                typeCard.addEventListener('click', () => {
-                    document.querySelectorAll('.seller-type-card').forEach(card => {
-                        card.classList.remove('selected');
-                    });
-                    typeCard.classList.add('selected');
-                    onStoreTypeSelected(type.id, type.name);
-                });
-                
-                sellerTypeGrid.appendChild(typeCard);
+    const sellerTypeGrid = document.getElementById('sellerTypeGrid');
+    if (!sellerTypeGrid) return;
+    
+    sellerTypeGrid.innerHTML = '';
+    
+    if (!types || types.length === 0) {
+        sellerTypeGrid.innerHTML = `
+            <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
+                <i class="fas fa-store fa-3x mb-3"></i>
+                <p>Mağaza tipi bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const iconMap = {
+        'Market': 'fas fa-store',
+        'Restoran': 'fas fa-utensils',
+        'Eczane': 'fas fa-prescription-bottle',
+        'Fırın': 'fas fa-bread-slice',
+        'Kafe': 'fas fa-coffee'
+    };
+    
+    types.forEach((type, index) => {
+        const typeCard = document.createElement('div');
+        typeCard.className = 'seller-type-card';
+        typeCard.dataset.typeId = type.id;
+        typeCard.dataset.typeName = type.name;
+        typeCard.dataset.typeIndex = index + 1; // Sıra numarası ekle
+        
+        typeCard.innerHTML = `
+            <div class="seller-type-icon">
+                <i class="${iconMap[type.name] || 'fas fa-store'}"></i>
+            </div>
+            <div class="seller-type-name">${type.name}</div>
+            <div class="store-type-number">${index + 1}</div>
+        `;
+        
+        typeCard.addEventListener('click', () => {
+            document.querySelectorAll('.seller-type-card').forEach(card => {
+                card.classList.remove('selected');
             });
-        }
-
+            typeCard.classList.add('selected');
+            onStoreTypeSelected(type.id, type.name);
+        });
+        
+        sellerTypeGrid.appendChild(typeCard);
+    });
+}
         // Satıcıları göster
         function updateSellersGrid() {
             const sellerGrid = document.getElementById('sellerGrid');
@@ -2868,6 +2891,19 @@ function shouldShowFallback(message) {
 }
 
 function getSmartFallback() {
+    function getSmartFallback() {
+    if (!selectedStoreTypeId) {
+        const storeCards = document.querySelectorAll('.seller-type-card');
+        if (storeCards.length > 0) {
+            const storeList = Array.from(storeCards)
+                .slice(0, 3)
+                .map(card => `${card.dataset.typeIndex}. ${card.querySelector('.seller-type-name')?.textContent}`)
+                .join(', ');
+            return `Hangi mağaza tipinden alışveriş yapmak istersiniz? ${storeList} diyebilirsiniz.`;
+        }
+        return "Hangi mağaza tipinden alışveriş yapmak istersiniz? Market, restoran veya eczane diyebilirsiniz.";
+    }
+        
     if (!selectedStoreTypeId) {
         return "Hangi mağaza tipinden alışveriş yapmak istersiniz? Market, restoran veya eczane diyebilirsiniz.";
     }
@@ -3667,28 +3703,54 @@ async function handleVoiceStoreSelection(message) {
 
     console.log('🔍 Mağaza arama:', cleanMessage);
     console.log('📋 Mevcut mağazalar:', Array.from(storeCards).map(card => 
-        card.querySelector('.seller-type-name')?.textContent
+        `${card.querySelector('.seller-type-name')?.textContent} (${card.dataset.typeIndex})`
     ));
 
-    // 1. DOĞRUDAN İSİM EŞLEŞMESİ
-    for (const card of storeCards) {
-        const typeName = card.querySelector('.seller-type-name')?.textContent.toLowerCase();
-        const dataName = card.dataset.typeName?.toLowerCase();
+    // 1. SAYISAL SEÇİM (birinci, ikinci, 1, 2 vb.)
+    const numberMap = {
+        'birinci': 1, 'bir': 1, '1': 1, '1.': 1,
+        'ikinci': 2, 'iki': 2, '2': 2, '2.': 2,
+        'üçüncü': 3, 'üç': 3, '3': 3, '3.': 3,
+        'dördüncü': 4, 'dört': 4, '4': 4, '4.': 4,
+        'beşinci': 5, 'beş': 5, '5': 5, '5.': 5,
+        'altıncı': 6, 'altı': 6, '6': 6, '6.': 6,
+        'yedinci': 7, 'yedi': 7, '7': 7, '7.': 7,
+        'sekizinci': 8, 'sekiz': 8, '8': 8, '8.': 8,
+        'dokuzuncu': 9, 'dokuz': 9, '9': 9, '9.': 9,
+        'onuncu': 10, 'on': 10, '10': 10, '10.': 10
+    };
+
+    if (numberMap[cleanMessage] !== undefined) {
+        const targetNumber = numberMap[cleanMessage];
+        selectedCard = Array.from(storeCards).find(card => 
+            parseInt(card.dataset.typeIndex) === targetNumber
+        );
         
-        const cardName = typeName || dataName;
-        if (!cardName) continue;
-
-        console.log(`🔍 Kontrol: "${cardName}" vs "${cleanMessage}"`);
-
-        // Çeşitli eşleşme yöntemleri
-        if (cleanMessage.includes(cardName) || cardName.includes(cleanMessage)) {
-            selectedCard = card;
-            console.log(`✅ Mağaza eşleşmesi: "${cardName}"`);
-            break;
+        if (selectedCard) {
+            console.log(`✅ Sayısal seçim: ${targetNumber}. mağaza`);
         }
     }
 
-    // 2. ANAHTAR KELİME EŞLEŞMESİ
+    // 2. DOĞRUDAN İSİM EŞLEŞMESİ
+    if (!selectedCard) {
+        for (const card of storeCards) {
+            const typeName = card.querySelector('.seller-type-name')?.textContent.toLowerCase();
+            const dataName = card.dataset.typeName?.toLowerCase();
+            
+            const cardName = typeName || dataName;
+            if (!cardName) continue;
+
+            console.log(`🔍 Kontrol: "${cardName}" vs "${cleanMessage}"`);
+
+            if (cleanMessage.includes(cardName) || cardName.includes(cleanMessage)) {
+                selectedCard = card;
+                console.log(`✅ İsim eşleşmesi: "${cardName}"`);
+                break;
+            }
+        }
+    }
+
+    // 3. ANAHTAR KELİME EŞLEŞMESİ
     if (!selectedCard) {
         const keywordMap = {
             'market': 'Market', 'süpermarket': 'Market', 'bakkal': 'Market',
@@ -3705,16 +3767,13 @@ async function handleVoiceStoreSelection(message) {
 
         for (const [keyword, storeType] of Object.entries(keywordMap)) {
             if (cleanMessage.includes(keyword)) {
-                // Bu store type'a ait kartı bul
-                for (const card of storeCards) {
-                    const cardName = card.querySelector('.seller-type-name')?.textContent;
-                    if (cardName === storeType) {
-                        selectedCard = card;
-                        console.log(`✅ Anahtar kelime eşleşmesi: "${keyword}" -> "${storeType}"`);
-                        break;
-                    }
+                selectedCard = Array.from(storeCards).find(card => 
+                    card.querySelector('.seller-type-name')?.textContent === storeType
+                );
+                if (selectedCard) {
+                    console.log(`✅ Anahtar kelime eşleşmesi: "${keyword}" -> "${storeType}"`);
+                    break;
                 }
-                if (selectedCard) break;
             }
         }
     }
@@ -3737,8 +3796,9 @@ async function handleVoiceStoreSelection(message) {
             }, 800);
             
             const storeTypeName = selectedCard.querySelector('.seller-type-name')?.textContent || 'Mağaza';
+            const storeNumber = selectedCard.dataset.typeIndex;
             
-            speakToUser(`${storeTypeName} seçildi. Şimdi bir satıcı seçin.`);
+            speakToUser(`${storeNumber}. ${storeTypeName} seçildi. Şimdi bir satıcı seçin.`);
             
             // Kökü güncelle
             currentRoot = "3:0";
@@ -3753,10 +3813,10 @@ async function handleVoiceStoreSelection(message) {
         }
     }
 
-    // BULUNAMADIYSA YARDIM MESAJI
+    // BULUNAMADIYSA YARDIM MESAJI (numara ile)
     const availableStores = Array.from(storeCards)
         .slice(0, 5)
-        .map(card => card.querySelector('.seller-type-name')?.textContent)
+        .map(card => `${card.dataset.typeIndex}. ${card.querySelector('.seller-type-name')?.textContent}`)
         .filter(name => name)
         .join(', ');
     
@@ -6723,6 +6783,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
