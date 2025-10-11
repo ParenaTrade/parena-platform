@@ -3606,67 +3606,39 @@ async function selectDynamicCategory(category) {
 
 // 🎯 Sesli Reyon Seçimi (Tıklama Simülasyonlu)
 async function handleVoiceCategorySelection(message) {
-    console.log("🎧 Sesli reyon seçimi algılandı:", message);
+    console.log(`🎯 Sesli Reyon Seçimi: ${message}`);
 
-    // Reyon isimlerini normalize edelim
-    const normalized = message.toLowerCase();
-
-    // Reyon eşleşme anahtarları (buraya senin diğer reyonlarını da ekleyebilirsin)
-    const categoryMap = {
-        "manav": "Manav",
-        "meyve": "Manav",
-        "sebze": "Manav",
-        "meyve sebze": "Manav",
-        "süt": "Süt Ürünleri",
-        "peynir": "Süt Ürünleri",
-        "yoğurt": "Süt Ürünleri",
-        "et": "Kasap",
-        "kasap": "Kasap",
-        "fırın": "Fırın",
-        "pastane": "Pastane",
-        "şarküteri": "Şarküteri"
-    };
-
-    let matchedCategory = null;
-    for (const [key, value] of Object.entries(categoryMap)) {
-        if (normalized.includes(key)) {
-            matchedCategory = value;
-            break;
-        }
-    }
-
-    if (!matchedCategory) {
-        console.warn("⚠️ Reyon eşleşmesi bulunamadı:", message);
-        speakToUser("Bu reyonu bulamadım, lütfen tekrar edin.");
+    // Sayfadaki tüm kategori kartlarını topla
+    const categoryCards = document.querySelectorAll('.category-card');
+    if (!categoryCards.length) {
+        console.warn("⚠️ Reyon kartı bulunamadı!");
+        speakToUser("Şu anda reyonlar yüklenmemiş görünüyor.");
         return false;
     }
 
-    // DOM'da ilgili reyon kartını bul
-    const cards = document.querySelectorAll('.category-card');
-    let clicked = false;
+    // En iyi eşleşmeyi bul (örneğin “manav”, “meyve sebze”, “kasap”)
+    let bestMatch = null;
+    message = message.toLowerCase();
 
-    for (const card of cards) {
-        const categoryName = (card.dataset.categoryName || "").toLowerCase();
-        if (categoryName.includes(matchedCategory.toLowerCase())) {
-            card.click(); // 🔥 Sesli tıklama simülasyonu
-            clicked = true;
-            console.log(`🛒 Sesli seçim: ${matchedCategory} reyonu tıklandı`);
-            break;
+    categoryCards.forEach(card => {
+        const categoryName = card.dataset.categoryName?.toLowerCase() || '';
+        if (message.includes(categoryName)) {
+            bestMatch = card;
         }
-    }
+    });
 
-    if (!clicked) {
-        console.warn("⚠️ DOM içinde reyon kartı bulunamadı:", matchedCategory);
-        speakToUser(`"${matchedCategory}" reyonu bulunamadı.`);
+    if (bestMatch) {
+        // Simüle tıklama
+        bestMatch.click();
+        console.log(`✅ Sesli olarak "${bestMatch.dataset.categoryName}" reyonu seçildi.`);
+        speakToUser(`${bestMatch.dataset.categoryName} reyonuna geçiliyor.`);
+        currentRoot = "5:0";
+        return true;
+    } else {
+        console.warn("❌ Eşleşen reyon bulunamadı:", message);
+        speakToUser("Bu reyonu bulamadım. Lütfen tekrar söyleyin.");
         return false;
     }
-
-    // Bildirim göster ve kökü ilerlet
-    displayMessage(`${matchedCategory} reyonu seçildi.`);
-    speakToUser(`${matchedCategory} reyonu seçildi. Şimdi ürün söyleyebilirsiniz.`);
-    currentRoot = "5:0"; // ✅ Ürün seçimi aşamasına geç
-
-    return true;
 }
 
 
@@ -6315,6 +6287,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
