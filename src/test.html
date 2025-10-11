@@ -166,6 +166,27 @@
     border: 2px solid var(--secondary);
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
+
+
+.product-number {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: var(--primary);
+    color: var(--secondary);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid var(--secondary);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 2;
+}
+        
         .language-selector {
             position: relative;
         }
@@ -1523,59 +1544,62 @@
         }
 
         // Ürünleri göster
-        function displayProducts(productsToShow) {
-            const productsGrid = document.getElementById('productsGrid');
-            if (!productsGrid) return;
-            
-            productsGrid.innerHTML = '';
-            
-            if (productsToShow.length === 0) {
-                productsGrid.innerHTML = `
-                    <div class="text-center" style="grid-column: 1 / -1; padding: 40px; color: #6c757d;">
-                        <i class="fas fa-box-open fa-3x mb-3"></i>
-                        <p>Bu kategoride ürün bulunamadı</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            productsToShow.forEach(product => {
-                const productCard = document.createElement('div');
-                productCard.className = 'product-card';
-                
-                let badgeHTML = '';
-                let priceHTML = '';
-                
-                if (product.discount_price && product.discount_price < product.price) {
-                    badgeHTML = `<div class="product-badge">İndirim</div>`;
-                    priceHTML = `
-                        <span class="product-price">${money(product.discount_price)}</span>
-                        <span class="product-discount">${money(product.price)}</span>
-                    `;
-                } else {
-                    priceHTML = `<span class="product-price">${money(product.price)}</span>`;
-                }
-                
-                productCard.innerHTML = `
-                    ${badgeHTML}
-                    <img src="${product.imgurl || 'https://via.placeholder.com/150x100?text=Ürün'}" 
-                         alt="${product.name}" 
-                         class="product-image">
-                    <div class="product-info">
-                        <div class="product-name">${product.name}</div>
-                        <div class="product-price">${priceHTML}</div>
-                        <button class="add-to-cart-btn" data-id="${product.id}">Sepete Ekle</button>
-                    </div>
-                `;
-                
-                const addToCartBtn = productCard.querySelector('.add-to-cart-btn');
-                addToCartBtn.addEventListener('click', function() {
-                    addToCart(product, 1, productCard);
-                });
-                
-                productsGrid.appendChild(productCard);
-            });
+       function displayProducts(productsToShow) {
+    const productsGrid = document.getElementById('productsGrid');
+    if (!productsGrid) return;
+    
+    productsGrid.innerHTML = '';
+    
+    if (productsToShow.length === 0) {
+        productsGrid.innerHTML = `
+            <div class="text-center" style="grid-column: 1 / -1; padding: 40px; color: #6c757d;">
+                <i class="fas fa-box-open fa-3x mb-3"></i>
+                <p>Bu kategoride ürün bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+    
+    productsToShow.forEach((product, index) => {
+        const productCard = document.createElement('div');
+        productCard.className = 'product-card';
+        productCard.dataset.productId = product.id;
+        productCard.dataset.productIndex = index + 1; // Sıra numarası ekle
+        
+        let badgeHTML = '';
+        let priceHTML = '';
+        
+        if (product.discount_price && product.discount_price < product.price) {
+            badgeHTML = `<div class="product-badge">İndirim</div>`;
+            priceHTML = `
+                <span class="product-price">${money(product.discount_price)}</span>
+                <span class="product-discount">${money(product.price)}</span>
+            `;
+        } else {
+            priceHTML = `<span class="product-price">${money(product.price)}</span>`;
         }
+        
+        productCard.innerHTML = `
+            ${badgeHTML}
+            <div class="product-number">${index + 1}</div>
+            <img src="${product.imgurl || 'https://via.placeholder.com/150x100?text=Ürün'}" 
+                 alt="${product.name}" 
+                 class="product-image">
+            <div class="product-info">
+                <div class="product-name">${product.name}</div>
+                <div class="product-price">${priceHTML}</div>
+                <button class="add-to-cart-btn" data-id="${product.id}">Sepete Ekle</button>
+            </div>
+        `;
+        
+        const addToCartBtn = productCard.querySelector('.add-to-cart-btn');
+        addToCartBtn.addEventListener('click', function() {
+            addToCart(product, 1, productCard);
+        });
+        
+        productsGrid.appendChild(productCard);
+    });
+}
 
         // =============================================
         // SEPET YÖNETİM FONKSİYONLARI
@@ -2889,6 +2913,27 @@ function shouldShowFallback(message) {
 
     function getSmartFallback() {
     if (!selectedStoreTypeId) {
+        if (selectedCategoryId && products.length > 0) {
+        const productCards = document.querySelectorAll('.product-card');
+        if (productCards.length > 0) {
+            const productList = Array.from(productCards)
+                .slice(0, 3)
+                .map(card => `${card.dataset.productIndex}. ${card.querySelector('.product-name')?.textContent}`)
+                .join(', ');
+            return `Ürün siparişi verebilirsiniz. Örneğin: "1. ürün", "2 numara" veya "1 kilo domates". Mevcut ürünler: ${productList}`;
+        }
+    }
+    
+    if (!selectedStoreTypeId) {
+        const storeCards = document.querySelectorAll('.seller-type-card');
+        if (storeCards.length > 0) {
+            const storeList = Array.from(storeCards)
+                .slice(0, 3)
+                .map(card => `${card.dataset.typeIndex}. ${card.querySelector('.seller-type-name')?.textContent}`)
+                .join(', ');
+            return `Hangi mağaza tipinden alışveriş yapmak istersiniz? ${storeList} diyebilirsiniz.`;
+        }
+    }
         const storeCards = document.querySelectorAll('.seller-type-card');
         if (storeCards.length > 0) {
             const storeList = Array.from(storeCards)
@@ -3843,19 +3888,62 @@ async function handleVoiceProductAdd(message) {
         console.log('📦 Ürün bilgisi çıkarılıyor...');
         const productInfo = extractProductInfoFromCommand(message);
         
-        if (!productInfo || !productInfo.productName) {
-            console.log('❌ Ürün bilgisi çıkarılamadı');
-            speakToUser("Ürün ismini anlayamadım. Lütfen '1 kilo domates' gibi söyleyin.");
-            return false;
+        // SAYISAL SEÇİM KONTROLÜ (1, 2, 3 vb.)
+        const numberMap = {
+            'birinci': 1, 'bir': 1, '1': 1, '1.': 1,
+            'ikinci': 2, 'iki': 2, '2': 2, '2.': 2,
+            'üçüncü': 3, 'üç': 3, '3': 3, '3.': 3,
+            'dördüncü': 4, 'dört': 4, '4': 4, '4.': 4,
+            'beşinci': 5, 'beş': 5, '5': 5, '5.': 5,
+            'altıncı': 6, 'altı': 6, '6': 6, '6.': 6,
+            'yedinci': 7, 'yedi': 7, '7': 7, '7.': 7,
+            'sekizinci': 8, 'sekiz': 8, '8': 8, '8.': 8,
+            'dokuzuncu': 9, 'dokuz': 9, '9': 9, '9.': 9,
+            'onuncu': 10, 'on': 10, '10': 10, '10.': 10
+        };
+
+        const cleanMessage = message.toLowerCase().trim();
+        let selectedProduct = null;
+        let quantity = 1;
+
+        // 1. SAYISAL SEÇİM (1. ürün, 2 numara vb.)
+        if (numberMap[cleanMessage] !== undefined) {
+            const targetNumber = numberMap[cleanMessage];
+            const productCard = document.querySelector(`.product-card[data-product-index="${targetNumber}"]`);
+            
+            if (productCard) {
+                const productId = productCard.dataset.productId;
+                selectedProduct = products.find(p => p.id === productId);
+                quantity = 1;
+                console.log(`✅ Sayısal ürün seçimi: ${targetNumber}. ürün`);
+            }
         }
 
-        console.log('✅ Çıkarılan ürün bilgisi:', productInfo);
-        console.log('🔍 Ürün aranıyor:', productInfo.productName);
+        // 2. GELENEKSEL ÜRÜN EKLEME (1 kilo domates vb.)
+        if (!selectedProduct && productInfo && productInfo.productName) {
+            console.log('✅ Geleneksel ürün ekleme:', productInfo);
+            selectedProduct = findProductByName(productInfo.productName);
+            quantity = productInfo.quantity;
+        }
 
-        const product = findProductByName(productInfo.productName);
+        // 3. SAYI + "NUMARA" KOMUTU (2 numara, 3 numaralı ürün vb.)
+        if (!selectedProduct) {
+            const numberMatch = cleanMessage.match(/(\d+)\s*numara/);
+            if (numberMatch) {
+                const targetNumber = parseInt(numberMatch[1]);
+                const productCard = document.querySelector(`.product-card[data-product-index="${targetNumber}"]`);
+                
+                if (productCard) {
+                    const productId = productCard.dataset.productId;
+                    selectedProduct = products.find(p => p.id === productId);
+                    quantity = 1;
+                    console.log(`✅ Numara komutu: ${targetNumber} numara`);
+                }
+            }
+        }
         
-        if (product) {
-            console.log('🎯 Ürün bulundu:', product.name);
+        if (selectedProduct) {
+            console.log('🎯 Ürün bulundu:', selectedProduct.name);
             
             // Kilit kontrolü
             if (isSellerLocked) {
@@ -3868,18 +3956,25 @@ async function handleVoiceProductAdd(message) {
             }
             
             // SEPETE EKLE
-            console.log('🛒 Sepete ekleniyor:', `${productInfo.quantity} ${productInfo.unit} ${product.name}`);
-            addToCart(product, productInfo.quantity);
-            speakToUser(`${productInfo.quantity} ${productInfo.unit} ${product.name} sepete eklendi.`);
+            console.log('🛒 Sepete ekleniyor:', `${quantity} adet ${selectedProduct.name}`);
+            addToCart(selectedProduct, quantity);
+            speakToUser(`${quantity} adet ${selectedProduct.name} sepete eklendi.`);
             
             return true;
         } else {
-            console.log('❌ Ürün bulunamadı:', productInfo.productName);
-            console.log('💡 Mevcut ürünler:', products.map(p => p.name));
+            console.log('❌ Ürün bulunamadı');
             
-            // Ürün bulunamazsa mevcut ürünleri listele
-            const availableProducts = products.slice(0, 3).map(p => p.name).join(', ');
-            speakToUser(`"${productInfo.productName}" bulunamadı. Mevcut ürünler: ${availableProducts}`);
+            // YARDIM MESAJI (numara ile)
+            const productCards = document.querySelectorAll('.product-card');
+            if (productCards.length > 0) {
+                const productList = Array.from(productCards)
+                    .slice(0, 3)
+                    .map(card => `${card.dataset.productIndex}. ${card.querySelector('.product-name')?.textContent}`)
+                    .join(', ');
+                speakToUser(`Ürün bulunamadı. Mevcut ürünler: ${productList}. Ürün numarası veya ismi söyleyebilirsiniz.`);
+            } else {
+                speakToUser("Ürün bulunamadı. Lütfen ürün ismini veya numarasını söyleyin.");
+            }
             return true;
         }
     } catch (error) {
@@ -3888,7 +3983,6 @@ async function handleVoiceProductAdd(message) {
         return false;
     }
 }
-
   function emergencyDebug() {
     console.log('🚨 ACİL DEBUG BAŞLIYOR...');
     
@@ -6779,6 +6873,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
