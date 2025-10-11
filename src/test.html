@@ -414,8 +414,28 @@
             box-shadow: var(--shadow);
             border: 2px solid transparent;
             min-width: 280px;
-            flex-shrink: 0;
+            flex-shrink: 0
+            position: relative; /* Numarayı konumlandırmak için */
         }
+        
+    .seller-number {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--primary);
+    color: var(--secondary);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid var(--secondary);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 2;
+}
         
         .seller-card:hover {
             transform: translateY(-5px);
@@ -495,7 +515,26 @@
             flex-direction: column;
             align-items: center;
             gap: 10px;
+            position: relative; /* Numarayı konumlandırmak için */
         }
+        .category-number {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--primary);
+    color: var(--secondary);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid var(--secondary);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 2;
+}
         
         .category-card:hover {
             transform: translateY(-5px);
@@ -1417,132 +1456,137 @@
 }
         // Satıcıları göster
         function updateSellersGrid() {
-            const sellerGrid = document.getElementById('sellerGrid');
-            if (!sellerGrid) return;
-            
-            sellerGrid.innerHTML = '';
-            
-            const sellersToShow = sellers;
-            
-            if (sellersToShow.length === 0) {
-                sellerGrid.innerHTML = `
-                    <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
-                        <i class="fas fa-store fa-3x mb-3"></i>
-                        <p>Bu konumda satıcı bulunamadı</p>
-                    </div>
-                `;
-                return;
+    const sellerGrid = document.getElementById('sellerGrid');
+    if (!sellerGrid) return;
+    
+    sellerGrid.innerHTML = '';
+    
+    const sellersToShow = sellers;
+    
+    if (sellersToShow.length === 0) {
+        sellerGrid.innerHTML = `
+            <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
+                <i class="fas fa-store fa-3x mb-3"></i>
+                <p>Bu konumda satıcı bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+    
+    sellersToShow.forEach((seller, index) => {
+        const sellerCard = document.createElement('div');
+        sellerCard.className = 'seller-card';
+        sellerCard.dataset.sellerId = seller.id;
+        sellerCard.dataset.sellerIndex = index + 1; // Sıra numarası ekle
+        
+        if (selectedSellerId === seller.id) {
+            sellerCard.classList.add('selected');
+        }
+        
+        let deliveryInfo = '';
+        if (selectedLocation === 'delivery') {
+            if (seller.delivery_available === false) {
+                deliveryInfo = `<div class="delivery-fee" style="color: #dc3545;"><i class="fas fa-times-circle"></i> Bu Konuma Teslimat Yok</div>`;
+            } else if (seller.delivery_fee > 0) {
+                deliveryInfo = `<div class="delivery-fee"><i class="fas fa-motorcycle"></i> Teslimat: ${money(seller.delivery_fee)}</div>`;
+            } else if (seller.delivery_fee === 0) {
+                deliveryInfo = `<div class="delivery-fee free"><i class="fas fa-motorcycle"></i> Ücretsiz Teslimat</div>`;
             }
             
-            sellersToShow.forEach(seller => {
-                const sellerCard = document.createElement('div');
-                sellerCard.className = 'seller-card';
-                sellerCard.dataset.sellerId = seller.id;
-                
-                if (selectedSellerId === seller.id) {
-                    sellerCard.classList.add('selected');
-                }
-                
-                let deliveryInfo = '';
-                if (selectedLocation === 'delivery') {
-                    if (seller.delivery_available === false) {
-                        deliveryInfo = `<div class="delivery-fee" style="color: #dc3545;"><i class="fas fa-times-circle"></i> Bu Konuma Teslimat Yok</div>`;
-                    } else if (seller.delivery_fee > 0) {
-                        deliveryInfo = `<div class="delivery-fee"><i class="fas fa-motorcycle"></i> Teslimat: ${money(seller.delivery_fee)}</div>`;
-                    } else if (seller.delivery_fee === 0) {
-                        deliveryInfo = `<div class="delivery-fee free"><i class="fas fa-motorcycle"></i> Ücretsiz Teslimat</div>`;
-                    }
-                    
-                    if (seller.min_order_amount > 0) {
-                        deliveryInfo += `<div class="min-order">Min. Sipariş: ${money(seller.min_order_amount)}</div>`;
-                    }
-                }
-                
-                sellerCard.innerHTML = `
-                    <img src="${seller.store_image || getDefaultSellerImage(seller)}" 
-                         alt="${seller.business_name}" 
-                         class="seller-image"
-                         onerror="this.src='${getDefaultSellerImage(seller)}'">
-                    <div class="seller-info">
-                        <div class="seller-name">${seller.business_name}</div>
-                        <div class="seller-details">
-                            <span><i class="fas fa-map-marker-alt"></i> ${seller.district || ''}, ${seller.city || 'Şehir belirtilmemiş'}</span>
-                            <span><i class="fas fa-star" style="color: gold;"></i> ${seller.rating || '4.5'}</span>
-                        </div>
-                        ${deliveryInfo ? `<div class="delivery-info">${deliveryInfo}</div>` : ''}
-                    </div>
-                `;
-                
-                sellerCard.addEventListener('click', () => {
-                    if (selectedLocation === 'delivery' && seller.delivery_available === false) {
-                        speakToUser("Bu satıcı konumunuza teslimat yapmıyor.");
-                        return;
-                    }
-                    selectDynamicSeller(seller);
-                });
-                
-                sellerGrid.appendChild(sellerCard);
-            });
+            if (seller.min_order_amount > 0) {
+                deliveryInfo += `<div class="min-order">Min. Sipariş: ${money(seller.min_order_amount)}</div>`;
+            }
         }
-
+        
+        sellerCard.innerHTML = `
+            <div class="seller-number">${index + 1}</div>
+            <img src="${seller.store_image || getDefaultSellerImage(seller)}" 
+                 alt="${seller.business_name}" 
+                 class="seller-image"
+                 onerror="this.src='${getDefaultSellerImage(seller)}'">
+            <div class="seller-info">
+                <div class="seller-name">${seller.business_name}</div>
+                <div class="seller-details">
+                    <span><i class="fas fa-map-marker-alt"></i> ${seller.district || ''}, ${seller.city || 'Şehir belirtilmemiş'}</span>
+                    <span><i class="fas fa-star" style="color: gold;"></i> ${seller.rating || '4.5'}</span>
+                </div>
+                ${deliveryInfo ? `<div class="delivery-info">${deliveryInfo}</div>` : ''}
+            </div>
+        `;
+        
+        sellerCard.addEventListener('click', () => {
+            if (selectedLocation === 'delivery' && seller.delivery_available === false) {
+                speakToUser("Bu satıcı konumunuza teslimat yapmıyor.");
+                return;
+            }
+            selectDynamicSeller(seller);
+        });
+        
+        sellerGrid.appendChild(sellerCard);
+    });
+}
         // Kategorileri göster
         function displayCategories(categoriesToShow) {
-            const categoriesGrid = document.getElementById('categoriesGrid');
-            if (!categoriesGrid) return;
-            
-            categoriesGrid.innerHTML = '';
-            
-            if (categoriesToShow.length === 0) {
-                categoriesGrid.innerHTML = `
-                    <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
-                        <i class="fas fa-box-open fa-3x mb-3"></i>
-                        <p>Kategori bulunamadı</p>
-                    </div>
-                `;
+    const categoriesGrid = document.getElementById('categoriesGrid');
+    if (!categoriesGrid) return;
+    
+    categoriesGrid.innerHTML = '';
+    
+    if (categoriesToShow.length === 0) {
+        categoriesGrid.innerHTML = `
+            <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
+                <i class="fas fa-box-open fa-3x mb-3"></i>
+                <p>Kategori bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const iconMap = {
+        'Meyve & Sebze': 'fas fa-apple-alt',
+        'Süt Ürünleri': 'fas fa-cheese',
+        'Et & Tavuk': 'fas fa-drumstick-bite',
+        'Temel Gıda': 'fas fa-wheat-alt',
+        'İçecekler': 'fas fa-wine-bottle'
+    };
+    
+    categoriesToShow.forEach((category, index) => {
+        const categoryCard = document.createElement('div');
+        categoryCard.className = 'category-card';
+        categoryCard.dataset.categoryId = category.id;
+        categoryCard.dataset.categoryName = category.name;
+        categoryCard.dataset.categoryIndex = index + 1; // Sıra numarası ekle
+        
+        categoryCard.innerHTML = `
+            <div class="category-number">${index + 1}</div>
+            <div class="category-icon">
+                <i class="${iconMap[category.name] || 'fas fa-box'}"></i>
+            </div>
+            <div class="category-name">${category.name}</div>
+        `;
+        
+        categoryCard.addEventListener('click', async function() {
+            if (!selectedSellerId) {
+                speakToUser("Önce bir satıcı seçmelisiniz.");
                 return;
             }
             
-            const iconMap = {
-                'Meyve & Sebze': 'fas fa-apple-alt',
-                'Süt Ürünleri': 'fas fa-cheese',
-                'Et & Tavuk': 'fas fa-drumstick-bite',
-                'Temel Gıda': 'fas fa-wheat-alt',
-                'İçecekler': 'fas fa-wine-bottle'
-            };
-            
-            categoriesToShow.forEach(category => {
-                const categoryCard = document.createElement('div');
-                categoryCard.className = 'category-card';
-                categoryCard.dataset.categoryId = category.id;
-                categoryCard.dataset.categoryName = category.name;
-                
-                categoryCard.innerHTML = `
-                    <div class="category-icon">
-                        <i class="${iconMap[category.name] || 'fas fa-box'}"></i>
-                    </div>
-                    <div class="category-name">${category.name}</div>
-                `;
-                
-                categoryCard.addEventListener('click', async function() {
-                    if (!selectedSellerId) {
-                        speakToUser("Önce bir satıcı seçmelisiniz.");
-                        return;
-                    }
-                    
-                    document.querySelectorAll('.category-card').forEach(c => {
-                        c.classList.remove('selected');
-                    });
-                    
-                    this.classList.add('selected');
-                    selectedCategoryId = category.id;
-                    await loadProductsByReyon(category.id);
-                    speakToUser(`${category.name} reyonu seçildi.`);
-                });
-                
-                categoriesGrid.appendChild(categoryCard);
+            document.querySelectorAll('.category-card').forEach(c => {
+                c.classList.remove('selected');
             });
-        }
-
+            
+            this.classList.add('selected');
+            selectedCategoryId = category.id;
+            await loadProductsByReyon(category.id);
+            
+            // Akıllı geri bildirim
+            const categoryNumber = this.dataset.categoryIndex;
+            speakToUser(`${categoryNumber}. ${category.name} reyonu seçildi.`);
+        });
+        
+        categoriesGrid.appendChild(categoryCard);
+    });
+}
         // Ürünleri göster
        function displayProducts(productsToShow) {
     const productsGrid = document.getElementById('productsGrid');
@@ -4253,7 +4297,6 @@ async function selectDynamicSeller(seller) {
 }
 
 // SESLİ SATICI SEÇİM - REYON YÜKLEME 
- // GELİŞTİRİLMİŞ handleVoiceSellerSelection
 async function handleVoiceSellerSelection(message) {
     console.log('🎯 Sesli satıcı seçimi:', message);
     
@@ -4273,19 +4316,24 @@ async function handleVoiceSellerSelection(message) {
     const cleanMessage = message.toLowerCase().trim();
     let selectedCard = null;
 
-    // 1. Sayısal seçim (birinci, ikinci, 1, 2 vb.)
+    // SAYISAL SEÇİM KONTROLÜ
     const numberMap = {
-        'birinci': 0, 'bir': 0, '1': 0, '1.': 0,
-        'ikinci': 1, 'iki': 1, '2': 1, '2.': 1,
-        'üçüncü': 2, 'üç': 2, '3': 2, '3.': 2,
-        'dördüncü': 3, 'dört': 3, '4': 3, '4.': 3,
-        'beşinci': 4, 'beş': 4, '5': 4, '5.': 4
+        'birinci': 1, 'bir': 1, '1': 1, '1.': 1,
+        'ikinci': 2, 'iki': 2, '2': 2, '2.': 2,
+        'üçüncü': 3, 'üç': 3, '3': 3, '3.': 3,
+        'dördüncü': 4, 'dört': 4, '4': 4, '4.': 4,
+        'beşinci': 5, 'beş': 5, '5': 5, '5.': 5
     };
 
+    // 1. Sayısal seçim
     if (numberMap[cleanMessage] !== undefined) {
-        const index = numberMap[cleanMessage];
-        if (index < sellerCards.length) {
-            selectedCard = sellerCards[index];
+        const targetNumber = numberMap[cleanMessage];
+        selectedCard = Array.from(sellerCards).find(card => 
+            parseInt(card.dataset.sellerIndex) === targetNumber
+        );
+        
+        if (selectedCard) {
+            console.log(`✅ Sayısal satıcı seçimi: ${targetNumber}. satıcı`);
         }
     }
 
@@ -4309,7 +4357,14 @@ async function handleVoiceSellerSelection(message) {
     }
 
     if (!selectedCard) {
-        speakToUser(`"${message}" bulunamadı. Lütfen geçerli bir satıcı seçin.`);
+        // Akıllı yardım mesajı
+        const sellerList = Array.from(sellerCards)
+            .slice(0, 3)
+            .map(card => `${card.dataset.sellerIndex}. ${card.querySelector('.seller-name')?.textContent}`)
+            .filter(name => name)
+            .join(', ');
+        
+        speakToUser(`Satıcı bulunamadı. Mevcut satıcılar: ${sellerList}`);
         return false;
     }
 
@@ -4319,12 +4374,15 @@ async function handleVoiceSellerSelection(message) {
     
     if (seller) {
         await selectDynamicSeller(seller);
+        
+        // Akıllı geri bildirim
+        const sellerNumber = selectedCard.dataset.sellerIndex;
+        speakToUser(`${sellerNumber}. ${seller.business_name} seçildi.`);
         return true;
     }
 
     return false;
 }
-
 
       
 // =============================================
@@ -4361,7 +4419,6 @@ async function selectDynamicCategory(category) {
 async function handleVoiceCategorySelection(message) {
     console.log(`🎯 Sesli Reyon Seçimi: ${message}`);
 
-    // Sayfadaki tüm kategori kartlarını topla
     const categoryCards = document.querySelectorAll('.category-card');
     if (!categoryCards.length) {
         console.warn("⚠️ Reyon kartı bulunamadı!");
@@ -4369,34 +4426,65 @@ async function handleVoiceCategorySelection(message) {
         return false;
     }
 
-    // En iyi eşleşmeyi bul (örneğin “manav”, “meyve sebze”, “kasap”)
+    const cleanMessage = message.toLowerCase();
     let bestMatch = null;
-    message = message.toLowerCase();
 
-    categoryCards.forEach(card => {
-        const categoryName = card.dataset.categoryName?.toLowerCase() || '';
-        if (message.includes(categoryName)) {
-            bestMatch = card;
+    // SAYISAL SEÇİM KONTROLÜ
+    const numberMap = {
+        'birinci': 1, 'bir': 1, '1': 1, '1.': 1,
+        'ikinci': 2, 'iki': 2, '2': 2, '2.': 2,
+        'üçüncü': 3, 'üç': 3, '3': 3, '3.': 3,
+        'dördüncü': 4, 'dört': 4, '4': 4, '4.': 4,
+        'beşinci': 5, 'beş': 5, '5': 5, '5.': 5
+    };
+
+    // 1. Sayısal seçim
+    if (numberMap[cleanMessage] !== undefined) {
+        const targetNumber = numberMap[cleanMessage];
+        bestMatch = Array.from(categoryCards).find(card => 
+            parseInt(card.dataset.categoryIndex) === targetNumber
+        );
+        
+        if (bestMatch) {
+            console.log(`✅ Sayısal reyon seçimi: ${targetNumber}. reyon`);
         }
-    });
+    }
+
+    // 2. İsimle arama
+    if (!bestMatch) {
+        categoryCards.forEach(card => {
+            const categoryName = card.dataset.categoryName?.toLowerCase() || '';
+            if (cleanMessage.includes(categoryName)) {
+                bestMatch = card;
+            }
+        });
+    }
 
     if (bestMatch) {
         // Simüle tıklama
         bestMatch.click();
-        console.log(`✅ Sesli olarak "${bestMatch.dataset.categoryName}" reyonu seçildi.`);
-        speakToUser(`${bestMatch.dataset.categoryName} reyonuna geçiliyor.`);
+        
+        // Akıllı geri bildirim
+        const categoryNumber = bestMatch.dataset.categoryIndex;
+        const categoryName = bestMatch.dataset.categoryName;
+        console.log(`✅ Sesli olarak "${categoryNumber}. ${categoryName}" reyonu seçildi.`);
+        
+        speakToUser(`${categoryNumber}. ${categoryName} reyonuna geçiliyor.`);
         currentRoot = "5:0";
         return true;
     } else {
         console.warn("❌ Eşleşen reyon bulunamadı:", message);
-        speakToUser("Bu reyonu bulamadım. Lütfen tekrar söyleyin.");
+        
+        // Akıllı yardım mesajı
+        const categoryList = Array.from(categoryCards)
+            .slice(0, 3)
+            .map(card => `${card.dataset.categoryIndex}. ${card.dataset.categoryName}`)
+            .join(', ');
+        
+        speakToUser(`Reyon bulunamadı. Mevcut reyonlar: ${categoryList}`);
         return false;
     }
 }
-
-
-
-        
 // =============================================
 // SATICININ TÜM ÜRÜNLERİNİ YÜKLE (YEDEK)
 // =============================================
@@ -6948,6 +7036,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
