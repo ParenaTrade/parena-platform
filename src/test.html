@@ -1940,39 +1940,83 @@ function setupCartItemEvents() {
 function speakToUser(message) {
     console.log(`🗣️ Asistan: ${message}`);
     
-    if (assistantMessage) {
-        assistantMessage.textContent = message;
-    }
-
-    // 🧠 Tekrar kontrolü
+    // Mesajı temizle
+    const cleanMessage = message.trim();
+    
+    if (!cleanMessage) return;
+    
     const now = Date.now();
-    const trimmed = message.trim();
-    if (trimmed === lastSpokenMessage && (now - lastSpeakTime) < 2000) {
-        console.log("🛑 Tekrarlayan sesli mesaj atlandı:", message);
+    
+    // 1. AYNI MESAJ KONTROLÜ
+    if (cleanMessage === lastSpokenMessage) {
+        console.log("🛑 Aynı mesaj tekrarı engellendi:", cleanMessage);
         return;
     }
-
-    lastSpokenMessage = trimmed;
-    lastSpeakTime = now;
-
-    // 🎤 Sesli okuma (isteğe bağlı)
+    
+    // 2. BENZER MESAJ KONTROLÜ
+    if (isSimilarMessage(cleanMessage, lastSpokenMessage)) {
+        console.log("🛑 Benzer mesaj tekrarı engellendi:", cleanMessage);
+        return;
+    }
+    
+    // 3. SIKLIK KONTROLÜ
+    if (now - lastSpeakTime < SPEAK_COOLDOWN) {
+        console.log("🛑 Sık mesaj engellendi (cooldown):", cleanMessage);
+        return;
+    }
+    
+    // MESAJI GÖSTER VE SÖYLE
+    if (assistantMessage) {
+        assistantMessage.textContent = cleanMessage;
+    }
+    
+    // SESLİ OKUMA
     if ('speechSynthesis' in window && isMicrophoneEnabled) {
-        const speech = new SpeechSynthesisUtterance(message);
+        const speech = new SpeechSynthesisUtterance(cleanMessage);
         speech.lang = currentLanguage === 'tr' ? 'tr-TR' :
                      currentLanguage === 'en' ? 'en-US' : 'de-DE';
-        speech.volume = 1;
-        speech.rate = 1;
-        speech.pitch = 1;
-
-        // Önceki konuşmayı durdur ve yenisini başlat
+        speech.volume = 0.8; // Biraz daha kısık
+        speech.rate = 0.9; // Biraz daha yavaş
+        
+        // Önceki konuşmayı durdur
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(speech);
     }
+    
+    // KAYDET
+    lastSpokenMessage = cleanMessage;
+    lastSpeakTime = now;
+    
+    console.log("✅ Yeni mesaj söylendi:", cleanMessage);
 }
 
-        // =============================================
-        // MİKROFON ve SES TANIMA
-        // =============================================
+function isSimilarMessage(newMessage, oldMessage) {
+    if (!oldMessage) return false;
+    
+    const newWords = newMessage.toLowerCase().split(' ');
+    const oldWords = oldMessage.toLowerCase().split(' ');
+    
+    // Ortak kelime sayısını bul
+    const commonWords = newWords.filter(word => 
+        oldWords.includes(word) && word.length > 3
+    );
+    
+    const similarity = commonWords.length / Math.max(newWords.length, oldWords.length);
+    
+    console.log(`🔍 Benzerlik kontrol: ${similarity.toFixed(2)} (${commonWords.join(', ')})`);
+    
+    return similarity > SIMILARITY_THRESHOLD;
+}
+
+    function speakToUserForce(message) {
+    // Zorla konuşma (önemli mesajlar için)
+    lastSpokenMessage = "";
+    lastSpeakTime = 0;
+    speakToUser(message);
+}
+// =============================================
+// MİKROFON ve SES TANIMA
+// =============================================
 
 async function enableDynamicMicrophone() {
     console.log('🎤 Mikrofon açılmak isteniyor...');
@@ -2826,7 +2870,7 @@ async function safeVoiceMatchQuery(userInput) {
         
 
 async function processVoiceCommand(transcript) {
-    const message = transcript.toLowerCase().trim();
+ const message = transcript.toLowerCase().trim();
     console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
     
     // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
@@ -2841,7 +2885,7 @@ async function processVoiceCommand(transcript) {
         console.log("🔇 Gereksiz mesaj filtrelendi");
         return;
     }
-
+    
     console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
 
     try {
@@ -2876,14 +2920,19 @@ async function processVoiceCommand(transcript) {
             if (success) return;
         }
 
-        // 5. FALLBACK MESAJI
-        console.log('❌ Hiçbir komut işlenemedi, fallback mesajı gösteriliyor');
+       // FALLBACK MESAJI (cooldown kontrolü ile)
+        console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
         const fallbackMessage = getSmartFallback();
-        speakToUser(fallbackMessage);
+        if (fallbackMessage) {
+            speakToUser(fallbackMessage);
+        }
 
     } catch (error) {
         console.error('❌ Komut işleme hatası:', error);
-        speakToUser("Komut işlenirken bir hata oluştu.");
+        // Hata mesajlarında da cooldown
+        if (Date.now() - lastSpeakTime > SPEAK_COOLDOWN) {
+            speakToUser("Bir hata oluştu, tekrar deneyin.");
+        }
     }
 }
 // YARDIMCI FONKSİYONLAR
@@ -2915,16 +2964,11 @@ function shouldShowFallback(message) {
 }
 
     function getSmartFallback() {
-    if (!selectedStoreTypeId) {
-        if (selectedCategoryId && products.length > 0) {
-        const productCards = document.querySelectorAll('.product-card');
-        if (productCards.length > 0) {
-            const productList = Array.from(productCards)
-                .slice(0, 3)
-                .map(card => `${card.dataset.productIndex}. ${card.querySelector('.product-name')?.textContent}`)
-                .join(', ');
-            return `Ürün siparişi verebilirsiniz. Örneğin: "1. ürün", "2 numara" veya "1 kilo domates". Mevcut ürünler: ${productList}`;
-        }
+    const now = Date.now();
+    
+    // Fallback'ler arasında da cooldown
+    if (now - lastSpeakTime < SPEAK_COOLDOWN * 2) {
+        return null; // Mesaj gösterme
     }
     
     if (!selectedStoreTypeId) {
@@ -2934,34 +2978,33 @@ function shouldShowFallback(message) {
                 .slice(0, 3)
                 .map(card => `${card.dataset.typeIndex}. ${card.querySelector('.seller-type-name')?.textContent}`)
                 .join(', ');
-            return `Hangi mağaza tipinden alışveriş yapmak istersiniz? ${storeList} diyebilirsiniz.`;
+            return `Hangi mağaza tipi? ${storeList}`;
         }
-    }
-        const storeCards = document.querySelectorAll('.seller-type-card');
-        if (storeCards.length > 0) {
-            const storeList = Array.from(storeCards)
-                .slice(0, 3)
-                .map(card => `${card.dataset.typeIndex}. ${card.querySelector('.seller-type-name')?.textContent}`)
-                .join(', ');
-            return `Hangi mağaza tipinden alışveriş yapmak istersiniz? ${storeList} diyebilirsiniz.`;
-        }
-        return "Hangi mağaza tipinden alışveriş yapmak istersiniz? Market, restoran veya eczane diyebilirsiniz.";
-    }
-        
-    if (!selectedStoreTypeId) {
-        return "Hangi mağaza tipinden alışveriş yapmak istersiniz? Market, restoran veya eczane diyebilirsiniz.";
+        return "Mağaza tipi seçin: Market, Restoran...";
     }
     
     if (!selectedSellerId) {
-        return "Lütfen bir satıcı seçin. Satıcı ismi veya 'birinci satıcı' diyebilirsiniz.";
+        return "Bir satıcı seçin. İsim veya numara söyleyin.";
     }
     
     if (!selectedCategoryId) {
-        return "Hangi reyondan alışveriş yapmak istersiniz? Manav, süt ürünleri gibi...";
+        return "Bir reyon seçin: Manav, Süt Ürünleri...";
     }
     
-    return "Ürün siparişi verebilirsiniz. Örneğin: '1 kilo domates'";
+    if (selectedCategoryId && products.length > 0) {
+        const productCards = document.querySelectorAll('.product-card');
+        if (productCards.length > 0) {
+            const productList = Array.from(productCards)
+                .slice(0, 2) // Sadece 2 ürün göster
+                .map(card => `${card.dataset.productIndex}. ${card.querySelector('.product-name')?.textContent}`)
+                .join(', ');
+            return `Ürün seçin: ${productList}`;
+        }
+    }
+    
+    return "Nasıl yardımcı olabilirim?";
 }
+        
 // YARDIMCI FONKSİYONLAR
 function hasStoreTypeKeywords(message) {
     const keywords = ['market', 'restoran', 'eczane', 'fırın', 'kafe', 'mağaza', 'tip'];
@@ -6905,6 +6948,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
