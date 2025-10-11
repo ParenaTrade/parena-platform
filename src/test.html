@@ -2731,6 +2731,7 @@ async function createDefaultCommandRules() {
 // DİNAMİK SES KOMUT İŞLEME
 // =============================================
 
+// 🎯 Sesli komut işleme - reyon dahil tam akış
 // 🎯 Sesli komut işleme - grid uyumlu
 async function processVoiceCommand(transcript) {
     const message = transcript.toLowerCase().trim();
@@ -2747,7 +2748,7 @@ async function processVoiceCommand(transcript) {
             if (success) {
                 displayMessage("Mağaza Seç: " + message);
                 speakToUser(`"${message}" mağazası seçildi. Şimdi bir satıcı seçin.`);
-                currentRoot = "3:0"; // Satıcı seçimine geç
+                currentRoot = "3:0";
                 return;
             }
         }
@@ -2758,31 +2759,39 @@ async function processVoiceCommand(transcript) {
             if (success) {
                 displayMessage("Satıcı Seç: " + message);
                 speakToUser(`"${message}" satıcısı seçildi. Reyon seçimine geçebilirsiniz.`);
-                currentRoot = "4:0"; // Reyon seçimine geç
+                currentRoot = "4:0";
                 return;
             }
         }
 
-        // 3️⃣ Ürün Bilgisi Çıkarma ve Sepete Ekleme (Reyon atlama)
+        // 3️⃣ Reyon Seç
+        if (currentRoot === "4:0" || /(reyon|manav|kasap|fırın|şarküteri|temizlik|içecek|gıda|süt|unlu)/i.test(message)) {
+            const success = await handleVoiceCategorySelection(message);
+            if (success) {
+                displayMessage("Reyon Seç: " + message);
+                speakToUser(`"${message}" reyonu seçildi. Şimdi ürün söyleyebilirsiniz.`);
+                currentRoot = "5:0"; // ✅ Ürün aşamasına geç
+                return;
+            }
+        }
+
+        // 4️⃣ Ürün Bilgisi Çıkarma ve Sepete Ekleme
         const productInfo = await extractProductInfoFromCommand(message);
         if (productInfo && productInfo.productName) {
             console.log(`✅ Ürün bulundu: ${productInfo.productName}, miktar: ${productInfo.quantity || 1}, birim: ${productInfo.unit || 'adet'}`);
-            
-            // Sepete eklemeden önce geçici root ayarlayalım
             const previousRoot = currentRoot;
-            currentRoot = "product-added"; // Reyon uyarısını atlamak için geçici
+            currentRoot = "product-added";
 
-            await handleProductAddFromVoice(productInfo, message); // Sepete ekleme fonksiyonu
-            currentRoot = previousRoot; // Root'u eski haline getir
-            
-            return; // Ürün eklendiyse başka işleme gerek yok
+            await handleProductAddFromVoice(productInfo, message);
+            currentRoot = previousRoot;
+            return;
         }
 
-        // 4️⃣ Bağlamsal komutlar (varsa)
+        // 5️⃣ Bağlamsal komutlar
         const contextualMatch = await handleContextualCommand(message);
         if (contextualMatch) return;
 
-        // 5️⃣ Dinamik kural eşleşmesi
+        // 6️⃣ Dinamik kural eşleşmesi
         const match = await findDynamicRuleMatch(message, currentRoot);
         if (match) {
             await executeDynamicMatchedRule(match, message);
@@ -6287,6 +6296,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
