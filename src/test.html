@@ -4576,127 +4576,72 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 3000);
 });       
-// TAM ÇALIŞAN extractProductInfoFromCommand
+// ACİL ÇÖZÜM - Basit ve garantili extractProductInfoFromCommand
 async function extractProductInfoFromCommand(message) {
     console.log('🎧 extractProductInfoFromCommand çağrıldı:', message);
 
-    if (!message || message.trim() === '') {
-        console.log('❌ Boş mesaj');
-        return null;
-    }
-
-    let cleanMessage = message.toLowerCase()
-        .replace(/ekle|sepete|al|istiyorum|lütfen|rica|ediyorum|örneğin/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
-
-    // HIZLI DÜZELTMELER - ÖNEMLİ!
-    const quickCorrections = {
-        'çarliston': 'çarliston biber',
-        'viber': 'çarliston biber', 
-        'domat': 'domates',
-        'sogan': 'soğan',
-        'salatalik': 'salatalık',
-        'patat': 'patates',
-        'kabak': 'kabak',
-        'biber': 'biber',
-        'marul': 'marul',
-        'domates': 'domates',
-        'soğan': 'soğan'
-    };
-
-    // Önce hızlı düzeltmeleri uygula
-    for (const [wrong, correct] of Object.entries(quickCorrections)) {
-        if (cleanMessage.includes(wrong)) {
-            cleanMessage = cleanMessage.replace(wrong, correct);
-            console.log(`🔄 Hızlı düzeltme: "${wrong}" -> "${correct}"`);
-        }
-    }
-
-    // BİRİM ve MİKTAR ÇIKARIMI
-    const unitPatterns = [
-        { pattern: /(\d+\.?\d*)\s*kilo\s*(.*)/, unit: 'kg' },
-        { pattern: /(\d+\.?\d*)\s*kg\s*(.*)/, unit: 'kg' },
-        { pattern: /(\d+\.?\d*)\s*gram\s*(.*)/, unit: 'g' },
-        { pattern: /(\d+\.?\d*)\s*gr\s*(.*)/, unit: 'g' },
-        { pattern: /(\d+\.?\d*)\s*paket\s*(.*)/, unit: 'paket' },
-        { pattern: /(\d+\.?\d*)\s*adet\s*(.*)/, unit: 'adet' },
-        { pattern: /(\d+\.?\d*)\s*tane\s*(.*)/, unit: 'adet' },
-        { pattern: /yarım\s*kilo\s*(.*)/, unit: 'kg', quantity: 0.5 },
-        { pattern: /çeyrek\s*kilo\s*(.*)/, unit: 'kg', quantity: 0.25 }
+    // Çok basit regex'ler - kesin çalışsın
+    const patterns = [
+        /(\d+)\s*kilo\s*(.+)/,
+        /(\d+)\s*kg\s*(.+)/, 
+        /(\d+)\s*paket\s*(.+)/,
+        /(\d+)\s*adet\s*(.+)/,
+        /(\d+)\s*tane\s*(.+)/,
+        /bir\s*kilo\s*(.+)/,
+        /iki\s*kilo\s*(.+)/,
+        /üç\s*kilo\s*(.+)/,
+        /bir\s*paket\s*(.+)/,
+        /iki\s*paket\s*(.+)/
     ];
 
     let quantity = 1;
     let unit = 'adet';
     let productName = '';
 
-    // Sayı kelimeleri
-    const numberWords = {
-        'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5,
-        'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10
-    };
-
-    // Önce sayı kelimelerini kontrol et
-    for (const [word, num] of Object.entries(numberWords)) {
-        const regex = new RegExp(`^${word}\\s+(.*)`, 'i');
-        const match = cleanMessage.match(regex);
+    for (const pattern of patterns) {
+        const match = message.toLowerCase().match(pattern);
         if (match) {
-            quantity = num;
-            productName = match[1];
-            console.log(`🔢 Sayı kelimesi bulundu: ${word} -> ${num}`);
+            if (pattern.toString().includes('bir')) quantity = 1;
+            else if (pattern.toString().includes('iki')) quantity = 2;
+            else if (pattern.toString().includes('üç')) quantity = 3;
+            else quantity = parseInt(match[1]) || 1;
+            
+            if (pattern.toString().includes('kilo') || pattern.toString().includes('kg')) unit = 'kg';
+            else if (pattern.toString().includes('paket')) unit = 'paket';
+            else unit = 'adet';
+            
+            productName = match[2]?.trim();
             break;
         }
     }
 
-    // Birim pattern'lerini kontrol et
-    let matched = false;
-    for (const unitPattern of unitPatterns) {
-        const match = cleanMessage.match(unitPattern.pattern);
-        if (match) {
-            if (unitPattern.quantity) {
-                quantity = unitPattern.quantity;
-            } else {
-                quantity = parseFloat(match[1]) || 1;
-            }
-            productName = match[2]?.trim() || cleanMessage;
-            unit = unitPattern.unit;
-            matched = true;
-            console.log(`📏 Birim pattern eşleşti: ${unitPattern.unit}, miktar: ${quantity}`);
-            break;
-        }
-    }
-
-    // Eğer birim pattern eşleşmediyse, sadece sayı ara
-    if (!matched) {
-        const numberMatch = cleanMessage.match(/^(\d+\.?\d*)\s*(.*)/);
-        if (numberMatch) {
-            quantity = parseFloat(numberMatch[1]) || 1;
-            productName = numberMatch[2]?.trim();
-            console.log(`🔢 Sadece sayı bulundu: ${quantity}`);
-        } else {
-            // Hiç sayı yoksa, tüm mesajı ürün adı olarak al
-            productName = cleanMessage;
-            quantity = 1;
-            console.log(`📝 Sayı yok, tüm mesaj ürün adı: ${productName}`);
-        }
-    }
-
-    // Ürün adını temizle
-    if (productName) {
-        productName = productName
-            .replace(/^\s*(ve|ile|\+)\s*/, '')
-            .replace(/\s*(ve|ile|\+)\s*$/, '')
+    // Eğer pattern eşleşmezse, tüm mesajı ürün adı yap
+    if (!productName) {
+        productName = message.toLowerCase()
+            .replace(/\d+/g, '')
+            .replace(/kilo|kg|paket|adet|tane|bir|iki|üç/g, '')
+            .replace(/\s+/g, ' ')
             .trim();
     }
 
-    if (!productName) {
-        console.log('❌ Ürün adı çıkarılamadı');
-        return null;
+    // Temel düzeltmeler
+    const fixes = {
+        'domat': 'domates',
+        'sogan': 'soğan', 
+        'salatalik': 'salatalık',
+        'carliston': 'çarliston biber',
+        'viber': 'çarliston biber'
+    };
+
+    for (const [wrong, correct] of Object.entries(fixes)) {
+        if (productName.includes(wrong)) {
+            productName = productName.replace(wrong, correct);
+        }
     }
 
-    console.log('🎯 SONUÇ - Ürün bilgisi:', { productName, quantity, unit });
+    if (!productName) return null;
+
+    console.log('🎯 BASİT ÇÖZÜM SONUCU:', { productName, quantity, unit });
     return { productName, quantity, unit };
 }
         
@@ -6468,6 +6413,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
