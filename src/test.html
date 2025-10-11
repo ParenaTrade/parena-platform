@@ -3601,9 +3601,77 @@ async function selectDynamicCategory(category) {
 }      
 
 // =============================================
-// KATEGORİYE GÖRE ÜRÜNLERİ YÜKLE
+// KATEGORİ SEÇ ÜRÜNLERİ YÜKLE
 // =============================================
 
+// 🎯 Sesli Reyon Seçimi (Tıklama Simülasyonlu)
+async function handleVoiceCategorySelection(message) {
+    console.log("🎧 Sesli reyon seçimi algılandı:", message);
+
+    // Reyon isimlerini normalize edelim
+    const normalized = message.toLowerCase();
+
+    // Reyon eşleşme anahtarları (buraya senin diğer reyonlarını da ekleyebilirsin)
+    const categoryMap = {
+        "manav": "Manav",
+        "meyve": "Manav",
+        "sebze": "Manav",
+        "meyve sebze": "Manav",
+        "süt": "Süt Ürünleri",
+        "peynir": "Süt Ürünleri",
+        "yoğurt": "Süt Ürünleri",
+        "et": "Kasap",
+        "kasap": "Kasap",
+        "fırın": "Fırın",
+        "pastane": "Pastane",
+        "şarküteri": "Şarküteri"
+    };
+
+    let matchedCategory = null;
+    for (const [key, value] of Object.entries(categoryMap)) {
+        if (normalized.includes(key)) {
+            matchedCategory = value;
+            break;
+        }
+    }
+
+    if (!matchedCategory) {
+        console.warn("⚠️ Reyon eşleşmesi bulunamadı:", message);
+        speakToUser("Bu reyonu bulamadım, lütfen tekrar edin.");
+        return false;
+    }
+
+    // DOM'da ilgili reyon kartını bul
+    const cards = document.querySelectorAll('.category-card');
+    let clicked = false;
+
+    for (const card of cards) {
+        const categoryName = (card.dataset.categoryName || "").toLowerCase();
+        if (categoryName.includes(matchedCategory.toLowerCase())) {
+            card.click(); // 🔥 Sesli tıklama simülasyonu
+            clicked = true;
+            console.log(`🛒 Sesli seçim: ${matchedCategory} reyonu tıklandı`);
+            break;
+        }
+    }
+
+    if (!clicked) {
+        console.warn("⚠️ DOM içinde reyon kartı bulunamadı:", matchedCategory);
+        speakToUser(`"${matchedCategory}" reyonu bulunamadı.`);
+        return false;
+    }
+
+    // Bildirim göster ve kökü ilerlet
+    displayMessage(`${matchedCategory} reyonu seçildi.`);
+    speakToUser(`${matchedCategory} reyonu seçildi. Şimdi ürün söyleyebilirsiniz.`);
+    currentRoot = "5:0"; // ✅ Ürün seçimi aşamasına geç
+
+    return true;
+}
+
+
+
+        
 // =============================================
 // SATICININ TÜM ÜRÜNLERİNİ YÜKLE (YEDEK)
 // =============================================
@@ -6247,6 +6315,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
