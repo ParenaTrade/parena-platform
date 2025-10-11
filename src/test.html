@@ -4907,111 +4907,151 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 3000);
 });       
 async function extractProductInfoFromCommand(message) {
-    console.log('🎧 extractProductInfoFromCommand çağrıldı:', message);
-
+    console.log('🔍 extractProductInfoFromCommand çağrıldı:', message);
+    
     if (!message || message.trim() === '') {
         console.log('❌ Boş mesaj');
         return null;
     }
 
-    // GELİŞMİŞ TEMİZLEME
-    let cleanMessage = message.toLowerCase()
-        .replace(/örneğin|mesela|şey|falan|filan|gibi|lütfen|rica|ediyorum|istiyorum|al|ekle|sepete/g, '')
+    // ÖNEMLİ: Değişkenleri baştan tanımla
+    let quantity = 1;
+    let unit = 'adet';
+    let productName = '';
+
+    // 1. Önce öğrenen sistemden düzeltmeyi al
+    let correctedMessage = message;
+    if (voiceLearner && voiceLearner.initialized) {
+        correctedMessage = await voiceLearner.correctUserInput(message);
+        if (correctedMessage !== message) {
+            console.log(`🔄 Öğrenen sistem düzeltmesi: "${message}" -> "${correctedMessage}"`);
+        }
+    }
+
+    // 2. Hızlı düzeltmeler (fallback)
+    const quickCorrections = {
+        'çarliston': 'Çarliston Biber',
+        'viber': 'Çarliston Biber',
+        'çarliston on': 'Çarliston Biber',
+        'on çarliston': 'Çarliston Biber',
+        'çarlistonbiber': 'Çarliston Biber',
+        'domat': 'Domates',
+        'sogan': 'Soğan',
+        'biberr': 'Biber',
+        'salatalik': 'Salatalık',
+        'patat': 'Patates'
+    };
+
+    const lowerMessage = correctedMessage.toLowerCase();
+    if (quickCorrections[lowerMessage]) {
+        correctedMessage = quickCorrections[lowerMessage];
+        console.log(`🔄 Hızlı düzeltme: "${message}" -> "${correctedMessage}"`);
+    }
+
+    // 3. Temizleme işlemi
+    let cleanMessage = correctedMessage
+        .replace(/ekle|sepete|al|istiyorum|lütfen|rica|ediyorum|tane|adet/g, '')
         .replace(/\s+/g, ' ')
         .trim();
 
     console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
 
-    // Eğer temizleme sonrası mesaj boşsa, orijinal mesajı kullan (filtresiz)
-    if (!cleanMessage) {
-        cleanMessage = message.toLowerCase().trim();
-    }
+    // 4. Birim ve miktar çıkarımı
+    const unitPatterns = [
+        { pattern: /(\d+)\s*kilo?\s*(.*)/, unit: 'kg' },
+        { pattern: /(\d+)\s*kg\s*(.*)/, unit: 'kg' },
+        { pattern: /(\d+)\s*gram\s*(.*)/, unit: 'g' },
+        { pattern: /(\d+)\s*gr\s*(.*)/, unit: 'g' },
+        { pattern: /(\d+)\s*litre?\s*(.*)/, unit: 'lt' },
+        { pattern: /(\d+)\s*lt\s*(.*)/, unit: 'lt' },
+        { pattern: /(\d+)\s*ml\s*(.*)/, unit: 'ml' },
+        { pattern: /(\d+)\s*paket\s*(.*)/, unit: 'paket' },
+        { pattern: /(\d+)\s*düzine\s*(.*)/, unit: 'düzine' },
+        { pattern: /yarım\s*kilo?\s*(.*)/, unit: 'kg', quantity: 0.5 },
+        { pattern: /çeyrek\s*kilo?\s*(.*)/, unit: 'kg', quantity: 0.25 }
+    ];
 
-    let quantity = 1;
-    let unit = 'adet';
-    let productName = '';
-
-    console.log('🔍 Pattern kontrolü başlıyor...');
-
-    // BASİT ve ETKİLİ PATTERN'LER
-    // 1. "1 kilo domates" pattern'i
-    const kiloMatch = cleanMessage.match(/(\d+)\s*kilo\s*(.+)/);
-    if (kiloMatch) {
-        quantity = parseInt(kiloMatch[1]) || 1;
-        productName = kiloMatch[2].trim();
-        unit = 'kg';
-        console.log(`✅ Kilo pattern eşleşti: ${quantity} kg ${productName}`);
-    }
-    // 2. "bir kilo domates" pattern'i
-    else if (cleanMessage.match(/bir\s*kilo\s*(.+)/)) {
-        quantity = 1;
-        productName = cleanMessage.replace(/bir\s*kilo\s*/, '').trim();
-        unit = 'kg';
-        console.log(`✅ Bir kilo pattern eşleşti: ${quantity} kg ${productName}`);
-    }
-    // 3. "iki kilo domates" pattern'i
-    else if (cleanMessage.match(/iki\s*kilo\s*(.+)/)) {
-        quantity = 2;
-        productName = cleanMessage.replace(/iki\s*kilo\s*/, '').trim();
-        unit = 'kg';
-        console.log(`✅ İki kilo pattern eşleşti: ${quantity} kg ${productName}`);
-    }
-    // 4. Sadece sayı + ürün
-    else if (cleanMessage.match(/(\d+)\s+(.+)/)) {
-        const match = cleanMessage.match(/(\d+)\s+(.+)/);
-        quantity = parseInt(match[1]) || 1;
-        productName = match[2].trim();
-        unit = 'adet';
-        console.log(`✅ Sayı pattern eşleşti: ${quantity} adet ${productName}`);
-    }
-    // 5. Sadece ürün adı
-    else {
-        productName = cleanMessage.trim();
-        quantity = 1;
-        unit = 'adet';
-        console.log(`✅ Sadece ürün adı: ${quantity} adet ${productName}`);
-    }
-
-    // TEMEL DÜZELTMELER
-    const fixes = {
-        'domat': 'domates', 'sogan': 'soğan', 'salatalik': 'salatalık',
-        'patat': 'patates', 'carliston': 'çarliston biber', 'viber': 'çarliston biber',
-        'biber': 'biber', 'kabak': 'kabak', 'marul': 'marul', 'domate': 'domates'
-    };
-
-    for (const [wrong, correct] of Object.entries(fixes)) {
-        if (productName && productName.includes(wrong)) {
-            productName = productName.replace(wrong, correct);
-            console.log(`🔄 Düzeltme: "${wrong}" -> "${correct}"`);
+    console.log('🔍 Birim pattern kontrolü başlıyor...');
+    
+    // Özel birimleri kontrol et
+    for (const unitPattern of unitPatterns) {
+        const match = cleanMessage.match(unitPattern.pattern);
+        console.log(`🔍 Pattern: ${unitPattern.pattern}, Match:`, match);
+        
+        if (match) {
+            if (unitPattern.quantity) {
+                quantity = unitPattern.quantity;
+                productName = match[1].trim();
+            } else {
+                quantity = parseInt(match[1]);
+                productName = match[2].trim();
+            }
+            unit = unitPattern.unit;
+            console.log(`✅ Pattern eşleşti: ${quantity} ${unit} ${productName}`);
+            break;
         }
     }
 
-    // SON KONTROL
+    // 5. Eğer özel birim bulunamazsa, standart çıkarım
+    if (!productName) {
+        console.log('🔍 Standart çıkarım başlıyor...');
+        
+        // Sayıları bul
+        const numbers = cleanMessage.match(/\d+/g);
+        console.log('🔍 Bulunan sayılar:', numbers);
+        
+        if (numbers && numbers.length > 0) {
+            quantity = parseInt(numbers[0]);
+            productName = cleanMessage.replace(numbers[0], '').trim();
+            console.log(`✅ Sayılı çıkarım: ${quantity} adet ${productName}`);
+        } else {
+            // Yazılı sayıları kontrol et
+            const textNumbers = {
+                'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5,
+                'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10
+            };
+            
+            console.log('🔍 Yazılı sayı kontrolü...');
+            let foundNumber = false;
+            
+            for (const [text, num] of Object.entries(textNumbers)) {
+                if (cleanMessage.includes(text)) {
+                    quantity = num;
+                    productName = cleanMessage.replace(text, '').trim();
+                    console.log(`✅ Yazılı sayı bulundu: ${text} -> ${num}`);
+                    foundNumber = true;
+                    break;
+                }
+            }
+            
+            // Sayı bulunamazsa varsayılan
+            if (!foundNumber) {
+                productName = cleanMessage.trim();
+                console.log(`✅ Varsayılan çıkarım: ${quantity} adet ${productName}`);
+            }
+        }
+    }
+
+    // 6. Ürün ismini temizle
+    productName = productName
+        .replace(/^\s*(ve|ile|\+)\s*/, '')
+        .replace(/\s*(ve|ile|\+)\s*$/, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    console.log('🎯 Son ürün bilgisi:', { productName, quantity, unit });
+    
+    // 7. Geçerlilik kontrolü
     if (!productName || productName.trim() === '') {
-        console.log('❌ Ürün adı çıkarılamadı');
+        console.log('❌ Ürün ismi çıkarılamadı');
         return null;
     }
 
-    productName = productName.trim();
-
-    console.log('🎯 SONUÇ:', { productName, quantity, unit });
-    return { productName, quantity, unit };
-}        
-
-        function emergencyProductTest() {
-    console.log('🚨 ACİL ÜRÜN TESTİ BAŞLIYOR...');
-    
-    // Manuel olarak sepete ürün ekle
-    if (products.length > 0) {
-        const testProduct = products[0]; // İlk ürünü al
-        console.log('🧪 Test ürünü:', testProduct.name);
-        
-        addToCart(testProduct, 1);
-        console.log('✅ Manuel ürün eklendi!');
-        speakToUser(`Test: 1 adet ${testProduct.name} sepete eklendi.`);
-    } else {
-        console.log('❌ Test için ürün yok');
-    }
+    return { 
+        productName: productName, 
+        quantity: quantity, 
+        unit: unit 
+    };
 }
 
 // Console'da çalıştırın:
@@ -6815,6 +6855,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
