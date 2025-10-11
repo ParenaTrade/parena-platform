@@ -3995,8 +3995,6 @@ async function selectCategoryByName(categoryName) {
     }
 }
 
-// Ürün ismine göre bulma (Güncellenmiş findProductByName)
-// DÜZELTİLMİŞ findProductByName
 // GELİŞTİRİLMİŞ findProductByName
 function findProductByName(productName) {
     console.log('🔍 findProductByName çağrıldı:', productName);
@@ -4016,33 +4014,49 @@ function findProductByName(productName) {
         .replace(/\s+/g, ' ')
         .trim();
 
-    console.log('📊 Ürün arama:', cleanProductName);
+    console.log('🔎 Aranan ürün:', cleanProductName);
     console.log('📦 Mevcut ürünler:', products.map(p => p.name));
 
-    // 1. Tam eşleşme
+    // 1. TAM EŞLEŞME - en kesin
     let found = products.find(p => {
         const cleanPName = p.name.toLowerCase().replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, '');
         return cleanPName === cleanProductName;
     });
     
     if (found) {
-        console.log(`✅ Tam eşleşme: ${found.name}`);
+        console.log(`✅ Tam eşleşme: "${found.name}"`);
         return found;
     }
 
-    // 2. Anahtar kelime eşleşmesi (basitleştirilmiş)
+    // 2. KELİME KÖKÜ EŞLEŞMESİ
     found = products.find(product => {
         const productNameClean = product.name.toLowerCase();
-        return productNameClean.includes(cleanProductName) || 
-               cleanProductName.includes(productNameClean);
+        const searchWords = cleanProductName.split(' ').filter(word => word.length > 2);
+        
+        // Tüm arama kelimeleri ürün adında geçiyor mu?
+        return searchWords.every(word => productNameClean.includes(word));
     });
     
     if (found) {
-        console.log(`✅ Anahtar kelime eşleşmesi: ${found.name}`);
+        console.log(`✅ Kelime kökü eşleşmesi: "${found.name}"`);
         return found;
     }
 
-    // 3. Kısmi eşleşme
+    // 3. TEK KELİME EŞLEŞMESİ
+    if (cleanProductName.split(' ').length === 1) {
+        found = products.find(product => {
+            const productNameClean = product.name.toLowerCase();
+            return productNameClean.includes(cleanProductName) || 
+                   cleanProductName.includes(productNameClean);
+        });
+        
+        if (found) {
+            console.log(`✅ Tek kelime eşleşmesi: "${found.name}"`);
+            return found;
+        }
+    }
+
+    // 4. KISMI EŞLEŞME
     const searchWords = cleanProductName.split(' ').filter(word => word.length > 2);
     if (searchWords.length > 0) {
         found = products.find(product => {
@@ -4051,14 +4065,59 @@ function findProductByName(productName) {
         });
         
         if (found) {
-            console.log(`✅ Kısmi eşleşme: ${found.name}`);
+            console.log(`✅ Kısmi eşleşme: "${found.name}"`);
             return found;
         }
     }
 
-    console.log(`❌ Ürün bulunamadı: ${cleanProductName}`);
+    console.log(`❌ Hiçbir eşleşme bulunamadı: "${cleanProductName}"`);
+    console.log('💡 Mevcut ürünler:', products.map(p => p.name));
     return null;
 }
+        
+// TEST FONKSİYONU - Hemen çalıştırın
+function testProductExtraction() {
+    console.log('🧪 ÜRÜN ÇIKARIM TESTİ BAŞLIYOR...');
+    
+    const testCases = [
+        "1 kilo domates",
+        "2 paket süt", 
+        "yarım kilo peynir",
+        "5 adet ekmek",
+        "domates", // sadece ürün adı
+        "bir kilo soğan", // sayı kelimesi
+        "iki paket makarna"
+    ];
+    
+    testCases.forEach((testCase, index) => {
+        console.log(`\n--- TEST ${index + 1}: "${testCase}" ---`);
+        
+        // 1. extractProductInfoFromCommand test
+        const productInfo = extractProductInfoFromCommand(testCase);
+        console.log('📦 Çıkarılan bilgi:', productInfo);
+        
+        if (productInfo && products.length > 0) {
+            // 2. findProductByName test
+            const foundProduct = findProductByName(productInfo.productName);
+            console.log('🔍 Bulunan ürün:', foundProduct ? foundProduct.name : 'BULUNAMADI');
+            
+            if (foundProduct) {
+                // 3. Sepete ekleme simülasyonu
+                console.log('🛒 Sepete eklenebilir:', `${productInfo.quantity} ${productInfo.unit} ${foundProduct.name}`);
+            }
+        }
+    });
+    
+    console.log('\n🎯 TEST TAMAMLANDI');
+}
+
+// Sayfa yüklendiğinde test et
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        // Test etmek için aşağıdaki satırın yorumunu kaldırın:
+        // testProductExtraction();
+    }, 3000);
+});
         
 function simpleProductMatch(productName) {
     if (!products || products.length === 0) return null;
@@ -4517,7 +4576,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 3000);
 });       
-// TAMAMEN YENİLENMİŞ extractProductInfoFromCommand
+// TAM ÇALIŞAN extractProductInfoFromCommand
 async function extractProductInfoFromCommand(message) {
     console.log('🎧 extractProductInfoFromCommand çağrıldı:', message);
 
@@ -4527,13 +4586,36 @@ async function extractProductInfoFromCommand(message) {
     }
 
     let cleanMessage = message.toLowerCase()
-        .replace(/ekle|sepete|al|istiyorum|lütfen|rica|ediyorum/g, '')
+        .replace(/ekle|sepete|al|istiyorum|lütfen|rica|ediyorum|örneğin/g, '')
         .replace(/\s+/g, ' ')
         .trim();
 
     console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
 
-    // 1. BİRİM ve MİKTAR ÇIKARIMI - Geliştirilmiş regex
+    // HIZLI DÜZELTMELER - ÖNEMLİ!
+    const quickCorrections = {
+        'çarliston': 'çarliston biber',
+        'viber': 'çarliston biber', 
+        'domat': 'domates',
+        'sogan': 'soğan',
+        'salatalik': 'salatalık',
+        'patat': 'patates',
+        'kabak': 'kabak',
+        'biber': 'biber',
+        'marul': 'marul',
+        'domates': 'domates',
+        'soğan': 'soğan'
+    };
+
+    // Önce hızlı düzeltmeleri uygula
+    for (const [wrong, correct] of Object.entries(quickCorrections)) {
+        if (cleanMessage.includes(wrong)) {
+            cleanMessage = cleanMessage.replace(wrong, correct);
+            console.log(`🔄 Hızlı düzeltme: "${wrong}" -> "${correct}"`);
+        }
+    }
+
+    // BİRİM ve MİKTAR ÇIKARIMI
     const unitPatterns = [
         { pattern: /(\d+\.?\d*)\s*kilo\s*(.*)/, unit: 'kg' },
         { pattern: /(\d+\.?\d*)\s*kg\s*(.*)/, unit: 'kg' },
@@ -4543,9 +4625,7 @@ async function extractProductInfoFromCommand(message) {
         { pattern: /(\d+\.?\d*)\s*adet\s*(.*)/, unit: 'adet' },
         { pattern: /(\d+\.?\d*)\s*tane\s*(.*)/, unit: 'adet' },
         { pattern: /yarım\s*kilo\s*(.*)/, unit: 'kg', quantity: 0.5 },
-        { pattern: /çeyrek\s*kilo\s*(.*)/, unit: 'kg', quantity: 0.25 },
-        { pattern: /(\d+\.?\d*)\s*litre\s*(.*)/, unit: 'lt' },
-        { pattern: /(\d+\.?\d*)\s*lt\s*(.*)/, unit: 'lt' }
+        { pattern: /çeyrek\s*kilo\s*(.*)/, unit: 'kg', quantity: 0.25 }
     ];
 
     let quantity = 1;
@@ -4555,15 +4635,17 @@ async function extractProductInfoFromCommand(message) {
     // Sayı kelimeleri
     const numberWords = {
         'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5,
-        'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10,
-        'onbir': 11, 'oniki': 12, 'onüç': 13, 'ondört': 14, 'onbeş': 15
+        'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10
     };
 
     // Önce sayı kelimelerini kontrol et
     for (const [word, num] of Object.entries(numberWords)) {
-        if (cleanMessage.startsWith(word + ' ')) {
+        const regex = new RegExp(`^${word}\\s+(.*)`, 'i');
+        const match = cleanMessage.match(regex);
+        if (match) {
             quantity = num;
-            cleanMessage = cleanMessage.replace(word + ' ', '');
+            productName = match[1];
+            console.log(`🔢 Sayı kelimesi bulundu: ${word} -> ${num}`);
             break;
         }
     }
@@ -4581,53 +4663,43 @@ async function extractProductInfoFromCommand(message) {
             productName = match[2]?.trim() || cleanMessage;
             unit = unitPattern.unit;
             matched = true;
+            console.log(`📏 Birim pattern eşleşti: ${unitPattern.unit}, miktar: ${quantity}`);
             break;
         }
     }
 
     // Eğer birim pattern eşleşmediyse, sadece sayı ara
     if (!matched) {
-        const numberMatch = cleanMessage.match(/(\d+\.?\d*)\s*(.*)/);
+        const numberMatch = cleanMessage.match(/^(\d+\.?\d*)\s*(.*)/);
         if (numberMatch) {
             quantity = parseFloat(numberMatch[1]) || 1;
-            productName = numberMatch[2]?.trim() || cleanMessage;
+            productName = numberMatch[2]?.trim();
+            console.log(`🔢 Sadece sayı bulundu: ${quantity}`);
         } else {
+            // Hiç sayı yoksa, tüm mesajı ürün adı olarak al
             productName = cleanMessage;
+            quantity = 1;
+            console.log(`📝 Sayı yok, tüm mesaj ürün adı: ${productName}`);
         }
     }
 
     // Ürün adını temizle
-    productName = productName
-        .replace(/^\s*(ve|ile|\+)\s*/, '')
-        .replace(/\s*(ve|ile|\+)\s*$/, '')
-        .trim();
+    if (productName) {
+        productName = productName
+            .replace(/^\s*(ve|ile|\+)\s*/, '')
+            .replace(/\s*(ve|ile|\+)\s*$/, '')
+            .trim();
+    }
 
     if (!productName) {
         console.log('❌ Ürün adı çıkarılamadı');
         return null;
     }
 
-    // Hızlı düzeltmeler
-    const quickCorrections = {
-        'çarliston': 'Çarliston Biber',
-        'viber': 'Çarliston Biber', 
-        'domat': 'Domates',
-        'sogan': 'Soğan',
-        'salatalik': 'Salatalık',
-        'patat': 'Patates',
-        'kabak': 'Kabak',
-        'biber': 'Biber',
-        'marul': 'Marul'
-    };
-
-    if (quickCorrections[productName.toLowerCase()]) {
-        productName = quickCorrections[productName.toLowerCase()];
-        console.log(`🔄 Hızlı düzeltme: "${productName}"`);
-    }
-
-    console.log('🎯 Son ürün bilgisi:', { productName, quantity, unit });
+    console.log('🎯 SONUÇ - Ürün bilgisi:', { productName, quantity, unit });
     return { productName, quantity, unit };
 }
+        
 // Hemen kullanabileceğiniz basit versiyon
 function setupVoiceRecognitionLearning() {
     console.log('🔧 Ses tanıma öğrenme sistemi kuruluyor...');
@@ -6396,6 +6468,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
