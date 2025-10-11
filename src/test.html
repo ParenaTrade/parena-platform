@@ -1892,23 +1892,36 @@ function setupCartItemEvents() {
 // SESSİZ ASİSTAN MESAJLARI
 // =============================================
 
+
+
 function speakToUser(message) {
     console.log(`🗣️ Asistan: ${message}`);
     
     if (assistantMessage) {
         assistantMessage.textContent = message;
     }
-    
-    // Sesli okuma (isteğe bağlı)
+
+    // 🧠 Tekrar kontrolü
+    const now = Date.now();
+    const trimmed = message.trim();
+    if (trimmed === lastSpokenMessage && (now - lastSpeakTime) < 2000) {
+        console.log("🛑 Tekrarlayan sesli mesaj atlandı:", message);
+        return;
+    }
+
+    lastSpokenMessage = trimmed;
+    lastSpeakTime = now;
+
+    // 🎤 Sesli okuma (isteğe bağlı)
     if ('speechSynthesis' in window && isMicrophoneEnabled) {
         const speech = new SpeechSynthesisUtterance(message);
-        speech.lang = currentLanguage === 'tr' ? 'tr-TR' : 
+        speech.lang = currentLanguage === 'tr' ? 'tr-TR' :
                      currentLanguage === 'en' ? 'en-US' : 'de-DE';
         speech.volume = 1;
         speech.rate = 1;
         speech.pitch = 1;
-        
-        // Önceki konuşmayı durdur
+
+        // Önceki konuşmayı durdur ve yenisini başlat
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(speech);
     }
@@ -2384,6 +2397,9 @@ let currentRoot = "0:0";
 let pendingResponse = null;
 let commandRules = new Map();
 let lastRecognizedProduct = null;
+let lastSpokenMessage = "";
+let lastSpeakTime = 0;
+let isLocationDetected = false;        
 
 // Konum state
 let userLocation = {
@@ -2393,7 +2409,7 @@ let userLocation = {
     city: null,
     district: null
 };
-let isLocationDetected = false;
+
 
 
 
@@ -6296,6 +6312,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
