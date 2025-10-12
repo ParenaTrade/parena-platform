@@ -957,14 +957,30 @@
             margin-bottom: 15px;
         }
         
-        .assistant-message {
-            padding: 12px;
-            background: rgba(93, 62, 188, 0.1);
-            border-radius: 8px;
-            margin-bottom: 10px;
-            color: var(--dark);
-        }
+/* Display mesaj stilleri */
+.assistant-message {
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+    transition: all 0.3s ease;
+    border-left: 4px solid var(--primary);
+    background: rgba(93, 62, 188, 0.1);
+    color: var(--dark);
+}
         
+ .assistant-message.success {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+    border-left-color: var(--success);
+}   
+
+        .assistant-message.error {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+    border-left-color: var(--danger);
+}
         .user-message {
             padding: 12px;
             background: rgba(255, 107, 0, 0.1);
@@ -2015,51 +2031,58 @@ function setupCartItemEvents() {
             }
         }
 
-       // =============================================
+// =============================================
 // SESSİZ ASİSTAN MESAJLARI
 // =============================================
 
 
 function speakToUser(message) {
-    console.log(`🗣️ Asistan: ${message}`);
+    console.log(`🗣️ Asistan (SESLİ): ${message}`);
     
-    // Mesajı temizle
     const cleanMessage = message.trim();
-    
     if (!cleanMessage) return;
     
     const now = Date.now();
     
     // 1. AYNI MESAJ KONTROLÜ
     if (cleanMessage === lastSpokenMessage) {
-        console.log("🛑 Aynı mesaj tekrarı engellendi:", cleanMessage);
+        console.log("🛑 Aynı sesli mesaj tekrarı engellendi:", cleanMessage);
         return;
     }
     
-    // 2. BENZER MESAJ KONTROLÜ
-    if (isSimilarMessage(cleanMessage, lastSpokenMessage)) {
-        console.log("🛑 Benzer mesaj tekrarı engellendi:", cleanMessage);
-        return;
-    }
-    
-    // 3. SIKLIK KONTROLÜ
+    // 2. SIKLIK KONTROLÜ
     if (now - lastSpeakTime < SPEAK_COOLDOWN) {
-        console.log("🛑 Sık mesaj engellendi (cooldown):", cleanMessage);
+        console.log("🛑 Sık sesli mesaj engellendi (cooldown):", cleanMessage);
         return;
     }
     
-    // MESAJI GÖSTER VE SÖYLE
-    if (assistantMessage) {
-        assistantMessage.textContent = cleanMessage;
+    // 3. MİNİMAL MESAJ KONTROLÜ - SADECE ÖNEMLİ MESAJLAR SESLİ OLSUN
+    const minimalMessages = [
+        "Eklendi", "Hata", "Ürün bulunamadı", "Sepet dolu", 
+        "Mağaza seçilmedi", "Satıcı seçilmedi", "Kategori seçilmedi"
+    ];
+    
+    if (!minimalMessages.includes(cleanMessage)) {
+        console.log("🔇 Minimal olmayan mesaj sesli söylenmeyecek:", cleanMessage);
+        return;
     }
     
-    // SESLİ OKUMA
+    // SESLİ OKUMA (sadece minimal mesajlar için)
     if ('speechSynthesis' in window && isMicrophoneEnabled) {
         const speech = new SpeechSynthesisUtterance(cleanMessage);
-        speech.lang = currentLanguage === 'tr' ? 'tr-TR' :
-                     currentLanguage === 'en' ? 'en-US' : 'de-DE';
-        speech.volume = 0.8; // Biraz daha kısık
-        speech.rate = 0.9; // Biraz daha yavaş
+        speech.lang = currentLanguage === 'tr' ? 'tr-TR' : 'en-US';
+        speech.volume = 0.7; // Daha kısık
+        speech.rate = 1.0; // Normal hız
+        
+        // Konuşma bitince mikrofonu yeniden başlat
+        speech.onend = function() {
+            console.log("✅ Sesli mesaj bitti");
+            setTimeout(() => {
+                if (isMicrophoneEnabled && !isListening) {
+                    restartRecognition();
+                }
+            }, 1000);
+        };
         
         // Önceki konuşmayı durdur
         window.speechSynthesis.cancel();
@@ -2070,9 +2093,8 @@ function speakToUser(message) {
     lastSpokenMessage = cleanMessage;
     lastSpeakTime = now;
     
-    console.log("✅ Yeni mesaj söylendi:", cleanMessage);
+    console.log("✅ Yeni sesli mesaj söylendi:", cleanMessage);
 }
-
 function isSimilarMessage(newMessage, oldMessage) {
     if (!oldMessage) return false;
     
@@ -3201,10 +3223,30 @@ function hasProductKeywords(message) {
 
         
         
-// 🖥️ Display mesaj fonksiyonu
+// Ekranda detaylı mesaj gösterme fonksiyonu
 function displayMessage(msg) {
-    const displayEl = document.getElementById('assistantDisplay');
-    if (displayEl) displayEl.textContent = msg;
+    // Mevcut assistantMessage elementini kullan
+    if (assistantMessage) {
+        assistantMessage.textContent = msg;
+        
+        // Mesaj stilini ayarla (başarı/başarısızlık)
+        if (msg.includes('✅') || msg.includes('Eklendi')) {
+            assistantMessage.style.background = 'rgba(40, 167, 69, 0.1)';
+            assistantMessage.style.color = 'var(--success)';
+            assistantMessage.style.borderLeft = '4px solid var(--success)';
+        } else if (msg.includes('❌') || msg.includes('Hata')) {
+            assistantMessage.style.background = 'rgba(220, 53, 69, 0.1)';
+            assistantMessage.style.color = 'var(--danger)';
+            assistantMessage.style.borderLeft = '4px solid var(--danger)';
+        } else {
+            assistantMessage.style.background = 'rgba(93, 62, 188, 0.1)';
+            assistantMessage.style.color = 'var(--dark)';
+            assistantMessage.style.borderLeft = '4px solid var(--primary)';
+        }
+    }
+    
+    // Ayrıca console'da da göster
+    console.log('📱 Display Message:', msg);
 }
 
 // 🛒 Sepet kontrol
@@ -3212,16 +3254,7 @@ function cartHasItems() {
     return cart && cart.length > 0;
 }
 
-// 🖥️ Display mesaj fonksiyonu
-function displayMessage(msg) {
-    const displayEl = document.getElementById('assistantDisplay');
-    if (displayEl) displayEl.textContent = msg;
-}
 
-// 🛒 Sepet kontrol
-function cartHasItems() {
-    return cart && cart.length > 0;
-}
 
 // Sepet temizleme komutlarını tespit et
 function isClearCartCommand(message) {
@@ -3977,7 +4010,8 @@ async function handleVoiceStoreSelection(message) {
             const storeTypeName = selectedCard.querySelector('.seller-type-name')?.textContent || 'Mağaza';
             const storeNumber = selectedCard.dataset.typeIndex;
             
-            speakToUser(`${storeNumber}. ${storeTypeName} OTOMATİK seçildi. Şimdi bir satıcı seçin.`);
+            displayMessage(`✅ ${storeNumber}. ${storeTypeName} seçildi. Şimdi bir satıcı seçin.`);
+            speakToUser("Seçildi"); // Sadece kısa onay
             
             // Kökü güncelle
             currentRoot = "3:0";
@@ -3985,9 +4019,10 @@ async function handleVoiceStoreSelection(message) {
             
             return true;
             
-        } catch (error) {
+         } catch (error) {
             console.error('❌ Mağaza tipi seçim hatası:', error);
-            speakToUser("Mağaza seçiminde hata oluştu.");
+            displayMessage("❌ Mağaza seçiminde hata oluştu.");
+            speakToUser("Hata");
             return false;
         }
     }
@@ -3999,7 +4034,8 @@ async function handleVoiceStoreSelection(message) {
         .filter(name => name)
         .join(', ');
     
-    speakToUser(`Hangi mağaza tipini istiyorsunuz? ${availableStores}`);
+    displayMessage(`❌ Mağaza bulunamadı. Mevcut mağazalar: ${availableStores}`);
+    speakToUser("Bulunamadı");
     return false;
 }       
 
@@ -4008,17 +4044,20 @@ async function handleVoiceProductAdd(message) {
     
     // Kontroller
     if (!selectedStoreTypeId) {
-        speakToUser("Önce bir mağaza tipi seçmelisiniz.");
+        displayMessage("❌ Önce bir mağaza tipi seçmelisiniz.");
+        speakToUser("Mağaza seçilmedi");
         return false;
     }
     
     if (!selectedSellerId) {
-        speakToUser("Lütfen bir satıcı seçin.");
+        displayMessage("❌ Lütfen bir satıcı seçin.");
+        speakToUser("Satıcı seçilmedi");
         return false;
     }
     
     if (!selectedCategoryId || products.length === 0) {
-        speakToUser("Önce bir kategori seçmelisiniz.");
+        displayMessage("❌ Önce bir kategori seçmelisiniz.");
+        speakToUser("Kategori seçilmedi");
         return false;
     }
     
@@ -4061,10 +4100,8 @@ async function handleVoiceProductAdd(message) {
         }
 
         // MİKTAR TESPİTİ (ayrı olarak)
-        // "2 numara 3 adet" → targetNumber=2, explicitQuantity=3
         const quantityMatch = cleanMessage.match(/(\d+)\s*(adet|tane|numara)/g);
         if (quantityMatch && quantityMatch.length >= 2) {
-            // Birden fazla sayı varsa, sonuncusu miktar olabilir
             const lastNumberMatch = cleanMessage.match(/(\d+)\s*(adet|tane)$/);
             if (lastNumberMatch) {
                 explicitQuantity = parseInt(lastNumberMatch[1]);
@@ -4104,7 +4141,8 @@ async function handleVoiceProductAdd(message) {
                 const firstCartItem = cart[0];
                 if (firstCartItem && firstCartItem.seller_id !== selectedSellerId) {
                     const currentSeller = sellers.find(s => s.id === firstCartItem.seller_id);
-                    speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name} ile alışverişe devam edebilirsiniz.`);
+                    displayMessage(`❌ Sepet dolu. Sadece ${currentSeller?.business_name} ile alışverişe devam edebilirsiniz.`);
+                    speakToUser("Sepet dolu");
                     return true;
                 }
             }
@@ -4113,20 +4151,23 @@ async function handleVoiceProductAdd(message) {
             console.log('🛒 Sepete ekleniyor:', `${quantity} adet ${selectedProduct.name}`);
             addToCart(selectedProduct, quantity);
             
-            // AKILLI GERİ BİLDİRİM
+            // ✅ SADECE EKRANDA DETAYLI GÖSTER - SESLİ MİNİMAL
             if (targetNumber !== null && explicitQuantity !== null) {
-                speakToUser(`${targetNumber}. üründen ${quantity} adet sepete eklendi.`);
+                displayMessage(`✅ ${targetNumber}. üründen ${quantity} adet sepete eklendi: ${selectedProduct.name}`);
+                speakToUser("Eklendi"); // Sadece kısa onay
             } else if (targetNumber !== null) {
-                speakToUser(`${targetNumber}. ürün sepete eklendi.`);
+                displayMessage(`✅ ${targetNumber}. ürün sepete eklendi: ${selectedProduct.name}`);
+                speakToUser("Eklendi"); // Sadece kısa onay
             } else {
-                speakToUser(`${quantity} adet ${selectedProduct.name} sepete eklendi.`);
+                displayMessage(`✅ ${quantity} adet ${selectedProduct.name} sepete eklendi`);
+                speakToUser("Eklendi"); // Sadece kısa onay
             }
             
             return true;
         } else {
             console.log('❌ Ürün bulunamadı');
             
-            // AKILLI YARDIM MESAJI
+            // ✅ SADECE SESLİ BASİT MESAJ - EKRANDA DETAY
             const productCards = document.querySelectorAll('.product-card');
             if (productCards.length > 0) {
                 const productList = Array.from(productCards)
@@ -4135,18 +4176,22 @@ async function handleVoiceProductAdd(message) {
                     .join(', ');
                 
                 if (targetNumber !== null) {
-                    speakToUser(`${targetNumber}. ürün bulunamadı. Mevcut ürünler: ${productList}`);
+                    displayMessage(`❌ ${targetNumber}. ürün bulunamadı. Mevcut ürünler: ${productList}`);
                 } else {
-                    speakToUser(`Ürün bulunamadı. Mevcut ürünler: ${productList}. "2 numara" veya "1 kilo domates" gibi söyleyebilirsiniz.`);
+                    displayMessage(`❌ Ürün bulunamadı. Mevcut ürünler: ${productList}`);
                 }
             } else {
-                speakToUser("Ürün bulunamadı. Lütfen ürün ismini veya numarasını söyleyin.");
+                displayMessage("❌ Ürün bulunamadı. Lütfen ürün ismini veya numarasını söyleyin.");
             }
+            
+            // ✅ SADECE SESLİ BASİT MESAJ
+            speakToUser("Ürün bulunamadı");
             return true;
         }
     } catch (error) {
         console.error('❌ Ürün ekleme hatası:', error);
-        speakToUser("Ürün eklenirken bir hata oluştu.");
+        displayMessage("❌ Ürün eklenirken bir hata oluştu.");
+        speakToUser("Hata"); // Sadece kısa hata mesajı
         return false;
     }
 }
@@ -4423,12 +4468,15 @@ async function handleVoiceSellerSelection(message) {
     if (seller) {
         await selectDynamicSeller(seller);
         
-        // Akıllı geri bildirim
+        // ✅ SADECE EKRANDA DETAY - SESLİ MİNİMAL
         const sellerNumber = selectedCard.dataset.sellerIndex;
-        speakToUser(`${sellerNumber}. ${seller.business_name} seçildi.`);
+        displayMessage(`✅ ${sellerNumber}. ${seller.business_name} seçildi. Şimdi bir reyon seçin.`);
+        speakToUser("Seçildi");
         return true;
     }
 
+    displayMessage("❌ Satıcı bulunamadı.");
+    speakToUser("Bulunamadı");
     return false;
 }
 
@@ -4517,19 +4565,19 @@ async function handleVoiceCategorySelection(message) {
         const categoryName = bestMatch.dataset.categoryName;
         console.log(`✅ Sesli olarak "${categoryNumber}. ${categoryName}" reyonu seçildi.`);
         
-        speakToUser(`${categoryNumber}. ${categoryName} reyonuna geçiliyor.`);
+         // ✅ SADECE EKRANDA DETAY - SESLİ MİNİMAL
+        displayMessage(`✅ ${categoryNumber}. ${categoryName} reyonuna geçiliyor.`);
+        speakToUser("Seçildi");
         currentRoot = "5:0";
         return true;
     } else {
-        console.warn("❌ Eşleşen reyon bulunamadı:", message);
-        
-        // Akıllı yardım mesajı
         const categoryList = Array.from(categoryCards)
             .slice(0, 3)
             .map(card => `${card.dataset.categoryIndex}. ${card.dataset.categoryName}`)
             .join(', ');
         
-        speakToUser(`Reyon bulunamadı. Mevcut reyonlar: ${categoryList}`);
+        displayMessage(`❌ Reyon bulunamadı. Mevcut reyonlar: ${categoryList}`);
+        speakToUser("Bulunamadı");
         return false;
     }
 }
@@ -7146,6 +7194,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
