@@ -2101,6 +2101,7 @@ function isSimilarMessage(newMessage, oldMessage) {
 // MİKROFON ve SES TANIMA
 // =============================================
 
+// Mikrofon açma fonksiyonunu güncelle
 async function enableDynamicMicrophone() {
     console.log('🎤 Mikrofon açılmak isteniyor...');
     
@@ -2128,7 +2129,7 @@ async function enableDynamicMicrophone() {
             }
         });
         
-        // Stream'i temizle (sadece izin için kullanıldı)
+        // Stream'i temizle
         stream.getTracks().forEach(track => track.stop());
         
         console.log('✅ Mikrofon izni alındı');
@@ -2141,23 +2142,24 @@ async function enableDynamicMicrophone() {
             microphoneToggle.style.color = 'var(--success)';
         }
         
-        // Ses tanımayı başlat (1 saniye gecikmeyle)
+        // İLK MESAJI GÖNDER VE SONRA SES TANIMAYI BAŞLAT
         setTimeout(() => {
-            initializeDynamicSpeechRecognition();
+            speakToUser("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
+            
+            // Asistan konuşması bittikten sonra ses tanımayı başlat
+            setTimeout(() => {
+                initializeDynamicSpeechRecognition();
+            }, 3000); // 3 saniye gecikme
         }, 1000);
-        
-        // Başarı mesajı
-        setTimeout(() => {
-            speakToUser("Mikrofon açıldı. 'Market, Restoran, Pastane' diyebilirsiniz");            
-        }, 1500);
         
     } catch (error) {
         console.error('❌ Mikrofon hatası:', error);
         speakToUser("Mikrofon erişimi sağlanamadı.");
         disableDynamicMicrophone();
     }
-}
- function disableDynamicMicrophone() {
+} 
+        
+        function disableDynamicMicrophone() {
     console.log('🔇 Mikrofon kapatılıyor...');
     
     isMicrophoneEnabled = false;
@@ -2461,9 +2463,16 @@ function setupManualMode() {
     }
 }
 
+// Ses tanıma başlatma fonksiyonunu güncelle
 function startRecognition() {
     if (!recognition) {
         console.error('❌ Recognition objesi yok');
+        return;
+    }
+    
+    // Asistan konuşuyorsa başlatma
+    if (isAssistantSpeaking) {
+        console.log('⏸️ Asistan konuşuyor, ses tanıma ertelendi');
         return;
     }
     
@@ -2486,16 +2495,16 @@ function startRecognition() {
             return;
         }
         
-        // Diğer hatalar için 2 saniye sonra yeniden dene
+        // Diğer hatalar için 3 saniye sonra yeniden dene
         setTimeout(() => {
-            if (isMicrophoneEnabled) {
+            if (isMicrophoneEnabled && !isListening && !isAssistantSpeaking) {
                 console.log('🔄 Hata sonrası yeniden deneme...');
                 startRecognition();
             }
-        }, 2000);
+        }, 3000);
     }
 }
-
+        
  function restartRecognition() {
     console.log('🔄 Ses tanıma yeniden başlatılıyor...');
     
@@ -7075,6 +7084,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
