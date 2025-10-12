@@ -2056,23 +2056,39 @@ function speakToUser(message) {
         return;
     }
     
-    // 3. MİNİMAL MESAJ KONTROLÜ - SADECE ÖNEMLİ MESAJLAR SESLİ OLSUN
-    const minimalMessages = [
-        "Eklendi", "Hata", "Ürün bulunamadı", "Sepet dolu", 
-        "Mağaza seçilmedi", "Satıcı seçilmedi", "Kategori seçilmedi"
+    // 3. SADECE SEÇİM ÖNCESİ VE ÖNEMLİ MESAJLAR SESLİ OLSUN
+    const allowedVoiceMessages = [
+        // SEÇİM ÖNCESİ MESAJLAR
+        "mağaza seçin", "satıcı seçin", "reyon seçin", "ürün seçin",
+        "hangi mağaza", "hangi satıcı", "hangi reyon", "hangi ürün",
+        "numara söyleyin", "isim söyleyin",
+        
+        // TEMEL ONAYLAR
+        "seçildi", "eklendi", "bulundu",
+        
+        // TEMEL UYARILAR
+        "hata", "bulunamadı", "sepet dolu", "seçilmedi",
+        
+        // SİSTEM MESAJLARI
+        "mikrofon açıldı", "mikrofon kapandı", "hoş geldiniz"
     ];
     
-    if (!minimalMessages.includes(cleanMessage)) {
-        console.log("🔇 Minimal olmayan mesaj sesli söylenmeyecek:", cleanMessage);
+    // Mesajın izin verilenlerden birini içerip içermediğini kontrol et
+    const isAllowed = allowedVoiceMessages.some(allowedMsg => 
+        cleanMessage.toLowerCase().includes(allowedMsg.toLowerCase())
+    );
+    
+    if (!isAllowed) {
+        console.log("🔇 Sadece seçim öncesi mesajlar sesli söylenecek:", cleanMessage);
         return;
     }
     
-    // SESLİ OKUMA (sadece minimal mesajlar için)
+    // SESLİ OKUMA (sadece izin verilen mesajlar için)
     if ('speechSynthesis' in window && isMicrophoneEnabled) {
         const speech = new SpeechSynthesisUtterance(cleanMessage);
         speech.lang = currentLanguage === 'tr' ? 'tr-TR' : 'en-US';
-        speech.volume = 0.7; // Daha kısık
-        speech.rate = 1.0; // Normal hız
+        speech.volume = 0.7;
+        speech.rate = 1.0;
         
         // Konuşma bitince mikrofonu yeniden başlat
         speech.onend = function() {
@@ -2130,7 +2146,8 @@ async function enableDynamicMicrophone() {
     // Konum kontrolü
     if (!selectedLocation) {
         showDynamicLocationModal();
-        speakToUser("Lütfen önce bir konum seçiniz.");
+        displayMessage("Lütfen önce bir konum seçiniz.");
+        speakToUser("konum seçin"); // SESLİ: Seçim öncesi
         return;
     }
     
@@ -2165,9 +2182,12 @@ async function enableDynamicMicrophone() {
         }
         
         // İLK MESAJI GÖNDER VE SONRA SES TANIMAYI BAŞLAT
-        setTimeout(() => {
-            speakToUser("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
-            
+    // Başarı mesajı
+    setTimeout(() => {
+        displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
+        speakToUser("mikrofon açıldı"); // SESLİ: Sistem mesajı
+    }, 1500);
+}        
             // Asistan konuşması bittikten sonra ses tanımayı başlat
             setTimeout(() => {
                 initializeDynamicSpeechRecognition();
@@ -2207,11 +2227,11 @@ async function enableDynamicMicrophone() {
         voiceIndicator.classList.remove('listening');
     }
     
-    if (assistantMessage) {
+   if (assistantMessage) {
         assistantMessage.textContent = "Mikrofon kapalı. Açmak için mikrofon butonuna tıklayın.";
     }
     
-    console.log('✅ Mikrofon kapatıldı');
+    speakToUser("mikrofon kapandı"); // SESLİ: Sistem mesajı
 }
 
 // "no-speech" hatalarını filtreleme
@@ -2549,14 +2569,16 @@ function startRecognition() {
         
             
         function initializeDynamicVoiceAssistant() {
-            setTimeout(() => {
-                if (!currentCustomer) {
-                    speakToUser("Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen konumunuzu seçin.");
-                } else {
-                    speakToUser(`Hoş geldiniz ${currentCustomer.name}! Ne satın almak istersiniz?`);
-                }
-            }, 1000);
+    setTimeout(() => {
+        if (!currentCustomer) {
+            displayMessage("Merhaba! Sesli sipariş sistemine hoş geldiniz. Lütfen konumunuzu seçin.");
+            speakToUser("hoş geldiniz"); // SESLİ: Sistem mesajı
+        } else {
+            displayMessage(`Hoş geldiniz ${currentCustomer.name}! Ne satın almak istersiniz?`);
+            speakToUser("hoş geldiniz"); // SESLİ: Sistem mesajı
         }
+    }, 1000);
+}
 
         // =============================================
         // EKSİK FONKSİYONLARIN TAMAMLANMASI
@@ -3900,18 +3922,20 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu. Lütfen bir satıcı seçin.`);
 }
         
+// Mağaza tipi seçimi
 async function handleVoiceStoreSelection(message) {
     console.log('🏪 Sesli mağaza tipi seçimi:', message);
     
     const storeCards = document.querySelectorAll('.seller-type-card');
     if (!storeCards.length) {
-        console.error('❌ Mağaza tipi kartları bulunamadı');
-        speakToUser("Mağaza listesi yükleniyor, lütfen bekleyin.");
+        displayMessage("❌ Mağaza listesi yükleniyor, lütfen bekleyin.");
+        speakToUser("mağaza seçin"); // SESLİ: Seçim öncesi
         return false;
     }
 
     const cleanMessage = message.toLowerCase().trim();
     let selectedCard = null;
+
 
     console.log('🔍 Mağaza arama:', cleanMessage);
     console.log('📋 Mevcut mağazalar:', Array.from(storeCards).map(card => 
@@ -3992,42 +4016,29 @@ async function handleVoiceStoreSelection(message) {
 
     if (selectedCard) {
         try {
-            console.log('🎯 Mağaza tipi kartı tıklanıyor:', selectedCard);
-            
-            // Kartı tıkla
             selectedCard.click();
-            
-            // Görsel feedback
-            selectedCard.style.transform = 'scale(1.05)';
-            selectedCard.style.boxShadow = '0 0 20px var(--primary)';
-            selectedCard.style.transition = 'all 0.3s ease';
-            
-            setTimeout(() => {
-                selectedCard.style.transform = 'scale(1)';
-                selectedCard.style.boxShadow = '';
-            }, 800);
             
             const storeTypeName = selectedCard.querySelector('.seller-type-name')?.textContent || 'Mağaza';
             const storeNumber = selectedCard.dataset.typeIndex;
             
+            // ✅ EKRANDA DETAYLI GÖSTER
             displayMessage(`✅ ${storeNumber}. ${storeTypeName} seçildi. Şimdi bir satıcı seçin.`);
-            speakToUser("Seçildi"); // Sadece kısa onay
             
-            // Kökü güncelle
+            // ✅ SESLİ: Sadece temel onay
+            speakToUser("seçildi");
+            
             currentRoot = "3:0";
-            console.log(`🔄 Kök güncellendi: 2:0 -> 3:0 (Mağaza tipi seçildi: ${storeTypeName})`);
-            
             return true;
             
-         } catch (error) {
+        } catch (error) {
             console.error('❌ Mağaza tipi seçim hatası:', error);
             displayMessage("❌ Mağaza seçiminde hata oluştu.");
-            speakToUser("Hata");
+            speakToUser("hata");
             return false;
         }
     }
 
-    // BULUNAMADIYSA YARDIM MESAJI (numara ile)
+    // Bulunamadıysa
     const availableStores = Array.from(storeCards)
         .slice(0, 5)
         .map(card => `${card.dataset.typeIndex}. ${card.querySelector('.seller-type-name')?.textContent}`)
@@ -4035,29 +4046,29 @@ async function handleVoiceStoreSelection(message) {
         .join(', ');
     
     displayMessage(`❌ Mağaza bulunamadı. Mevcut mağazalar: ${availableStores}`);
-    speakToUser("Bulunamadı");
+    speakToUser("mağaza seçin"); // SESLİ: Seçim öncesi
     return false;
 }       
 
 async function handleVoiceProductAdd(message) {
     console.log('🎯 Sesli ürün ekleme:', message);
     
-    // Kontroller
+    // Kontroller - SESLİ: Seçim öncesi mesajlar
     if (!selectedStoreTypeId) {
         displayMessage("❌ Önce bir mağaza tipi seçmelisiniz.");
-        speakToUser("Mağaza seçilmedi");
+        speakToUser("mağaza seçin");
         return false;
     }
     
     if (!selectedSellerId) {
         displayMessage("❌ Lütfen bir satıcı seçin.");
-        speakToUser("Satıcı seçilmedi");
+        speakToUser("satıcı seçin");
         return false;
     }
     
     if (!selectedCategoryId || products.length === 0) {
         displayMessage("❌ Önce bir kategori seçmelisiniz.");
-        speakToUser("Kategori seçilmedi");
+        speakToUser("reyon seçin");
         return false;
     }
     
@@ -4142,7 +4153,7 @@ async function handleVoiceProductAdd(message) {
                 if (firstCartItem && firstCartItem.seller_id !== selectedSellerId) {
                     const currentSeller = sellers.find(s => s.id === firstCartItem.seller_id);
                     displayMessage(`❌ Sepet dolu. Sadece ${currentSeller?.business_name} ile alışverişe devam edebilirsiniz.`);
-                    speakToUser("Sepet dolu");
+                    speakToUser("sepet dolu");
                     return true;
                 }
             }
@@ -4151,23 +4162,23 @@ async function handleVoiceProductAdd(message) {
             console.log('🛒 Sepete ekleniyor:', `${quantity} adet ${selectedProduct.name}`);
             addToCart(selectedProduct, quantity);
             
-            // ✅ SADECE EKRANDA DETAYLI GÖSTER - SESLİ MİNİMAL
+            // ✅ EKRANDA DETAYLI GÖSTER
             if (targetNumber !== null && explicitQuantity !== null) {
                 displayMessage(`✅ ${targetNumber}. üründen ${quantity} adet sepete eklendi: ${selectedProduct.name}`);
-                speakToUser("Eklendi"); // Sadece kısa onay
             } else if (targetNumber !== null) {
                 displayMessage(`✅ ${targetNumber}. ürün sepete eklendi: ${selectedProduct.name}`);
-                speakToUser("Eklendi"); // Sadece kısa onay
             } else {
                 displayMessage(`✅ ${quantity} adet ${selectedProduct.name} sepete eklendi`);
-                speakToUser("Eklendi"); // Sadece kısa onay
             }
+            
+            // ✅ SESLİ: Sadece temel onay
+            speakToUser("eklendi");
             
             return true;
         } else {
             console.log('❌ Ürün bulunamadı');
             
-            // ✅ SADECE SESLİ BASİT MESAJ - EKRANDA DETAY
+            // ✅ EKRANDA DETAYLI GÖSTER
             const productCards = document.querySelectorAll('.product-card');
             if (productCards.length > 0) {
                 const productList = Array.from(productCards)
@@ -4184,14 +4195,15 @@ async function handleVoiceProductAdd(message) {
                 displayMessage("❌ Ürün bulunamadı. Lütfen ürün ismini veya numarasını söyleyin.");
             }
             
-            // ✅ SADECE SESLİ BASİT MESAJ
-            speakToUser("Ürün bulunamadı");
+            // ✅ SESLİ: Sadece temel uyarı
+            speakToUser("ürün seçin");
+            
             return true;
         }
     } catch (error) {
         console.error('❌ Ürün ekleme hatası:', error);
         displayMessage("❌ Ürün eklenirken bir hata oluştu.");
-        speakToUser("Hata"); // Sadece kısa hata mesajı
+        speakToUser("hata");
         return false;
     }
 }
@@ -4395,14 +4407,15 @@ async function handleVoiceSellerSelection(message) {
     
     // Store Type kontrolü
     if (!selectedStoreTypeId) {
-        speakToUser("Önce bir mağaza tipi seçmelisiniz.");
+        displayMessage("❌ Önce bir mağaza tipi seçmelisiniz.");
+        speakToUser("mağaza seçin"); // SESLİ: Seçim öncesi
         return false;
     }
 
     const sellerCards = document.querySelectorAll("#sellerGrid .seller-card");
     if (!sellerCards.length) {
-        console.error('❌ Satıcı kartları bulunamadı');
-        speakToUser("Satıcı listesi yüklenmedi. Lütfen bekleyin.");
+        displayMessage("❌ Satıcı listesi yüklenmedi. Lütfen bekleyin.");
+        speakToUser("satıcı seçin"); // SESLİ: Seçim öncesi
         return false;
     }
 
@@ -4450,14 +4463,14 @@ async function handleVoiceSellerSelection(message) {
     }
 
     if (!selectedCard) {
-        // Akıllı yardım mesajı
         const sellerList = Array.from(sellerCards)
             .slice(0, 3)
             .map(card => `${card.dataset.sellerIndex}. ${card.querySelector('.seller-name')?.textContent}`)
             .filter(name => name)
             .join(', ');
         
-        speakToUser(`Satıcı bulunamadı. Mevcut satıcılar: ${sellerList}`);
+        displayMessage(`❌ Satıcı bulunamadı. Mevcut satıcılar: ${sellerList}`);
+        speakToUser("satıcı seçin"); // SESLİ: Seçim öncesi
         return false;
     }
 
@@ -4468,15 +4481,19 @@ async function handleVoiceSellerSelection(message) {
     if (seller) {
         await selectDynamicSeller(seller);
         
-        // ✅ SADECE EKRANDA DETAY - SESLİ MİNİMAL
         const sellerNumber = selectedCard.dataset.sellerIndex;
+        
+        // ✅ EKRANDA DETAYLI GÖSTER
         displayMessage(`✅ ${sellerNumber}. ${seller.business_name} seçildi. Şimdi bir reyon seçin.`);
-        speakToUser("Seçildi");
+        
+        // ✅ SESLİ: Sadece temel onay
+        speakToUser("seçildi");
+        
         return true;
     }
 
     displayMessage("❌ Satıcı bulunamadı.");
-    speakToUser("Bulunamadı");
+    speakToUser("satıcı seçin"); // SESLİ: Seçim öncesi
     return false;
 }
 
@@ -4517,8 +4534,8 @@ async function handleVoiceCategorySelection(message) {
 
     const categoryCards = document.querySelectorAll('.category-card');
     if (!categoryCards.length) {
-        console.warn("⚠️ Reyon kartı bulunamadı!");
-        speakToUser("Şu anda reyonlar yüklenmemiş görünüyor.");
+        displayMessage("⚠️ Reyonlar yüklenmemiş görünüyor.");
+        speakToUser("reyon seçin"); // SESLİ: Seçim öncesi
         return false;
     }
 
@@ -4565,9 +4582,11 @@ async function handleVoiceCategorySelection(message) {
         const categoryName = bestMatch.dataset.categoryName;
         console.log(`✅ Sesli olarak "${categoryNumber}. ${categoryName}" reyonu seçildi.`);
         
-         // ✅ SADECE EKRANDA DETAY - SESLİ MİNİMAL
-        displayMessage(`✅ ${categoryNumber}. ${categoryName} reyonuna geçiliyor.`);
-        speakToUser("Seçildi");
+ // ✅ EKRANDA DETAYLI GÖSTER
+        displayMessage(`✅ ${categoryNumber}. ${categoryName} reyonu seçildi. Şimdi ürün seçin.`);
+        
+        // ✅ SESLİ: Sadece temel onay
+        speakToUser("seçildi");
         currentRoot = "5:0";
         return true;
     } else {
@@ -4576,8 +4595,8 @@ async function handleVoiceCategorySelection(message) {
             .map(card => `${card.dataset.categoryIndex}. ${card.dataset.categoryName}`)
             .join(', ');
         
-        displayMessage(`❌ Reyon bulunamadı. Mevcut reyonlar: ${categoryList}`);
-        speakToUser("Bulunamadı");
+         displayMessage(`❌ Reyon bulunamadı. Mevcut reyonlar: ${categoryList}`);
+        speakToUser("reyon seçin"); // SESLİ: Seçim öncesi
         return false;
     }
 }
@@ -5334,22 +5353,37 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 
+// Akıllı yardım mesajları
 function getContextualHelp() {
-    if (selectedCategoryId && products.length > 0) {
-        const sampleProducts = products.slice(0, 3).map(p => p.name).join(', ');
-        return `Ürün siparişi verebilirsiniz. Örneğin: "1 kilo domates", "2 paket süt". Mevcut ürünler: ${sampleProducts}`;
+    if (!selectedStoreTypeId) {
+        const availableTypes = storeTypes.map(st => st.name).join(', ');
+        displayMessage(`Hangi mağaza tipinden alışveriş yapmak istersiniz? ${availableTypes}`);
+        speakToUser("mağaza seçin"); // SESLİ: Seçim öncesi
+        return "mağaza seçin";
     }
     
-    if (selectedSellerId && categories.length > 0 && !selectedCategoryId) {
+    if (!selectedSellerId) {
+        displayMessage("Lütfen bir satıcı seçin. Satıcı ismi veya numarası söyleyebilirsiniz.");
+        speakToUser("satıcı seçin"); // SESLİ: Seçim öncesi
+        return "satıcı seçin";
+    }
+    
+    if (!selectedCategoryId) {
         const categoryList = categories.slice(0, 3).map(c => c.name).join(', ');
-        return `Bir reyon seçin. Örneğin: "manav", "süt ürünleri". Mevcut reyonlar: ${categoryList}`;
+        displayMessage(`Hangi reyondan alışveriş yapmak istersiniz? ${categoryList}`);
+        speakToUser("reyon seçin"); // SESLİ: Seçim öncesi
+        return "reyon seçin";
     }
     
-    if (selectedStoreTypeId && sellers.length > 0 && !selectedSellerId) {
-        return "Bir satıcı seçin. Satıcı ismi söyleyebilir veya 'birinci satıcı' diyebilirsiniz.";
+    if (products.length > 0) {
+        const sampleProducts = products.slice(0, 2).map(p => p.name).join(', ');
+        displayMessage(`Ürün siparişi verebilirsiniz. Örneğin: "1 kilo ${sampleProducts.split(',')[0]}"`);
+        speakToUser("ürün seçin"); // SESLİ: Seçim öncesi
+        return "ürün seçin";
     }
     
-    return "Nasıl yardımcı olabilirim? Sesli olarak mağaza seçebilir, satıcı seçebilir veya ürün siparişi verebilirsiniz.";
+    displayMessage("Nasıl yardımcı olabilirim?");
+    return "yardım";
 }
         
 
@@ -7194,6 +7228,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
