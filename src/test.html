@@ -1642,9 +1642,8 @@
         categoriesGrid.appendChild(categoryCard);
     });
 }
-        // Ürünleri göster
-          // Ürünleri göster
-       function displayProducts(productsToShow) {
+     // Ürünleri göster - GÜNCELLENMİŞ
+function displayProducts(productsToShow) {
     const productsGrid = document.getElementById('productsGrid');
     if (!productsGrid) return;
     
@@ -1664,8 +1663,8 @@
         const productCard = document.createElement('div');
         productCard.className = 'product-card';
         productCard.dataset.productId = product.id;
-        productCard.dataset.productIndex = index + 1; // Sıra numarası ekle
-	productCard.dataset.productHarf = getProductFirstLetter(product.name); // BAŞ HARF EKLENDİ
+        productCard.dataset.productIndex = index + 1;
+        productCard.dataset.productHarf = getProductFirstLetter(product.name); // BAŞ HARF EKLENDİ
         
         let badgeHTML = '';
         let priceHTML = '';
@@ -1682,14 +1681,15 @@
         
         productCard.innerHTML = `
             ${badgeHTML}
-            <div class="product-number">${getProductFirstLetter(product.name)}${index + 1}</div>	
+            <div class="product-number">${index + 1}</div>
+            <div class="product-harf">${getProductFirstLetter(product.name)}</div>
             <img src="${product.imgurl || 'https://via.placeholder.com/150x100?text=Ürün'}" 
                  alt="${product.name}" 
                  class="product-image">
             <div class="product-info">
                 <div class="product-name">${product.name}</div>
                 <div class="product-price">${priceHTML}</div>
-		<div class="voice-help">Sesli: "${getProductFirstLetter(product.name)}" "${index + 1}"</div>
+                <div class="voice-help">Sesli: "${index + 1}" veya "${getProductFirstLetter(product.name)}"</div>
                 <button class="add-to-cart-btn" data-id="${product.id}">Sepete Ekle</button>
             </div>
         `;
@@ -1703,6 +1703,21 @@
     });
 }
 
+// Ürün adının baş harfini al
+function getProductFirstLetter(productName) {
+    if (!productName || productName.length === 0) return '';
+    
+    // Türkçe karakterleri düzelt ve büyük harf yap
+    const firstLetter = productName.charAt(0).toUpperCase();
+    
+    // Türkçe karakter düzeltmeleri
+    const turkishMap = {
+        'Ç': 'C', 'Ğ': 'G', 'İ': 'I', 'Ö': 'O', 
+        'Ş': 'S', 'Ü': 'U'
+    };
+    
+    return turkishMap[firstLetter] || firstLetter;
+}
 		// Ürün adının baş harfini al
 function getProductFirstLetter(productName) {
     if (!productName || productName.length === 0) return '';
@@ -4097,147 +4112,252 @@ async function handleVoiceStoreSelection(message) {
     return false;
 }       
 
+// SESLİ ÜRÜN EKLEME - HARF ve NUMARA BİRLEŞİMLİ
 async function handleVoiceProductAdd(message) {
-    console.log('🎯 Sesli ürün ekleme:', message);
+    console.log('🎯 Sesli ürün ekleme (harf + numara destekli):', message);
     
     // Kontroller
-    if (!selectedStoreTypeId) {
-        displayMessage("❌ Önce bir mağaza tipi seçmelisiniz.");
-        speakToUser("mağaza seçin");
-        return false;
-    }
-    
-    if (!selectedSellerId) {
-        displayMessage("❌ Lütfen bir satıcı seçin.");
-        speakToUser("satıcı seçin");
-        return false;
-    }
-    
     if (!selectedCategoryId || products.length === 0) {
-        displayMessage("❌ Önce bir kategori seçmelisiniz.");
-        speakToUser("reyon seçin");
+        speakToUser("Önce bir kategori seçin.");
         return false;
     }
-    
-    try {
-        const productInfo = extractProductInfoFromCommand(message);
+
+    const cleanMessage = message.toLowerCase().trim();
+    let productNumber = null;
+    let quantity = 1;
+    let selectedProduct = null;
+    let productCard = null;
+
+    // 1. HARF + NUMARA BİRLEŞİMİ (ÖNCELİKLİ)
+    const harfNumaraMatch = cleanMessage.match(/^([a-zçğıöşü])\s*(\d+)\s*(\d*(?:\.\d+)?)?$/);
+    if (harfNumaraMatch) {
+        const harf = harfNumaraMatch[1].toUpperCase();
+        productNumber = parseInt(harfNumaraMatch[2]);
+        quantity = harfNumaraMatch[3] ? parseFloat(harfNumaraMatch[3]) : 1;
         
-        if (!productInfo) {
-            displayMessage("❌ Ürün ismini anlayamadım.");
-            speakToUser("ürün seçin");
-            return false;
+        console.log(`🔤🔄 Harf+numara birleşimi: "${harf} ${productNumber}", miktar: ${quantity}`);
+        
+        // Önce harf ile ürünü bul
+        const allProductCards = document.querySelectorAll('.product-card');
+        let foundProducts = [];
+        
+        for (const card of allProductCards) {
+            if (card.dataset.productHarf === harf) {
+                foundProducts.push(card);
+            }
         }
-
-        const { productName, quantity, unit } = productInfo;
-        console.log('🔍 Aranan ürün:', productName);
-
-        // ÖZEL: "X numara" pattern'i için ürün bulma
-        let selectedProduct = null;
-
-        // "X numara" pattern'i için özel kontrol
-        const numaraMatch = productName.match(/^(\d+)\s*numara$/);
-        if (numaraMatch) {
-            const targetNumber = parseInt(numaraMatch[1]);
-            console.log(`🔢 Numara ile ürün aranıyor: ${targetNumber}. ürün`);
+        
+        // Eğer birden fazla aynı harfle ürün varsa, numarayı kullan
+        if (foundProducts.length > 0) {
+            if (productNumber <= foundProducts.length) {
+                productCard = foundProducts[productNumber - 1];
+                const productId = productCard.dataset.productId;
+                selectedProduct = products.find(p => p.id === productId);
+                console.log(`✅ Harf+numara bulundu: ${harf}${productNumber} → ${selectedProduct.name}`);
+            }
+        }
+    }
+    
+    // 2. SADECE HARF İLE ARAMA
+    if (!selectedProduct) {
+        const harfMatch = cleanMessage.match(/^([a-zçğıöşü])\s*(\d*(?:\.\d+)?)?$/);
+        if (harfMatch) {
+            const harf = harfMatch[1].toUpperCase();
+            quantity = harfMatch[2] ? parseFloat(harfMatch[2]) : 1;
             
-            // Sayısal seçim - DOM'dan ürünü bul
-            const productCard = document.querySelector(`.product-card[data-product-index="${targetNumber}"]`);
+            console.log(`🔤 Harf ile arama: "${harf}", miktar: ${quantity}`);
+            
+            // Tüm ürün kartlarında harfi ara
+            const allProductCards = document.querySelectorAll('.product-card');
+            let foundProducts = [];
+            
+            for (const card of allProductCards) {
+                if (card.dataset.productHarf === harf) {
+                    foundProducts.push(card);
+                }
+            }
+            
+            // Eğer sadece 1 ürün bulunduysa onu seç
+            if (foundProducts.length === 1) {
+                productCard = foundProducts[0];
+                const productId = productCard.dataset.productId;
+                selectedProduct = products.find(p => p.id === productId);
+                console.log(`✅ Tek harf bulundu: ${harf} → ${selectedProduct.name}`);
+            }
+            // Eğer birden fazla ürün bulunduysa, ilkini seç ve kullanıcıya bilgi ver
+            else if (foundProducts.length > 1) {
+                productCard = foundProducts[0];
+                const productId = productCard.dataset.productId;
+                selectedProduct = products.find(p => p.id === productId);
+                
+                const availableOptions = foundProducts.map((card, index) => 
+                    `${card.dataset.productHarf}${index + 1}`
+                ).join(', ');
+                
+                console.log(`ℹ️ Aynı harfle ${foundProducts.length} ürün bulundu: ${availableOptions}`);
+                speakToUser(`"${harf}" harfiyle ${foundProducts.length} ürün var. "${harf}1" veya "${harf}2" şeklinde seçin.`);
+                
+                // Kullanıcıya seçenekleri göster
+                const productNames = foundProducts.slice(0, 3).map((card, index) => 
+                    `${harf}${index + 1} → ${card.querySelector('.product-name').textContent}`
+                ).join(', ');
+                
+                displayMessage(`ℹ️ "${harf}" harfiyle ${foundProducts.length} ürün: ${productNames}`);
+                return true; // Kullanıcıya seçim şansı ver
+            }
+        }
+    }
+    
+    // 3. NUMARA İLE ARAMA (mevcut sistem)
+    if (!selectedProduct) {
+        const numaraMatch = cleanMessage.match(/^(\d+)\s*(\d*(?:\.\d+)?)?$/);
+        if (numaraMatch) {
+            productNumber = parseInt(numaraMatch[1]);
+            quantity = numaraMatch[2] ? parseFloat(numaraMatch[2]) : 1;
+            
+            console.log(`🔢 Numara ile arama: ${productNumber}, miktar: ${quantity}`);
+            
+            productCard = document.querySelector(`.product-card[data-product-index="${productNumber}"]`);
             if (productCard) {
                 const productId = productCard.dataset.productId;
                 selectedProduct = products.find(p => p.id === productId);
-                if (selectedProduct) {
-                    console.log(`✅ Numara ile ürün bulundu: ${selectedProduct.name}`);
-                }
             }
         }
+    }
 
-        // Eğer numara ile bulunamadıysa, normal arama yap
-        if (!selectedProduct) {
-            // 1. Önce tam eşleşme
-            selectedProduct = products.find(p => 
-                p.name.toLowerCase() === productName.toLowerCase()
-            );
-
-            // 2. İçerme eşleşmesi
-            if (!selectedProduct) {
-                selectedProduct = products.find(p => 
-                    p.name.toLowerCase().includes(productName.toLowerCase()) ||
-                    productName.toLowerCase().includes(p.name.toLowerCase())
-                );
-            }
-
-            // 3. Kelime eşleşmesi
-            if (!selectedProduct) {
-                const searchWords = productName.toLowerCase().split(' ').filter(word => word.length > 2);
-                selectedProduct = products.find(product => {
-                    const productWords = product.name.toLowerCase().split(' ');
-                    return searchWords.some(searchWord => 
-                        productWords.some(pWord => pWord.includes(searchWord))
-                    );
-                });
+    // 4. SONUÇ
+    if (selectedProduct && productCard) {
+        // Kilit kontrolü
+        if (isSellerLocked) {
+            const firstCartItem = cart[0];
+            if (firstCartItem && firstCartItem.seller_id !== selectedSellerId) {
+                const currentSeller = sellers.find(s => s.id === firstCartItem.seller_id);
+                speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name} ile alışverişe devam edebilirsiniz.`);
+                return true;
             }
         }
-
-        // SONUÇ
-        if (selectedProduct) {
-            console.log('🎯 Ürün bulundu:', selectedProduct.name);
-            
-            // Kilit kontrolü
-            if (isSellerLocked) {
-                const firstCartItem = cart[0];
-                if (firstCartItem && firstCartItem.seller_id !== selectedSellerId) {
-                    const currentSeller = sellers.find(s => s.id === firstCartItem.seller_id);
-                    displayMessage(`❌ Sepet dolu. Sadece ${currentSeller?.business_name} ile alışverişe devam edebilirsiniz.`);
-                    speakToUser("sepet dolu");
-                    return true;
-                }
-            }
-            
-            // SEPETE EKLE - MİKTARI DOĞRU KULLAN
-            console.log('🛒 Sepete ekleniyor:', `${quantity} ${unit} ${selectedProduct.name}`);
-            addToCart(selectedProduct, quantity);
-            
-            // ✅ EKRANDA DETAYLI GÖSTER
-            if (numaraMatch) {
-                const targetNumber = parseInt(numaraMatch[1]);
-                displayMessage(`✅ ${targetNumber}. üründen ${quantity} ${unit} sepete eklendi: ${selectedProduct.name}`);
-            } else {
-                displayMessage(`✅ ${quantity} ${unit} ${selectedProduct.name} sepete eklendi`);
-            }
-            
-            // ✅ SESLİ: Sadece temel onay
-            speakToUser("eklendi");
-            
-            return true;
-        } else {
-            console.log('❌ Ürün bulunamadı:', productName);
-            
-            // ✅ EKRANDA DETAYLI GÖSTER
-            const productCards = document.querySelectorAll('.product-card');
-            if (productCards.length > 0) {
-                const productList = Array.from(productCards)
-                    .slice(0, 3)
-                    .map(card => `${card.dataset.productIndex}. ${card.querySelector('.product-name')?.textContent}`)
-                    .join(', ');
-                
-                displayMessage(`❌ "${productName}" bulunamadı. Mevcut ürünler: ${productList}`);
-            } else {
-                displayMessage(`❌ "${productName}" bulunamadı. Lütfen ürün ismini veya numarasını söyleyin.`);
-            }
-            
-            // ✅ SESLİ: Sadece temel uyarı
-            speakToUser("ürün seçin");
-            
-            return true;
-        }
-    } catch (error) {
-        console.error('❌ Ürün ekleme hatası:', error);
-        displayMessage("❌ Ürün eklenirken bir hata oluştu.");
-        speakToUser("hata");
+        
+        // SEPETE EKLE
+        addToCart(selectedProduct, quantity, productCard);
+        
+        // BAŞARI MESAJI
+        const urunNumarasi = productCard.dataset.productIndex;
+        const harfKodu = productCard.dataset.productHarf;
+        
+        displayMessage(`✅ ${urunNumarasi}. ürün (${harfKodu}) ${quantity} adet sepete eklendi: ${selectedProduct.name}`);
+        speakToUser("eklendi");
+        
+        return true;
+    } else {
+        // ÜRÜN BULUNAMADI - YARDIM GÖSTER
+        showAdvancedVoiceHelp();
         return false;
     }
-}       
-   function testAllFixed() {
+}
+
+// GELİŞMİŞ YARDIM MESAJI
+function showAdvancedVoiceHelp() {
+    const productCards = document.querySelectorAll('.product-card');
+    if (productCards.length === 0) return;
+    
+    // Ürünleri harflere göre grupla
+    const harfGruplari = {};
+    productCards.forEach((card) => {
+        const harf = card.dataset.productHarf;
+        if (!harfGruplari[harf]) {
+            harfGruplari[harf] = [];
+        }
+        harfGruplari[harf].push(card);
+    });
+    
+    let helpMessage = "Ürün eklemek için:\n";
+    let examples = [];
+    
+    // Tek ürünlü harfler
+    const tekUrunluHarfler = [];
+    const cokUrunluHarfler = [];
+    
+    Object.entries(harfGruplari).forEach(([harf, cards]) => {
+        if (cards.length === 1) {
+            tekUrunluHarfler.push(`${harf} → ${cards[0].querySelector('.product-name').textContent}`);
+        } else {
+            cokUrunluHarfler.push(`${harf} (${cards.length} ürün)`);
+        }
+    });
+    
+    if (tekUrunluHarfler.length > 0) {
+        helpMessage += `• Tek ürünler: ${tekUrunluHarfler.slice(0, 5).join(', ')}\n`;
+        examples.push(`"${tekUrunluHarfler[0].split(' → ')[0]}"`);
+    }
+    
+    if (cokUrunluHarfler.length > 0) {
+        helpMessage += `• Çoklu ürünler: ${cokUrunluHarfler.slice(0, 3).join(', ')} → "${cokUrunluHarfler[0]}1", "${cokUrunluHarfler[0]}2" şeklinde\n`;
+        examples.push(`"${cokUrunluHarfler[0]}1"`);
+    }
+    
+    helpMessage += `• Örnekler: ${examples.join(' veya ')}`;
+    
+    displayMessage(`🎯 ${helpMessage}`);
+    speakToUser("numara, harf veya harf artı numara söyleyin");
+}
+
+// TEST FONKSİYONU - Tüm kombinasyonlar
+function testTumKombinasyonlar() {
+    console.log('🧪 TÜM KOMBİNASYON TESTİ');
+    
+    const testCases = [
+        "a",        // A ürünü 1 adet
+        "a 2",      // A ürünü 2 adet
+        "a1",       // A1 ürünü 1 adet
+        "a1 2",     // A1 ürünü 2 adet
+        "a 1 2",    // A1 ürünü 2 adet (boşluklu)
+        "b",        // B ürünü 1 adet
+        "b2",       // B2 ürünü 1 adet
+        "b2 1.5",   // B2 ürünü 1.5 adet
+        "1",        // 1. ürün 1 adet
+        "1 2",      // 1. ürün 2 adet
+        "ç1",       // Ç1 ürünü 1 adet
+        "ğ2 3",     // Ğ2 ürünü 3 adet
+    ];
+    
+    testCases.forEach((testCase, index) => {
+        console.log(`\n--- TEST ${index + 1}: "${testCase}" ---`);
+        
+        const cleanMessage = testCase.toLowerCase().trim();
+        
+        // 1. Harf+numara testi
+        const harfNumaraMatch = cleanMessage.match(/^([a-zçğıöşü])\s*(\d+)\s*(\d*(?:\.\d+)?)?$/);
+        if (harfNumaraMatch) {
+            const harf = harfNumaraMatch[1].toUpperCase();
+            const productNumber = parseInt(harfNumaraMatch[2]);
+            const quantity = harfNumaraMatch[3] ? parseFloat(harfNumaraMatch[3]) : 1;
+            console.log(`✅ HARF+NUMARA: "${harf}${productNumber}", miktar: ${quantity}`);
+            return;
+        }
+        
+        // 2. Sadece harf testi
+        const harfMatch = cleanMessage.match(/^([a-zçğıöşü])\s*(\d*(?:\.\d+)?)?$/);
+        if (harfMatch) {
+            const harf = harfMatch[1].toUpperCase();
+            const quantity = harfMatch[2] ? parseFloat(harfMatch[2]) : 1;
+            console.log(`✅ SADECE HARF: "${harf}", miktar: ${quantity}`);
+            return;
+        }
+        
+        // 3. Sadece numara testi
+        const numaraMatch = cleanMessage.match(/^(\d+)\s*(\d*(?:\.\d+)?)?$/);
+        if (numaraMatch) {
+            const productNumber = parseInt(numaraMatch[1]);
+            const quantity = numaraMatch[2] ? parseFloat(numaraMatch[2]) : 1;
+            console.log(`✅ SADECE NUMARA: "${productNumber}", miktar: ${quantity}`);
+            return;
+        }
+        
+        console.log('❌ Hiçbir pattern eşleşmedi');
+    });
+}
+		
+		function testAllFixed() {
     console.log('🧪 TUM PATTERN TESTI');
     
     const testCases = [
@@ -7372,6 +7492,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
