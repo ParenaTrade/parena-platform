@@ -2181,11 +2181,23 @@ async function enableDynamicMicrophone() {
             microphoneToggle.style.color = 'var(--success)';
         }
         
-    // Başarı mesajı
-    setTimeout(() => {
-        displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
-        speakToUser("mikrofon açıldı"); // SESLİ: Sistem mesajı
-    }, 1500);
+        // Ses tanımayı başlat (1 saniye gecikmeyle)
+        setTimeout(() => {
+            initializeDynamicSpeechRecognition();
+        }, 1000);
+        
+        // Başarı mesajı
+        setTimeout(() => {
+            displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
+            speakToUser("mikrofon açıldı"); // SESLİ: Sistem mesajı
+        }, 1500);
+        
+    } catch (error) {
+        console.error('❌ Mikrofon hatası:', error);
+        displayMessage("Mikrofon erişimi sağlanamadı.");
+        speakToUser("mikrofon hatası");
+        disableDynamicMicrophone();
+    }
 }
                 
  function disableDynamicMicrophone() {
@@ -2214,13 +2226,15 @@ async function enableDynamicMicrophone() {
         voiceIndicator.classList.remove('listening');
     }
     
-   if (assistantMessage) {
+    if (assistantMessage) {
         assistantMessage.textContent = "Mikrofon kapalı. Açmak için mikrofon butonuna tıklayın.";
     }
     
     speakToUser("mikrofon kapandı"); // SESLİ: Sistem mesajı
+    
+    console.log('✅ Mikrofon kapatıldı');
 }
-
+        
 // "no-speech" hatalarını filtreleme
 function setupSpeechRecognitionFilter() {
     let errorCount = 0;
@@ -2428,11 +2442,15 @@ function setupManualMode() {
 }
 
         
-      function initializeDynamicSpeechRecognition() {
+    function initializeDynamicSpeechRecognition() {
     // Basitleştirilmiş ses tanıma (no-speech hatalarını yoksay)
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+        console.error('❌ Ses tanıma desteklenmiyor');
+        displayMessage("Tarayıcınız ses tanımayı desteklemiyor.");
+        return;
+    }
     
     recognition = new SpeechRecognition();
     recognition.continuous = false;
@@ -2491,6 +2509,7 @@ function setupManualMode() {
         console.error('Başlatma hatası:', error);
     }
 }
+        
 
 // Ses tanıma başlatma fonksiyonunu güncelle
 function startRecognition() {
@@ -7215,6 +7234,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
