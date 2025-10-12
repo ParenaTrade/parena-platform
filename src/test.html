@@ -1688,6 +1688,7 @@ document.head.appendChild(harfStyle);
     });
 }
      // Ürünleri göster - GÜNCELLENMİŞ
+// Ürünleri göster - GELİŞMİŞ BİRİM DESTEKLİ
 function displayProducts(productsToShow) {
     const productsGrid = document.getElementById('productsGrid');
     if (!productsGrid) return;
@@ -1709,7 +1710,9 @@ function displayProducts(productsToShow) {
         productCard.className = 'product-card';
         productCard.dataset.productId = product.id;
         productCard.dataset.productIndex = index + 1;
-        productCard.dataset.productHarf = getProductFirstLetter(product.name); // BAŞ HARF EKLENDİ
+        
+        const productHarf = getProductFirstLetter(product.name);
+        productCard.dataset.productHarf = productHarf;
         
         let badgeHTML = '';
         let priceHTML = '';
@@ -1724,18 +1727,28 @@ function displayProducts(productsToShow) {
             priceHTML = `<span class="product-price">${money(product.price)}</span>`;
         }
         
+        // Ürün tipine göre önerilen birimler
+        const birimOnerileri = getRecommendedUnits(product.name);
+        
         productCard.innerHTML = `
             ${badgeHTML}
             <div class="product-number">${index + 1}</div>
-            <div class="product-harf">${getProductFirstLetter(product.name)}</div>
+            <div class="product-harf" data-harf="${productHarf}">${productHarf}</div>
+            <div class="product-kod">${index + 1}${productHarf}</div>
             <img src="${product.imgurl || 'https://via.placeholder.com/150x100?text=Ürün'}" 
                  alt="${product.name}" 
                  class="product-image">
             <div class="product-info">
                 <div class="product-name">${product.name}</div>
                 <div class="product-price">${priceHTML}</div>
-                <div class="voice-help">Sesli: "${index + 1}" veya "${getProductFirstLetter(product.name)}"</div>
-                <button class="add-to-cart-btn" data-id="${product.id}">Sepete Ekle</button>
+                <div class="voice-help">
+                    <i class="fas fa-microphone"></i> 
+                    <strong>"${index + 1} ${productHarf}"</strong>
+                    ${birimOnerileri}
+                </div>
+                <button class="add-to-cart-btn" data-id="${product.id}">
+                    <i class="fas fa-cart-plus"></i> Sepete Ekle
+                </button>
             </div>
         `;
         
@@ -1746,8 +1759,29 @@ function displayProducts(productsToShow) {
         
         productsGrid.appendChild(productCard);
     });
+    
+    showGelismisYardim();
 }
 
+// ÖNERİLEN BİRİMLER
+function getRecommendedUnits(productName) {
+    const name = productName.toLowerCase();
+    let birimler = [];
+    
+    if (name.includes('domates') || name.includes('biber') || name.includes('soğan')) {
+        birimler = ['2 kilo', '500 gram', 'yarım kilo'];
+    } else if (name.includes('süt') || name.includes('su') || name.includes('içecek')) {
+        birimler = ['1 litre', '500 ml', '2 paket'];
+    } else if (name.includes('ekmek') || name.includes('poğaça')) {
+        birimler = ['2 adet', '1 paket', '3 porsiyon'];
+    } else if (name.includes('peynir') || name.includes('zeytin')) {
+        birimler = ['250 gram', 'yarım kilo', '1 paket'];
+    } else {
+        birimler = ['2 adet', '1 kilo', '1 paket'];
+    }
+    
+    return `<div style="font-size:10px; margin-top:3px;">Örnek: ${birimler.join(', ')}</div>`;
+}		
 // Ürün adının baş harfini al
 function getProductFirstLetter(productName) {
     if (!productName || productName.length === 0) return '';
@@ -1778,6 +1812,71 @@ function getProductFirstLetter(productName) {
     
     return turkishMap[firstLetter] || firstLetter;
 }
+		// GELİŞMİŞ YARDIM MESAJI
+function showGelismisYardim() {
+    const productCards = document.querySelectorAll('.product-card');
+    if (productCards.length === 0) return;
+    
+    const ornekler = [
+        '"5 D 2" → 5D ürünü 2 adet',
+        '"D 2" → D ürünü 2 adet', 
+        '"2 B 500 gram" → 2B ürünü 500 gram',
+        '"3 C yarım kilo" → 3C ürünü 0.5 kg',
+        '"1 D 1.5 porsiyon" → 1D ürünü 1.5 porsiyon',
+        '"1 S 1 paket" → 1S ürünü 1 paket',
+        '"2 S 1 litre" → 2S ürünü 1 litre',
+        '"3 S 500 ml" → 3S ürünü 0.5 litre',
+        '"3 D 2 adet" → 3D ürünü 2 adet'
+    ];
+    
+    const helpMessage = `
+        <div style="
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 15px 0;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        ">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 15px;">
+                <i class="fas fa-robot" style="font-size: 24px;"></i>
+                <h4 style="margin: 0; font-weight: 700;">AKILLI SESLİ SİSTEM</h4>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px;">
+                    <strong>📏 DESTEKLENEN BİRİMLER</strong><br>
+                    <small>kilo, gram, litre, ml,<br>paket, porsiyon, adet,<br>yarım, çeyrek</small>
+                </div>
+                <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px;">
+                    <strong>🎯 KOMUT FORMATI</strong><br>
+                    <small>"numara harf miktar birim"<br>Örnek: "1 A 2 kilo"</small>
+                </div>
+            </div>
+            
+            <div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px;">
+                <strong>📋 ÖRNEK KOMUTLAR:</strong><br>
+                <div style="font-size: 12px; line-height: 1.6; margin-top: 8px;">
+                    ${ornekler.slice(0, 4).join('<br>')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Yardım mesajını güncelle
+    const existingHelp = document.getElementById('gelismis-yardim');
+    if (existingHelp) {
+        existingHelp.innerHTML = helpMessage;
+    } else {
+        const helpDiv = document.createElement('div');
+        helpDiv.id = 'gelismis-yardim';
+        helpDiv.innerHTML = helpMessage;
+        productsGrid.parentNode.insertBefore(helpDiv, productsGrid);
+    }
+    
+    speakToUser("Tüm birimler destekleniyor. Örnek: beş de iki kilo");
+}
+		
 
         // =============================================
         // SEPET YÖNETİM FONKSİYONLARI
@@ -4158,9 +4257,9 @@ async function handleVoiceStoreSelection(message) {
     return false;
 }       
 
-// SESLİ ÜRÜN EKLEME - HARF ve NUMARA BİRLEŞİMLİ
+// GELİŞMİŞ SESLİ ÜRÜN EKLEME - TÜM BİRİMLER DESTEKLİ
 async function handleVoiceProductAdd(message) {
-    console.log('🎯 Sesli ürün ekleme (harf + numara destekli):', message);
+    console.log('🎯 Gelişmiş sesli ürün ekleme:', message);
     
     // Kontroller
     if (!selectedCategoryId || products.length === 0) {
@@ -4169,109 +4268,89 @@ async function handleVoiceProductAdd(message) {
     }
 
     const cleanMessage = message.toLowerCase().trim();
-    let productNumber = null;
-    let quantity = 1;
     let selectedProduct = null;
     let productCard = null;
+    let quantity = 1;
+    let unit = 'adet';
 
-    // 1. HARF + NUMARA BİRLEŞİMİ (ÖNCELİKLİ)
-    const harfNumaraMatch = cleanMessage.match(/^([a-zçğıöşü])\s*(\d+)\s*(\d*(?:\.\d+)?)?$/);
-    if (harfNumaraMatch) {
-        const harf = harfNumaraMatch[1].toUpperCase();
-        productNumber = parseInt(harfNumaraMatch[2]);
-        quantity = harfNumaraMatch[3] ? parseFloat(harfNumaraMatch[3]) : 1;
+    // 1. GELİŞMİŞ SAYI+HARF+BİRİM SİSTEMİ
+    const gelismisMatch = cleanMessage.match(/^(\d+)\s*([a-zçğıöşü])\s*(\d*(?:\.\d+)?)?\s*(kilo|gram|litre?|lt|ml|paket|porsiyon|adet|tane|yarım|çeyrek)?$/);
+    
+    if (gelismisMatch) {
+        const productNumber = parseInt(gelismisMatch[1]);
+        const harf = gelismisMatch[2].toUpperCase();
+        const miktar = gelismisMatch[3];
+        const birim = gelismisMatch[4];
         
-        console.log(`🔤🔄 Harf+numara birleşimi: "${harf} ${productNumber}", miktar: ${quantity}`);
+        console.log(`🔢🔤📏 Gelişmiş sistem: ${productNumber}${harf}, miktar: ${miktar}, birim: ${birim}`);
         
-        // Önce harf ile ürünü bul
-        const allProductCards = document.querySelectorAll('.product-card');
-        let foundProducts = [];
+        // Miktarı hesapla
+        if (miktar) {
+            quantity = parseFloat(miktar);
+        } else if (birim === 'yarım') {
+            quantity = 0.5;
+        } else if (birim === 'çeyrek') {
+            quantity = 0.25;
+        }
         
-        for (const card of allProductCards) {
-            if (card.dataset.productHarf === harf) {
-                foundProducts.push(card);
+        // Birimi belirle
+        if (birim) {
+            unit = normalizeUnit(birim);
+            
+            // Özel dönüşümler
+            if (birim === 'gram') {
+                quantity = quantity / 1000;
+                unit = 'kg';
+            } else if (birim === 'ml') {
+                quantity = quantity / 1000;
+                unit = 'lt';
+            } else if (birim === 'yarım') {
+                unit = 'kg';
+            } else if (birim === 'çeyrek') {
+                unit = 'kg';
             }
         }
         
-        // Eğer birden fazla aynı harfle ürün varsa, numarayı kullan
-        if (foundProducts.length > 0) {
-            if (productNumber <= foundProducts.length) {
-                productCard = foundProducts[productNumber - 1];
+        // Ürünü bul
+        productCard = document.querySelector(`.product-card[data-product-index="${productNumber}"]`);
+        if (productCard) {
+            // Harf kontrolü
+            const productHarf = productCard.dataset.productHarf;
+            if (productHarf === harf) {
                 const productId = productCard.dataset.productId;
                 selectedProduct = products.find(p => p.id === productId);
-                console.log(`✅ Harf+numara bulundu: ${harf}${productNumber} → ${selectedProduct.name}`);
+                console.log(`✅ Gelişmiş sistem bulundu: ${productNumber}${harf} → ${quantity} ${unit} ${selectedProduct.name}`);
+            } else {
+                console.log(`❌ Harf uyuşmuyor: ${productNumber}. ürün harfi ${productHarf}, söylenen ${harf}`);
+                displayMessage(`❌ ${productNumber}. ürünün harfi "${productHarf}", siz "${harf}" dediniz.`);
+                speakToUser("harf uyuşmuyor");
+                return false;
             }
         }
     }
     
-    // 2. SADECE HARF İLE ARAMA
+    // 2. BASİT SAYI+HARF (geriye uyumluluk)
     if (!selectedProduct) {
-        const harfMatch = cleanMessage.match(/^([a-zçğıöşü])\s*(\d*(?:\.\d+)?)?$/);
-        if (harfMatch) {
-            const harf = harfMatch[1].toUpperCase();
-            quantity = harfMatch[2] ? parseFloat(harfMatch[2]) : 1;
+        const basitMatch = cleanMessage.match(/^(\d+)\s*([a-zçğıöşü])\s*(\d*(?:\.\d+)?)?$/);
+        if (basitMatch) {
+            const productNumber = parseInt(basitMatch[1]);
+            const harf = basitMatch[2].toUpperCase();
+            quantity = basitMatch[3] ? parseFloat(basitMatch[3]) : 1;
             
-            console.log(`🔤 Harf ile arama: "${harf}", miktar: ${quantity}`);
-            
-            // Tüm ürün kartlarında harfi ara
-            const allProductCards = document.querySelectorAll('.product-card');
-            let foundProducts = [];
-            
-            for (const card of allProductCards) {
-                if (card.dataset.productHarf === harf) {
-                    foundProducts.push(card);
-                }
-            }
-            
-            // Eğer sadece 1 ürün bulunduysa onu seç
-            if (foundProducts.length === 1) {
-                productCard = foundProducts[0];
-                const productId = productCard.dataset.productId;
-                selectedProduct = products.find(p => p.id === productId);
-                console.log(`✅ Tek harf bulundu: ${harf} → ${selectedProduct.name}`);
-            }
-            // Eğer birden fazla ürün bulunduysa, ilkini seç ve kullanıcıya bilgi ver
-            else if (foundProducts.length > 1) {
-                productCard = foundProducts[0];
-                const productId = productCard.dataset.productId;
-                selectedProduct = products.find(p => p.id === productId);
-                
-                const availableOptions = foundProducts.map((card, index) => 
-                    `${card.dataset.productHarf}${index + 1}`
-                ).join(', ');
-                
-                console.log(`ℹ️ Aynı harfle ${foundProducts.length} ürün bulundu: ${availableOptions}`);
-                speakToUser(`"${harf}" harfiyle ${foundProducts.length} ürün var. "${harf}1" veya "${harf}2" şeklinde seçin.`);
-                
-                // Kullanıcıya seçenekleri göster
-                const productNames = foundProducts.slice(0, 3).map((card, index) => 
-                    `${harf}${index + 1} → ${card.querySelector('.product-name').textContent}`
-                ).join(', ');
-                
-                displayMessage(`ℹ️ "${harf}" harfiyle ${foundProducts.length} ürün: ${productNames}`);
-                return true; // Kullanıcıya seçim şansı ver
-            }
-        }
-    }
-    
-    // 3. NUMARA İLE ARAMA (mevcut sistem)
-    if (!selectedProduct) {
-        const numaraMatch = cleanMessage.match(/^(\d+)\s*(\d*(?:\.\d+)?)?$/);
-        if (numaraMatch) {
-            productNumber = parseInt(numaraMatch[1]);
-            quantity = numaraMatch[2] ? parseFloat(numaraMatch[2]) : 1;
-            
-            console.log(`🔢 Numara ile arama: ${productNumber}, miktar: ${quantity}`);
+            console.log(`🔢🔤 Basit sistem: ${productNumber}${harf}, miktar: ${quantity}`);
             
             productCard = document.querySelector(`.product-card[data-product-index="${productNumber}"]`);
             if (productCard) {
-                const productId = productCard.dataset.productId;
-                selectedProduct = products.find(p => p.id === productId);
+                const productHarf = productCard.dataset.productHarf;
+                if (productHarf === harf) {
+                    const productId = productCard.dataset.productId;
+                    selectedProduct = products.find(p => p.id === productId);
+                }
             }
         }
     }
 
-    // 4. SONUÇ
+    // 3. SONUÇ
     if (selectedProduct && productCard) {
         // Kilit kontrolü
         if (isSellerLocked) {
@@ -4290,17 +4369,37 @@ async function handleVoiceProductAdd(message) {
         const urunNumarasi = productCard.dataset.productIndex;
         const harfKodu = productCard.dataset.productHarf;
         
-        displayMessage(`✅ ${urunNumarasi}. ürün (${harfKodu}) ${quantity} adet sepete eklendi: ${selectedProduct.name}`);
+        displayMessage(`✅ ${urunNumarasi}${harfKodu} → ${quantity} ${unit} sepete eklendi: ${selectedProduct.name}`);
         speakToUser("eklendi");
         
         return true;
     } else {
         // ÜRÜN BULUNAMADI - YARDIM GÖSTER
-        showAdvancedVoiceHelp();
+        showGelismisYardim();
         return false;
     }
 }
 
+// BİRİM NORMALİZASYONU
+function normalizeUnit(birim) {
+    const birimMap = {
+        'kilo': 'kg',
+        'gram': 'kg', // gram kg'ya çevrilecek
+        'litre': 'lt',
+        'litre?': 'lt', 
+        'lt': 'lt',
+        'ml': 'lt', // ml lt'ye çevrilecek
+        'paket': 'paket',
+        'porsiyon': 'porsiyon',
+        'adet': 'adet',
+        'tane': 'adet',
+        'yarım': 'kg',
+        'çeyrek': 'kg'
+    };
+    
+    return birimMap[birim] || 'adet';
+}
+		
 // GELİŞMİŞ YARDIM MESAJI
 function showAdvancedVoiceHelp() {
     const productCards = document.querySelectorAll('.product-card');
@@ -4347,23 +4446,23 @@ function showAdvancedVoiceHelp() {
     speakToUser("numara, harf veya harf artı numara söyleyin");
 }
 
-// TEST FONKSİYONU - Tüm kombinasyonlar
+// TÜM KOMBİNASYONLARI TEST ET
 function testTumKombinasyonlar() {
     console.log('🧪 TÜM KOMBİNASYON TESTİ');
     
     const testCases = [
-        "a",        // A ürünü 1 adet
-        "a 2",      // A ürünü 2 adet
-        "a1",       // A1 ürünü 1 adet
-        "a1 2",     // A1 ürünü 2 adet
-        "a 1 2",    // A1 ürünü 2 adet (boşluklu)
-        "b",        // B ürünü 1 adet
-        "b2",       // B2 ürünü 1 adet
-        "b2 1.5",   // B2 ürünü 1.5 adet
-        "1",        // 1. ürün 1 adet
-        "1 2",      // 1. ürün 2 adet
-        "ç1",       // Ç1 ürünü 1 adet
-        "ğ2 3",     // Ğ2 ürünü 3 adet
+        "5 d 2",
+        "d 2", 
+        "2 b 500 gram",
+        "3 c yarım kilo",
+        "1 d 1.5 porsiyon",
+        "1 s 1 paket",
+        "2 s 1 litre",
+        "3 s 500 ml",
+        "3 d 2 adet",
+        "4 a yarım",
+        "1 b çeyrek",
+        "2 c 250 gram"
     ];
     
     testCases.forEach((testCase, index) => {
@@ -4371,38 +4470,35 @@ function testTumKombinasyonlar() {
         
         const cleanMessage = testCase.toLowerCase().trim();
         
-        // 1. Harf+numara testi
-        const harfNumaraMatch = cleanMessage.match(/^([a-zçğıöşü])\s*(\d+)\s*(\d*(?:\.\d+)?)?$/);
-        if (harfNumaraMatch) {
-            const harf = harfNumaraMatch[1].toUpperCase();
-            const productNumber = parseInt(harfNumaraMatch[2]);
-            const quantity = harfNumaraMatch[3] ? parseFloat(harfNumaraMatch[3]) : 1;
-            console.log(`✅ HARF+NUMARA: "${harf}${productNumber}", miktar: ${quantity}`);
-            return;
-        }
+        // Gelişmiş sistem testi
+        const gelismisMatch = cleanMessage.match(/^(\d+)?\s*([a-zçğıöşü])\s*(\d*(?:\.\d+)?)?\s*(kilo|gram|litre?|lt|ml|paket|porsiyon|adet|tane|yarım|çeyrek)?$/);
         
-        // 2. Sadece harf testi
-        const harfMatch = cleanMessage.match(/^([a-zçğıöşü])\s*(\d*(?:\.\d+)?)?$/);
-        if (harfMatch) {
-            const harf = harfMatch[1].toUpperCase();
-            const quantity = harfMatch[2] ? parseFloat(harfMatch[2]) : 1;
- 
-            return;
+        if (gelismisMatch) {
+            const productNumber = gelismisMatch[1] ? parseInt(gelismisMatch[1]) : null;
+            const harf = gelismisMatch[2].toUpperCase();
+            const miktar = gelismisMatch[3];
+            const birim = gelismisMatch[4];
+            
+            let quantity = miktar ? parseFloat(miktar) : 1;
+            let unit = normalizeUnit(birim);
+            
+            // Özel dönüşümler
+            if (birim === 'gram') {
+                quantity = quantity / 1000;
+            } else if (birim === 'ml') {
+                quantity = quantity / 1000;
+            } else if (birim === 'yarım') {
+                quantity = 0.5;
+            } else if (birim === 'çeyrek') {
+                quantity = 0.25;
+            }
+            
+            console.log(`✅ ${productNumber || ''}${harf} → ${quantity} ${unit}`);
+        } else {
+            console.log('❌ Eşleşme bulunamadı');
         }
-        
-        // 3. Sadece numara testi
-        const numaraMatch = cleanMessage.match(/^(\d+)\s*(\d*(?:\.\d+)?)?$/);
-        if (numaraMatch) {
-            const productNumber = parseInt(numaraMatch[1]);
-            const quantity = numaraMatch[2] ? parseFloat(numaraMatch[2]) : 1;
-            console.log(`✅ SADECE NUMARA: "${productNumber}", miktar: ${quantity}`);
-            return;
-        }
-        
-        console.log('❌ Hiçbir pattern eşleşmedi');
     });
-}
-		
+}		
 		function testAllFixed() {
     console.log('🧪 TUM PATTERN TESTI');
     
@@ -7538,6 +7634,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
