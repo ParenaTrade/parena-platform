@@ -2856,6 +2856,9 @@ function initializeSimpleSpeechRecognition() {
     recognition.lang = 'tr-TR';
     recognition.interimResults = false;
     
+    // Değişken tanımla
+    let isRestarting = false;
+    
     recognition.onstart = function() {
         console.log('✅ Dinliyorum...');
         isListening = true;
@@ -2874,34 +2877,34 @@ function initializeSimpleSpeechRecognition() {
         console.log('⚠️ Hata (yoksayılıyor):', event.error);
         isListening = false;
         if (voiceIndicator) voiceIndicator.classList.remove('listening');
-        
-        // Tüm hataları yoksay ve yeniden başla
-        setTimeout(() => {
-            if (isMicrophoneEnabled && !isListening) {
-                try {
-                    recognition.start();
-                } catch (e) {
-                    console.log('Yeniden başlatma hatası:', e);
-                }
-            }
-        }, 1000);
     };
     
-    // initializeSimpleSpeechRecognition içinde:
- recognition.onend = function() {
+    recognition.onend = function() {
         isListening = false;
         if (voiceIndicator) voiceIndicator.classList.remove('listening');
         
-        if (isMicrophoneEnabled) {
+        // DÜZELTME: Daha güvenli yeniden başlatma
+        if (isMicrophoneEnabled && !isRestarting) {
+            isRestarting = true;
             setTimeout(() => {
                 try {
-                    recognition.start();
+                    if (isMicrophoneEnabled && recognition) {
+                        recognition.start();
+                    }
                 } catch (error) {
                     console.log('Yeniden başlatma hatası:', error);
+                    // Hata durumunda 3 saniye bekle
+                    setTimeout(() => {
+                        if (isMicrophoneEnabled) {
+                            initializeSimpleSpeechRecognition();
+                        }
+                    }, 3000);
+                } finally {
+                    isRestarting = false;
                 }
-            }, 800);
+            }, 1000);
         }
-    };
+    }; // ⭐ BURASI KAPATILDI
     
     try {
         recognition.start();
@@ -8003,6 +8006,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
