@@ -4235,75 +4235,47 @@ function superSimpleExtract(message) {
     return { productName, quantity, unit: 'adet' };
 }
 
-// Acil durumda bu satırı açın:
-// extractProductInfoFromCommand = superSimpleExtract;
-// Acil durumda bu satırı açın:
-// extractProductInfoFromCommand = superSimpleExtract;
-        
-// Sepeti tamamen boşaltma fonksiyonu
-// clearCart fonksiyonunu güncelle
-function clearCart() {
-    console.log('🗑️ Sepet tamamen boşaltılıyor...');
-    
-    cart = [];
-    updateCartUI();
-    
-    // 🆕 BİLDİRİM GÖSTER
-    showClearCartNotification();
-    
-    unlockStoreAndSeller();
-    speakToUser("Sepet boşaltıldı");
-    closeDynamicCart();
-    
-    console.log('✅ Sepet tamamen boşaltıldı');
-}
-
-// Ses tanıma fonksiyonlarını güncelle
-recognition.onstart = function() {
-    console.log('✅ Dinliyorum...');
-    isListening = true;
-    
-    // 🆕 DİNLİYORUM BİLDİRİMİ
-    showListeningNotification();
-    
-    if (voiceIndicator) voiceIndicator.classList.add('listening');
-};
-
-recognition.onresult = function(event) {
-    const transcript = event.results[0][0].transcript;
-    console.log('🎯 Tanınan:', transcript);
-    
-    // 🆕 KOMUT ALINDI BİLDİRİMİ
-    showCommandReceivedNotification(transcript);
-    
-    if (userMessage) userMessage.textContent = transcript;
-    processVoiceCommand(transcript);
-};
-
-recognition.onerror = function(event) {
-    console.log('⚠️ Hata:', event.error);
-    
-    // 🆕 HATA BİLDİRİMİ
-    showErrorNotification();
-};
+    function clearCart() {
     console.log('🗑️ Sepet tamamen boşaltılıyor...');
     console.log('📊 Önceki sepet:', cart.length, 'ürün');
     
     cart = [];
-    
-    // HEMEN GÜNCELLE
     updateCartUI();
-    
-    // Kilidi kesinlikle kaldır
+    showClearCartNotification();
     unlockStoreAndSeller();
-    
     speakToUser("Sepet boşaltıldı. Artık başka mağazalardan alışveriş yapabilirsiniz.");
-    
-    // Sepet kapatılsın
     closeDynamicCart();
-    
     console.log('✅ Sepet tamamen boşaltıldı');
 }
+        
+// Bildirim fonksiyonlarını tanımla (eğer yoksa)
+function showClearCartNotification() {
+    updateVoiceNotification('🗑️ Sepet başarıyla boşaltıldı!', 'success');
+}
+
+function showListeningNotification() {
+    updateVoiceNotification('🎤 Dinliyorum... Konuşun!', 'listening');
+}
+
+function showCommandReceivedNotification(command) {
+    updateVoiceNotification(`✅ "${command}"`, 'success');
+}
+
+function showErrorNotification() {
+    updateVoiceNotification('❌ Ses anlaşılamadı, lütfen tekrar deneyin', 'error');
+}
+
+function updateVoiceNotification(message, type = 'info') {
+    const notification = document.getElementById('voiceCommandNotification');
+    if (!notification) return;
+    
+    const notificationText = notification.querySelector('.voice-notification-text');
+    const icon = notification.querySelector('i');
+    
+    if (notificationText) {
+        notificationText.textContent = message;
+    }
+    
 
         function initSliderControls() {
     const slider = document.getElementById('commandSlider');
@@ -4341,7 +4313,8 @@ recognition.onerror = function(event) {
         showGroup(newIndex);
     }, 5000);
 }
-// Sepet UI'sına temizleme butonu ekle
+
+        
 // Sepet UI'sına temizleme butonu ekle
 function addClearCartButton() {
     const cartItems = document.getElementById('cartItems');
@@ -8258,6 +8231,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
