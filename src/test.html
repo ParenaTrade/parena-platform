@@ -3536,8 +3536,19 @@ async function processVoiceCommand(transcript) {
     
     console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
 
-    try {
-        // 1. ÜRÜN EKLEME KOMUTU - ÖNCELİKLİ
+       try {
+        // ✅ MAĞAZA SEÇİMİ - current:2'de kal
+        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
+            console.log('🏪 Mağaza seçim komutu algılandı');
+            const success = await handleVoiceStoreSelection(filteredMessage);
+            if (success) {
+                // ✅ Mağaza seçildi ama kök değişmedi - current:2'de kaldı
+                console.log('✅ Mağaza seçildi, kök sabit:', currentRoot);
+                return;
+            }
+        }     
+        
+         // 1. ÜRÜN EKLEME KOMUTU - ÖNCELİKLİ
         if (selectedCategoryId && products.length > 0) {
             console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
             const success = await handleVoiceProductAdd(filteredMessage);
@@ -3547,28 +3558,21 @@ async function processVoiceCommand(transcript) {
             }
         }
 
-        // 2. MAĞAZA TİPİ SEÇİMİ
-        if ((currentRoot === "2:0" || !selectedStoreTypeId) && hasStoreTypeKeywords(filteredMessage)) {
-            console.log('🏪 Mağaza tipi seçim komutu algılandı');
-            const success = await handleVoiceStoreSelection(filteredMessage);
-            if (success) return;
-        }
-
-        // 3. SATICI SEÇİMİ
-        if ((currentRoot === "3:0" || (selectedStoreTypeId && !selectedSellerId)) && hasSellerKeywords(filteredMessage)) {
+        // 2. SATICI SEÇİMİ - current:2'deyken satıcı seçilebilir
+        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasSellerKeywords(filteredMessage)) {
             console.log('🏬 Satıcı seçim komutu algılandı');
             const success = await handleVoiceSellerSelection(filteredMessage);
             if (success) return;
         }
 
-        // 4. REYON SEÇİMİ
-        if ((currentRoot === "4:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
+        // 3. REYON SEÇİMİ
+        if ((currentRoot === "3:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
             console.log('📦 Reyon seçim komutu algılandı');
             const success = await handleVoiceCategorySelection(filteredMessage);
             if (success) return;
         }
 
-       // FALLBACK MESAJI (cooldown kontrolü ile)
+        // FALLBACK MESAJI
         console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
         const fallbackMessage = getSmartFallback();
         if (fallbackMessage) {
@@ -3577,12 +3581,12 @@ async function processVoiceCommand(transcript) {
 
     } catch (error) {
         console.error('❌ Komut işleme hatası:', error);
-        // Hata mesajlarında da cooldown
         if (Date.now() - lastSpeakTime > SPEAK_COOLDOWN) {
             speakToUser("Bir hata oluştu, tekrar deneyin.");
         }
     }
 }
+        
 // YARDIMCI FONKSİYONLAR
 function filterUnnecessaryWords(message) {
     const unnecessary = [
@@ -3618,7 +3622,20 @@ function shouldShowFallback(message) {
     if (now - lastSpeakTime < SPEAK_COOLDOWN * 2) {
         return null; // Mesaj gösterme
     }
-    
+
+    // ✅ MAĞAZA SEÇİMİ DURUMU - current:2
+    if (currentRoot === "2:0" && selectedStoreTypeId) {
+        const sellerCards = document.querySelectorAll('.seller-card');
+        if (sellerCards.length > 0) {
+            const sellerList = Array.from(sellerCards)
+                .slice(0, 3)
+                .map(card => `${card.dataset.sellerIndex}. ${card.querySelector('.seller-name')?.textContent}`)
+                .join(', ');
+            return `Hangi satıcı? ${sellerList} Veya başka mağaza için mağaza ismi söyleyin.`;
+        }
+        return "Bu mağazada satıcı bulunamadı. Başka mağaza seçmek için mağaza ismi söyleyin.";
+    }
+        
     if (!selectedStoreTypeId) {
         const storeCards = document.querySelectorAll('.seller-type-card');
         if (storeCards.length > 0) {
@@ -4427,9 +4444,9 @@ async function onStoreTypeSelected(storeTypeId, storeTypeName) {
     products = [];
     resetProductAndCategoryUI();
     
-    // KÖKÜ GÜNCELLE - STORE TYPE SEÇİLDİ, SATICI BEKLENİYOR
-    currentRoot = "3:0";
-    debugLog(`🔄 Kök güncellendi: 2:0 -> 3:0 (Store type seçildi: ${storeTypeName})`);
+    // ✅ KÖKÜ DEĞİŞTİRME - current:2'de kal (mağaza seçimi)
+    currentRoot = "2:0";
+    debugLog(`🔄 Kök SABİT: 2:0 (Store type seçildi: ${storeTypeName})`);
     
     speakToUser(`${storeTypeName} seçildi. ${filteredSellers.length} satıcı bulundu. Lütfen bir satıcı seçin.`);
 }
@@ -4526,7 +4543,7 @@ async function handleVoiceStoreSelection(message) {
         }
     }
 
-    if (selectedCard) {
+     if (selectedCard) {
         try {
             selectedCard.click();
             
@@ -4539,7 +4556,10 @@ async function handleVoiceStoreSelection(message) {
             // ✅ SESLİ: Sadece temel onay
             speakToUser("seçildi");
             
-            currentRoot = "3:0";
+            // ✅ KÖKÜ DEĞİŞTİRME - current:2'de kal
+            currentRoot = "2:0";
+            console.log('✅ Mağaza seçildi, kök sabit:', currentRoot);
+            
             return true;
             
         } catch (error) {
@@ -4558,7 +4578,7 @@ async function handleVoiceStoreSelection(message) {
         .join(', ');
     
     displayMessage(`❌ Mağaza bulunamadı. Mevcut mağazalar: ${availableStores}`);
-    speakToUser("mağaza seçin"); // SESLİ: Seçim öncesi
+    speakToUser("mağaza seçin");
     return false;
 }       
 
@@ -4835,8 +4855,8 @@ async function selectDynamicSeller(seller) {
     products = [];
     
     // KÖKÜ GÜNCELLE - SATICI SEÇİLDİ
-    currentRoot = "4:0";
-    debugLog(`🔄 Kök güncellendi: 3:0 -> 4:0 (Satıcı seçildi)`);
+    currentRoot = "3:0";
+    debugLog(`🔄 Kök güncellendi: 2:0 -> 3:0 (Satıcı seçildi)`);
     
     // UI temizleme
     if (categoriesGrid) {
@@ -4861,7 +4881,7 @@ async function selectDynamicSeller(seller) {
     if (categoriesSection) categoriesSection.style.display = 'block';
     if (productsSection) productsSection.style.display = 'none';
     
-    debugLog(`✅ Satıcı seçildi: ${seller.business_name}`);
+   debugLog(`✅ Satıcı seçildi: ${seller.business_name}`);
     
     // Teslimat durumuna göre mesaj
     let deliveryMsg = "";
@@ -7831,6 +7851,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
