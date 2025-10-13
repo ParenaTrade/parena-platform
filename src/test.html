@@ -4458,45 +4458,73 @@ async function handleVoiceStoreSelection(message) {
     const storeCards = document.querySelectorAll('.seller-type-card');
     if (!storeCards.length) {
         displayMessage("❌ Mağaza listesi yükleniyor, lütfen bekleyin.");
-        speakToUser("mağaza seçin"); // SESLİ: Seçim öncesi
+        speakToUser("mağaza seçin");
         return false;
     }
 
     const cleanMessage = message.toLowerCase().trim();
     let selectedCard = null;
 
-
     console.log('🔍 Mağaza arama:', cleanMessage);
     console.log('📋 Mevcut mağazalar:', Array.from(storeCards).map(card => 
         `${card.querySelector('.seller-type-name')?.textContent} (${card.dataset.typeIndex})`
     ));
 
-    // 1. SAYISAL SEÇİM (birinci, ikinci, 1, 2 vb.)
+    // 1. SAYISAL SEÇİM (bir, iki, üç, 1, 2, 3 vb.) - GENİŞLETİLMİŞ
     const numberMap = {
-        'bir': 1, 'bir': 1, '1': 1, '1.': 1,
-        'iki': 2, 'iki': 2, '2': 2, '2.': 2,
-        'üç': 3, 'üç': 3, '3': 3, '3.': 3,
-        'dört': 4, 'dört': 4, '4': 4, '4.': 4,
-        'beş': 5, 'beş': 5, '5': 5, '5.': 5,
-        'altı': 6, 'altı': 6, '6': 6, '6.': 6,
-        'yedi': 7, 'yedi': 7, '7': 7, '7.': 7,
-        'sekiz': 8, 'sekiz': 8, '8': 8, '8.': 8,
-        'dokuz': 9, 'dokuz': 9, '9': 9, '9.': 9,
-        'on': 10, 'on': 10, '10': 10, '10.': 10
+        'bir': 1, 'birinci': 1, '1': 1, '1.': 1,
+        'iki': 2, 'ikinci': 2, '2': 2, '2.': 2,
+        'üç': 3, 'üçüncü': 3, '3': 3, '3.': 3,
+        'dört': 4, 'dördüncü': 4, '4': 4, '4.': 4,
+        'beş': 5, 'beşinci': 5, '5': 5, '5.': 5,
+        'altı': 6, 'altıncı': 6, '6': 6, '6.': 6,
+        'yedi': 7, 'yedinci': 7, '7': 7, '7.': 7,
+        'sekiz': 8, 'sekizinci': 8, '8': 8, '8.': 8,
+        'dokuz': 9, 'dokuzuncu': 9, '9': 9, '9.': 9,
+        'on': 10, 'onuncu': 10, '10': 10, '10.': 10
     };
 
-    if (numberMap[cleanMessage] !== undefined) {
-        const targetNumber = numberMap[cleanMessage];
-        selectedCard = Array.from(storeCards).find(card => 
-            parseInt(card.dataset.typeIndex) === targetNumber
-        );
-        
-        if (selectedCard) {
-            console.log(`✅ Sayısal seçim: ${targetNumber}. mağaza`);
+    // Sayısal seçim kontrolü - TÜM SAYILAR İÇİN
+    for (const [numberWord, targetNumber] of Object.entries(numberMap)) {
+        if (cleanMessage.includes(numberWord)) {
+            selectedCard = Array.from(storeCards).find(card => 
+                parseInt(card.dataset.typeIndex) === targetNumber
+            );
+            
+            if (selectedCard) {
+                console.log(`✅ Sayısal seçim: ${targetNumber}. mağaza (${numberWord})`);
+                break;
+            }
         }
     }
 
-    // 2. DOĞRUDAN İSİM EŞLEŞMESİ
+    // 2. ÖZEL MAĞAZA İSİM EŞLEŞMESİ - pastane, alkol, çiçek, çarşı için
+    if (!selectedCard) {
+        const specialStoreMap = {
+            'pastane': 'Pastane',
+            'fırın': 'Pastane',
+            'alkol': 'Alkol', 
+            'içki': 'Alkol',
+            'çiçek': 'Çiçek',
+            'çiçekçi': 'Çiçek',
+            'çarşı': 'Çarşı',
+            'avm': 'Çarşı'
+        };
+
+        for (const [keyword, storeType] of Object.entries(specialStoreMap)) {
+            if (cleanMessage.includes(keyword)) {
+                selectedCard = Array.from(storeCards).find(card => 
+                    card.querySelector('.seller-type-name')?.textContent === storeType
+                );
+                if (selectedCard) {
+                    console.log(`✅ Özel mağaza eşleşmesi: "${keyword}" -> "${storeType}"`);
+                    break;
+                }
+            }
+        }
+    }
+
+    // 3. DOĞRUDAN İSİM EŞLEŞMESİ (mevcut kod)
     if (!selectedCard) {
         for (const card of storeCards) {
             const typeName = card.querySelector('.seller-type-name')?.textContent.toLowerCase();
@@ -4515,7 +4543,7 @@ async function handleVoiceStoreSelection(message) {
         }
     }
 
-    // 3. ANAHTAR KELİME EŞLEŞMESİ
+    // 4. ANAHTAR KELİME EŞLEŞMESİ (mevcut kod)
     if (!selectedCard) {
         const keywordMap = {
             'market': 'Market', 'süpermarket': 'Market', 'bakkal': 'Market',
@@ -4543,7 +4571,7 @@ async function handleVoiceStoreSelection(message) {
         }
     }
 
-     if (selectedCard) {
+    if (selectedCard) {
         try {
             selectedCard.click();
             
@@ -7851,6 +7879,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
