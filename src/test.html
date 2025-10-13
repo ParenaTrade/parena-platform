@@ -2888,33 +2888,27 @@ function initializeSimpleSpeechRecognition() {
     };
     
     // initializeSimpleSpeechRecognition içinde:
-recognition.onend = function() {
-    isListening = false;
-    if (voiceIndicator) voiceIndicator.classList.remove('listening');
-    
-    // ⚠️ DÜZELTME: Daha güvenli yeniden başlatma
-    if (isMicrophoneEnabled && !isRestarting) {
-        isRestarting = true;
-        setTimeout(() => {
-            try {
-                if (isMicrophoneEnabled && recognition) {
-                    recognition.start();
-                }
-            } catch (error) {
-                console.log('Yeniden başlatma hatası:', error);
-                // Hata durumunda 3 saniye bekle
-                setTimeout(() => {
-                    if (isMicrophoneEnabled) {
-                        initializeSimpleSpeechRecognition();
-                    }
-                }, 3000);
-            } finally {
-                isRestarting = false;
-            }
-        }, 1000);
-    }
-};
+ recognition.onend = function() {
+        isListening = false;
+        if (voiceIndicator) voiceIndicator.classList.remove('listening');
         
+        if (isMicrophoneEnabled) {
+            setTimeout(() => {
+                try {
+                    recognition.start();
+                } catch (error) {
+                    console.log('Yeniden başlatma hatası:', error);
+                }
+            }, 800);
+        }
+    };
+    
+    try {
+        recognition.start();
+    } catch (error) {
+        console.error('Başlatma hatası:', error);
+    }
+}        
         // Acil durum fallback'leri
 function setupEmergencyFallbacks() {
     // Languages tablosu yoksa
@@ -8009,6 +8003,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
