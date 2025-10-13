@@ -288,6 +288,54 @@
     color: white;
     transform: scale(1.1);
 }
+
+/* 🆕 SESLİ KOMUT BİLDİRİMİ STİLLERİ */
+.voice-command-notification {
+    margin-top: 15px;
+    padding: 0 10px;
+    animation: pulseGlow 2s infinite;
+}
+
+.voice-notification-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #fff3cd, #ffeb3b);
+    color: #856404;
+    border: 2px solid #ffc107;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 13px;
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
+.voice-notification-content i {
+    color: #ff5722;
+    animation: bounce 1s infinite;
+}
+
+.voice-notification-text {
+    font-weight: 700;
+}
+
+/* Yanıp Sönme Animasyonu */
+@keyframes pulseGlow {
+    0%, 100% { 
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 0.9;
+        transform: scale(1.02);
+    }
+}
+
+/* Mikrofon Bounce Animasyonu */
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+}
         
         .order-summary {
             display: flex;
@@ -2031,7 +2079,7 @@ function updateProductCartCounts() {
 function initCommandSlider() {
     console.log('🔄 Slider başlatılıyor...');
     
-     // Eğer slider zaten varsa çık
+    // Eğer slider zaten varsa çık
     if (document.querySelector('.command-slider-header')) return;
     
     const examples = [
@@ -2046,7 +2094,7 @@ function initCommandSlider() {
         { text: "1 numara 1,5 porsiyon", icon: "fas fa-utensil-spoon" }
     ];
     
- // Products section'ı bul
+    // Products section'ı bul
     const productsSection = document.getElementById('productsSection');
     if (!productsSection) return;
 
@@ -2060,7 +2108,7 @@ function initCommandSlider() {
         exampleGroups.push(examples.slice(i, i + 3));
     }
 
-    // Slider container'ını oluştur - BODY'YE EKLE
+    // Slider container'ını oluştur
     const sliderContainer = document.createElement('div');
     sliderContainer.className = 'command-slider-header';
     sliderContainer.id = 'commandSlider';
@@ -2083,7 +2131,6 @@ function initCommandSlider() {
                     </div>
                 `).join('')}
             </div>
-            <span class="slider-title">Sesli Komut Örnekleri:</span>
             <div class="slider-controls">
                 <button class="slider-btn prev-btn" title="Önceki">
                     <i class="fas fa-chevron-left"></i>
@@ -2093,12 +2140,23 @@ function initCommandSlider() {
                 </button>
             </div>
         </div>
+        
+        <!-- 🆕 SESLİ KOMUT BİLDİRİMİ BURAYA EKLENDİ -->
+        <div class="voice-command-notification" id="voiceCommandNotification">
+            <div class="voice-notification-content">
+                <i class="fas fa-microphone"></i>
+                <span class="voice-notification-text">"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz</span>
+            </div>
+        </div>
     `;
 
-        // SADECE BURASI DEĞİŞTİ: Body yerine products header'a ekle
+    // Products header'a ekle
     productsHeader.appendChild(sliderContainer);
-    console.log('✅ Slider body\'ye eklendi');
-
+    console.log('✅ Slider ve sesli komut bildirimi eklendi');
+    
+    // Slider fonksiyonlarını başlat
+    initSliderControls();
+}
     // Slider state
     let currentGroupIndex = 0;
     let autoSlideInterval;
@@ -2182,6 +2240,95 @@ window.addEventListener('load', function() {
         initCommandSlider();
     }
 });
+
+
+
+        // 🆕 SESLİ KOMUT BİLDİRİMİNİ GÜNCELLE
+function updateVoiceNotification(message, type = 'info') {
+    const notification = document.getElementById('voiceCommandNotification');
+    if (!notification) return;
+    
+    const notificationContent = notification.querySelector('.voice-notification-content');
+    const notificationText = notification.querySelector('.voice-notification-text');
+    const icon = notification.querySelector('i');
+    
+    if (notificationText) {
+        notificationText.textContent = message;
+    }
+    
+    // Türüne göre stil değiştir
+    const types = {
+        info: { 
+            bg: 'linear-gradient(135deg, #fff3cd, #ffeb3b)', 
+            color: '#856404', 
+            border: '#ffc107',
+            icon: 'fas fa-microphone'
+        },
+        success: { 
+            bg: 'linear-gradient(135deg, #d4edda, #28a745)', 
+            color: '#155724', 
+            border: '#28a745',
+            icon: 'fas fa-check-circle'
+        },
+        error: { 
+            bg: 'linear-gradient(135deg, #f8d7da, #dc3545)', 
+            color: '#721c24', 
+            border: '#dc3545',
+            icon: 'fas fa-exclamation-circle'
+        },
+        listening: { 
+            bg: 'linear-gradient(135deg, #cce7ff, #007bff)', 
+            color: '#004085', 
+            border: '#007bff',
+            icon: 'fas fa-microphone-alt'
+        }
+    };
+    
+    const style = types[type] || types.info;
+    
+    if (notificationContent) {
+        notificationContent.style.background = style.bg;
+        notificationContent.style.color = style.color;
+        notificationContent.style.borderColor = style.border;
+    }
+    
+    if (icon) {
+        icon.className = style.icon;
+    }
+}
+
+// 🆕 ÖZEL DURUMLAR İÇİN FONKSİYONLAR
+// 🆕 ÖZEL DURUMLAR İÇİN FONKSİYONLAR
+function showListeningNotification() {
+    updateVoiceNotification('🎤 Dinliyorum... Konuşun!', 'listening');
+}
+
+function showCommandReceivedNotification(command) {
+    updateVoiceNotification(`✅ "${command}"`, 'success');
+    
+    // 2 saniye sonra normal mesaja dön
+    setTimeout(() => {
+        updateVoiceNotification('"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz', 'info');
+    }, 2000);
+}
+
+function showClearCartNotification() {
+    updateVoiceNotification('🗑️ Sepet başarıyla boşaltıldı!', 'success');
+    
+    // 3 saniye sonra normal mesaja dön
+    setTimeout(() => {
+        updateVoiceNotification('Yeni ürünler ekleyebilirsiniz', 'info');
+    }, 3000);
+}
+
+function showErrorNotification() {
+    updateVoiceNotification('❌ Ses anlaşılamadı, lütfen tekrar deneyin', 'error');
+    
+    // 2 saniye sonra normal mesaja dön
+    setTimeout(() => {
+        updateVoiceNotification('"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz', 'info');
+    }, 2000);
+}
         
         // =============================================
         // SEPET YÖNETİM FONKSİYONLARI
@@ -4087,7 +4234,51 @@ function superSimpleExtract(message) {
 // extractProductInfoFromCommand = superSimpleExtract;
         
 // Sepeti tamamen boşaltma fonksiyonu
+// clearCart fonksiyonunu güncelle
 function clearCart() {
+    console.log('🗑️ Sepet tamamen boşaltılıyor...');
+    
+    cart = [];
+    updateCartUI();
+    
+    // 🆕 BİLDİRİM GÖSTER
+    showClearCartNotification();
+    
+    unlockStoreAndSeller();
+    speakToUser("Sepet boşaltıldı");
+    closeDynamicCart();
+    
+    console.log('✅ Sepet tamamen boşaltıldı');
+}
+
+// Ses tanıma fonksiyonlarını güncelle
+recognition.onstart = function() {
+    console.log('✅ Dinliyorum...');
+    isListening = true;
+    
+    // 🆕 DİNLİYORUM BİLDİRİMİ
+    showListeningNotification();
+    
+    if (voiceIndicator) voiceIndicator.classList.add('listening');
+};
+
+recognition.onresult = function(event) {
+    const transcript = event.results[0][0].transcript;
+    console.log('🎯 Tanınan:', transcript);
+    
+    // 🆕 KOMUT ALINDI BİLDİRİMİ
+    showCommandReceivedNotification(transcript);
+    
+    if (userMessage) userMessage.textContent = transcript;
+    processVoiceCommand(transcript);
+};
+
+recognition.onerror = function(event) {
+    console.log('⚠️ Hata:', event.error);
+    
+    // 🆕 HATA BİLDİRİMİ
+    showErrorNotification();
+};
     console.log('🗑️ Sepet tamamen boşaltılıyor...');
     console.log('📊 Önceki sepet:', cart.length, 'ürün');
     
@@ -4105,6 +4296,43 @@ function clearCart() {
     closeDynamicCart();
     
     console.log('✅ Sepet tamamen boşaltıldı');
+}
+
+        function initSliderControls() {
+    const slider = document.getElementById('commandSlider');
+    if (!slider) return;
+    
+    const prevBtn = slider.querySelector('.prev-btn');
+    const nextBtn = slider.querySelector('.next-btn');
+    const groups = slider.querySelectorAll('.slider-example-group');
+    
+    let currentGroup = 0;
+    
+    function showGroup(index) {
+        groups.forEach((group, i) => {
+            group.classList.toggle('active', i === index);
+        });
+        currentGroup = index;
+    }
+    
+    prevBtn.addEventListener('click', () => {
+        let newIndex = currentGroup - 1;
+        if (newIndex < 0) newIndex = groups.length - 1;
+        showGroup(newIndex);
+    });
+    
+    nextBtn.addEventListener('click', () => {
+        let newIndex = currentGroup + 1;
+        if (newIndex >= groups.length) newIndex = 0;
+        showGroup(newIndex);
+    });
+    
+    // Otomatik slider (opsiyonel)
+    setInterval(() => {
+        let newIndex = currentGroup + 1;
+        if (newIndex >= groups.length) newIndex = 0;
+        showGroup(newIndex);
+    }, 5000);
 }
 // Sepet UI'sına temizleme butonu ekle
 // Sepet UI'sına temizleme butonu ekle
@@ -8023,6 +8251,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
