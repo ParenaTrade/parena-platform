@@ -186,6 +186,119 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     z-index: 2;
 }
+
+
+/* ÜRÜN GRID HEADER SABİT SLIDER STİLLERİ */
+.command-slider-header {
+    width: 100%;
+    background: rgba(93, 62, 188, 0.05);
+    border: 2px solid var(--primary-light);
+    border-radius: var(--border-radius);
+    padding: 12px 20px;
+    margin-top: 15px;
+    display: none; /* Başlangıçta gizli */
+}
+
+.products-section[style*="display: block"] .command-slider-header,
+.products-section[style*="display: grid"] .command-slider-header {
+    display: block !important;
+}
+
+.slider-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--primary);
+}
+
+.slider-icon {
+    color: var(--accent);
+    font-size: 16px;
+}
+
+.slider-title {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+
+        
+.slider-examples-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    overflow: hidden;
+    max-width: 400px;
+}
+
+.slider-example {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.3;
+    transition: all 0.5s ease;
+    white-space: nowrap;
+    font-size: 13px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    background: rgba(93, 62, 188, 0.1);
+}
+
+.slider-example.active {
+    opacity: 1;
+    background: rgba(93, 62, 188, 0.2);
+    transform: scale(1.05);
+    font-weight: 600;
+}
+
+/* Responsive düzenlemeler */
+@media (max-width: 768px) {
+    .command-slider-header {
+        padding: 10px 15px;
+        margin-top: 10px;
+    }
+    
+    .slider-content {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+    }
+    
+    .slider-examples-container {
+        max-width: 100%;
+        gap: 10px;
+        justify-content: center;
+    }
+    
+    .slider-example {
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+    
+    .slider-title {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .slider-examples-container {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .slider-example {
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+    
+    .command-slider-header {
+        padding: 8px 12px;
+    }
+}
+
         
         .language-selector {
             position: relative;
@@ -1807,6 +1920,12 @@ function displayProducts(productsToShow) {
     
     // Sepet sayılarını güncelle
     updateProductCartCounts();
+    
+     // Slider'ı göster
+    const slider = document.querySelector('.command-slider-header');
+    if (slider) {
+        slider.style.display = 'block';
+    }
 }
 
 // SEPETTEKİ ÜRÜN SAYILARINI GÜNCELLE
@@ -1833,12 +1952,22 @@ function updateProductCartCounts() {
     });
 }
 
-
-
-        // KOMUT SLIDER'INI BAŞLAT
+        function showProductsSection() {
+    const productsSection = document.getElementById('productsSection');
+    if (productsSection) {
+        productsSection.style.display = 'block';
+        
+        // Slider'ı göster
+        const slider = document.querySelector('.command-slider-header');
+        if (slider) {
+            slider.style.display = 'block';
+        }
+    }
+}
+// ÜRÜN GRID HEADER'INDA SABİT KOMUT SLIDER
 function initCommandSlider() {
     // Eğer slider zaten varsa çık
-    if (document.querySelector('.command-slider')) return;
+    if (document.querySelector('.command-slider-header')) return;
     
     const examples = [
         { text: "1 numara 5 kilo", icon: "fas fa-weight" },
@@ -1852,31 +1981,45 @@ function initCommandSlider() {
         { text: "1 numara 1,5 porsiyon", icon: "fas fa-utensil-spoon" }
     ];
 
-    const slider = document.createElement('div');
-    slider.className = 'command-slider';
-    slider.innerHTML = `
-        <i class="fas fa-microphone-alt" style="color: var(--accent);"></i>
-        <span>Sesli komut örnekleri:</span>
-        <div class="command-examples-container"></div>
+    // Products section'ı bul
+    const productsSection = document.getElementById('productsSection');
+    if (!productsSection) {
+        console.log('❌ Products section bulunamadı');
+        return;
+    }
+
+    // Products header'ı bul
+    const productsHeader = productsSection.querySelector('.products-header');
+    if (!productsHeader) {
+        console.log('❌ Products header bulunamadı');
+        return;
+    }
+
+    // Slider container'ını oluştur
+    const sliderContainer = document.createElement('div');
+    sliderContainer.className = 'command-slider-header';
+    
+    sliderContainer.innerHTML = `
+        <div class="slider-content">
+            <i class="fas fa-microphone-alt slider-icon"></i>
+            <span class="slider-title">Sesli komut örnekleri:</span>
+            <div class="slider-examples-container">
+                ${examples.map((example, index) => `
+                    <div class="slider-example ${index === 0 ? 'active' : ''}">
+                        <i class="${example.icon}"></i>
+                        <span>${example.text}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
     `;
 
-    const examplesContainer = slider.querySelector('.command-examples-container');
-    
-    examples.forEach((example, index) => {
-        const exampleEl = document.createElement('div');
-        exampleEl.className = 'command-example';
-        exampleEl.innerHTML = `
-            <i class="${example.icon}"></i>
-            <span>${example.text}</span>
-        `;
-        examplesContainer.appendChild(exampleEl);
-    });
-
-    document.body.appendChild(slider);
+    // Slider'ı products header'ına ekle
+    productsHeader.appendChild(sliderContainer);
 
     // Slider animasyonu
     let currentIndex = 0;
-    const allExamples = examplesContainer.querySelectorAll('.command-example');
+    const allExamples = sliderContainer.querySelectorAll('.slider-example');
     
     function animateSlider() {
         allExamples.forEach(el => el.classList.remove('active'));
@@ -1892,14 +2035,32 @@ function initCommandSlider() {
     animateSlider();
     
     // 3 saniyede bir değiştir
-    setInterval(animateSlider, 3000);
+    const sliderInterval = setInterval(animateSlider, 3000);
+    
+    // Products section görünür olduğunda slider'ı göster
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                const isVisible = productsSection.style.display !== 'none';
+                sliderContainer.style.display = isVisible ? 'block' : 'none';
+                
+                if (isVisible) {
+                    animateSlider(); // Yeniden başlat
+                }
+            }
+        });
+    });
+    
+    observer.observe(productsSection, { attributes: true });
+    
+    console.log('✅ Komut slider header başlatıldı');
 }
 
-        // Uygulama başlangıcında çağır
+        // Uygulama başlangıcında slider'ı başlat
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         initCommandSlider();
-    }, 2000);
+    }, 1000);
 });
 
         // =============================================
@@ -7558,4 +7719,5 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
