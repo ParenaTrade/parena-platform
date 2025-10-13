@@ -2011,10 +2011,17 @@ function updateProductCartCounts() {
     }
 }
         
-// ÜRÜN GRID HEADER'INDA SABİT KOMUT SLIDER - 3'LÜ GRUP
+// DÜZELTİLMİŞ SLAYT FONKSİYONU - PRODUCTS SECTION'DAN BAĞIMSIZ
 function initCommandSlider() {
-    // Eğer slider zaten varsa çık
-    if (document.querySelector('.command-slider-header')) return;
+    console.log('🔄 Slider başlatılıyor...');
+    
+    // Eğer slider zaten varsa, sadece göster
+    const existingSlider = document.getElementById('commandSlider');
+    if (existingSlider) {
+        console.log('✅ Slider zaten var, gösteriliyor...');
+        existingSlider.style.display = 'flex';
+        return;
+    }
     
     const examples = [
         { text: "1 numara 5 kilo", icon: "fas fa-weight" },
@@ -2028,29 +2035,16 @@ function initCommandSlider() {
         { text: "1 numara 1,5 porsiyon", icon: "fas fa-utensil-spoon" }
     ];
 
-    // Products section'ı bul
-    const productsSection = document.getElementById('productsSection');
-    if (!productsSection) {
-        console.log('❌ Products section bulunamadı');
-        return;
-    }
-
-    // Products header'ı bul
-    const productsHeader = productsSection.querySelector('.products-header');
-    if (!productsHeader) {
-        console.log('❌ Products header bulunamadı');
-        return;
-    }
-
     // Örnekleri 3'lü gruplara ayır
     const exampleGroups = [];
     for (let i = 0; i < examples.length; i += 3) {
         exampleGroups.push(examples.slice(i, i + 3));
     }
 
-    // Slider container'ını oluştur
+    // Slider container'ını oluştur - BODY'YE EKLE
     const sliderContainer = document.createElement('div');
     sliderContainer.className = 'command-slider-header';
+    sliderContainer.id = 'commandSlider';
     
     sliderContainer.innerHTML = `
         <div class="slider-content">
@@ -2081,12 +2075,12 @@ function initCommandSlider() {
         </div>
     `;
 
-    // Slider'ı products header'ına ekle
-    document.body.appendChild(sliderContainer); // Body'ye direkt ekle
+    // Slider'ı body'e ekle - PRODUCTS SECTION'DAN BAĞIMSIZ
+    document.body.appendChild(sliderContainer);
+    console.log('✅ Slider body\'ye eklendi');
 
     // Slider state
     let currentGroupIndex = 0;
-    let currentExampleIndex = 0;
     let autoSlideInterval;
 
     // Grup değiştirme fonksiyonu
@@ -2106,43 +2100,18 @@ function initCommandSlider() {
             const groupExamples = sliderContainer.querySelectorAll(`.slider-example[data-group="${groupIndex}"]`);
             if (groupExamples[0]) {
                 groupExamples[0].classList.add('active-example');
-                currentExampleIndex = 0;
             }
         }
         
         currentGroupIndex = groupIndex;
     }
 
-    // Örnek değiştirme fonksiyonu
-    function showExample(groupIndex, exampleIndex) {
-        const examples = sliderContainer.querySelectorAll('.slider-example');
-        
-        // Tüm örnekleri pasif yap
-        examples.forEach(example => example.classList.remove('active-example'));
-        
-        // Yeni örneği aktif et
-        const targetExample = sliderContainer.querySelector(`.slider-example[data-group="${groupIndex}"][data-example="${exampleIndex}"]`);
-        if (targetExample) {
-            targetExample.classList.add('active-example');
-            currentExampleIndex = exampleIndex;
-        }
-    }
-
     // Otomatik slayt fonksiyonu
     function startAutoSlide() {
         autoSlideInterval = setInterval(() => {
-            const currentGroup = exampleGroups[currentGroupIndex];
-            
-            // Önce grup içinde örnekleri gez
-            if (currentExampleIndex < currentGroup.length - 1) {
-                showExample(currentGroupIndex, currentExampleIndex + 1);
-            } 
-            // Sonra diğer gruba geç
-            else {
-                const nextGroupIndex = (currentGroupIndex + 1) % exampleGroups.length;
-                showGroup(nextGroupIndex);
-            }
-        }, 3000); // 3 saniyede bir değişim
+            const nextGroupIndex = (currentGroupIndex + 1) % exampleGroups.length;
+            showGroup(nextGroupIndex);
+        }, 4000); // 4 saniyede bir değişim
     }
 
     // Manuel kontrol fonksiyonları
@@ -2174,26 +2143,26 @@ function initCommandSlider() {
     showGroup(0);
     startAutoSlide();
 
-    // Products section görünür olduğunda slider'ı göster
-    const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                const isVisible = productsSection.style.display !== 'none';
-                sliderContainer.style.display = isVisible ? 'block' : 'none';
-                
-                if (isVisible) {
-                    resetAutoSlide(); // Yeniden başlat
-                } else {
-                    clearInterval(autoSlideInterval);
-                }
-            }
-        });
-    });
-    
-    observer.observe(productsSection, { attributes: true });
-    
     console.log('✅ 3\'lü grup komut slider başlatıldı');
 }
+
+// HEMEN ÇALIŞTIR - DOM yüklenir yüklenmez
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM yüklendi, slider başlatılıyor...');
+    initCommandSlider();
+});
+
+// Sayfa tamamen yüklendiğinde de kontrol et
+window.addEventListener('load', function() {
+    console.log('📄 Sayfa tamamen yüklendi');
+    // Slider'ın görünür olup olmadığını kontrol et
+    const slider = document.getElementById('commandSlider');
+    if (!slider || slider.style.display === 'none') {
+        console.log('⚠️ Slider görünmüyor, yeniden başlatılıyor...');
+        initCommandSlider();
+    }
+});
+        
         // =============================================
         // SEPET YÖNETİM FONKSİYONLARI
         // =============================================
@@ -7850,6 +7819,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
