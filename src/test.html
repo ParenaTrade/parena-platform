@@ -2283,10 +2283,17 @@ window.addEventListener('load', function() {
 
 
 
-     function updateVoiceNotification(message, type = 'info') {
-    // ⭐ ARTIK #voiceCommandNotification BİR DIV ELEMENTİ
+    let notificationTimeout = null;
+
+function updateVoiceNotification(message, type = 'info', autoReset = true, resetDelay = 3000) {
     const notification = document.getElementById('voiceCommandNotification');
     if (!notification) return;
+    
+    // ⭐ ÖNCEKİ ZAMANLAYICIYI TEMİZLE
+    if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+        notificationTimeout = null;
+    }
     
     const notificationText = notification.querySelector('.voice-notification-text');
     const icon = notification.querySelector('i');
@@ -2295,7 +2302,7 @@ window.addEventListener('load', function() {
         notificationText.textContent = message;
     }
     
-    // Stil güncelleme - SADECE BİLDİRİM İÇİN
+    // Stil güncelleme
     const types = {
         info: { 
             bg: 'linear-gradient(135deg, #fff3cd, #ffeb3b)', 
@@ -2335,40 +2342,34 @@ window.addEventListener('load', function() {
     if (icon) {
         icon.className = style.icon;
     }
+    
+    // ⭐ OTOMATİK GERİ DÖNÜŞ
+    if (autoReset && type !== 'info') {
+        notificationTimeout = setTimeout(() => {
+            updateVoiceNotification('"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz', 'info', false);
+        }, resetDelay);
+    }
+}
+
+
+// ⭐ BASİTLEŞTİRİLMİŞ BİLDİRİM FONKSİYONLARI
+function showClearCartNotification() {
+    updateVoiceNotification('🗑️ Sepet başarıyla boşaltıldı!', 'success', true, 3000);
 }
         
-// 🆕 ÖZEL DURUMLAR İÇİN FONKSİYONLAR
-// 🆕 ÖZEL DURUMLAR İÇİN FONKSİYONLAR
 function showListeningNotification() {
-    updateVoiceNotification('🎤 Dinliyorum... Konuşun!', 'listening');
+    updateVoiceNotification('🎤 Dinliyorum... Konuşun!', 'listening', true, 5000);
 }
 
 function showCommandReceivedNotification(command) {
-    updateVoiceNotification(`✅ "${command}"`, 'success');
-    
-    // 2 saniye sonra normal mesaja dön
-    setTimeout(() => {
-        updateVoiceNotification('"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz', 'info');
-    }, 2000);
+    updateVoiceNotification(`✅ "${command}"`, 'success', true, 2000);
 }
-
-function showClearCartNotification() {
-    updateVoiceNotification('🗑️ Sepet başarıyla boşaltıldı!', 'success');
-    
-    // 3 saniye sonra normal mesaja dön
-    setTimeout(() => {
-        updateVoiceNotification('Yeni ürünler ekleyebilirsiniz', 'info');
-    }, 3000);
-}
+        
 
 function showErrorNotification() {
-    updateVoiceNotification('❌ Ses anlaşılamadı, lütfen tekrar deneyin', 'error');
-    
-    // 2 saniye sonra normal mesaja dön
-    setTimeout(() => {
-        updateVoiceNotification('"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz', 'info');
-    }, 2000);
+    updateVoiceNotification('❌ Ses anlaşılamadı, lütfen tekrar deneyin', 'error', true, 2000);
 }
+
         
         // =============================================
         // SEPET YÖNETİM FONKSİYONLARI
@@ -8306,6 +8307,7 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
 
 
 
