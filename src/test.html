@@ -644,6 +644,107 @@
             text-decoration: line-through;
             margin-left: 5px;
         }
+
+        /* SESLİ KOMUT İPUCU STİLLERİ */
+.voice-command-hint {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(93, 62, 188, 0.9);
+    color: white;
+    padding: 5px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 3;
+}
+
+.product-card:hover .voice-command-hint {
+    opacity: 1;
+}
+
+/* SEPETTEKİ ÜRÜN SAYACI */
+.product-cart-count {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--success);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 2;
+}
+
+/* KOMUT SLIDER STİLLERİ */
+.command-slider {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.95);
+    padding: 12px 20px;
+    border-radius: 25px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--primary);
+    border: 2px solid var(--primary-light);
+}
+
+.command-example {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+    white-space: nowrap;
+}
+
+.command-example.active {
+    opacity: 1;
+    font-weight: 600;
+}
+
+.command-examples-container {
+    display: flex;
+    gap: 15px;
+    overflow: hidden;
+    width: 300px;
+}
+
+/* Responsive düzenlemeler */
+@media (max-width: 768px) {
+    .command-slider {
+        bottom: 70px;
+        padding: 10px 15px;
+        font-size: 12px;
+    }
+    
+    .command-examples-container {
+        width: 200px;
+    }
+    
+    .command-example {
+        font-size: 11px;
+    }
+}
         
         .add-to-cart-btn {
             margin-top: 10px;
@@ -1643,7 +1744,8 @@
     });
 }
         // Ürünleri göster
-       function displayProducts(productsToShow) {
+       // ÜRÜN GÖSTERİM FONKSİYONUNU GÜNCELLE
+function displayProducts(productsToShow) {
     const productsGrid = document.getElementById('productsGrid');
     if (!productsGrid) return;
     
@@ -1651,7 +1753,7 @@
     
     if (productsToShow.length === 0) {
         productsGrid.innerHTML = `
-            <div class="text-center" style="grid-column: 1 / -1; padding: 40px; color: #6c757d;">
+            <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
                 <i class="fas fa-box-open fa-3x mb-3"></i>
                 <p>Bu kategoride ürün bulunamadı</p>
             </div>
@@ -1663,7 +1765,7 @@
         const productCard = document.createElement('div');
         productCard.className = 'product-card';
         productCard.dataset.productId = product.id;
-        productCard.dataset.productIndex = index + 1; // Sıra numarası ekle
+        productCard.dataset.productIndex = index + 1;
         
         let badgeHTML = '';
         let priceHTML = '';
@@ -1681,6 +1783,10 @@
         productCard.innerHTML = `
             ${badgeHTML}
             <div class="product-number">${index + 1}</div>
+            <div class="voice-command-hint">
+                <i class="fas fa-microphone"></i>
+                <span>"${index + 1} numara 5 kilo"</span>
+            </div>
             <img src="${product.imgurl || 'https://via.placeholder.com/150x100?text=Ürün'}" 
                  alt="${product.name}" 
                  class="product-image">
@@ -1698,7 +1804,103 @@
         
         productsGrid.appendChild(productCard);
     });
+    
+    // Sepet sayılarını güncelle
+    updateProductCartCounts();
 }
+
+// SEPETTEKİ ÜRÜN SAYILARINI GÜNCELLE
+function updateProductCartCounts() {
+    const productCards = document.querySelectorAll('.product-card');
+    
+    productCards.forEach(card => {
+        const productId = card.dataset.productId;
+        const existingCount = card.querySelector('.product-cart-count');
+        
+        // Eski sayacı temizle
+        if (existingCount) {
+            existingCount.remove();
+        }
+        
+        // Sepette bu üründen var mı kontrol et
+        const cartItem = cart.find(item => item.id === productId);
+        if (cartItem && cartItem.quantity > 0) {
+            const countBadge = document.createElement('div');
+            countBadge.className = 'product-cart-count';
+            countBadge.textContent = cartItem.quantity;
+            card.appendChild(countBadge);
+        }
+    });
+}
+
+
+
+        // KOMUT SLIDER'INI BAŞLAT
+function initCommandSlider() {
+    // Eğer slider zaten varsa çık
+    if (document.querySelector('.command-slider')) return;
+    
+    const examples = [
+        { text: "1 numara 5 kilo", icon: "fas fa-weight" },
+        { text: "1 numara 2,5 kilo", icon: "fas fa-balance-scale" },
+        { text: "1 numara 500 gram", icon: "fas fa-weight-hanging" },
+        { text: "1 numara Yarım kilo", icon: "fas fa-adjust" },
+        { text: "1 numara 5 adet", icon: "fas fa-cube" },
+        { text: "1 numara 5 paket", icon: "fas fa-box" },
+        { text: "1 numara 3 litre", icon: "fas fa-wine-bottle" },
+        { text: "1 numara 1 porsiyon", icon: "fas fa-utensils" },
+        { text: "1 numara 1,5 porsiyon", icon: "fas fa-utensil-spoon" }
+    ];
+
+    const slider = document.createElement('div');
+    slider.className = 'command-slider';
+    slider.innerHTML = `
+        <i class="fas fa-microphone-alt" style="color: var(--accent);"></i>
+        <span>Sesli komut örnekleri:</span>
+        <div class="command-examples-container"></div>
+    `;
+
+    const examplesContainer = slider.querySelector('.command-examples-container');
+    
+    examples.forEach((example, index) => {
+        const exampleEl = document.createElement('div');
+        exampleEl.className = 'command-example';
+        exampleEl.innerHTML = `
+            <i class="${example.icon}"></i>
+            <span>${example.text}</span>
+        `;
+        examplesContainer.appendChild(exampleEl);
+    });
+
+    document.body.appendChild(slider);
+
+    // Slider animasyonu
+    let currentIndex = 0;
+    const allExamples = examplesContainer.querySelectorAll('.command-example');
+    
+    function animateSlider() {
+        allExamples.forEach(el => el.classList.remove('active'));
+        
+        if (allExamples[currentIndex]) {
+            allExamples[currentIndex].classList.add('active');
+        }
+        
+        currentIndex = (currentIndex + 1) % allExamples.length;
+    }
+    
+    // İlk örneği aktif et
+    animateSlider();
+    
+    // 3 saniyede bir değiştir
+    setInterval(animateSlider, 3000);
+}
+
+        // Uygulama başlangıcında çağır
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        initCommandSlider();
+    }, 2000);
+});
 
         // =============================================
         // SEPET YÖNETİM FONKSİYONLARI
@@ -1875,7 +2077,10 @@ function updateLockUI() {
     
     // Ödeme özeti
     updateCartTotals();
-    
+       
+     // Sepet sayılarını güncelle
+    updateProductCartCounts();
+       
     // ÖNEMLİ DÜZELTME: Sepet durumuna göre kilit yönetimi
     console.log('🔍 Kilit kontrolü - Sepet:', totalItems, 'ürün, Kilitli mi:', isSellerLocked);
     
@@ -7353,3 +7558,4 @@ function waitForDOMElements() {
     </script>
 </body>
 </html>
+
