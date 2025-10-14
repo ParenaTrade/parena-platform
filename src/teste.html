@@ -3714,64 +3714,7 @@ async function processVoiceCommand(transcript) {
     console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
 
        try {
-        // ✅ MAĞAZA SEÇİMİ - current:2'de kal
-        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
-            console.log('🏪 Mağaza seçim komutu algılandı');
-            const success = await handleVoiceStoreSelection(filteredMessage);
-            if (success) {
-                // ✅ Mağaza seçildi ama kök değişmedi - current:2'de kaldı
-                console.log('✅ Mağaza seçildi, kök sabit:', currentRoot);
-                return;
-            }
-        }     
-        
-         // 1. ÜRÜN EKLEME KOMUTU - ÖNCELİKLİ
-        if (selectedCategoryId && products.length > 0) {
-            console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
-            const success = await handleVoiceProductAdd(filteredMessage);
-            if (success) {
-                console.log('✅ Ürün başarıyla eklendi');
-                return;
-            }
-        }
-
-        // 2. SATICI SEÇİMİ - current:2'deyken satıcı seçilebilir
-        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasSellerKeywords(filteredMessage)) {
-            console.log('🏬 Satıcı seçim komutu algılandı');
-            const success = await handleVoiceSellerSelection(filteredMessage);
-            if (success) return;
-        }
-
-        // 3. REYON SEÇİMİ
-        if ((currentRoot === "3:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
-            console.log('📦 Reyon seçim komutu algılandı');
-            const success = await handleVoiceCategorySelection(filteredMessage);
-            if (success) return;
-        }
-
-            // 🆕 BU KODU EKLEYİN - BAŞLANGIÇ
-    const clearCartCommands = [
-        'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
-        'clear cart', 'empty cart', 'reset cart', 'temizle',
-        'hepsini sil', 'ürünleri kaldır', 'sepetten kaldır', 'boşalt'
-    ];
-    
-    const normalizedMessage = message.toLowerCase().trim();
-    
-    if (clearCartCommands.some(cmd => normalizedMessage.includes(cmd))) {
-        console.log('🛒 Sepeti boşaltma komutu algılandı');
-        clearCart();
-        return; // ⚠️ BU RETURN KRİTİK - diğer kodları durdurur
-    }
-        // FALLBACK MESAJI
-        console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
-        const fallbackMessage = getSmartFallback();
-        if (fallbackMessage) {
-            speakToUser(fallbackMessage);
-        }
-
-    
-    // ÖDEME AKIŞI KONTROLLERİ - HEM SESLİ HEM TIKLAMA
+        // ÖDEME AKIŞI KONTROLLERİ - HEM SESLİ HEM TIKLAMA
     if (isWaitingForPhone && expectedInput === 'phone') {
         await processPhoneNumber(message);
         return;
@@ -3837,15 +3780,71 @@ async function processVoiceCommand(transcript) {
         startPaymentProcess('bonus');
         return;
     }
+    
+        // ✅ MAĞAZA SEÇİMİ - current:2'de kal
+        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
+            console.log('🏪 Mağaza seçim komutu algılandı');
+            const success = await handleVoiceStoreSelection(filteredMessage);
+            if (success) {
+                // ✅ Mağaza seçildi ama kök değişmedi - current:2'de kaldı
+                console.log('✅ Mağaza seçildi, kök sabit:', currentRoot);
+                return;
+            }
+        }     
+        
+         // 1. ÜRÜN EKLEME KOMUTU - ÖNCELİKLİ
+        if (selectedCategoryId && products.length > 0) {
+            console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
+            const success = await handleVoiceProductAdd(filteredMessage);
+            if (success) {
+                console.log('✅ Ürün başarıyla eklendi');
+                return;
+            }
+        }
+
+        // 2. SATICI SEÇİMİ - current:2'deyken satıcı seçilebilir
+        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasSellerKeywords(filteredMessage)) {
+            console.log('🏬 Satıcı seçim komutu algılandı');
+            const success = await handleVoiceSellerSelection(filteredMessage);
+            if (success) return;
+        }
+
+        // 3. REYON SEÇİMİ
+        if ((currentRoot === "3:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
+            console.log('📦 Reyon seçim komutu algılandı');
+            const success = await handleVoiceCategorySelection(filteredMessage);
+            if (success) return;
+        }
+
+            // 🆕 BU KODU EKLEYİN - BAŞLANGIÇ
+    const clearCartCommands = [
+        'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+        'clear cart', 'empty cart', 'reset cart', 'temizle',
+        'hepsini sil', 'ürünleri kaldır', 'sepetten kaldır', 'boşalt'
+    ];
+    
+    const normalizedMessage = message.toLowerCase().trim();
+    
+    if (clearCartCommands.some(cmd => normalizedMessage.includes(cmd))) {
+        console.log('🛒 Sepeti boşaltma komutu algılandı');
+        clearCart();
+        return; // ⚠️ BU RETURN KRİTİK - diğer kodları durdurur
+    }
+        // FALLBACK MESAJI
+        console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
+        const fallbackMessage = getSmartFallback();
+        if (fallbackMessage) {
+            speakToUser(fallbackMessage);
+        }
+
         catch (error) {
         console.error('❌ Komut işleme hatası:', error);
         if (Date.now() - lastSpeakTime > SPEAK_COOLDOWN) {
         speakToUser("Bir hata oluştu, tekrar deneyin.");
         }
     }
-}
-}        
-        
+}    
+                
 // YARDIMCI FONKSİYONLAR
 function filterUnnecessaryWords(message) {
     const unnecessary = [
@@ -8985,4 +8984,5 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
