@@ -9864,112 +9864,6 @@ function handlePaymentCommand(message) {
     return false;
 }
 
-function initializeOptimizedSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-        console.error('❌ Ses tanıma desteklenmiyor');
-        return;
-    }
-    
-    // Önceki recognition'ı temizle
-    if (recognition) {
-        try {
-            recognition.stop();
-        } catch (e) {}
-        recognition = null;
-    }
-    
-    recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.lang = 'tr-TR';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 3;
-    
-    let restartTimeout = null;
-    
-    recognition.onstart = function() {
-        console.log('✅ Dinliyorum... Net konuşun');
-        isListening = true;
-        if (voiceIndicator) voiceIndicator.classList.add('listening');
-        
-        if (restartTimeout) {
-            clearTimeout(restartTimeout);
-            restartTimeout = null;
-        }
-    };
-    
-    recognition.onresult = function(event) {
-        console.log('🎯 Ses algılandı, işleniyor...');
-        
-        // En iyi sonucu al
-        let bestResult = event.results[0][0];
-        for (let i = 0; i < event.results[0].length; i++) {
-            if (event.results[0][i].confidence > bestResult.confidence) {
-                bestResult = event.results[0][i];
-            }
-        }
-        
-        const transcript = bestResult.transcript;
-        const confidence = bestResult.confidence;
-        
-        console.log(`🎯 Tanınan: "${transcript}" (Güven: ${(confidence * 100).toFixed(1)}%)`);
-        
-        // Düşük güvenilirlik uyarısı
-        if (confidence < 0.6) {
-            console.log('⚠️ Düşük güvenilirlik, kullanıcıyı uyar');
-            speakToUser("Anlayamadım, lütfen tekrar söyler misiniz?");
-            return;
-        }
-        
-        if (userMessage) userMessage.textContent = transcript;
-        
-        // processVoiceCommand'ü çağır
-        processVoiceCommand(transcript);
-    };
-    
-    recognition.onerror = function(event) {
-        console.log('⚠️ Ses tanıma hatası:', event.error);
-        isListening = false;
-        if (voiceIndicator) voiceIndicator.classList.remove('listening');
-    };
-    
-    recognition.onend = function() {
-        console.log('🔚 Ses tanıma sonlandı');
-        isListening = false;
-        if (voiceIndicator) voiceIndicator.classList.remove('listening');
-        
-        if (isMicrophoneEnabled) {
-            restartTimeout = setTimeout(() => {
-                try {
-                    if (isMicrophoneEnabled && recognition) {
-                        recognition.start();
-                        console.log('🔄 Ses tanıma yeniden başlatıldı');
-                    }
-                } catch (error) {
-                    console.log('Yeniden başlatma hatası:', error);
-                    setTimeout(() => {
-                        if (isMicrophoneEnabled) {
-                            initializeOptimizedSpeechRecognition();
-                        }
-                    }, 2000);
-                }
-            }, 800);
-        }
-    };
-    
-    try {
-        recognition.start();
-        console.log('🚀 Optimize edilmiş ses tanıma başlatıldı');
-    } catch (error) {
-        console.error('Başlatma hatası:', error);
-        setTimeout(() => {
-            if (isMicrophoneEnabled) {
-                initializeOptimizedSpeechRecognition();
-            }
-        }, 3000);
-    }
-}
 
     
     // Teslimat zamanını formatla
@@ -10048,6 +9942,7 @@ function updatePaymentStyles() {
     </script>
 </body>
 </html>
+
 
 
 
