@@ -8479,62 +8479,97 @@ function startPaymentProcess(paymentMethod) {
     expectedInput = 'phone';
 }
 
-// TELEFON İŞLEME - DAHA AÇIK SESLİ MESAJ
-async function processPhoneNumber(phoneInput) {
-    console.log('📞 Telefon işleniyor:', phoneInput);
+// formatPhoneNumber fonksiyonunu GÜNCELLEYİN
+function formatPhoneNumber(phoneText) {
+    console.log('📞 formatPhoneNumber çağrıldı:', phoneText);
     
-    const cleanPhone = cleanPhoneNumber(phoneInput);
+    // Sadece rakamları al
+    let cleanNumber = phoneText.replace(/\D/g, '');
     
-    if (!cleanPhone || cleanPhone.length < 10) {
-        displayMessage("❌ Geçerli bir telefon numarası girmediniz. Lütfen tekrar söyleyin.");
-        speakToUser("Geçerli bir telefon numarası söyleyin.");
-        return false;
+    // 0541... formatında sakla (11 haneli)
+    if (cleanNumber.startsWith('90')) {
+        // 905356953555 → 05356953555
+        cleanNumber = '0' + cleanNumber.substring(2);
+    } else if (!cleanNumber.startsWith('0') && cleanNumber.length === 10) {
+        // 5356953555 → 05356953555  
+        cleanNumber = '0' + cleanNumber;
     }
     
-    displayMessage(`📞 Telefon: ${formatPhoneNumber(cleanPhone)} kontrol ediliyor...`);
-    speakToUser(`Telefon numaranız ${formatPhoneNumber(cleanPhone)} kontrol ediliyor`);
+    // 11 haneli mi kontrol et (05356953555)
+    if (cleanNumber.length === 11 && cleanNumber.startsWith('05')) {
+        return cleanNumber; // 05356953555 formatında döndür
+    }
+    
+    return null;
+}
+
+// isValidPhoneNumber fonksiyonunu GÜNCELLEYİN
+function isValidPhoneNumber(phoneNumber) {
+    if (!phoneNumber) return false;
+    
+    // Türkiye telefon numarası pattern'i (05356953555)
+    const phonePattern = /^05[0-9]{9}$/;
+    return phonePattern.test(phoneNumber);
+}
+
+// formatPhoneDisplay fonksiyonunu GÜNCELLEYİN
+function formatPhoneDisplay(phone) {
+    if (!phone) return '';
+    
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length === 11 && cleanPhone.startsWith('05')) {
+        // 05356953555 → +90 (535) 695 35 55
+        return `+90 (${cleanPhone.substring(1,4)}) ${cleanPhone.substring(4,7)} ${cleanPhone.substring(7,9)} ${cleanPhone.substring(9,11)}`;
+    }
+    
+    return phone;
+}        
+
+// TELEFON İŞLEME - DAHA AÇIK SESLİ MESAJ
+async function processPhoneNumber(message) {
+    console.log('📞 Telefon işleniyor:', message);
     
     try {
-        const { data: customer, error } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('phone', cleanPhone)
-            .single();
+        // Rakamları çıkar
+        const numbers = message.replace(/\D/g, '');
         
-        if (error && error.code !== '406') {
-            console.error('Müşteri sorgu hatası:', error);
+        if (numbers.length >= 10) {
+            // Formatla (05356953555)
+            const formattedPhone = formatPhoneNumber(numbers);
+            
+            if (formattedPhone && isValidPhoneNumber(formattedPhone)) {
+                console.log('✅ Geçerli telefon:', formattedPhone);
+                
+                // Telefon numarasını kaydet (0535... formatında)
+                customerPhone = formattedPhone;
+                localStorage.setItem('customerPhone', customerPhone);
+                
+                // UI güncelle
+                displayMessage(`✅ Telefon numaranız kaydedildi: ${formatPhoneDisplay(formattedPhone)}`);
+                speakToUser("Telefon numaranız kaydedildi. Lütfen adınızı ve soyadınızı söyleyin.");
+                
+                // Sonraki adıma geç
+                isWaitingForPhone = false;
+                isWaitingForName = true;
+                expectedInput = 'name';
+                
+                return true;
+            }
         }
         
-        if (customer) {
-            currentCustomer = customer;
-            localStorage.setItem('currentCustomer', JSON.stringify(customer));
-            
-            displayMessage(`✅ Hoş geldiniz ${customer.name}! Sepetiniz kaydediliyor...`);
-            speakToUser(`Hoş geldiniz ${customer.name}! Kayıtlı adresinize teslimat yapılsın mı? Evet veya hayır diyebilirsiniz`);
-            
-            await linkCartToCustomer(customer.id);
-            await checkDeliveryAddress(customer);
-            
-        } else {
-            // ✅ YENİ MÜŞTERİ İÇİN AÇIK SESLİ MESAJ
-            displayMessage("👋 Yeni müşteri kaydı oluşturuluyor. Lütfen adınızı ve soyadınızı söyleyin.");
-            speakToUser("Yeni müşteri kaydı için lütfen adınızı ve soyadınızı söyleyin, örneğin: Umut Durmaz");
-            
-            isWaitingForName = true;
-            expectedInput = 'name';
-            pendingPhone = cleanPhone;
-        }
-        
-        return true;
+        // Geçersiz numara
+        console.log('❌ Geçersiz telefon numarası:', message);
+        displayMessage("❌ Geçerli bir telefon numarası girmediniz. Lütfen 11 haneli numaranızı söyleyin:");
+        speakToUser("Geçerli bir telefon numarası söyleyin");
+        return false;
         
     } catch (error) {
         console.error('❌ Telefon işleme hatası:', error);
-        displayMessage("❌ Sistem hatası. Lütfen tekrar deneyin.");
-        speakToUser("Sistem hatası oluştu, lütfen tekrar deneyin");
+        displayMessage("❌ Telefon numarası işlenirken hata oluştu.");
+        speakToUser("Tekrar deneyin");
         return false;
     }
 }
-
 // AD SOYAD İŞLEME - DAHA AÇIK SESLİ MESAJ
 async function processCustomerName(fullName) {
     console.log('👤 Müşteri adı işleniyor:', fullName);
@@ -8550,7 +8585,7 @@ async function processCustomerName(fullName) {
     const lastName = nameParts.slice(1).join(' ');
     
     displayMessage(`👤 Ad: ${firstName} ${lastName}. Lütfen bina numarasını söyleyin.`);
-    speakToUser(`Teşekkürler ${firstName} ${lastName}. Şimdi lütfen bina numaranızı söyleyin, örneğin: on beş`);
+    speakToUser(`Teşekkürler ${firstName} ${lastName}. Şimdi lütfen bina numaranızı söyleyin.`);
     
     isWaitingForBuilding = true;
     expectedInput = 'building';
@@ -8570,14 +8605,14 @@ async function processBuildingInfo(buildingInfo) {
     const buildingMatch = buildingInfo.match(/\d+/);
     if (!buildingMatch) {
         displayMessage("❌ Geçerli bir bina numarası söyleyin.");
-        speakToUser("Geçerli bir bina numarası söyleyin, örneğin: yirmi üç veya beş");
+        speakToUser("Geçerli bir bina numarası söyleyin.");
         return false;
     }
     
     const buildingNumber = buildingMatch[0];
     
     displayMessage(`🏢 Bina: ${buildingNumber}. Lütfen daire numarasını söyleyin.`);
-    speakToUser(`Bina numaranız ${buildingNumber}. Şimdi lütfen daire numaranızı söyleyin, örneğin: dört`);
+    speakToUser(`Bina numaranız ${buildingNumber}. Şimdi lütfen daire numaranızı söyleyin.`);
     
     isWaitingForApartment = true;
     expectedInput = 'apartment';
@@ -9058,6 +9093,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
