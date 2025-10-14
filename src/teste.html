@@ -3568,6 +3568,93 @@ function startRecognition() {
         // Önceki cevaptaki tüm dinamik fonksiyonlar buraya eklenecek
         // (processVoiceCommand, executeDynamicAction, handleDynamicStoreTypeSelection, vb.)
 
+
+
+
+
+        function processVoiceCommand(transcript) {
+    const message = transcript.toLowerCase().trim();
+    console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
+    
+    // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
+    if (transcript.trim() === lastSpokenMessage.trim()) {
+        console.log("⚠️ Kendi cevabımız tekrar algılandı, atlandı");
+        return;
+    }
+    
+    // GEREKSİZ KELİMELERİ FİLTRELE
+    const filteredMessage = filterUnnecessaryWords(message);
+    if (!filteredMessage) {
+        console.log("🔇 Gereksiz mesaj filtrelendi");
+        return;
+    }
+    
+    console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
+    
+    try {
+        // 1. ÖDEME KOMUTLARI - EN ÖNCELİKLİ
+        if (handlePaymentCommand(filteredMessage)) {
+            console.log('✅ Ödeme komutu işlendi');
+            return;
+        }
+        
+        // 2. SEPET TEMİZLEME KOMUTLARI
+        const clearCartCommands = [
+            'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+            'clear cart', 'empty cart', 'reset cart', 'temizle',
+            'hepsini sil', 'ürünleri kaldır', 'sepetten kaldır', 'boşalt'
+        ];
+        
+        if (clearCartCommands.some(cmd => filteredMessage.includes(cmd))) {
+            console.log('🛒 Sepeti boşaltma komutu algılandı');
+            clearCart();
+            return;
+        }
+        
+        // 3. ÜRÜN EKLEME KOMUTU
+        if (selectedCategoryId && products.length > 0) {
+            console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
+            const success = handleVoiceProductAdd(filteredMessage);
+            if (success) {
+                console.log('✅ Ürün başarıyla eklendi');
+                return;
+            }
+        }
+        
+        // 4. DİĞER SEÇİM KOMUTLARI
+        if (currentRoot === "2:0" && hasStoreTypeKeywords(filteredMessage)) {
+            console.log('🏪 Mağaza seçim komutu algılandı');
+            const success = handleVoiceStoreSelection(filteredMessage);
+            if (success) return;
+        }
+        
+        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasSellerKeywords(filteredMessage)) {
+            console.log('🏬 Satıcı seçim komutu algılandı');
+            const success = handleVoiceSellerSelection(filteredMessage);
+            if (success) return;
+        }
+        
+        if ((currentRoot === "3:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
+            console.log('📦 Reyon seçim komutu algılandı');
+            const success = handleVoiceCategorySelection(filteredMessage);
+            if (success) return;
+        }
+        
+        // 5. FALLBACK MESAJI
+        console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
+        const fallbackMessage = getSmartFallback();
+        if (fallbackMessage && shouldShowFallback(filteredMessage)) {
+            speakToUser(fallbackMessage);
+        }
+        
+    } catch (error) {
+        console.error('❌ Komut işleme hatası:', error);
+        if (Date.now() - lastSpeakTime > SPEAK_COOLDOWN) {
+            speakToUser("Bir hata oluştu, tekrar deneyin.");
+        }
+    }
+}
+
 // =============================================
 // TAMAMEN DİNAMİK SESLİ SİPARİŞ SİSTEMİ
 // =============================================
@@ -3619,7 +3706,30 @@ let userLocation = {
 };
 
 
+// Fonksiyonları global scope'a taşı
+window.processVoiceCommand = processVoiceCommand;
+window.filterUnnecessaryWords = filterUnnecessaryWords;
+window.hasStoreTypeKeywords = hasStoreTypeKeywords;
+window.hasSellerKeywords = hasSellerKeywords;
+window.hasCategoryKeywords = hasCategoryKeywords;
+window.getSmartFallback = getSmartFallback;
+window.shouldShowFallback = shouldShowFallback;
+window.handlePaymentCommand = handlePaymentCommand;
+window.initializeOptimizedSpeechRecognition = initializeOptimizedSpeechRecognition;
 
+console.log('✅ processVoiceCommand ve yardımcı fonksiyonlar tanımlandı!');
+
+// Sayfa yüklendiğinde kontrol et
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ processVoiceCommand fonksiyonu hazır!');
+    
+    // Fonksiyonun tanımlandığını test et
+    if (typeof processVoiceCommand === 'function') {
+        console.log('✅ processVoiceCommand fonksiyonu başarıyla tanımlandı');
+    } else {
+        console.error('❌ processVoiceCommand fonksiyonu tanımlanmadı');
+    }
+});
 
 // DOM Elements
         const profileBtn = document.getElementById('profileBtn');
@@ -4076,7 +4186,7 @@ async function safeVoiceMatchQuery(userInput) {
 function filterUnnecessaryWords(message) {
     const unnecessary = [
         'lütfen', 'rica', 'ediyorum', 'istiyorum', 'örneğin', 'mesela',
-        'şey', 'falan', 'filan', 'gibi', 'yani', 'acaba'
+        'şey', 'falan', 'filan', 'gibi', 'yani', 'acaba', 'bir'
     ];
     
     let filtered = message;
@@ -4085,7 +4195,7 @@ function filterUnnecessaryWords(message) {
     });
     
     return filtered.replace(/\s+/g, ' ').trim();
-}
+
 
 // Fallback gösterim kontrolü - YENİ FONKSİYON
 function shouldShowFallback(message) {
@@ -4100,6 +4210,7 @@ function shouldShowFallback(message) {
     window.lastFallbackTime = now;
     return true;
 }
+    
     // Akıllı fallback mesajı - GÜNCELLENMİŞ
 function getSmartFallback() {
     const now = Date.now();
@@ -4120,15 +4231,7 @@ function getSmartFallback() {
     
     // DİĞER DURUMLAR İÇİN MEVCUT FALLBACK
     if (!selectedStoreTypeId) {
-        const storeCards = document.querySelectorAll('.seller-type-card');
-        if (storeCards.length > 0) {
-            const storeList = Array.from(storeCards)
-                .slice(0, 3)
-                .map(card => `${card.dataset.typeIndex}. ${card.querySelector('.seller-type-name')?.textContent}`)
-                .join(', ');
-            return `Hangi mağaza tipi? ${storeList}`;
-        }
-        return "Mağaza tipi seçin: market, restoran...";
+        return "Hangi mağaza tipinden alışveriş yapmak istersiniz? Market, restoran...";
     }
     
     if (!selectedSellerId) {
@@ -4140,7 +4243,7 @@ function getSmartFallback() {
     }
     
     if (selectedCategoryId && products.length > 0) {
-        return "Ürün siparişi verebilirsiniz. Örneğin: 1 kilo domates";
+        return "Ürün siparişi verebilirsiniz. Örneğin: 1 numara 2 kilo veya domates";
     }
     
     if (cart.length > 0) {
@@ -4155,17 +4258,17 @@ function hasStoreTypeKeywords(message) {
     const keywords = ['market', 'restoran', 'eczane', 'pastane', 'alkol', 'çiçek', 'çarşı', 'mağaza', 'tip'];
     return keywords.some(keyword => message.includes(keyword));
 }
-
+    
 function hasSellerKeywords(message) {
     const keywords = ['satıcı', 'yer', 'dükkan', 'market', 'birinci', 'ikinci', 'üçüncü'];
-    return keywords.some(keyword => message.includes(keyword)) || 
-           /\d/.test(message); // Sayı içeriyorsa
+    return keywords.some(keyword => message.includes(keyword)) || /\d/.test(message);
 }
 
 function hasCategoryKeywords(message) {
     const keywords = ['reyon', 'manav', 'kasap', 'fırın', 'şarküteri', 'içecek', 'süt', 'meyve', 'sebze'];
     return keywords.some(keyword => message.includes(keyword));
 }
+
 
 function hasProductKeywords(message) {
     const keywords = ['kilo', 'gram', 'paket', 'adet', 'tane', 'litre', 'lt', 'yarım', 'çeyrek'];
@@ -9784,7 +9887,116 @@ function handlePaymentCommand(message) {
     
     return false;
 }
-// Teslimat zamanını formatla
+
+function initializeOptimizedSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        console.error('❌ Ses tanıma desteklenmiyor');
+        return;
+    }
+    
+    // Önceki recognition'ı temizle
+    if (recognition) {
+        try {
+            recognition.stop();
+        } catch (e) {}
+        recognition = null;
+    }
+    
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = 'tr-TR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 3;
+    
+    let restartTimeout = null;
+    
+    recognition.onstart = function() {
+        console.log('✅ Dinliyorum... Net konuşun');
+        isListening = true;
+        if (voiceIndicator) voiceIndicator.classList.add('listening');
+        
+        if (restartTimeout) {
+            clearTimeout(restartTimeout);
+            restartTimeout = null;
+        }
+    };
+    
+    recognition.onresult = function(event) {
+        console.log('🎯 Ses algılandı, işleniyor...');
+        
+        // En iyi sonucu al
+        let bestResult = event.results[0][0];
+        for (let i = 0; i < event.results[0].length; i++) {
+            if (event.results[0][i].confidence > bestResult.confidence) {
+                bestResult = event.results[0][i];
+            }
+        }
+        
+        const transcript = bestResult.transcript;
+        const confidence = bestResult.confidence;
+        
+        console.log(`🎯 Tanınan: "${transcript}" (Güven: ${(confidence * 100).toFixed(1)}%)`);
+        
+        // Düşük güvenilirlik uyarısı
+        if (confidence < 0.6) {
+            console.log('⚠️ Düşük güvenilirlik, kullanıcıyı uyar');
+            speakToUser("Anlayamadım, lütfen tekrar söyler misiniz?");
+            return;
+        }
+        
+        if (userMessage) userMessage.textContent = transcript;
+        
+        // processVoiceCommand'ü çağır
+        processVoiceCommand(transcript);
+    };
+    
+    recognition.onerror = function(event) {
+        console.log('⚠️ Ses tanıma hatası:', event.error);
+        isListening = false;
+        if (voiceIndicator) voiceIndicator.classList.remove('listening');
+    };
+    
+    recognition.onend = function() {
+        console.log('🔚 Ses tanıma sonlandı');
+        isListening = false;
+        if (voiceIndicator) voiceIndicator.classList.remove('listening');
+        
+        if (isMicrophoneEnabled) {
+            restartTimeout = setTimeout(() => {
+                try {
+                    if (isMicrophoneEnabled && recognition) {
+                        recognition.start();
+                        console.log('🔄 Ses tanıma yeniden başlatıldı');
+                    }
+                } catch (error) {
+                    console.log('Yeniden başlatma hatası:', error);
+                    setTimeout(() => {
+                        if (isMicrophoneEnabled) {
+                            initializeOptimizedSpeechRecognition();
+                        }
+                    }, 2000);
+                }
+            }, 800);
+        }
+    };
+    
+    try {
+        recognition.start();
+        console.log('🚀 Optimize edilmiş ses tanıma başlatıldı');
+    } catch (error) {
+        console.error('Başlatma hatası:', error);
+        setTimeout(() => {
+            if (isMicrophoneEnabled) {
+                initializeOptimizedSpeechRecognition();
+            }
+        }, 3000);
+    }
+}
+
+    
+    // Teslimat zamanını formatla
 function formatDeliveryTime(deliveryTime) {
     const time = new Date(deliveryTime);
     return time.toLocaleTimeString('tr-TR', { 
