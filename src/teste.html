@@ -1560,6 +1560,125 @@
    gap: 15px;
    overflow-x: auto;
 }
+
+        /* Form Stilleri */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--dark);
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--gray-light);
+    border-radius: var(--border-radius);
+    font-size: 14px;
+    transition: var(--transition);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: var(--primary);
+    outline: none;
+}
+
+.form-group input:read-only {
+    background-color: var(--gray-light);
+    cursor: not-allowed;
+}
+
+.locked-address {
+    padding: 12px;
+    background: var(--gray-light);
+    border-radius: var(--border-radius);
+    border: 2px solid var(--success);
+    color: var(--dark);
+    font-weight: 500;
+}
+
+.address-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.address-input-group input {
+    flex: 1;
+}
+
+.btn-small {
+    padding: 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-small:hover {
+    background: var(--primary-light);
+}
+
+.row {
+    display: flex;
+    gap: 15px;
+}
+
+.col-6 {
+    flex: 1;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.btn-primary {
+    flex: 1;
+    padding: 15px;
+    background: var(--success);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-primary:hover {
+    background: #218838;
+}
+
+.btn-secondary {
+    flex: 1;
+    padding: 15px;
+    background: var(--gray);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+/* Sesli girdi vurgulama */
+.voice-input-active {
+    border-color: var(--accent) !important;
+    background: rgba(255, 107, 0, 0.1) !important;
+    animation: pulse 1s infinite;
+}
     </style>
 </head>
 <body>
@@ -1693,7 +1812,121 @@
             </div>
         </div>
     </div>
-
+    <!-- HTML'ye bu popup'ı ekleyin -->
+<div id="customerInfoModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3>📋 Teslimat Bilgileri</h3>
+            <span class="close-modal" id="closeCustomerModal">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="customerInfoForm">
+                <!-- Telefon -->
+                <div class="form-group">
+                    <label for="customerPhone">📞 Telefon Numarası *</label>
+                    <input type="tel" id="customerPhone" name="phone" required 
+                           placeholder="05__ ___ __ __" 
+                           pattern="[0-9]{11}"
+                           title="11 haneli telefon numarası">
+                </div>
+                
+                <!-- Ad Soyad -->
+                <div class="form-group">
+                    <label for="customerName">👤 Ad Soyad *</label>
+                    <input type="text" id="customerName" name="name" required
+                           placeholder="Adınız ve soyadınız">
+                </div>
+                
+                <!-- Kayıtlı Adres (Kilitli) -->
+                <div id="registeredAddressSection" style="display: none;">
+                    <div class="form-group">
+                        <label>🏠 Kayıtlı Adresiniz</label>
+                        <div class="locked-address" id="registeredAddressDisplay">
+                            <!-- Kayıtlı adres burada gösterilecek -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Teslimat Adresi -->
+                <div class="form-group">
+                    <label for="deliveryAddress">📍 Teslimat Adresi *</label>
+                    <div class="address-input-group">
+                        <input type="text" id="deliveryAddress" name="address" 
+                               required readonly
+                               placeholder="Konumunuz yükleniyor...">
+                        <button type="button" id="refreshLocation" class="btn-small">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Bina ve Daire -->
+                <div class="row">
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label for="buildingNumber">🏢 Bina No *</label>
+                            <input type="text" id="buildingNumber" name="building" 
+                                   required placeholder="Bina numarası">
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label for="apartmentNumber">🚪 Daire No</label>
+                            <input type="text" id="apartmentNumber" name="apartment" 
+                                   placeholder="Daire numarası (opsiyonel)">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Adres Notu -->
+                <div class="form-group">
+                    <label for="addressNote">📝 Adres Tarifi</label>
+                    <textarea id="addressNote" name="note" 
+                              placeholder="Kapı rengi, kat, zil bilgisi vb. (opsiyonel)"
+                              rows="2"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" id="cancelCustomerForm" class="btn-secondary">
+                        İptal
+                    </button>
+                    <button type="submit" id="submitCustomerForm" class="btn-primary">
+                        ✅ Bilgileri Kaydet ve Siparişi Tamamla
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- Kayıtlı Kullanıcı Onay Bölümünü Ekle -->
+<div id="addressConfirmationSection" style="display: none; margin: 20px 0; padding: 15px; background: #fff3cd; border-radius: 10px; border: 2px solid #ffc107;">
+    <div style="text-align: center; margin-bottom: 15px;">
+        <i class="fas fa-map-marker-alt" style="color: #856404; font-size: 24px;"></i>
+        <h4 style="margin: 10px 0; color: #856404;">Teslimat Adresi Kontrolü</h4>
+    </div>
+    
+    <div style="margin-bottom: 15px;">
+        <div style="font-weight: bold; color: #856404; margin-bottom: 5px;">📋 Kayıtlı Adresiniz:</div>
+        <div id="currentRegisteredAddress" style="background: white; padding: 10px; border-radius: 5px; margin-bottom: 10px;"></div>
+        
+        <div style="font-weight: bold; color: #856404; margin-bottom: 5px;">📍 Yeni Teslimat Adresi:</div>
+        <div id="newDeliveryAddress" style="background: white; padding: 10px; border-radius: 5px;"></div>
+    </div>
+    
+    <div style="text-align: center; font-weight: 500; color: #856404; margin-bottom: 15px;">
+        <i class="fas fa-info-circle"></i>
+        Siparişinize ait teslimat adresi farklı ise lütfen bina no ve kapı no bilgilerini tamamladıktan sonra "Evet" diyebilirsiniz. Değil ise "Hayır" diyebilirsiniz.
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+        <button type="button" id="confirmSameAddress" class="btn-secondary" style="flex: 1;">
+            <i class="fas fa-times"></i> Hayır - Aynı Adres
+        </button>
+        <button type="button" id="confirmNewAddress" class="btn-primary" style="flex: 1;">
+            <i class="fas fa-check"></i> Evet - Yeni Adres
+        </button>
+    </div>
+</div>
     <!-- Cart Section -->
     <div class="cart-container" id="cartContainer">
         <div class="cart-header">
@@ -1732,7 +1965,6 @@
             <button class="payment-btn bonus" id="payBonus">Bonus ile Öde</button>
         </div>
     </div>
-
     <!-- Footer -->
     <footer>
         <div class="footer-container">
@@ -1795,6 +2027,7 @@
             <div class="voice-bar"></div>
         </div>
     </div>
+    
 
     <script>
         // =============================================
@@ -3323,15 +3556,6 @@ let lastSpeakTime = 0;
 let isLocationDetected = false;    
 
 // Ödeme akışı state değişkenleri
-let isWaitingForPhone = false;
-let isWaitingForName = false;
-let isWaitingForBuilding = false;
-let isWaitingForApartment = false;
-let isWaitingForAddressConfirm = false;
-let isWaitingForNewBuilding = false;
-let isWaitingForNewApartment = false;
-let isWaitingForOrderConfirm = false;
-let expectedInput = null;
 let pendingPhone = null;
 let pendingCustomerInfo = null;
 let pendingAddressInfo = null;
@@ -3763,46 +3987,6 @@ async function processVoiceCommand(transcript) {
     console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
 
     try {
-        // ÖDEME AKIŞI KONTROLLERİ - HEM SESLİ HEM TIKLAMA
-        if (isWaitingForPhone && expectedInput === 'phone') {
-            await processPhoneNumber(message);
-            return;
-        }
-        
-        if (isWaitingForName && expectedInput === 'name') {
-            await processCustomerName(message);
-            return;
-        }
-        
-        if (isWaitingForBuilding && expectedInput === 'building') {
-            await processBuildingInfo(message);
-            return;
-        }
-        
-        if (isWaitingForApartment && expectedInput === 'apartment') {
-            await processApartmentInfo(message);
-            return;
-        }
-        
-        if (isWaitingForAddressConfirm && expectedInput === 'address_confirm') {
-            await processAddressConfirmation(message);
-            return;
-        }
-        
-        if (isWaitingForNewBuilding && expectedInput === 'new_building') {
-            await processNewBuildingInfo(message);
-            return;
-        }
-        
-        if (isWaitingForNewApartment && expectedInput === 'new_apartment') {
-            await processNewApartmentInfo(message);
-            return;
-        }
-        
-        if (isWaitingForOrderConfirm && expectedInput === 'order_confirm') {
-            await processOrderConfirmation(message);
-            return;
-        }
         
         // ÖDEME KOMUTLARI - SESLİ
         if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
@@ -8362,6 +8546,410 @@ function waitForDOMElements() {
 // =============================================
 // ÖDEME ve SİPARİŞ TAMAMLAMA SİSTEMİ (SESLİ + TIKLAMA)
 // =============================================
+// Popup form yönetimi
+let customerFormData = {
+    phone: '',
+    name: '',
+    address: '',
+    building: '',
+    apartment: '',
+    note: ''
+};
+
+// Popup'ı aç
+function openCustomerInfoModal() {
+    console.log('📋 Müşteri bilgileri modalı açılıyor...');
+    
+    const modal = document.getElementById('customerInfoModal');
+    modal.style.display = 'flex';
+    
+    // Formu doldur
+    populateCustomerForm();
+    
+    // Lokasyonu güncelle
+    updateDeliveryAddressFromLocation();
+}
+
+// Formu doldur
+function populateCustomerForm() {
+    // Sesli girdileri forma aktar
+    if (customerPhone) {
+        document.getElementById('customerPhone').value = customerPhone;
+        customerFormData.phone = customerPhone;
+    }
+    
+    if (customerName) {
+        document.getElementById('customerName').value = customerName;
+        customerFormData.name = customerName;
+    }
+    
+    if (buildingInfo) {
+        document.getElementById('buildingNumber').value = buildingInfo;
+        customerFormData.building = buildingInfo;
+    }
+    
+    if (apartmentInfo) {
+        document.getElementById('apartmentNumber').value = apartmentInfo;
+        customerFormData.apartment = apartmentInfo;
+    }
+    
+    // Kayıtlı kullanıcı kontrolü
+    checkRegisteredCustomer();
+}
+
+// Kayıtlı kullanıcı kontrolü
+async function checkRegisteredCustomer() {
+    if (customerPhone && isValidPhoneNumber(customerPhone)) {
+        try {
+            const { data: existingCustomer, error } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('phone', customerPhone)
+                .single();
+            
+            if (existingCustomer && !error) {
+                // KAYITLI KULLANICI - formu kilitle
+                showRegisteredCustomerInfo(existingCustomer);
+            }
+        } catch (error) {
+            console.log('Yeni kullanıcı veya sorgu hatası:', error);
+        }
+    }
+}
+
+// Kayıtlı kullanıcı bilgilerini göster - GÜNCELLENMİŞ
+function showRegisteredCustomerInfo(customer) {
+    const registeredSection = document.getElementById('registeredAddressSection');
+    const addressDisplay = document.getElementById('registeredAddressDisplay');
+    const confirmationSection = document.getElementById('addressConfirmationSection');
+    
+    // Kayıtlı adresi göster
+    addressDisplay.innerHTML = `
+        <div style="color: var(--success); margin-bottom: 5px;">
+            <i class="fas fa-check-circle"></i> Kayıtlı Adresiniz
+        </div>
+        <div>${customer.address || 'Adres bilgisi bulunamadı'}</div>
+        <div style="font-size: 12px; color: var(--gray); margin-top: 5px;">
+            Telefon: ${formatPhoneDisplay(customer.phone)}
+        </div>
+    `;
+    
+    registeredSection.style.display = 'block';
+    
+    // Form alanlarını kilitle (teslimat adresi hariç)
+    document.getElementById('customerPhone').readOnly = true;
+    document.getElementById('customerName').readOnly = true;
+    
+    // ADRES KARŞILAŞTIRMA
+    const isAddressDifferent = compareAddresses(customer.address);
+    
+    if (isAddressDifferent) {
+        // ADRES FARKLI - onay bölümünü göster
+        showAddressConfirmation(customer.address);
+    } else {
+        // ADRES AYNI - normal devam et
+        document.getElementById('deliveryAddress').value = customer.address;
+        customerFormData.address = customer.address;
+    }
+}
+
+// Adres karşılaştırma fonksiyonu
+function compareAddresses(registeredAddress) {
+    if (!userLocation || !userLocation.address || !registeredAddress) {
+        return false;
+    }
+    
+    const registeredClean = registeredAddress.toLowerCase()
+        .replace(/bina no:?.*|daire no:?.*|apt:?.*|no:?.*|\d+/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    const currentClean = userLocation.address.toLowerCase()
+        .replace(/bina no:?.*|daire no:?.*|apt:?.*|no:?.*|\d+/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    console.log('🔍 Adres Karşılaştırma:', {
+        kayıtlı: registeredClean,
+        mevcut: currentClean,
+        farklı: registeredClean !== currentClean
+    });
+    
+    return registeredClean !== currentClean;
+}
+
+// Adres onay bölümünü göster
+function showAddressConfirmation(registeredAddress) {
+    const confirmationSection = document.getElementById('addressConfirmationSection');
+    const currentAddressElem = document.getElementById('currentRegisteredAddress');
+    const newAddressElem = document.getElementById('newDeliveryAddress');
+    
+    // Adresleri doldur
+    currentAddressElem.textContent = registeredAddress || 'Kayıtlı adres bulunamadı';
+    newAddressElem.textContent = userLocation.address || 'Mevcut konum bulunamadı';
+    
+    // Onay bölümünü göster
+    confirmationSection.style.display = 'block';
+    
+    // Lokasyon adresini teslimat adresine doldur (ama kullanıcı onayı bekleniyor)
+    document.getElementById('deliveryAddress').value = userLocation.address;
+    customerFormData.address = userLocation.address;
+    
+    // SESLİ UYARI
+    speakToUser("Siparişinize ait teslimat adresi farklı. Lütfen bina no ve kapı no bilgilerini tamamladıktan sonra Evet diyebilirsiniz. Değil ise Hayır diyebilirsiniz.");
+    
+    // Buton event'lerini ayarla
+    setupAddressConfirmationButtons(registeredAddress);
+}
+
+ // Adres onay butonlarını ayarla
+function setupAddressConfirmationButtons(registeredAddress) {
+    const confirmSameBtn = document.getElementById('confirmSameAddress');
+    const confirmNewBtn = document.getElementById('confirmNewAddress');
+    
+    // AYNI ADRES (Hayır) - Kayıtlı adresi kullan
+    confirmSameBtn.addEventListener('click', function() {
+        console.log('✅ Kullanıcı kayıtlı adresi kullanmayı seçti');
+        
+        document.getElementById('deliveryAddress').value = registeredAddress;
+        customerFormData.address = registeredAddress;
+        
+        // Bina ve daire bilgilerini kayıtlı adresten çıkar
+        extractBuildingInfoFromAddress(registeredAddress);
+        
+        // Onay bölümünü gizle
+        document.getElementById('addressConfirmationSection').style.display = 'none';
+        
+        speakToUser("Kayıtlı adresiniz kullanılacak. Lütfen bina ve daire numarasını kontrol edin.");
+    });
+    
+    // YENİ ADRES (Evet) - Mevcut lokasyonu kullan
+    confirmNewBtn.addEventListener('click', function() {
+        console.log('✅ Kullanıcı yeni adresi kullanmayı seçti');
+        
+        document.getElementById('deliveryAddress').value = userLocation.address;
+        customerFormData.address = userLocation.address;
+        
+        // Onay bölümünü gizle
+        document.getElementById('addressConfirmationSection').style.display = 'none';
+        
+        speakToUser("Yeni adresiniz kullanılacak. Lütfen bina ve daire numarasını girin.");
+    });
+}       
+// Lokasyondan teslimat adresini güncelle
+function updateDeliveryAddressFromLocation() {
+    if (userLocation && userLocation.address) {
+        document.getElementById('deliveryAddress').value = userLocation.address;
+        customerFormData.address = userLocation.address;
+        
+        // Sesli geri bildirim
+        speakToUser("Konumunuz tespit edildi. Lütfen bina ve daire numarasını girin.");
+    } else {
+        // Lokasyon yoksa tespit et
+        detectUserLocation().then(success => {
+            if (success) {
+                document.getElementById('deliveryAddress').value = userLocation.address;
+                customerFormData.address = userLocation.address;
+            }
+        });
+    }
+}
+// Kayıtlı adresten bina bilgilerini çıkar
+function extractBuildingInfoFromAddress(address) {
+    if (!address) return;
+    
+    // Bina numarasını ara
+    const buildingMatch = address.match(/bina\s*(no:?)?\s*(\d+)|bin[aa]?\s*(\d+)/i);
+    if (buildingMatch) {
+        const buildingNo = buildingMatch[2] || buildingMatch[3];
+        if (buildingNo) {
+            document.getElementById('buildingNumber').value = buildingNo;
+            customerFormData.building = buildingNo;
+        }
+    }
+    
+    // Daire numarasını ara
+    const apartmentMatch = address.match(/daire\s*(no:?)?\s*(\d+)|dai?r?e?\s*(\d+)|apt\.?\s*(\d+)/i);
+    if (apartmentMatch) {
+        const apartmentNo = apartmentMatch[2] || apartmentMatch[3] || apartmentMatch[4];
+        if (apartmentNo) {
+            document.getElementById('apartmentNumber').value = apartmentNo;
+            customerFormData.apartment = apartmentNo;
+        }
+    }
+    
+    console.log('🏢 Adresten çıkarılan bilgiler:', {
+        bina: customerFormData.building,
+        daire: customerFormData.apartment
+    });
+}
+        
+// Form event listener'larını güncelle
+function setupCustomerFormEvents() {
+    const form = document.getElementById('customerInfoForm');
+    const closeBtn = document.getElementById('closeCustomerModal');
+    const cancelBtn = document.getElementById('cancelCustomerForm');
+    const refreshBtn = document.getElementById('refreshLocation');
+    
+    // Form gönderimi
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Adres onayı kontrolü
+        if (isAddressConfirmationRequired()) {
+            showFormError('Lütfen önce teslimat adresi seçiminizi yapın.');
+            return;
+        }
+        
+        submitCustomerForm();
+    });
+    
+    // Kapatma butonları
+    closeBtn.addEventListener('click', closeCustomerModal);
+    cancelBtn.addEventListener('click', closeCustomerModal);
+    
+    // Lokasyon yenileme
+    refreshBtn.addEventListener('click', function() {
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        detectUserLocation().then(success => {
+            if (success) {
+                updateDeliveryAddressFromLocation();
+                
+                // Yeniden adres karşılaştırması yap
+                if (customerPhone) {
+                    checkRegisteredCustomer();
+                }
+            }
+            
+            setTimeout(() => {
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+            }, 2000);
+        });
+    });
+    
+    // Input değişikliklerini takip et
+    form.addEventListener('input', function(e) {
+        const field = e.target.name;
+        customerFormData[field] = e.target.value;
+    });
+}
+// Adres onayı gerekip gerekmediğini kontrol et
+function isAddressConfirmationRequired() {
+    const confirmationSection = document.getElementById('addressConfirmationSection');
+    return confirmationSection.style.display !== 'none';
+}
+
+// Popup'ı kapatırken temizle
+function closeCustomerModal() {
+    document.getElementById('customerInfoModal').style.display = 'none';
+    
+    // Onay bölümünü gizle
+    document.getElementById('addressConfirmationSection').style.display = 'none';
+    
+    // Formu temizle
+    document.getElementById('customerInfoForm').reset();
+    customerFormData = {
+        phone: '',
+        name: '',
+        address: '',
+        building: '',
+        apartment: '',
+        note: ''
+    };
+}
+        
+// Formu gönder
+async function submitCustomerForm() {
+    console.log('✅ Form gönderiliyor:', customerFormData);
+    
+    // Validasyon
+    if (!customerFormData.phone || !isValidPhoneNumber(customerFormData.phone)) {
+        showFormError('Lütfen geçerli bir telefon numarası girin.');
+        return;
+    }
+    
+    if (!customerFormData.name || customerFormData.name.length < 2) {
+        showFormError('Lütfen geçerli bir ad soyad girin.');
+        return;
+    }
+    
+    if (!customerFormData.address) {
+        showFormError('Lütfen teslimat adresini seçin.');
+        return;
+    }
+    
+    if (!customerFormData.building) {
+        showFormError('Lütfen bina numarasını girin.');
+        return;
+    }
+    
+    try {
+        // Müşteri kaydı
+        const fullAddress = `${customerFormData.address} - Bina: ${customerFormData.building}${customerFormData.apartment ? `, Daire: ${customerFormData.apartment}` : ''}${customerFormData.note ? ` (${customerFormData.note})` : ''}`;
+        
+        const { data, error } = await supabase
+            .from('customers')
+            .upsert([
+                {
+                    phone: customerFormData.phone,
+                    name: customerFormData.name,
+                    address: fullAddress,
+                    created_at: new Date().toISOString()
+                }
+            ], {
+                onConflict: 'phone',
+                ignoreDuplicates: false
+            })
+            .select();
+        
+        if (error) throw error;
+        
+        console.log('✅ Müşteri kaydedildi:', data);
+        
+        // Popup'ı kapat ve siparişi tamamla
+        closeCustomerModal();
+        await completeOrderWithFormData(fullAddress);
+        
+    } catch (error) {
+        console.error('❌ Form gönderme hatası:', error);
+        showFormError('Kayıt işlemi başarısız. Lütfen tekrar deneyin.');
+    }
+}
+
+// Form verileriyle siparişi tamamla
+async function completeOrderWithFormData(fullAddress) {
+    const total = calculateTotal();
+    const orderNumber = `ORD${Date.now()}${Math.random().toString(36).substr(2, 5)}`.toUpperCase();
+    
+    displayMessage(`✅ Siparişiniz alındı! Teslimat adresi: ${fullAddress}`);
+    speakToUser("Siparişiniz alındı. Teşekkür ederiz!");
+    
+    // Sepeti temizle
+    cart = [];
+    updateCartUI();
+    unlockStoreAndSeller();
+    resetPaymentProcess();
+}
+
+// Form hatası göster
+function showFormError(message) {
+    displayMessage(`❌ ${message}`);
+    speakToUser("Form hatası");
+}
+
+// Popup'ı kapat
+function closeCustomerModal() {
+    document.getElementById('customerInfoModal').style.display = 'none';
+}
+
+// Ödeme sürecini popup'a yönlendir
+function startPaymentProcess(paymentMethod) {
+    console.log('💳 Ödeme süreci başlatılıyor (popup ile)');
+    currentPaymentMethod = paymentMethod;
+    openCustomerInfoModal();
+}
+        
 
 // Ödeme butonlarına event listener EKLE - HEM SESLİ HEM TIKLAMA
 // setupPaymentButtons fonksiyonunu değiştir - yeni fonksiyon
@@ -8440,40 +9028,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// ÖDEME SÜRECİNDE DAHA AÇIK SESLİ MESAJLAR
-function startPaymentProcess(paymentMethod) {
-    console.log('💳 Ödeme süreci başlatılıyor:', paymentMethod);
-    
-    if (cart.length === 0) {
-        displayMessage("❌ Sepetiniz boş. Ödeme yapabilmek için sepete ürün ekleyin.");
-        speakToUser("Sepetiniz boş, önce ürün ekleyin");
-        return;
-    }
-    
-    if (!selectedSellerId) {
-        displayMessage("❌ Satıcı seçilmedi.");
-        speakToUser("Satıcı seçilmedi");
-        return;
-    }
-    
-    currentPaymentMethod = paymentMethod;
-    
-    const paymentMethodName = getPaymentMethodName(paymentMethod);
-    const totalAmount = calculateTotal();
-    
-    // ✅ DAHA AÇIK SESLİ MESAJ
-    const voiceMessage = `${paymentMethodName} ödeme seçildi. Toplam tutar ${money(totalAmount)}. Lütfen telefon numaranızı söyleyin`;
-    
-    displayMessage(`🔄 ${paymentMethodName} ödeme seçildi. Telefon numaranızı sesli olarak söyleyin.`);
-    speakToUser(voiceMessage);
-    
-    if (cartContainer) {
-        cartContainer.classList.add('open');
-    }
-    
-    isWaitingForPhone = true;
-    expectedInput = 'phone';
-}
 
 // formatPhoneNumber fonksiyonunu GÜNCELLEYİN
 function formatPhoneNumber(phoneText) {
@@ -8521,159 +9075,9 @@ function formatPhoneDisplay(phone) {
     return phone;
 }        
 
-// TELEFON İŞLEME - DAHA AÇIK SESLİ MESAJ
-async function processPhoneNumber(message) {
-    console.log('📞 Telefon işleniyor:', message);
-    
-    try {
-        // Rakamları çıkar
-        const numbers = message.replace(/\D/g, '');
-        
-        if (numbers.length >= 10) {
-            // Formatla (05356953555)
-            const formattedPhone = formatPhoneNumber(numbers);
-            
-            if (formattedPhone && isValidPhoneNumber(formattedPhone)) {
-                console.log('✅ Geçerli telefon:', formattedPhone);
-                
-                // Telefon numarasını kaydet (0535... formatında)
-                customerPhone = formattedPhone;
-                localStorage.setItem('customerPhone', customerPhone);
-                
-                // UI güncelle
-                displayMessage(`✅ Telefon numaranız kaydedildi: ${formatPhoneDisplay(formattedPhone)}`);
-                speakToUser("Telefon numaranız kaydedildi. Lütfen adınızı ve soyadınızı söyleyin.");
-                
-                // Sonraki adıma geç
-                isWaitingForPhone = false;
-                isWaitingForName = true;
-                expectedInput = 'name';
-                
-                return true;
-            }
-        }
-        
-        // Geçersiz numara
-        console.log('❌ Geçersiz telefon numarası:', message);
-        displayMessage("❌ Geçerli bir telefon numarası girmediniz. Lütfen 11 haneli numaranızı söyleyin:");
-        speakToUser("Geçerli bir telefon numarası söyleyin");
-        return false;
-        
-    } catch (error) {
-        console.error('❌ Telefon işleme hatası:', error);
-        displayMessage("❌ Telefon numarası işlenirken hata oluştu.");
-        speakToUser("Tekrar deneyin");
-        return false;
-    }
-}
-// AD SOYAD İŞLEME - DAHA AÇIK SESLİ MESAJ
-async function processCustomerName(fullName) {
-    console.log('👤 Müşteri adı işleniyor:', fullName);
-    
-    if (!fullName || fullName.trim().split(' ').length < 2) {
-        displayMessage("❌ Lütfen hem adınızı hem soyadınızı söyleyin.");
-        speakToUser("Lütfen hem adınızı hem soyadınızı söyleyin, örneğin: Ayşe Demir");
-        return false;
-    }
-    
-    const nameParts = fullName.trim().split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(' ');
-    
-    displayMessage(`👤 Ad: ${firstName} ${lastName}. Lütfen bina numarasını söyleyin.`);
-    speakToUser(`Teşekkürler ${firstName} ${lastName}. Şimdi lütfen bina numaranızı söyleyin.`);
-    
-    isWaitingForBuilding = true;
-    expectedInput = 'building';
-    pendingCustomerInfo = {
-        firstName,
-        lastName,
-        phone: pendingPhone
-    };
-    
-    return true;
-}
 
-// BİNA NUMARASI - DAHA AÇIK SESLİ MESAJ
-async function processBuildingInfo(buildingInfo) {
-    console.log('🏢 Bina bilgisi işleniyor:', buildingInfo);
-    
-    const buildingMatch = buildingInfo.match(/\d+/);
-    if (!buildingMatch) {
-        displayMessage("❌ Geçerli bir bina numarası söyleyin.");
-        speakToUser("Geçerli bir bina numarası söyleyin.");
-        return false;
-    }
-    
-    const buildingNumber = buildingMatch[0];
-    
-    displayMessage(`🏢 Bina: ${buildingNumber}. Lütfen daire numarasını söyleyin.`);
-    speakToUser(`Bina numaranız ${buildingNumber}. Şimdi lütfen daire numaranızı söyleyin.`);
-    
-    isWaitingForApartment = true;
-    expectedInput = 'apartment';
-    pendingCustomerInfo.buildingNumber = buildingNumber;
-    
-    return true;
-}
 
-// DAİRE NUMARASI - DAHA AÇIK SESLİ MESAJ
-async function processApartmentInfo(apartmentInfo) {
-    console.log('🚪 Daire bilgisi işleniyor:', apartmentInfo);
-    
-    const apartmentMatch = apartmentInfo.match(/\d+/);
-    if (!apartmentMatch) {
-        displayMessage("❌ Geçerli bir daire numarası söyleyin.");
-        speakToUser("Geçerli bir daire numarası söyleyin, örneğin: üç veya on iki");
-        return false;
-    }
-    
-    const apartmentNumber = apartmentMatch[0];
-    pendingCustomerInfo.apartmentNumber = apartmentNumber;
-    
-    displayMessage("🔄 Müşteri kaydı oluşturuluyor...");
-    speakToUser("Bilgileriniz kaydediliyor, lütfen bekleyin");
-    
-    try {
-        const { data: newCustomer, error } = await supabase
-            .from('customers')
-            .insert([{
-                name: `${pendingCustomerInfo.firstName} ${pendingCustomerInfo.lastName}`,
-                phone: pendingCustomerInfo.phone,
-                address: JSON.stringify({
-                    building: pendingCustomerInfo.buildingNumber,
-                    apartment: pendingCustomerInfo.apartmentNumber,
-                    district: userLocation.district,
-                    city: userLocation.city
-                }),
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        currentCustomer = newCustomer;
-        localStorage.setItem('currentCustomer', JSON.stringify(newCustomer));
-        
-        if (referralCode) {
-            await processReferralTracking(newCustomer.id);
-        }
-        
-        displayMessage(`✅ Kaydınız tamamlandı! Hoş geldiniz ${newCustomer.name}.`);
-        speakToUser(`Kaydınız tamamlandı! Hoş geldiniz ${newCustomer.name}. Şimdi adres kontrolü yapılıyor`);
-        
-        await checkDeliveryAddress(newCustomer);
-        
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Müşteri kayıt hatası:', error);
-        displayMessage("❌ Kayıt işlemi başarısız. Lütfen tekrar deneyin.");
-        speakToUser("Kayıt işlemi başarısız oldu, lütfen tekrar deneyin");
-        return false;
-    }
-}
+
         
 // Referans takibi işleme
 // processReferralTracking fonksiyonunu değiştir - yeni fonksiyon
@@ -8728,34 +9132,6 @@ async function checkDeliveryAddress(customer) {
     }
 }
 
-// Adres onayı işleme - HEM SESLİ HEM TIKLAMA
-// processAddressConfirmation fonksiyonunu değiştir - yeni fonksiyon
-async function processAddressConfirmation(response) {
-    console.log('📍 Adres onayı:', response);
-    
-    const cleanResponse = response.toLowerCase().trim();
-    
-    if (cleanResponse.includes('evet') || cleanResponse.includes('evet')) {
-        // Kayıtlı adres kullan
-        displayMessage("✅ Kayıtlı adresinize teslimat yapılacak.");
-        speakToUser("Kayıtlı adresiniz kullanılacak");
-        
-        // Mesafe kontrolüne geç
-        await checkDeliveryDistance();
-        
-    } else if (cleanResponse.includes('hayır') || cleanResponse.includes('hayır')) {
-        // Yeni adres bilgisi iste
-        displayMessage("🔄 Lütfen yeni bina numarasını söyleyin.");
-        speakToUser("Bina numarasını söyleyin");
-        
-        isWaitingForNewBuilding = true;
-        expectedInput = 'new_building';
-        
-    } else {
-        displayMessage("❌ Lütfen 'Evet' veya 'Hayır' olarak cevap verin.");
-        speakToUser("Evet veya hayır diyin");
-    }
-}
 
 // Ek adres bilgisi isteme - HEM SESLİ HEM TIKLAMA
 // requestAdditionalAddressInfo fonksiyonunu değiştir - yeni fonksiyon
@@ -8874,26 +9250,6 @@ async function proceedToOrderConfirmation() {
     expectedInput = 'order_confirm';
 }
 
-// Sipariş onayı işleme - HEM SESLİ HEM TIKLAMA
-// processOrderConfirmation fonksiyonunu değiştir - yeni fonksiyon
-async function processOrderConfirmation(response) {
-    console.log('✅ Sipariş onayı:', response);
-    
-    const cleanResponse = response.toLowerCase().trim();
-    
-    if (cleanResponse.includes('evet') || cleanResponse.includes('evet')) {
-        // Siparişi kaydet
-        await saveOrder();
-    } else if (cleanResponse.includes('hayır') || cleanResponse.includes('hayır')) {
-        // Siparişi iptal et
-        displayMessage("❌ Sipariş iptal edildi.");
-        speakToUser("Sipariş iptal edildi");
-        resetPaymentProcess();
-    } else {
-        displayMessage("❌ Lütfen 'Evet' veya 'Hayır' olarak cevap verin.");
-        speakToUser("Evet veya hayır diyin");
-    }
-}
 
 // saveOrder fonksiyonunu güncelle
 async function saveOrder() {
@@ -9089,6 +9445,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
