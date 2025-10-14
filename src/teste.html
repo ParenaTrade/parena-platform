@@ -1561,8 +1561,8 @@
    overflow-x: auto;
 }
 
-const paymentStyles = `
-/* Ödeme Modal Stilleri */
+const updatedPaymentStyles = `
+/* Ödeme Modal Stilleri - GÜNCELLENMİŞ */
 .payment-options {
     display: flex;
     flex-direction: column;
@@ -1585,10 +1585,11 @@ const paymentStyles = `
     border-color: var(--primary);
     background: rgba(93, 62, 188, 0.05);
 }
-
+        
 .payment-option.selected {
     border-color: var(--primary);
     background: rgba(93, 62, 188, 0.1);
+    transform: scale(1.02);
 }
 
 .payment-icon {
@@ -1618,6 +1619,8 @@ const paymentStyles = `
     border-top: 1px solid var(--gray-light);
     padding-top: 15px;
     margin: 20px 0;
+    font-size: 18px;
+    font-weight: 600;
 }
 
 .payment-confirm-btn {
@@ -1633,6 +1636,13 @@ const paymentStyles = `
     transition: var(--transition);
 }
 
+    .payment-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 20px 0;
+}
+
 .payment-confirm-btn:disabled {
     background: var(--gray);
     cursor: not-allowed;
@@ -1642,7 +1652,56 @@ const paymentStyles = `
     background: #218838;
     transform: translateY(-2px);
 }
+        
+.payment-confirm-btn.voice-btn {
+    background: var(--accent);
+}
 
+.payment-confirm-btn.voice-btn:hover {
+    background: #e55a00;
+}
+.voice-help {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: rgba(93, 62, 188, 0.1);
+    border-radius: var(--border-radius);
+    font-size: 14px;
+    color: var(--primary);
+}        
+
+        .voice-help i {
+    color: var(--primary);
+}
+
+/* Modal z-index düzenlemesi */
+.modal {
+    z-index: 10001 !important;
+}
+
+.command-slider-header {
+    z-index: 9999 !important;
+}
+
+.voice-status {
+    z-index: 10002 !important;
+}
+`;
+
+// Stilleri ekle veya güncelle
+function updatePaymentStyles() {
+    const existingStyle = document.getElementById('payment-styles');
+    if (existingStyle) {
+        existingStyle.remove();
+    }
+    
+    const style = document.createElement('style');
+    style.id = 'payment-styles';
+    style.textContent = updatedPaymentStyles;
+    document.head.appendChild(style);
+}
+        
 /* Telefon Doğrulama Stilleri */
 .phone-input-container {
     display: flex;
@@ -3930,34 +3989,15 @@ async function safeVoiceMatchQuery(userInput) {
 }
         
 
-async function processVoiceCommand(transcript) {
  const message = transcript.toLowerCase().trim();
     console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
-
-        
-    // ÖDEME KOMUTLARI - ÖNCELİKLİ
-    if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
-        if (cart.length === 0) {
-            speakToUser("Sepetiniz boş. Ödeme yapmak için önce ürün ekleyin.");
-            return;
-        }
-        
-        if (handlePaymentCommand(message)) {
-            return;
-        }
-        
-        // Genel ödeme komutu
-        showPaymentModal();
-        speakToUser("Ödeme yöntemi seçin: nakit, kart veya bonus.");
-        return;
-    }
     
     // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
     if (transcript.trim() === lastSpokenMessage.trim()) {
         console.log("⚠️ Kendi cevabımız tekrar algılandı, atlandı");
         return;
     }
-
+    
     // GEREKSİZ KELİMELERİ FİLTRELE
     const filteredMessage = filterUnnecessaryWords(message);
     if (!filteredMessage) {
@@ -3966,20 +4006,28 @@ async function processVoiceCommand(transcript) {
     }
     
     console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
-
-       try {
-        // ✅ MAĞAZA SEÇİMİ - current:2'de kal
-        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
-            console.log('🏪 Mağaza seçim komutu algılandı');
-            const success = await handleVoiceStoreSelection(filteredMessage);
-            if (success) {
-                // ✅ Mağaza seçildi ama kök değişmedi - current:2'de kaldı
-                console.log('✅ Mağaza seçildi, kök sabit:', currentRoot);
-                return;
-            }
-        }     
+    
+    try {
+        // 1. ÖDEME KOMUTLARI - EN ÖNCELİKLİ
+        if (handlePaymentCommand(filteredMessage)) {
+            console.log('✅ Ödeme komutu işlendi');
+            return;
+        }
         
-         // 1. ÜRÜN EKLEME KOMUTU - ÖNCELİKLİ
+        // 2. SEPET TEMİZLEME KOMUTLARI
+        const clearCartCommands = [
+            'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+            'clear cart', 'empty cart', 'reset cart', 'temizle',
+            'hepsini sil', 'ürünleri kaldır', 'sepetten kaldır', 'boşalt'
+        ];
+        
+        if (clearCartCommands.some(cmd => filteredMessage.includes(cmd))) {
+            console.log('🛒 Sepeti boşaltma komutu algılandı');
+            clearCart();
+            return;
+        }
+        
+        // 3. ÜRÜN EKLEME KOMUTU
         if (selectedCategoryId && products.length > 0) {
             console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
             const success = await handleVoiceProductAdd(filteredMessage);
@@ -3988,42 +4036,33 @@ async function processVoiceCommand(transcript) {
                 return;
             }
         }
-
-        // 2. SATICI SEÇİMİ - current:2'deyken satıcı seçilebilir
+        
+        // 4. DİĞER SEÇİM KOMUTLARI
+        if (currentRoot === "2:0" && hasStoreTypeKeywords(filteredMessage)) {
+            console.log('🏪 Mağaza seçim komutu algılandı');
+            const success = await handleVoiceStoreSelection(filteredMessage);
+            if (success) return;
+        }
+        
         if ((currentRoot === "2:0" || currentRoot === "2:1") && hasSellerKeywords(filteredMessage)) {
             console.log('🏬 Satıcı seçim komutu algılandı');
             const success = await handleVoiceSellerSelection(filteredMessage);
             if (success) return;
         }
-
-        // 3. REYON SEÇİMİ
+        
         if ((currentRoot === "3:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
             console.log('📦 Reyon seçim komutu algılandı');
             const success = await handleVoiceCategorySelection(filteredMessage);
             if (success) return;
         }
-
-            // 🆕 BU KODU EKLEYİN - BAŞLANGIÇ
-    const clearCartCommands = [
-        'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
-        'clear cart', 'empty cart', 'reset cart', 'temizle',
-        'hepsini sil', 'ürünleri kaldır', 'sepetten kaldır', 'boşalt'
-    ];
-    
-    const normalizedMessage = message.toLowerCase().trim();
-    
-    if (clearCartCommands.some(cmd => normalizedMessage.includes(cmd))) {
-        console.log('🛒 Sepeti boşaltma komutu algılandı');
-        clearCart();
-        return; // ⚠️ BU RETURN KRİTİK - diğer kodları durdurur
-    }
-        // FALLBACK MESAJI
+        
+        // 5. FALLBACK MESAJI
         console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
         const fallbackMessage = getSmartFallback();
-        if (fallbackMessage) {
+        if (fallbackMessage && shouldShowFallback(filteredMessage)) {
             speakToUser(fallbackMessage);
         }
-
+        
     } catch (error) {
         console.error('❌ Komut işleme hatası:', error);
         if (Date.now() - lastSpeakTime > SPEAK_COOLDOWN) {
@@ -4031,6 +4070,7 @@ async function processVoiceCommand(transcript) {
         }
     }
 }
+
         
 // YARDIMCI FONKSİYONLAR
 function filterUnnecessaryWords(message) {
@@ -4047,40 +4087,38 @@ function filterUnnecessaryWords(message) {
     return filtered.replace(/\s+/g, ' ').trim();
 }
 
+// Fallback gösterim kontrolü - YENİ FONKSİYON
 function shouldShowFallback(message) {
     // Sadece belirli aralıklarla fallback göster
     const now = Date.now();
     const lastFallbackTime = window.lastFallbackTime || 0;
     
-    if (now - lastFallbackTime < 5000) { // 5 saniyede bir
+    if (now - lastFallbackTime < 8000) { // 8 saniyede bir
         return false;
     }
     
     window.lastFallbackTime = now;
     return true;
 }
-
-    function getSmartFallback() {
+    // Akıllı fallback mesajı - GÜNCELLENMİŞ
+function getSmartFallback() {
     const now = Date.now();
     
     // Fallback'ler arasında da cooldown
     if (now - lastSpeakTime < SPEAK_COOLDOWN * 2) {
-        return null; // Mesaj gösterme
+        return null;
     }
-
-    // ✅ MAĞAZA SEÇİMİ DURUMU - current:2
-    if (currentRoot === "2:0" && selectedStoreTypeId) {
-        const sellerCards = document.querySelectorAll('.seller-card');
-        if (sellerCards.length > 0) {
-            const sellerList = Array.from(sellerCards)
-                .slice(0, 3)
-                .map(card => `${card.dataset.sellerIndex}. ${card.querySelector('.seller-name')?.textContent}`)
-                .join(', ');
-            return `Hangi satıcı? ${sellerList} Veya başka mağaza için mağaza ismi söyleyin.`;
+    
+    // ÖDEME MODUNDA ÖZEL MESAJLAR
+    if (currentRoot === "payment:0") {
+        if (!currentPaymentMethod) {
+            return "Lütfen bir ödeme yöntemi seçin: nakit, kart veya bonus.";
+        } else {
+            return `${getPaymentMethodName(currentPaymentMethod)} seçildi. Ödemeyi onayla diyerek devam edebilirsiniz.`;
         }
-        return "Bu mağazada satıcı bulunamadı. Başka mağaza seçmek için mağaza ismi söyleyin.";
     }
-        
+    
+    // DİĞER DURUMLAR İÇİN MEVCUT FALLBACK
     if (!selectedStoreTypeId) {
         const storeCards = document.querySelectorAll('.seller-type-card');
         if (storeCards.length > 0) {
@@ -4090,7 +4128,7 @@ function shouldShowFallback(message) {
                 .join(', ');
             return `Hangi mağaza tipi? ${storeList}`;
         }
-        return "Mağaza tipi seçin:...";
+        return "Mağaza tipi seçin: market, restoran...";
     }
     
     if (!selectedSellerId) {
@@ -4102,14 +4140,11 @@ function shouldShowFallback(message) {
     }
     
     if (selectedCategoryId && products.length > 0) {
-        const productCards = document.querySelectorAll('.product-card');
-        if (productCards.length > 0) {
-            const productList = Array.from(productCards)
-                .slice(0, 2) // Sadece 2 ürün göster
-                .map(card => `${card.dataset.productIndex}. ${card.querySelector('.product-name')?.textContent}`)
-                .join(', ');
-            return `Ürün seçin: ${productList}`;
-        }
+        return "Ürün siparişi verebilirsiniz. Örneğin: 1 kilo domates";
+    }
+    
+    if (cart.length > 0) {
+        return "Sepetinizde ürünler var. Ödeme yapmak için ödeme yap diyebilirsiniz.";
     }
     
     return "Nasıl yardımcı olabilirim?";
@@ -8686,12 +8721,18 @@ function updateUIAfterLogin() {
 
 // Ödeme durumu
         
-// Ödeme modalı
+// Ödeme modalını göster - GÜNCELLENMİŞ
 function showPaymentModal() {
+    console.log('💰 Ödeme modalı gösteriliyor...');
+    
+    // Önce varsa diğer modaları kapat
+    closeAllModals();
+    
     const modal = document.createElement('div');
     modal.id = 'paymentModal';
     modal.className = 'modal';
     modal.style.display = 'flex';
+    modal.style.zIndex = '10001'; // Diğer elementlerden daha yüksek
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
@@ -8733,38 +8774,56 @@ function showPaymentModal() {
             <div class="payment-total">
                 <div class="total-row">
                     <span>Toplam Tutar:</span>
-                    <span id="modalTotalAmount">${calculateTotal().toFixed(2)} ₺</span>
+                    <span id="modalTotalAmount">${money(calculateTotal())}</span>
                 </div>
             </div>
             
-            <button id="confirmPayment" class="payment-confirm-btn" disabled>
-                Ödemeyi Onayla
-            </button>
+            <div class="payment-actions">
+                <button id="confirmPayment" class="payment-confirm-btn" disabled>
+                    Ödemeyi Onayla
+                </button>
+                <button id="voiceConfirmPayment" class="payment-confirm-btn voice-btn" style="display: none;">
+                    <i class="fas fa-microphone"></i> Sesli Onayla
+                </button>
+            </div>
+            
+            <div class="voice-help">
+                <i class="fas fa-info-circle"></i>
+                <span>"Nakit", "Kart" veya "Bonus" diyerek seçim yapabilirsiniz</span>
+            </div>
         </div>
     `;
     
     document.body.appendChild(modal);
     setupPaymentModalEvents();
+    
+    // ÖDEME KÖKÜNÜ GÜNCELLE
+    currentRoot = "payment:0";
+    console.log('🔄 Kök güncellendi: payment:0 (Ödeme modu)');
+    
+    // Sesli yardım mesajı
+    speakToUser("Ödeme yöntemi seçin: nakit, kart veya bonus. Seçtikten sonra ödemeyi onayla diyebilirsiniz.");
 }
 
-// Ödeme modal event'leri
+// Tüm modalları kapat
+function closeAllModals() {
+    const modals = ['paymentModal', 'phoneVerificationModal', 'orderConfirmationModal'];
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.remove();
+    });
+}
+
+        
+// Ödeme modal event'leri - GÜNCELLENMİŞ
 function setupPaymentModalEvents() {
     const paymentOptions = document.querySelectorAll('.payment-option');
     const confirmBtn = document.getElementById('confirmPayment');
+    const voiceConfirmBtn = document.getElementById('voiceConfirmPayment');
     
     paymentOptions.forEach(option => {
         option.addEventListener('click', function() {
-            // Tüm seçimleri temizle
-            paymentOptions.forEach(opt => opt.classList.remove('selected'));
-            // Seçili olanı işaretle
-            this.classList.add('selected');
-            
-            // Ödeme yöntemini kaydet
-            currentPaymentMethod = this.dataset.method;
-            
-            // Butonu aktif et
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = `${getPaymentMethodName(currentPaymentMethod)} ile Ödemeyi Onayla`;
+            selectPaymentOption(this);
         });
     });
     
@@ -8773,9 +8832,22 @@ function setupPaymentModalEvents() {
             processPayment(currentPaymentMethod);
         }
     });
+    
+    voiceConfirmBtn.addEventListener('click', function() {
+        speakToUser("Ödemeyi onayla diyerek sesli olarak onaylayabilirsiniz.");
+    });
+    
+    // Modal dışına tıklama ile kapatma
+    const modal = document.getElementById('paymentModal');
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closePaymentModal();
+        }
+    });
 }
-
+        
 // Ödeme modalını kapat
+// Ödeme modalını kapat - GÜNCELLENMİŞ
 function closePaymentModal() {
     const modal = document.getElementById('paymentModal');
     if (modal) {
@@ -8783,6 +8855,12 @@ function closePaymentModal() {
     }
     currentPaymentMethod = null;
     isPaymentProcessing = false;
+    
+    // Kökü önceki duruma döndür
+    currentRoot = "5:0";
+    console.log('🔄 Kök geri döndü: 5:0 (Ürün seçimi)');
+    
+    speakToUser("Ödeme işlemi iptal edildi. Ürün seçmeye devam edebilirsiniz.");
 }
 
 // Ödeme yöntemi isimleri
@@ -8795,9 +8873,39 @@ function getPaymentMethodName(method) {
     return names[method] || 'Ödeme';
 }
 
-// Ödeme işlemi
+// Ödeme seçeneği seçimi - YENİ FONKSİYON
+function selectPaymentOption(optionElement) {
+    const paymentOptions = document.querySelectorAll('.payment-option');
+    
+    // Tüm seçimleri temizle
+    paymentOptions.forEach(opt => opt.classList.remove('selected'));
+    
+    // Seçili olanı işaretle
+    optionElement.classList.add('selected');
+    
+    // Ödeme yöntemini kaydet
+    currentPaymentMethod = optionElement.dataset.method;
+    
+    // Butonları aktif et
+    const confirmBtn = document.getElementById('confirmPayment');
+    const voiceConfirmBtn = document.getElementById('voiceConfirmPayment');
+    
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = `${getPaymentMethodName(currentPaymentMethod)} ile Ödemeyi Onayla`;
+    voiceConfirmBtn.style.display = 'block';
+    
+    console.log(`✅ Ödeme yöntemi seçildi: ${currentPaymentMethod}`);
+    
+    // Sesli geri bildirim
+    speakToUser(`${getPaymentMethodName(currentPaymentMethod)} seçildi. Ödemeyi onayla diyebilirsiniz.`);
+}
+        
+// Ödeme işlemi - GÜNCELLENMİŞ
 async function processPayment(paymentMethod) {
-    if (isPaymentProcessing) return;
+    if (isPaymentProcessing) {
+        console.log('⏳ Ödeme zaten işleniyor...');
+        return;
+    }
     
     isPaymentProcessing = true;
     const confirmBtn = document.getElementById('confirmPayment');
@@ -8806,22 +8914,34 @@ async function processPayment(paymentMethod) {
         console.log('💰 Ödeme işlemi başlatılıyor:', paymentMethod);
         
         // Butonu güncelle
-        confirmBtn.disabled = true;
-        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> İşleniyor...';
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> İşleniyor...';
+        }
         
         // Sepet kontrolü
         if (cart.length === 0) {
             throw new Error('Sepetiniz boş');
         }
         
+        // Satıcı kontrolü
+        if (!selectedSellerId) {
+            throw new Error('Satıcı seçilmedi');
+        }
+        
+        displayMessage("Ödeme işlemi başlatılıyor...");
+        speakToUser("Ödeme işleniyor, lütfen bekleyin.");
+        
         // Kullanıcı kontrolü
         const user = await checkUserAuthentication();
         
         if (!user) {
             // Misafir mod - telefon doğrulama
+            console.log('👤 Misafir ödeme işlemi');
             await handleGuestPayment(paymentMethod);
         } else {
             // Kayıtlı kullanıcı - direkt ödeme
+            console.log('👤 Kayıtlı kullanıcı ödemesi:', user.name);
             await handleRegisteredUserPayment(paymentMethod, user);
         }
         
@@ -8831,12 +8951,13 @@ async function processPayment(paymentMethod) {
         speakToUser("Ödeme işlemi başarısız. Lütfen tekrar deneyin.");
         
         // Butonu sıfırla
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = `${getPaymentMethodName(paymentMethod)} ile Ödemeyi Onayla`;
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = `${getPaymentMethodName(paymentMethod)} ile Ödemeyi Onayla`;
+        }
         isPaymentProcessing = false;
     }
 }
-
 // Misafir ödeme işlemi
 async function handleGuestPayment(paymentMethod) {
     console.log('👤 Misafir ödeme işlemi');
@@ -9580,37 +9701,89 @@ function getProductName(productId) {
 // SESLİ ÖDEME KOMUTLARI
 // =============================================
 
-// Ödeme komutlarını işle
+// Ödeme komutlarını işle - GÜNCELLENMİŞ
 function handlePaymentCommand(message) {
     const cleanMessage = message.toLowerCase().trim();
     
-    const paymentCommands = {
-        'nakit': 'cash',
-        'nakit öde': 'cash',
-        'para ile': 'cash',
-        'kapıda nakit': 'cash',
-        'kart': 'card',
-        'kartla': 'card',
-        'kredi kartı': 'card',
-        'bank kartı': 'card',
-        'bonus': 'bonus',
-        'bonus puan': 'bonus',
-        'puan ile': 'bonus'
-    };
+    console.log(`💰 Ödeme komutu işleniyor: "${cleanMessage}" | Mevcut kök: ${currentRoot}`);
     
-    for (const [command, method] of Object.entries(paymentCommands)) {
-        if (cleanMessage.includes(command)) {
-            console.log(`💰 Sesli ödeme komutu: ${command} -> ${method}`);
-            currentPaymentMethod = method;
-            showPaymentModal();
-            speakToUser(`${getPaymentMethodName(method)} ödeme seçildi. Lütfen ödemeyi onaylayın.`);
+    // ÖDEME ONAY KOMUTLARI (Modal açıkken)
+    if (currentRoot === "payment:0") {
+        const confirmCommands = [
+            'ödemeyi onayla', 'onayla', 'tamam', 'evet', 'ödeme yap',
+            'confirm', 'approve', 'yes', 'ok'
+        ];
+        
+        if (confirmCommands.some(cmd => cleanMessage.includes(cmd))) {
+            if (currentPaymentMethod && !isPaymentProcessing) {
+                console.log('✅ Ödeme onay komutu algılandı');
+                processPayment(currentPaymentMethod);
+                return true;
+            } else {
+                speakToUser("Lütfen önce bir ödeme yöntemi seçin.");
+                return true;
+            }
+        }
+        
+        // ÖDEME YÖNTEMİ SEÇİM KOMUTLARI
+        const paymentCommands = {
+            'nakit': 'cash',
+            'nakit öde': 'cash', 
+            'para ile': 'cash',
+            'kapıda nakit': 'cash',
+            'cash': 'cash',
+            'kart': 'card',
+            'kartla': 'card',
+            'kredi kartı': 'card',
+            'bank kartı': 'card',
+            'kart ile': 'card',
+            'card': 'card',
+            'bonus': 'bonus',
+            'bonus puan': 'bonus',
+            'puan ile': 'bonus',
+            'points': 'bonus'
+        };
+        
+        for (const [command, method] of Object.entries(paymentCommands)) {
+            if (cleanMessage.includes(command)) {
+                console.log(`💰 Sesli ödeme seçimi: ${command} -> ${method}`);
+                
+                // UI'da seçimi göster
+                const optionElement = document.querySelector(`[data-method="${method}"]`);
+                if (optionElement) {
+                    selectPaymentOption(optionElement);
+                } else {
+                    currentPaymentMethod = method;
+                    speakToUser(`${getPaymentMethodName(method)} seçildi. Ödemeyi onayla diyebilirsiniz.`);
+                }
+                return true;
+            }
+        }
+        
+        // İPTAL KOMUTLARI
+        const cancelCommands = ['iptal', 'cancel', 'geri', 'back', 'vazgeç'];
+        if (cancelCommands.some(cmd => cleanMessage.includes(cmd))) {
+            closePaymentModal();
             return true;
         }
+        
+        return false;
+    }
+    
+    // ÖDEME BAŞLATMA KOMUTLARI (Modal kapalıyken)
+    if (cleanMessage.includes('ödeme') || cleanMessage.includes('öde') || cleanMessage.includes('satın al')) {
+        if (cart.length === 0) {
+            speakToUser("Sepetiniz boş. Ödeme yapmak için önce ürün ekleyin.");
+            return true;
+        }
+        
+        console.log('💰 Ödeme başlatma komutu algılandı');
+        showPaymentModal();
+        return true;
     }
     
     return false;
 }
-
 // Teslimat zamanını formatla
 function formatDeliveryTime(deliveryTime) {
     const time = new Date(deliveryTime);
@@ -9626,7 +9799,10 @@ function formatDeliveryTime(deliveryTime) {
 
 // Mevcut ödeme butonlarını güncelle
 document.addEventListener('DOMContentLoaded', function() {
-    // Ödeme butonlarını dinle
+    // Stilleri güncelle
+    updatePaymentStyles();
+    
+    // Ödeme butonlarını güncelle
     const payButtons = ['payCash', 'payCard', 'payBonus'];
     
     payButtons.forEach(btnId => {
@@ -9646,19 +9822,45 @@ document.addEventListener('DOMContentLoaded', function() {
         orderSummary.addEventListener('click', function() {
             if (cart.length > 0) {
                 showPaymentModal();
+            } else {
+                speakToUser("Sepetiniz boş. Ödeme yapmak için önce ürün ekleyin.");
             }
         });
     }
+    
+    console.log('✅ Ödeme sistemi güncellemeleri yüklendi!');
 });
 
-console.log('✅ Ödeme ve sipariş sistemi tamamlandı!');
-
-
+// Hata ayıklama için global fonksiyon
+window.debugPayment = function() {
+    console.log('🔍 ÖDME DURUMU:');
+    console.log('- currentRoot:', currentRoot);
+    console.log('- currentPaymentMethod:', currentPaymentMethod);
+    console.log('- isPaymentProcessing:', isPaymentProcessing);
+    console.log('- cart items:', cart.length);
+    console.log('- selectedSellerId:', selectedSellerId);
+    
+    const modal = document.getElementById('paymentModal');
+    console.log('- paymentModal exists:', !!modal);
+};
+        
+function updatePaymentStyles() {
+    const existingStyle = document.getElementById('payment-styles');
+    if (existingStyle) {
+        existingStyle.remove();
+    }
+    
+    const style = document.createElement('style');
+    style.id = 'payment-styles';
+    style.textContent = updatedPaymentStyles;
+    document.head.appendChild(style);
+}
         
 
     </script>
 </body>
 </html>
+
 
 
 
