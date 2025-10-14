@@ -9780,89 +9780,6 @@ function getProductName(productId) {
 // SESLİ ÖDEME KOMUTLARI
 // =============================================
 
-// Ödeme komutlarını işle - GÜNCELLENMİŞ
-function handlePaymentCommand(message) {
-    const cleanMessage = message.toLowerCase().trim();
-    
-    console.log(`💰 Ödeme komutu işleniyor: "${cleanMessage}" | Mevcut kök: ${currentRoot}`);
-    
-    // ÖDEME ONAY KOMUTLARI (Modal açıkken)
-    if (currentRoot === "payment:0") {
-        const confirmCommands = [
-            'ödemeyi onayla', 'onayla', 'tamam', 'evet', 'ödeme yap',
-            'confirm', 'approve', 'yes', 'ok'
-        ];
-        
-        if (confirmCommands.some(cmd => cleanMessage.includes(cmd))) {
-            if (currentPaymentMethod && !isPaymentProcessing) {
-                console.log('✅ Ödeme onay komutu algılandı');
-                processPayment(currentPaymentMethod);
-                return true;
-            } else {
-                speakToUser("Lütfen önce bir ödeme yöntemi seçin.");
-                return true;
-            }
-        }
-        
-        // ÖDEME YÖNTEMİ SEÇİM KOMUTLARI
-        const paymentCommands = {
-            'nakit': 'cash',
-            'nakit öde': 'cash', 
-            'para ile': 'cash',
-            'kapıda nakit': 'cash',
-            'cash': 'cash',
-            'kart': 'card',
-            'kartla': 'card',
-            'kredi kartı': 'card',
-            'bank kartı': 'card',
-            'kart ile': 'card',
-            'card': 'card',
-            'bonus': 'bonus',
-            'bonus puan': 'bonus',
-            'puan ile': 'bonus',
-            'points': 'bonus'
-        };
-        
-        for (const [command, method] of Object.entries(paymentCommands)) {
-            if (cleanMessage.includes(command)) {
-                console.log(`💰 Sesli ödeme seçimi: ${command} -> ${method}`);
-                
-                // UI'da seçimi göster
-                const optionElement = document.querySelector(`[data-method="${method}"]`);
-                if (optionElement) {
-                    selectPaymentOption(optionElement);
-                } else {
-                    currentPaymentMethod = method;
-                    speakToUser(`${getPaymentMethodName(method)} seçildi. Ödemeyi onayla diyebilirsiniz.`);
-                }
-                return true;
-            }
-        }
-        
-        // İPTAL KOMUTLARI
-        const cancelCommands = ['iptal', 'cancel', 'geri', 'back', 'vazgeç'];
-        if (cancelCommands.some(cmd => cleanMessage.includes(cmd))) {
-            closePaymentModal();
-            return true;
-        }
-        
-        return false;
-    }
-    
-    // ÖDEME BAŞLATMA KOMUTLARI (Modal kapalıyken)
-    if (cleanMessage.includes('ödeme') || cleanMessage.includes('öde') || cleanMessage.includes('satın al')) {
-        if (cart.length === 0) {
-            speakToUser("Sepetiniz boş. Ödeme yapmak için önce ürün ekleyin.");
-            return true;
-        }
-        
-        console.log('💰 Ödeme başlatma komutu algılandı');
-        showPaymentModal();
-        return true;
-    }
-    
-    return false;
-}
 
 
     
@@ -9942,6 +9859,7 @@ function updatePaymentStyles() {
     </script>
 </body>
 </html>
+
 
 
 
