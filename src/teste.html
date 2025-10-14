@@ -3359,7 +3359,25 @@ let commandRules = new Map();
 let lastRecognizedProduct = null;
 let lastSpokenMessage = "";
 let lastSpeakTime = 0;
-let isLocationDetected = false;        
+let isLocationDetected = false;   
+
+// Ödeme akışı state değişkenleri
+let isWaitingForPhone = false;
+let isWaitingForName = false;
+let isWaitingForBuilding = false;
+let isWaitingForApartment = false;
+let isWaitingForAddressConfirm = false;
+let isWaitingForNewBuilding = false;
+let isWaitingForNewApartment = false;
+let isWaitingForOrderConfirm = false;
+let expectedInput = null;
+let pendingPhone = null;
+let pendingCustomerInfo = null;
+let pendingAddressInfo = null;
+let orderNotes = null;
+
+
+        
 
 // Konum state
 let userLocation = {
@@ -3450,6 +3468,9 @@ let userLocation = {
 async function initApp() {
       try {
         console.log('🚀 Uygulama başlatılıyor...');
+
+        // ÖDEME SİSTEMİNİ KUR (hem sesli hem tıklama)
+        setupPaymentButtons();
         
         // Önce öğrenen sistemi başlat
         await voiceLearner.initialize();
@@ -3740,12 +3761,80 @@ async function safeVoiceMatchQuery(userInput) {
     }
 }
         
-
+/ processVoiceCommand fonksiyonuna ödeme akışı desteği ekle
+// processVoiceCommand fonksiyonunu değiştir - yeni fonksiyon
 async function processVoiceCommand(transcript) {
- const message = transcript.toLowerCase().trim();
-    console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
+    const message = transcript.toLowerCase().trim();
+    console.log(`🔊 Sesli komut: "${message}" | Beklenen: ${expectedInput}`);
     
-    // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
+    // ÖDEME AKIŞI KONTROLLERİ - HEM SESLİ HEM TIKLAMA
+    if (isWaitingForPhone && expectedInput === 'phone') {
+        await processPhoneNumber(message);
+        return;
+    }
+    
+    if (isWaitingForName && expectedInput === 'name') {
+        await processCustomerName(message);
+        return;
+    }
+    
+    if (isWaitingForBuilding && expectedInput === 'building') {
+        await processBuildingInfo(message);
+        return;
+    }
+    
+    if (isWaitingForApartment && expectedInput === 'apartment') {
+        await processApartmentInfo(message);
+        return;
+    }
+    
+    if (isWaitingForAddressConfirm && expectedInput === 'address_confirm') {
+        await processAddressConfirmation(message);
+        return;
+    }
+    
+    if (isWaitingForNewBuilding && expectedInput === 'new_building') {
+        await processNewBuildingInfo(message);
+        return;
+    }
+    
+    if (isWaitingForNewApartment && expectedInput === 'new_apartment') {
+        await processNewApartmentInfo(message);
+        return;
+    }
+    
+    if (isWaitingForOrderConfirm && expectedInput === 'order_confirm') {
+        await processOrderConfirmation(message);
+        return;
+    }
+    
+    // ÖDEME KOMUTLARI - SESLİ
+    if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
+        if (cart.length === 0) {
+            speakToUser("Sepetiniz boş");
+            return;
+        }
+        displayMessage("💳 Ödeme yöntemi seçin: Nakit, Kart veya Bonus");
+        speakToUser("Ödeme yöntemi seçin");
+        return;
+    }
+    
+    if (message.includes('nakit')) {
+        startPaymentProcess('cash');
+        return;
+    }
+    
+    if (message.includes('kart')) {
+        startPaymentProcess('card');
+        return;
+    }
+    
+    if (message.includes('bonus')) {
+        startPaymentProcess('bonus');
+        return;
+    }
+    
+   // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
     if (transcript.trim() === lastSpokenMessage.trim()) {
         console.log("⚠️ Kendi cevabımız tekrar algılandı, atlandı");
         return;
@@ -3824,6 +3913,7 @@ async function processVoiceCommand(transcript) {
         }
     }
 }
+
         
 // YARDIMCI FONKSİYONLAR
 function filterUnnecessaryWords(message) {
@@ -8852,6 +8942,7 @@ function formatDeliveryTime(deliveryTime) {
     </script>
 </body>
 </html>
+
 
 
 
