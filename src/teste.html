@@ -8645,7 +8645,7 @@ async function checkUserAuthentication() {
         return null;
     }
 }
-        
+    
 // Kullanıcı girişi
 async function handleUserLogin(phone, password = null) {
     try {
@@ -8800,18 +8800,12 @@ function updateUIAfterLogin() {
 
 // Ödeme durumu
         
-// Ödeme modalını göster - GÜNCELLENMİŞ
+// Ödeme modalı
 function showPaymentModal() {
-    console.log('💰 Ödeme modalı gösteriliyor...');
-    
-    // Önce varsa diğer modaları kapat
-    closeAllModals();
-    
     const modal = document.createElement('div');
     modal.id = 'paymentModal';
     modal.className = 'modal';
     modal.style.display = 'flex';
-    modal.style.zIndex = '10001'; // Diğer elementlerden daha yüksek
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
@@ -8853,37 +8847,20 @@ function showPaymentModal() {
             <div class="payment-total">
                 <div class="total-row">
                     <span>Toplam Tutar:</span>
-                    <span id="modalTotalAmount">${money(calculateTotal())}</span>
+                    <span id="modalTotalAmount">${calculateTotal().toFixed(2)} ₺</span>
                 </div>
             </div>
             
-            <div class="payment-actions">
-                <button id="confirmPayment" class="payment-confirm-btn" disabled>
-                    Ödemeyi Onayla
-                </button>
-                <button id="voiceConfirmPayment" class="payment-confirm-btn voice-btn" style="display: none;">
-                    <i class="fas fa-microphone"></i> Sesli Onayla
-                </button>
-            </div>
-            
-            <div class="voice-help">
-                <i class="fas fa-info-circle"></i>
-                <span>"Nakit", "Kart" veya "Bonus" diyerek seçim yapabilirsiniz</span>
-            </div>
+            <button id="confirmPayment" class="payment-confirm-btn" disabled>
+                Ödemeyi Onayla
+            </button>
         </div>
     `;
     
     document.body.appendChild(modal);
     setupPaymentModalEvents();
-    
-    // ÖDEME KÖKÜNÜ GÜNCELLE
-    currentRoot = "payment:0";
-    console.log('🔄 Kök güncellendi: payment:0 (Ödeme modu)');
-    
-    // Sesli yardım mesajı
-    speakToUser("Ödeme yöntemi seçin: nakit, kart veya bonus. Seçtikten sonra ödemeyi onayla diyebilirsiniz.");
 }
-
+    
 // Tüm modalları kapat
 function closeAllModals() {
     const modals = ['paymentModal', 'phoneVerificationModal', 'orderConfirmationModal'];
@@ -8894,15 +8871,24 @@ function closeAllModals() {
 }
 
         
-// Ödeme modal event'leri - GÜNCELLENMİŞ
+// Ödeme modal event'leri
 function setupPaymentModalEvents() {
     const paymentOptions = document.querySelectorAll('.payment-option');
     const confirmBtn = document.getElementById('confirmPayment');
-    const voiceConfirmBtn = document.getElementById('voiceConfirmPayment');
     
     paymentOptions.forEach(option => {
         option.addEventListener('click', function() {
-            selectPaymentOption(this);
+            // Tüm seçimleri temizle
+            paymentOptions.forEach(opt => opt.classList.remove('selected'));
+            // Seçili olanı işaretle
+            this.classList.add('selected');
+            
+            // Ödeme yöntemini kaydet
+            currentPaymentMethod = this.dataset.method;
+            
+            // Butonu aktif et
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = `${getPaymentMethodName(currentPaymentMethod)} ile Ödemeyi Onayla`;
         });
     });
     
@@ -8911,22 +8897,9 @@ function setupPaymentModalEvents() {
             processPayment(currentPaymentMethod);
         }
     });
-    
-    voiceConfirmBtn.addEventListener('click', function() {
-        speakToUser("Ödemeyi onayla diyerek sesli olarak onaylayabilirsiniz.");
-    });
-    
-    // Modal dışına tıklama ile kapatma
-    const modal = document.getElementById('paymentModal');
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            closePaymentModal();
-        }
-    });
-}
-        
+}        
+
 // Ödeme modalını kapat
-// Ödeme modalını kapat - GÜNCELLENMİŞ
 function closePaymentModal() {
     const modal = document.getElementById('paymentModal');
     if (modal) {
@@ -8934,14 +8907,8 @@ function closePaymentModal() {
     }
     currentPaymentMethod = null;
     isPaymentProcessing = false;
-    
-    // Kökü önceki duruma döndür
-    currentRoot = "5:0";
-    console.log('🔄 Kök geri döndü: 5:0 (Ürün seçimi)');
-    
-    speakToUser("Ödeme işlemi iptal edildi. Ürün seçmeye devam edebilirsiniz.");
 }
-
+    
 // Ödeme yöntemi isimleri
 function getPaymentMethodName(method) {
     const names = {
@@ -8951,6 +8918,7 @@ function getPaymentMethodName(method) {
     };
     return names[method] || 'Ödeme';
 }
+
 
 // Ödeme seçeneği seçimi - YENİ FONKSİYON
 function selectPaymentOption(optionElement) {
@@ -8979,12 +8947,9 @@ function selectPaymentOption(optionElement) {
     speakToUser(`${getPaymentMethodName(currentPaymentMethod)} seçildi. Ödemeyi onayla diyebilirsiniz.`);
 }
         
-// Ödeme işlemi - GÜNCELLENMİŞ
+// Ödeme işlemi
 async function processPayment(paymentMethod) {
-    if (isPaymentProcessing) {
-        console.log('⏳ Ödeme zaten işleniyor...');
-        return;
-    }
+    if (isPaymentProcessing) return;
     
     isPaymentProcessing = true;
     const confirmBtn = document.getElementById('confirmPayment');
@@ -8993,34 +8958,22 @@ async function processPayment(paymentMethod) {
         console.log('💰 Ödeme işlemi başlatılıyor:', paymentMethod);
         
         // Butonu güncelle
-        if (confirmBtn) {
-            confirmBtn.disabled = true;
-            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> İşleniyor...';
-        }
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> İşleniyor...';
         
         // Sepet kontrolü
         if (cart.length === 0) {
             throw new Error('Sepetiniz boş');
         }
         
-        // Satıcı kontrolü
-        if (!selectedSellerId) {
-            throw new Error('Satıcı seçilmedi');
-        }
-        
-        displayMessage("Ödeme işlemi başlatılıyor...");
-        speakToUser("Ödeme işleniyor, lütfen bekleyin.");
-        
         // Kullanıcı kontrolü
         const user = await checkUserAuthentication();
         
         if (!user) {
             // Misafir mod - telefon doğrulama
-            console.log('👤 Misafir ödeme işlemi');
             await handleGuestPayment(paymentMethod);
         } else {
             // Kayıtlı kullanıcı - direkt ödeme
-            console.log('👤 Kayıtlı kullanıcı ödemesi:', user.name);
             await handleRegisteredUserPayment(paymentMethod, user);
         }
         
@@ -9030,13 +8983,12 @@ async function processPayment(paymentMethod) {
         speakToUser("Ödeme işlemi başarısız. Lütfen tekrar deneyin.");
         
         // Butonu sıfırla
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = `${getPaymentMethodName(paymentMethod)} ile Ödemeyi Onayla`;
-        }
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = `${getPaymentMethodName(paymentMethod)} ile Ödemeyi Onayla`;
         isPaymentProcessing = false;
     }
 }
+    
 // Misafir ödeme işlemi
 async function handleGuestPayment(paymentMethod) {
     console.log('👤 Misafir ödeme işlemi');
@@ -9109,7 +9061,6 @@ function showPhoneVerificationModal(paymentMethod) {
     document.body.appendChild(modal);
     setupPhoneVerificationEvents(paymentMethod);
 }
-
 // Telefon doğrulama event'leri
 function setupPhoneVerificationEvents(paymentMethod) {
     const phoneInput = document.getElementById('phoneNumber');
@@ -9301,7 +9252,6 @@ async function completeGuestOrder(paymentMethod, phoneNumber) {
         speakToUser("Sipariş işlemi başarısız. Lütfen tekrar deneyin.");
     }
 }
-
 // Kayıtlı kullanıcı ödeme işlemi
 async function handleRegisteredUserPayment(paymentMethod, user) {
     try {
@@ -9352,7 +9302,6 @@ async function handleRegisteredUserPayment(paymentMethod, user) {
         speakToUser("Sipariş işlemi başarısız. Lütfen tekrar deneyin.");
     }
 }
-
 
 // =============================================
 // ÖDEME SİSTEMİ - ESKİ SİSTEM ENTEGRASYONU
@@ -9859,6 +9808,7 @@ function updatePaymentStyles() {
     </script>
 </body>
 </html>
+
 
 
 
