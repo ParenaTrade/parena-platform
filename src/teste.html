@@ -2644,8 +2644,7 @@ function updateCartTotals() {
 // =============================================
 // SESSİZ ASİSTAN MESAJLARI
 // =============================================
-
-
+// speakToUser fonksiyonunu güncelle - ÖDEME MESAJLARI İÇİN SESLİ OLSUN
 function speakToUser(message) {
     console.log(`🗣️ Asistan (SESLİ): ${message}`);
     
@@ -2666,7 +2665,7 @@ function speakToUser(message) {
         return;
     }
     
-    // 3. SADECE SEÇİM ÖNCESİ VE ÖNEMLİ MESAJLAR SESLİ OLSUN
+    // 3. ÖDEME AKIŞI MESAJLARI DA SESLİ OLSUN
     const allowedVoiceMessages = [
         // SEÇİM ÖNCESİ MESAJLAR
         "mağaza seçin", "satıcı seçin", "reyon seçin", "ürün seçin",
@@ -2680,7 +2679,19 @@ function speakToUser(message) {
         "hata", "bulunamadı", "sepet dolu", "seçilmedi",
         
         // SİSTEM MESAJLARI
-        "mikrofon açıldı", "mikrofon kapandı", "hoş geldiniz"
+        "mikrofon açıldı", "mikrofon kapandı", "hoş geldiniz",
+        
+        // ✅ ÖDEME AKIŞI MESAJLARI - EKLENDİ
+        "telefon numaranızı söyleyin", "telefon numarası",
+        "adınızı ve soyadınızı söyleyin", "ad soyad",
+        "bina numarasını söyleyin", "bina numarası",
+        "daire numarasını söyleyin", "daire numarası",
+        "kayıtlı adresinize teslimat", "adres", "teslimat",
+        "ödeme yöntemi seçin", "nakit", "kart", "bonus",
+        "siparişi onaylıyor musunuz", "onay",
+        "kaydınız tamamlandı", "hoş geldiniz",
+        "geçersiz telefon numarası", "geçersiz bina numarası", "geçersiz daire numarası",
+        "sistem hatası", "kayıt hatası"
     ];
     
     // Mesajın izin verilenlerden birini içerip içermediğini kontrol et
@@ -2689,11 +2700,11 @@ function speakToUser(message) {
     );
     
     if (!isAllowed) {
-        console.log("🔇 Sadece seçim öncesi mesajlar sesli söylenecek:", cleanMessage);
+        console.log("🔇 Sadece seçim ve ödeme mesajları sesli söylenecek:", cleanMessage);
         return;
     }
     
-    // SESLİ OKUMA (sadece izin verilen mesajlar için)
+    // SESLİ OKUMA (izin verilen mesajlar için)
     if ('speechSynthesis' in window && isMicrophoneEnabled) {
         const speech = new SpeechSynthesisUtterance(cleanMessage);
         speech.lang = currentLanguage === 'tr' ? 'tr-TR' : 'en-US';
@@ -2721,7 +2732,8 @@ function speakToUser(message) {
     
     console.log("✅ Yeni sesli mesaj söylendi:", cleanMessage);
 }
-function isSimilarMessage(newMessage, oldMessage) {
+        
+    function isSimilarMessage(newMessage, oldMessage) {
     if (!oldMessage) return false;
     
     const newWords = newMessage.toLowerCase().split(' ');
@@ -8401,19 +8413,16 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Ödeme sürecini başlat - HEM SESLİ HEM TIKLAMA İÇİN
-// startPaymentProcess fonksiyonunu değiştir - yeni fonksiyon
+// ÖDEME SÜRECİNDE DAHA AÇIK SESLİ MESAJLAR
 function startPaymentProcess(paymentMethod) {
     console.log('💳 Ödeme süreci başlatılıyor:', paymentMethod);
     
-    // Sepet kontrolü
     if (cart.length === 0) {
         displayMessage("❌ Sepetiniz boş. Ödeme yapabilmek için sepete ürün ekleyin.");
-        speakToUser("Sepetiniz boş");
+        speakToUser("Sepetiniz boş, önce ürün ekleyin");
         return;
     }
     
-    // Satıcı kontrolü
     if (!selectedSellerId) {
         displayMessage("❌ Satıcı seçilmedi.");
         speakToUser("Satıcı seçilmedi");
@@ -8422,39 +8431,40 @@ function startPaymentProcess(paymentMethod) {
     
     currentPaymentMethod = paymentMethod;
     
-    // Ödeme yöntemi bilgilendirmesi
     const paymentMethodName = getPaymentMethodName(paymentMethod);
-    displayMessage(`🔄 ${paymentMethodName} ödeme seçildi. Telefon numaranızı sesli olarak söyleyin.`);
-    speakToUser("Telefon numaranızı söyleyin");
+    const totalAmount = calculateTotal();
     
-    // Sepeti otomatik aç (kullanıcı deneyimi için)
+    // ✅ DAHA AÇIK SESLİ MESAJ
+    const voiceMessage = `${paymentMethodName} ödeme seçildi. Toplam tutar ${money(totalAmount)}. Lütfen telefon numaranızı söyleyin`;
+    
+    displayMessage(`🔄 ${paymentMethodName} ödeme seçildi. Telefon numaranızı sesli olarak söyleyin.`);
+    speakToUser(voiceMessage);
+    
     if (cartContainer) {
         cartContainer.classList.add('open');
     }
     
-    // Telefon numarası alma moduna geç
     isWaitingForPhone = true;
     expectedInput = 'phone';
 }
 
-// Telefon numarasını işle - HEM SESLİ HEM TIKLAMA
-// processPhoneNumber fonksiyonunu değiştir - yeni fonksiyon
+        
+// TELEFON İŞLEME - DAHA AÇIK SESLİ MESAJ
 async function processPhoneNumber(phoneInput) {
     console.log('📞 Telefon işleniyor:', phoneInput);
     
-    // Telefon numarasını temizle ve formatla
     const cleanPhone = cleanPhoneNumber(phoneInput);
     
     if (!cleanPhone || cleanPhone.length < 10) {
         displayMessage("❌ Geçerli bir telefon numarası girmediniz. Lütfen tekrar söyleyin.");
-        speakToUser("Geçersiz telefon numarası");
+        speakToUser("Geçerli bir telefon numarası söyleyin, örneğin: sıfır beş yüz kırk bir, altı yüz otuz üç, yetmiş iki, elli");
         return false;
     }
     
     displayMessage(`📞 Telefon: ${formatPhoneNumber(cleanPhone)} kontrol ediliyor...`);
+    speakToUser(`Telefon numaranız ${formatPhoneNumber(cleanPhone)} kontrol ediliyor`);
     
     try {
-        // Müşteri kontrolü
         const { data: customer, error } = await supabase
             .from('customers')
             .select('*')
@@ -8466,23 +8476,19 @@ async function processPhoneNumber(phoneInput) {
         }
         
         if (customer) {
-            // Mevcut müşteri
             currentCustomer = customer;
             localStorage.setItem('currentCustomer', JSON.stringify(customer));
             
             displayMessage(`✅ Hoş geldiniz ${customer.name}! Sepetiniz kaydediliyor...`);
-            speakToUser(`Hoş geldiniz ${customer.name}`);
+            speakToUser(`Hoş geldiniz ${customer.name}! Kayıtlı adresinize teslimat yapılsın mı? Evet veya hayır diyebilirsiniz`);
             
-            // Sepeti müşteriye bağla
             await linkCartToCustomer(customer.id);
-            
-            // Adres kontrolüne geç
             await checkDeliveryAddress(customer);
             
         } else {
-            // Yeni müşteri
+            // ✅ YENİ MÜŞTERİ İÇİN AÇIK SESLİ MESAJ
             displayMessage("👋 Yeni müşteri kaydı oluşturuluyor. Lütfen adınızı ve soyadınızı söyleyin.");
-            speakToUser("Adınızı ve soyadınızı söyleyin");
+            speakToUser("Yeni müşteri kaydı için lütfen adınızı ve soyadınızı söyleyin, örneğin: Ahmet Yılmaz");
             
             isWaitingForName = true;
             expectedInput = 'name';
@@ -8494,19 +8500,19 @@ async function processPhoneNumber(phoneInput) {
     } catch (error) {
         console.error('❌ Telefon işleme hatası:', error);
         displayMessage("❌ Sistem hatası. Lütfen tekrar deneyin.");
-        speakToUser("Sistem hatası");
+        speakToUser("Sistem hatası oluştu, lütfen tekrar deneyin");
         return false;
     }
 }
 
-// İsim ve soyisim işleme - HEM SESLİ HEM TIKLAMA
-// processCustomerName fonksiyonunu değiştir - yeni fonksiyon
+        
+// AD SOYAD İŞLEME - DAHA AÇIK SESLİ MESAJ
 async function processCustomerName(fullName) {
     console.log('👤 Müşteri adı işleniyor:', fullName);
     
     if (!fullName || fullName.trim().split(' ').length < 2) {
         displayMessage("❌ Lütfen hem adınızı hem soyadınızı söyleyin.");
-        speakToUser("Ad ve soyad gerekli");
+        speakToUser("Lütfen hem adınızı hem soyadınızı söyleyin, örneğin: Ayşe Demir");
         return false;
     }
     
@@ -8515,7 +8521,7 @@ async function processCustomerName(fullName) {
     const lastName = nameParts.slice(1).join(' ');
     
     displayMessage(`👤 Ad: ${firstName} ${lastName}. Lütfen bina numarasını söyleyin.`);
-    speakToUser("Bina numarasını söyleyin");
+    speakToUser(`Teşekkürler ${firstName} ${lastName}. Şimdi lütfen bina numaranızı söyleyin, örneğin: on beş`);
     
     isWaitingForBuilding = true;
     expectedInput = 'building';
@@ -8527,23 +8533,22 @@ async function processCustomerName(fullName) {
     
     return true;
 }
-
-// Bina ve daire numarası işleme - HEM SESLİ HEM TIKLAMA
-// processBuildingInfo fonksiyonunu değiştir - yeni fonksiyon
+        
+// BİNA NUMARASI - DAHA AÇIK SESLİ MESAJ
 async function processBuildingInfo(buildingInfo) {
     console.log('🏢 Bina bilgisi işleniyor:', buildingInfo);
     
     const buildingMatch = buildingInfo.match(/\d+/);
     if (!buildingMatch) {
         displayMessage("❌ Geçerli bir bina numarası söyleyin.");
-        speakToUser("Geçersiz bina numarası");
+        speakToUser("Geçerli bir bina numarası söyleyin, örneğin: yirmi üç veya beş");
         return false;
     }
     
     const buildingNumber = buildingMatch[0];
     
     displayMessage(`🏢 Bina: ${buildingNumber}. Lütfen daire numarasını söyleyin.`);
-    speakToUser("Daire numarasını söyleyin");
+    speakToUser(`Bina numaranız ${buildingNumber}. Şimdi lütfen daire numaranızı söyleyin, örneğin: dört`);
     
     isWaitingForApartment = true;
     expectedInput = 'apartment';
@@ -8552,15 +8557,14 @@ async function processBuildingInfo(buildingInfo) {
     return true;
 }
 
-// Daire numarası işleme ve müşteri kaydı - HEM SESLİ HEM TIKLAMA
-// processApartmentInfo fonksiyonunu değiştir - yeni fonksiyon
+// DAİRE NUMARASI - DAHA AÇIK SESLİ MESAJ
 async function processApartmentInfo(apartmentInfo) {
     console.log('🚪 Daire bilgisi işleniyor:', apartmentInfo);
     
     const apartmentMatch = apartmentInfo.match(/\d+/);
     if (!apartmentMatch) {
         displayMessage("❌ Geçerli bir daire numarası söyleyin.");
-        speakToUser("Geçersiz daire numarası");
+        speakToUser("Geçerli bir daire numarası söyleyin, örneğin: üç veya on iki");
         return false;
     }
     
@@ -8568,9 +8572,9 @@ async function processApartmentInfo(apartmentInfo) {
     pendingCustomerInfo.apartmentNumber = apartmentNumber;
     
     displayMessage("🔄 Müşteri kaydı oluşturuluyor...");
+    speakToUser("Bilgileriniz kaydediliyor, lütfen bekleyin");
     
     try {
-        // Müşteri kaydı oluştur
         const { data: newCustomer, error } = await supabase
             .from('customers')
             .insert([{
@@ -8592,15 +8596,13 @@ async function processApartmentInfo(apartmentInfo) {
         currentCustomer = newCustomer;
         localStorage.setItem('currentCustomer', JSON.stringify(newCustomer));
         
-        // Referans kaydı (varsa)
         if (referralCode) {
             await processReferralTracking(newCustomer.id);
         }
         
         displayMessage(`✅ Kaydınız tamamlandı! Hoş geldiniz ${newCustomer.name}.`);
-        speakToUser("Kaydınız tamamlandı");
+        speakToUser(`Kaydınız tamamlandı! Hoş geldiniz ${newCustomer.name}. Şimdi adres kontrolü yapılıyor`);
         
-        // Adres kontrolüne geç
         await checkDeliveryAddress(newCustomer);
         
         return true;
@@ -8608,11 +8610,11 @@ async function processApartmentInfo(apartmentInfo) {
     } catch (error) {
         console.error('❌ Müşteri kayıt hatası:', error);
         displayMessage("❌ Kayıt işlemi başarısız. Lütfen tekrar deneyin.");
-        speakToUser("Kayıt hatası");
+        speakToUser("Kayıt işlemi başarısız oldu, lütfen tekrar deneyin");
         return false;
     }
 }
-
+        
 // Referans takibi işleme
 // processReferralTracking fonksiyonunu değiştir - yeni fonksiyon
 async function processReferralTracking(customerId) {
@@ -8984,6 +8986,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
