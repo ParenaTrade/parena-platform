@@ -2995,10 +2995,11 @@ function speakToUser(message) {
 // =============================================
 
 // Mikrofon açma fonksiyonunu güncelle
+// Mikrofon açma/kapama fonksiyonu - TAMİR EDİLMİŞ
 async function enableDynamicMicrophone() {
     console.log('🎤 Mikrofon açılmak isteniyor...');
     
-    // Konum kontrolü - TAMAM
+    // Konum kontrolü
     if (!selectedLocation) {
         showDynamicLocationModal();
         displayMessage("Lütfen önce bir konum seçiniz.");
@@ -3006,7 +3007,7 @@ async function enableDynamicMicrophone() {
         return;
     }
     
-    // Zaten açıksa kapat - TAMAM
+    // Zaten açıksa kapat
     if (isMicrophoneEnabled) {
         disableDynamicMicrophone();
         return;
@@ -3015,13 +3016,12 @@ async function enableDynamicMicrophone() {
     try {
         console.log('🔐 Mikrofon izni isteniyor...');
         
-        // ⚠️ DÜZELTME: Stream'i globalde tut, hemen kapatma!
-        window.microphoneStream = await navigator.mediaDevices.getUserMedia({ 
+        // Mikrofon erişimi iste
+        await navigator.mediaDevices.getUserMedia({ 
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true,
-                sampleRate: 16000 // ⭐ Ek optimizasyon
+                autoGainControl: true
             }
         });
         
@@ -3036,16 +3036,14 @@ async function enableDynamicMicrophone() {
             microphoneToggle.style.color = 'var(--success)';
         }
         
-        // ⚠️ DÜZELTME: Doğru fonksiyonu çağır
-        setTimeout(() => {
-            initializeSimpleSpeechRecognition(); // initializeDynamicSpeechRecognition yerine
-        }, 1000);
+        // Ses tanımayı başlat
+        initializeSimpleSpeechRecognition();
         
         // Başarı mesajı
         setTimeout(() => {
             displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
             speakToUser("mikrofon açıldı");
-        }, 1500);
+        }, 500);
         
     } catch (error) {
         console.error('❌ Mikrofon hatası:', error);
@@ -3054,20 +3052,13 @@ async function enableDynamicMicrophone() {
         disableDynamicMicrophone();
     }
 }
-                
- function disableDynamicMicrophone() {
+        
+ // Mikrofon kapatma fonksiyonu
+function disableDynamicMicrophone() {
     console.log('🔇 Mikrofon kapatılıyor...');
     
     isMicrophoneEnabled = false;
     isListening = false;
-    
-    // ⚠️ DÜZELTME: Stream'i de temizle
-    if (window.microphoneStream) {
-        window.microphoneStream.getTracks().forEach(track => {
-            track.stop(); // Mikrofon erişimini serbest bırak
-        });
-        window.microphoneStream = null;
-    }
     
     // Recognition'ı durdur
     if (recognition) {
@@ -3193,24 +3184,34 @@ function setupVisualFeedback() {
         updateRecognitionStatus('waiting');
     };
 }
-// Basitleştirilmiş ses tanıma (no-speech hatalarını yoksay)
+// Basitleştirilmiş ses tanıma - TAMİR EDİLMİŞ
 function initializeSimpleSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+        console.error('❌ Ses tanıma desteklenmiyor');
+        displayMessage("Tarayıcınız ses tanımayı desteklemiyor.");
+        return;
+    }
+    
+    // Eski recognition'ı temizle
+    if (recognition) {
+        try {
+            recognition.stop();
+        } catch (e) {}
+        recognition = null;
+    }
     
     recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.lang = 'tr-TR';
     recognition.interimResults = false;
     
-    // Değişken tanımla
-    let isRestarting = false;
-    
     recognition.onstart = function() {
         console.log('✅ Dinliyorum...');
         isListening = true;
         if (voiceIndicator) voiceIndicator.classList.add('listening');
+        updateVoiceNotification('🎤 Dinliyorum... Konuşun!', 'listening');
     };
     
     recognition.onresult = function(event) {
@@ -3219,47 +3220,48 @@ function initializeSimpleSpeechRecognition() {
         
         if (userMessage) userMessage.textContent = transcript;
         processVoiceCommand(transcript);
+        updateVoiceNotification(`✅ "${transcript}"`, 'success', true, 2000);
     };
     
     recognition.onerror = function(event) {
-        console.log('⚠️ Hata (yoksayılıyor):', event.error);
-        isListening = false;
-        if (voiceIndicator) voiceIndicator.classList.remove('listening');
-    };
-    
-    recognition.onend = function() {
+        console.log('⚠️ Hata:', event.error);
         isListening = false;
         if (voiceIndicator) voiceIndicator.classList.remove('listening');
         
-        // DÜZELTME: Daha güvenli yeniden başlatma
-        if (isMicrophoneEnabled && !isRestarting) {
-            isRestarting = true;
+        // "no-speech" hatasını yoksay
+        if (event.error !== 'no-speech') {
+            updateVoiceNotification('❌ Ses anlaşılamadı, lütfen tekrar deneyin', 'error', true, 2000);
+        }
+    };
+    
+    recognition.onend = function() {
+        console.log('🔚 Ses tanıma sonlandı');
+        isListening = false;
+        if (voiceIndicator) voiceIndicator.classList.remove('listening');
+        
+        // Mikrofon hala açıksa yeniden başlat
+        if (isMicrophoneEnabled && !isAssistantSpeaking) {
             setTimeout(() => {
                 try {
-                    if (isMicrophoneEnabled && recognition) {
+                    if (recognition && isMicrophoneEnabled) {
                         recognition.start();
                     }
                 } catch (error) {
                     console.log('Yeniden başlatma hatası:', error);
-                    // Hata durumunda 3 saniye bekle
-                    setTimeout(() => {
-                        if (isMicrophoneEnabled) {
-                            initializeSimpleSpeechRecognition();
-                        }
-                    }, 3000);
-                } finally {
-                    isRestarting = false;
                 }
             }, 1000);
         }
-    }; // ⭐ BURASI KAPATILDI
+    };
     
+    // Ses tanımayı başlat
     try {
         recognition.start();
+        console.log('✅ Ses tanıma başlatıldı');
     } catch (error) {
-        console.error('Başlatma hatası:', error);
+        console.error('❌ Ses tanıma başlatma hatası:', error);
     }
-}        
+}
+        
         // Acil durum fallback'leri
 function setupEmergencyFallbacks() {
     // Languages tablosu yoksa
@@ -3553,7 +3555,8 @@ let commandRules = new Map();
 let lastRecognizedProduct = null;
 let lastSpokenMessage = "";
 let lastSpeakTime = 0;
-let isLocationDetected = false;    
+let isLocationDetected = false;
+let isAssistantSpeaking = false;
 
 // Ödeme akışı state değişkenleri
 let pendingPhone = null;
@@ -9443,6 +9446,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
