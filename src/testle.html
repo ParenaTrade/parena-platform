@@ -2636,34 +2636,49 @@ function setupCartItemEvents() {
         });
     });
 }
-        function updateCartTotals() {
-  let subtotal = 0; // KDV hariç toplam
-  let totalTax = 0; // KDV toplamı
-  let total = 0;    // KDV dahil toplam
+        // 🔹 KDV dahil fiyat mantığına göre updateCartTotals()
+function updateCartTotals() {
+    console.log('📊 updateCartTotals çağrıldı (vergi dahil hesaplama)');
+    
+    let subtotal = 0;  // KDV hariç toplam
+    let totalTax = 0;  // KDV toplamı
+    let total = 0;     // KDV dahil toplam
 
-  cart.forEach(item => {
-    const taxDecimal = (item.tax_rate || 0) / 100;
-    const itemTotal = item.price * item.quantity; // KDV dahil
-    const itemSubtotal = itemTotal / (1 + taxDecimal); // KDV hariç
-    const itemTax = itemTotal - itemSubtotal; // KDV
+    cart.forEach(item => {
+        const taxDecimal = (item.tax_rate || 0) / 100;
+        const itemTotal = (item.price || 0) * (item.quantity || 0); // fiyat zaten KDV dahil
+        const itemSubtotal = itemTotal / (1 + taxDecimal); // matrah (KDV hariç)
+        const itemTax = itemTotal - itemSubtotal; // vergi tutarı
 
-    item.subtotal = itemSubtotal;
-    item.tax_amount = itemTax;
-    item.total = itemTotal;
+        item.subtotal = itemSubtotal;
+        item.tax_amount = itemTax;
+        item.total = itemTotal;
 
-    subtotal += itemSubtotal;
-    totalTax += itemTax;
-    total += itemTotal;
-  });
+        subtotal += itemSubtotal;
+        totalTax += itemTax;
+        total += itemTotal;
+    });
 
-  // Sepet özetini güncelle
-  document.getElementById("cartSubtotal").textContent = money(subtotal);
-  document.getElementById("cartTax").textContent = money(totalTax);
-  document.getElementById("cartTotal").textContent = money(total);
+    // 🧮 UI Güncelle
+    if (subtotalEl) subtotalEl.textContent = money(subtotal);
+    if (vatAmountEl) vatAmountEl.textContent = money(totalTax);
+    if (totalAmountEl) totalAmountEl.textContent = money(total);
 
-  return { subtotal, totalTax, total };
+    console.log(`💰 Sepet Güncellendi | Matrah: ${subtotal.toFixed(2)}₺ | KDV: ${totalTax.toFixed(2)}₺ | Toplam: ${total.toFixed(2)}₺`);
 }
 
+     // 🔹 calculateTotal() — sadece KDV dahil toplam döndürür
+function calculateTotal() {
+    let total = 0;
+
+    cart.forEach(item => {
+        const itemTotal = (item.price || 0) * (item.quantity || 0); // KDV dahil
+        total += itemTotal;
+    });
+
+    console.log('💰 Sepet toplamı hesaplandı (KDV dahil):', total, '| Ürün sayısı:', cart.length);
+    return total;
+}
 
         // =============================================
         // YARDIMCI FONKSİYONLAR
@@ -9199,6 +9214,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
