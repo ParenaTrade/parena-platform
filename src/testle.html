@@ -2637,32 +2637,40 @@ function setupCartItemEvents() {
     });
 }
         function updateCartTotals() {
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            const vat = subtotal * 0.18;
-            const total = subtotal + vat;
-            
-            if (subtotalEl) subtotalEl.textContent = money(subtotal);
-            if (vatAmountEl) vatAmountEl.textContent = money(vat);
-            if (totalAmountEl) totalAmountEl.textContent = money(total);
-        }
+  let subtotal = 0; // KDV hariç toplam
+  let totalTax = 0; // KDV toplamı
+  let total = 0;    // KDV dahil toplam
 
-       function calculateTotal() {
-    const total = cart.reduce((sum, item) => {
-        const quantity = item.quantity || 0;
-        const price = item.price || 0;
-        return sum + (price * quantity);
-    }, 0);
-    
-    console.log('💰 Sepet toplamı hesaplandı:', total, '| Ürün sayısı:', cart.length);
-    return total;
+  cart.forEach(item => {
+    const taxDecimal = (item.tax_rate || 0) / 100;
+    const itemTotal = item.price * item.quantity; // KDV dahil
+    const itemSubtotal = itemTotal / (1 + taxDecimal); // KDV hariç
+    const itemTax = itemTotal - itemSubtotal; // KDV
+
+    item.subtotal = itemSubtotal;
+    item.tax_amount = itemTax;
+    item.total = itemTotal;
+
+    subtotal += itemSubtotal;
+    totalTax += itemTax;
+    total += itemTotal;
+  });
+
+  // Sepet özetini güncelle
+  document.getElementById("cartSubtotal").textContent = money(subtotal);
+  document.getElementById("cartTax").textContent = money(totalTax);
+  document.getElementById("cartTotal").textContent = money(total);
+
+  return { subtotal, totalTax, total };
 }
+
 
         // =============================================
         // YARDIMCI FONKSİYONLAR
         // =============================================
 
         // Money fonksiyonunu güncelle (küsüratları düzgün göstersin)
-function money(n) { 
+    function money(n) { 
     const number = Number(n || 0);
     // Küsüratlı sayıları düzgün formatla
     if (number % 1 !== 0) {
@@ -2674,18 +2682,31 @@ function money(n) {
 
 // Sepet gösteriminde küsüratları düzgün göster
 function updateCartTotals() {
-    const subtotal = cart.reduce((sum, item) => {
-        const itemTotal = (item.price || 0) * (item.quantity || 0);
-        // Küsüratlı sayıları yuvarla
-        return sum + Math.round(itemTotal * 100) / 100;
-    }, 0);
-    
-    const vat = Math.round(subtotal * 0.18 * 100) / 100;
-    const total = Math.round((subtotal + vat) * 100) / 100;
-    
-    if (subtotalEl) subtotalEl.textContent = money(subtotal);
-    if (vatAmountEl) vatAmountEl.textContent = money(vat);
-    if (totalAmountEl) totalAmountEl.textContent = money(total);
+  let subtotal = 0; // KDV hariç toplam
+  let totalTax = 0; // KDV toplamı
+  let total = 0;    // KDV dahil toplam
+
+  cart.forEach(item => {
+    const taxDecimal = (item.tax_rate || 0) / 100;
+    const itemTotal = item.price * item.quantity; // KDV dahil
+    const itemSubtotal = itemTotal / (1 + taxDecimal); // KDV hariç
+    const itemTax = itemTotal - itemSubtotal; // KDV
+
+    item.subtotal = itemSubtotal;
+    item.tax_amount = itemTax;
+    item.total = itemTotal;
+
+    subtotal += itemSubtotal;
+    totalTax += itemTax;
+    total += itemTotal;
+  });
+
+  // Sepet özetini güncelle
+  document.getElementById("cartSubtotal").textContent = money(subtotal);
+  document.getElementById("cartTax").textContent = money(totalTax);
+  document.getElementById("cartTotal").textContent = money(total);
+
+  return { subtotal, totalTax, total };
 }
 
         function getDefaultSellerImage(seller) {
@@ -9178,6 +9199,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
