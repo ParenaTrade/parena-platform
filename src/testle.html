@@ -7534,7 +7534,7 @@ function translatePage(lang) {
     debugLog(`✅ Dil değiştirildi: ${lang}`);
 }
 
-        // =============================================
+// =============================================
 // DİL SELECTOR UI
 // =============================================
 
@@ -8830,112 +8830,106 @@ async function processOrderConfirmation(response) {
 
 // saveOrder fonksiyonunu güncelle
 async function saveOrder() {
-    console.log('💾 Sipariş kaydediliyor...');
-    
-    displayMessage("🔄 Siparişiniz kaydediliyor...");
-    
-    try {
-        const totalAmount = calculateTotal();
-        
-        // Demo müşteri kontrolü
-        if (currentCustomer.id && currentCustomer.id.startsWith('demo-')) {
-            // DEMO SİPARİŞ
-            const demoOrder = {
-                id: 'demo-order-' + Date.now(),
-                customer: currentCustomer,
-                items: cart,
-                total: totalAmount,
-                payment_method: currentPaymentMethod,
-                status: 'confirmed',
-                order_notes: orderNotes || '',
-                delivery_address: JSON.stringify({
-                    district: userLocation.district,
-                    city: userLocation.city,
-                    building: pendingAddressInfo?.building || '',
-                    apartment: pendingAddressInfo?.apartment || ''
-                }),
-                created_at: new Date().toISOString()
-            };
-            
-            localStorage.setItem('lastOrder', JSON.stringify(demoOrder));
-            
-            displayMessage("✅ Demo siparişiniz kaydedildi! Teşekkür ederiz.");
-            speakToUser("Siparişiniz için teşekkür eder iyi günler dileriz");
-            
-        } else {
-            // GERÇEK SİPARİŞ - Basitleştirilmiş veri
-            const orderData = {
-                customer_id: currentCustomer.id,
-                seller_id: selectedSellerId,
-                total_amount: totalAmount,
-                payment_method: currentPaymentMethod,
-                status: 'confirmed',
-                order_notes: orderNotes || 'Sesli sipariş',
-                delivery_address: JSON.stringify({
-                    district: userLocation.district || 'Bilinmiyor',
-                    city: userLocation.city || 'Bilinmiyor'
-                })
-            };
-            
-            console.log('📦 Sipariş verisi:', orderData);
-            
-            // Sipariş kaydı
-            const { data: order, error: orderError } = await supabase
-                .from('orders')
-                .insert([orderData])
-                .select()
-                .single();
-            
-            if (orderError) {
-                console.error('Sipariş hatası:', orderError);
-                throw new Error('Sipariş kaydedilemedi: ' + orderError.message);
-            }
-            
-            // Sipariş detayları
-            const orderDetails = cart.map(item => ({
-                order_id: order.id,
-                product_id: item.id,
-                quantity: item.quantity,
-                unit_price: item.price,
-                total_price: item.price * item.quantity
-            }));
-            
-            const { error: detailsError } = await supabase
-                .from('order_details')
-                .insert(orderDetails);
-            
-            if (detailsError) throw detailsError;
-            
-            displayMessage("✅ Siparişiniz için teşekkür eder, iyi günler dileriz!");
-            speakToUser("Siparişiniz için teşekkür eder iyi günler dileriz");
-        }
-        
-        // Temizlik ve reset
-        setTimeout(() => {
-            resetAfterSuccessfulOrder();
-        }, 3000);
-        
-    } catch (error) {
-        console.error('❌ Sipariş kaydetme hatası:', error);
-        
-        // FALLBACK: Demo sipariş oluştur
-        const demoOrder = {
-            id: 'demo-fallback-' + Date.now(),
-            customer: currentCustomer || { name: "Müşteri" },
-            items: cart,
-            total: calculateTotal(),
-            payment_method: currentPaymentMethod,
-            status: 'confirmed',
-            created_at: new Date().toISOString()
-        };
-        
-        localStorage.setItem('lastOrder', JSON.stringify(demoOrder));
-        
-        displayMessage("✅ Demo siparişiniz kaydedildi! Teşekkür ederiz.");
-        speakToUser("Demo siparişiniz kaydedildi teşekkür ederiz");
-        
-        resetAfterSuccessfulOrder();
+  console.log('💾 Sipariş kaydediliyor...');
+  displayMessage("🔄 Siparişiniz kaydediliyor...");
+
+  try {
+    const totalAmount = calculateTotal();
+
+    // 1️⃣ DEMO sipariş kontrolü
+    if (currentCustomer.id && currentCustomer.id.startsWith('demo-')) {
+      const demoOrder = {
+        id: 'demo-order-' + Date.now(),
+        customer: currentCustomer,
+        items: cart,
+        total: totalAmount,
+        payment_method: currentPaymentMethod,
+        status: 'confirmed',
+        order_notes: orderNotes || '',
+        delivery_address: JSON.stringify({
+          district: userLocation.district,
+          city: userLocation.city,
+          building: pendingAddressInfo?.building || '',
+          apartment: pendingAddressInfo?.apartment || ''
+        }),
+        created_at: new Date().toISOString()
+      };
+
+      localStorage.setItem('lastOrder', JSON.stringify(demoOrder));
+      displayMessage("✅ Demo siparişiniz kaydedildi! Teşekkür ederiz.");
+      speakToUser("Siparişiniz için teşekkür ederiz");
+    } 
+    else {
+      // 2️⃣ Gerçek sipariş kaydı
+      const orderData = {
+        customer_id: currentCustomer.id,
+        seller_id: selectedSellerId,
+        total_amount: totalAmount,
+        payment_method: currentPaymentMethod,
+        status: 'confirmed',
+        order_notes: orderNotes || 'Sesli sipariş',
+        delivery_address: JSON.stringify({
+          district: userLocation.district || 'Bilinmiyor',
+          city: userLocation.city || 'Bilinmiyor'
+        })
+      };
+
+      console.log('📦 Sipariş verisi:', orderData);
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([orderData])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // 3️⃣ Sipariş detayları
+      const orderDetails = cart.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        discount: 0,
+        tax_rate: item.tax_rate
+      }));
+
+      console.log('📦 Order Details:', orderDetails);
+
+      const { error: detailsError } = await supabase
+        .from('order_details')
+        .insert(orderDetails);
+
+      if (detailsError) throw detailsError;
+
+      displayMessage("✅ Siparişiniz için teşekkür eder, iyi günler dileriz!");
+      speakToUser("Siparişiniz için teşekkür ederiz, iyi günler dileriz");
     }
+
+    // 4️⃣ Başarılı işlem sonrası temizlik
+    setTimeout(() => resetAfterSuccessfulOrder(), 3000);
+
+  } catch (error) {
+    console.error('❌ Sipariş kaydetme hatası:', error);
+
+    // Fallback: Demo kayıt oluştur
+    const demoOrder = {
+      id: 'demo-fallback-' + Date.now(),
+      customer: currentCustomer || { name: "Müşteri" },
+      items: cart,
+      total: calculateTotal(),
+      payment_method: currentPaymentMethod,
+      status: 'confirmed',
+      created_at: new Date().toISOString()
+    };
+
+    localStorage.setItem('lastOrder', JSON.stringify(demoOrder));
+
+    displayMessage("✅ Demo siparişiniz kaydedildi! Teşekkür ederiz.");
+    speakToUser("Demo siparişiniz kaydedildi, teşekkür ederiz");
+
+    resetAfterSuccessfulOrder();
+  }
 }
         
 // Başarılı sipariş sonrası reset
@@ -9022,6 +9016,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
