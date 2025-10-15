@@ -8408,29 +8408,154 @@ function getPaymentMethodName(method) {
     return names[method] || 'Ödeme';
 }
 
-function cleanPhoneNumber(phone) {
-    // Daha esnek telefon numarası temizleme
-    let cleaned = phone.replace(/\D/g, '');
+// EKSİK FONKSİYONU EKLEYELİM
+function formatPhoneNumber(phoneInput) {
+    console.log('📞 formatPhoneNumber çağrıldı:', phoneInput);
     
-    // "nakit", "kart" gibi kelimeleri filtrele
-    const invalidWords = ['nakit', 'kart', 'bonus', 'ödeme', 'öde'];
-    if (invalidWords.some(word => phone.toLowerCase().includes(word))) {
-        return null;
+    // Mevcut cleanPhoneNumber fonksiyonunu kullan
+    const cleanedNumber = cleanPhoneNumber(phoneInput);
+    
+    if (!cleanedNumber) {
+        console.log('❌ cleanPhoneNumber geçersiz numara döndü');
+        return {
+            success: false,
+            formatted: phoneInput,
+            raw: null
+        };
     }
     
-    // 10 haneli numara kontrolü
-    if (cleaned.length === 10 && cleaned.startsWith('5')) {
-        return cleaned;
-    }
+    console.log('🔧 Temizlenmiş numara:', cleanedNumber);
     
-    // 11 haneli (0 ile başlayan)
-    if (cleaned.length === 11 && cleaned.startsWith('05')) {
-        return cleaned.substring(1);
-    }
+    // Formatlı numara oluştur
+    const formatted = `+90 ${cleanedNumber.substring(0, 3)} ${cleanedNumber.substring(3, 6)} ${cleanedNumber.substring(6, 8)} ${cleanedNumber.substring(8, 10)}`;
     
-    return null;
+    console.log('✅ Formatlanmış numara:', formatted);
+    return {
+        success: true,
+        formatted: formatted,
+        raw: cleanedNumber
+    };
 }
 
+// GÜNCELLENMİŞ processPhoneNumber - Mevcut cleanPhoneNumber ile entegre
+async function processPhoneNumber(message) {
+    console.log('📞 processPhoneNumber çağrıldı:', message);
+    
+    try {
+        // Önce doğrudan cleanPhoneNumber ile temizle
+        const cleanedNumber = cleanPhoneNumber(message);
+        
+        if (!cleanedNumber) {
+            console.log('❌ cleanPhoneNumber geçersiz numara döndü');
+            
+            // Alternatif: Rakamları manuel çıkar ve tekrar dene
+            const numbers = message.match(/\d+/g);
+            if (numbers) {
+                const combined = numbers.join('');
+                const retryCleaned = cleanPhoneNumber(combined);
+                if (retryCleaned) {
+                    console.log('🔄 Manuel çıkarım başarılı:', retryCleaned);
+                    return await processValidPhoneNumber(retryCleaned);
+                }
+            }
+            
+            displayMessage("❌ Geçerli bir telefon numarası girmediniz. Lütfen 10 haneli numaranızı söyleyin (örn: 541 633 72 81).");
+            speakToUser("Geçerli bir telefon numarası söyleyin");
+            return false;
+        }
+        
+        return await processValidPhoneNumber(cleanedNumber);
+        
+    } catch (error) {
+        console.error('❌ Telefon işleme hatası:', error);
+        displayMessage("❌ Telefon numarası işlenirken bir hata oluştu. Lütfen tekrar deneyin.");
+        speakToUser("Telefon hatası");
+        return false;
+    }
+}
+
+// YARDIMCI FONKSİYON - Geçerli telefon işleme
+async function processValidPhoneNumber(cleanedNumber) {
+    console.log('✅ Geçerli telefon işleniyor:', cleanedNumber);
+    
+    // Telefon numarasını formatla
+    const formattedResult = formatPhoneNumber(cleanedNumber);
+    
+    if (!formattedResult.success) {
+        console.log('❌ Telefon numarası formatı geçersiz');
+        displayMessage("❌ Telefon numarası formatı geçersiz. Lütfen 10 haneli numaranızı söyleyin (örn: 541 633 72 81).");
+        speakToUser("Geçerli bir telefon numarası söyleyin");
+        return false;
+    }
+    
+    console.log('✅ Formatlanmış telefon:', formattedResult.formatted);
+    
+    // Müşteri bilgisini güncelle veya oluştur
+    currentCustomer = {
+        phone: formattedResult.raw,
+        formatted_phone: formattedResult.formatted,
+        name: null,
+        address: null,
+        is_guest: true
+    };
+    
+    // Durumu güncelle
+    isWaitingForPhone = false;
+    isWaitingForName = true;
+    expectedInput = 'name';
+    
+    // Başarı mesajı
+    displayMessage(`✅ Telefon numaranız kaydedildi: ${formattedResult.formatted}. Şimdi adınızı ve soyadınızı söyleyin.`);
+    speakToUser("Telefon numaranız kaydedildi. Lütfen adınızı ve soyadınızı söyleyin");
+    
+    return true;
+}
+
+// GELİŞMİŞ HATA AYIKLAMA FONKSİYONU
+function debugPhoneProcessing() {
+    console.log('🐛 TELEFON İŞLEME DEBUG');
+    
+    const testCases = [
+        "0541 633 72 81",
+        "541 633 72 81",
+        "5416337281", 
+        "05416337281",
+        "telefon 541 633 72 81",
+        "numara 0541 633 72 81",
+        "toplam tutar 5 3 0", // geçersiz
+        "nakit 541 633 72 81", // geçersiz (nakit kelimesi içeriyor)
+        "5416337281 nakit" // geçersiz
+    ];
+    
+    testCases.forEach((testCase, index) => {
+        console.log(`\n--- TEST ${index + 1}: "${testCase}" ---`);
+        
+        // cleanPhoneNumber test
+        const cleaned = cleanPhoneNumber(testCase);
+        console.log('🧹 cleanPhoneNumber sonucu:', cleaned);
+        
+        if (cleaned) {
+            // formatPhoneNumber test
+            const formatted = formatPhoneNumber(cleaned);
+            console.log('🔧 formatPhoneNumber sonucu:', formatted);
+        } else {
+            console.log('❌ cleanPhoneNumber geçersiz döndü');
+            
+            // Rakam çıkarımı deneyelim
+            const numbers = testCase.match(/\d+/g);
+            if (numbers) {
+                const combined = numbers.join('');
+                console.log('🔍 Rakam çıkarımı:', combined);
+                const retry = cleanPhoneNumber(combined);
+                console.log('🔄 Yeniden deneme sonucu:', retry);
+            }
+        }
+    });
+}
+
+// ACİL TEST - Hemen çalıştırın!
+debugPhoneProcessing();
+        
 // Mesafe hesaplama (Haversine formülü)
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Dünya yarıçapı km
@@ -9058,6 +9183,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
