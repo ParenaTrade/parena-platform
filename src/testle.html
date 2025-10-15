@@ -2295,19 +2295,16 @@ window.addEventListener('load', function() {
         // SEPET YÖNETİM FONKSİYONLARI
         // =============================================
 
-    async function addToCart(product, quantity, productCard = null) {
+// 🛒 Ürün ekleme
+async function addToCart(product, quantity, productCard = null) {
   console.log('🛒 addToCart çağrıldı:', product.name, quantity);
-  console.log('📊 Önceki sepet durumu:', cart.length, 'ürün');
-  console.log('🔒 Kilit durumu:', isSellerLocked);
-  console.log('🏪 Seçili satıcı:', selectedSellerId);
 
   // 🔹 1. Satıcı kilit kontrolü
   if (isSellerLocked && cart.length > 0) {
     const firstCartItem = cart[0];
     if (firstCartItem && firstCartItem.seller_id !== selectedSellerId) {
       const currentSeller = sellers.find(s => s.id === firstCartItem.seller_id);
-      console.log('❌ Farklı satıcıdan ürün eklenmeye çalışılıyor');
-      speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut satıcı'} ile alışverişe devam edebilirsiniz.`);
+      speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut satıcı'} ile alışveriş yapabilirsiniz.`);
       return;
     }
   }
@@ -2315,12 +2312,12 @@ window.addEventListener('load', function() {
   const wasCartEmpty = cart.length === 0;
   const existingItem = cart.find(item => item.id === product.id);
 
-  // 🔹 2. Fiyat ve vergi oranını al
+  // 🔹 2. Fiyat & vergi oranı
   let unitPrice = product.discount_price || product.price || null;
   let taxRate = product.tax_rate ? Number(product.tax_rate) : null;
   let productPriceId = product.product_price_id || null;
 
-  // Eğer ürün objesinde fiyat yoksa, product_prices üzerinden çek
+  // Eksikse veritabanından çek
   if (!unitPrice || taxRate === null) {
     console.log('💡 Ürün fiyatı Supabase üzerinden alınıyor...');
     const { data: priceData, error } = await supabase
@@ -2331,11 +2328,7 @@ window.addEventListener('load', function() {
         discount_price,
         seller_id,
         product_id,
-        products (
-          id,
-          name,
-          tax_rate
-        )
+        products ( id, name, tax_rate )
       `)
       .eq('product_id', product.id)
       .eq('seller_id', selectedSellerId)
@@ -2353,19 +2346,14 @@ window.addEventListener('load', function() {
     taxRate = parseFloat(priceData.products.tax_rate || 0);
   }
 
-  // 🔹 3. Vergi hesaplama
-  // tax_rate alanı vergi yüzdesi olarak kayıtlı (örnek: 10, 18)
-  const taxRateDecimal = taxRate / 100;
-  const subtotal = unitPrice * quantity;
-  const taxAmount = subtotal * taxRateDecimal;
-  const total = subtotal + taxAmount;
+  // 🔹 3. Vergi dahil hesaplama
+  const taxDecimal = taxRate / 100;
+  const itemTotal = unitPrice * quantity; // KDV dahil fiyat
+  const itemSubtotal = itemTotal / (1 + taxDecimal);
+  const itemTax = itemTotal - itemSubtotal;
 
   if (existingItem) {
     existingItem.quantity += quantity;
-    existingItem.subtotal += subtotal;
-    existingItem.tax_amount = existingItem.subtotal * taxRateDecimal;
-    existingItem.total = existingItem.subtotal + existingItem.tax_amount;
-    console.log('✅ Mevcut ürün güncellendi:', existingItem.name, existingItem.quantity);
   } else {
     cart.push({
       id: product.id,
@@ -2378,306 +2366,155 @@ window.addEventListener('load', function() {
       seller_id: selectedSellerId,
       category_id: selectedCategoryId,
       tax_rate: taxRate,
-      tax_amount: taxAmount,
-      subtotal,
-      total
+      subtotal: itemSubtotal,
+      tax_amount: itemTax,
+      total: itemTotal
     });
-    console.log('✅ Yeni ürün eklendi:', product.name);
   }
 
-  // 🔹 4. UI Güncelle
   updateCartUI();
 
-  // İlk ürün eklendiyse satıcı kilidini aktif et
-  if (wasCartEmpty && cart.length > 0) {
-    console.log('🎯 İlk ürün eklendi, kilit aktif ediliyor...');
-    lockStoreAndSeller();
-  }
+  if (wasCartEmpty && cart.length > 0) lockStoreAndSeller();
 
-  // Kart animasyonu
   if (productCard) {
     productCard.style.transform = 'scale(1.05)';
-    setTimeout(() => {
-      productCard.style.transform = 'scale(1)';
-    }, 300);
+    setTimeout(() => (productCard.style.transform = 'scale(1)'), 300);
+  }
+}
+
+// 🔒 Mağaza ve satıcı kilitleme
+function lockStoreAndSeller() {
+  isSellerLocked = true;
+  localStorage.setItem('isSellerLocked', 'true');
+  updateLockUI();
+
+  const currentSeller = sellers.find(s => s.id === selectedSellerId);
+  speakToUser(`İlk ürün sepete eklendi. Artık sadece ${currentSeller?.business_name || 'bu mağaza'} ile alışveriş yapabilirsiniz.`);
+}
+
+// 🔓 Kilidi kaldırma
+function unlockStoreAndSeller() {
+  isSellerLocked = false;
+  localStorage.setItem('isSellerLocked', 'false');
+  updateLockUI();
+}
+
+// 🔐 Kilit UI
+function updateLockUI() {
+  document.querySelectorAll('.seller-type-card, .seller-card').forEach(card => {
+    card.style.opacity = isSellerLocked ? '0.5' : '1';
+    card.style.pointerEvents = isSellerLocked ? 'none' : 'auto';
+  });
+
+  const indicator = document.getElementById('lockIndicator');
+  if (isSellerLocked) {
+    if (!indicator) {
+      const el = document.createElement('div');
+      el.id = 'lockIndicator';
+      el.innerHTML = `<div style="position: fixed; top: 72px; right: 20px; background: var(--success); color: white; padding: 10px; border-radius: 8px; z-index: 1000; box-shadow: var(--shadow);">
+        <i class="fas fa-lock"></i> Sepet Aktif - Mağaza Kilitli
+      </div>`;
+      document.body.appendChild(el);
+    }
+  } else if (indicator) indicator.remove();
+}
+
+// 🧮 KDV dahil / hariç hesaplama
+function updateCartTotals() {
+  let subtotal = 0, totalTax = 0, total = 0;
+  cart.forEach(item => {
+    const taxDecimal = (item.tax_rate || 0) / 100;
+    const itemTotal = (item.price || 0) * (item.quantity || 0);
+    const itemSubtotal = itemTotal / (1 + taxDecimal);
+    const itemTax = itemTotal - itemSubtotal;
+
+    item.subtotal = itemSubtotal;
+    item.tax_amount = itemTax;
+    item.total = itemTotal;
+
+    subtotal += itemSubtotal;
+    totalTax += itemTax;
+    total += itemTotal;
+  });
+
+  if (subtotalEl) subtotalEl.textContent = money(subtotal);
+  if (vatAmountEl) vatAmountEl.textContent = money(totalTax);
+  if (totalAmountEl) totalAmountEl.textContent = money(total);
+}
+
+// 🔹 Genel toplam (KDV dahil)
+function calculateTotal() {
+  return cart.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
+}
+
+// 🧩 Sepet ürün satırları
+function updateCartItems() {
+  const cartContainer = document.getElementById('cartItems');
+  if (!cartContainer) return;
+
+  if (cart.length === 0) {
+    cartContainer.innerHTML = `<div class="empty-cart"><i class="fas fa-shopping-cart fa-2x mb-2"></i><p>Sepetiniz boş.</p></div>`;
+    return;
   }
 
-  console.log(`✅ Sepet güncellendi: ${cart.length} ürün`);
+  cartContainer.innerHTML = cart.map((item, index) => {
+    const taxDecimal = (item.tax_rate || 0) / 100;
+    const itemTotal = (item.price || 0) * (item.quantity || 0);
+    const itemSubtotal = itemTotal / (1 + taxDecimal);
+    const itemTax = itemTotal - itemSubtotal;
+
+    return `
+      <div class="cart-item">
+        <div class="cart-item-info">
+          <img src="${item.image || 'https://via.placeholder.com/60'}" class="cart-item-image">
+          <div class="cart-item-details">
+            <div class="cart-item-name">${item.name}</div>
+            <div class="cart-item-price">${money(item.price)} × ${item.quantity} = ${money(itemTotal)}</div>
+            <div class="cart-item-tax">Matrah: ${money(itemSubtotal)} | KDV: ${money(itemTax)}</div>
+          </div>
+        </div>
+        <div class="cart-item-actions">
+          <button class="quantity-btn decrease" data-index="${index}">−</button>
+          <span class="cart-item-quantity">${item.quantity}</span>
+          <button class="quantity-btn increase" data-index="${index}">+</button>
+          <button class="quantity-btn remove" data-index="${index}"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>`;
+  }).join('');
+
+  setupCartItemEvents();
 }
 
-
-// Mağaza ve satıcı kilitleme fonksiyonu
-function lockStoreAndSeller() {
-    console.log('🔒 Mağaza ve satıcı kilitleniyor...');
-    
-    if (!selectedSellerId) {
-        console.log('⚠️ Kilitlenecek satıcı yok');
-        return;
-    }
-    
-    // Kilit durumunu global değişkende sakla
-    isSellerLocked = true;
-    localStorage.setItem('isSellerLocked', 'true');
-    
-    // UI'da kilidi göster
-    updateLockUI();
-    
-    // Daha açık mesaj
-    const currentSeller = sellers.find(s => s.id === selectedSellerId);
-    speakToUser(`İlk ürün sepete eklendi. Artık sadece ${currentSeller?.business_name || 'bu mağaza'} ile alışveriş yapabilirsiniz. Başka mağaza seçmek için "sepeti boşalt" diyebilirsiniz.`);
-    
-    console.log('✅ Mağaza ve satıcı kilitlendi:', selectedSellerId);
-}
-        
-// Kilidi kaldırma fonksiyonu
-function unlockStoreAndSeller() {
-    console.log('🔓 Mağaza ve satıcı kilidi kaldırılıyor...');
-    
-    isSellerLocked = false;
-    localStorage.setItem('isSellerLocked', 'false');
-    
-    // UI'dan kilidi kaldır
-    updateLockUI();
-    
-    console.log('✅ Mağaza ve satıcı kilidi kaldırıldı');
-}
-
-// UI güncelleme fonksiyonu
-function updateLockUI() {
-    const sellerTypeGrid = document.getElementById('sellerTypeGrid');
-    const sellerGrid = document.getElementById('sellerGrid');
-    
-    if (isSellerLocked) {
-        // Kilitli durum - diğer mağazaları gri göster
-        document.querySelectorAll('.seller-type-card:not(.selected)').forEach(card => {
-            card.style.opacity = '0.5';
-            card.style.pointerEvents = 'none';
-            card.title = 'Sepet dolu - sadece seçili mağaza kullanılabilir';
-        });
-        
-        document.querySelectorAll('.seller-card:not(.selected)').forEach(card => {
-            card.style.opacity = '0.5';
-            card.style.pointerEvents = 'none';
-            card.title = 'Sepet dolu - sadece seçili satıcı kullanılabilir';
-        });
-        
-        // Seçili olanları normal göster
-        document.querySelectorAll('.seller-type-card.selected, .seller-card.selected').forEach(card => {
-            card.style.opacity = '1';
-            card.style.pointerEvents = 'auto';
-            card.style.border = '2px solid var(--success)';
-        });
-        
-        // Kilit ikonu ekle
-        if (!document.getElementById('lockIndicator')) {
-            const lockIndicator = document.createElement('div');
-            lockIndicator.id = 'lockIndicator';
-            lockIndicator.innerHTML = `
-                <div style="position: fixed; top: 72px; right: 20px; background: var(--success); color: white; padding: 10px; border-radius: 8px; z-index: 1000; box-shadow: var(--shadow);">
-                    <i class="fas fa-lock"></i> Sepet Aktif - Mağaza Kilitli
-                </div>
-            `;
-            document.body.appendChild(lockIndicator);
-        }
-        
-    } else {
-        // Kilitli değil - tümü aktif
-        document.querySelectorAll('.seller-type-card, .seller-card').forEach(card => {
-            card.style.opacity = '1';
-            card.style.pointerEvents = 'auto';
-            card.style.border = '';
-            card.title = '';
-        });
-        
-        // Kilit ikonunu kaldır
-        const lockIndicator = document.getElementById('lockIndicator');
-        if (lockIndicator) {
-            lockIndicator.remove();
-        }
-    }
-}
-   function updateCartUI() {
-    console.log('🔄 updateCartUI çağrıldı, sepet durumu:', cart.length, 'ürün');
-    
-    // Sepet sayacı - CANLI HESAPLAMA
-    const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    console.log('📊 Sepet toplam ürün sayısı:', totalItems);
-    
-    if (orderCount) {
-        orderCount.textContent = totalItems;
-        console.log('✅ Sepet sayacı güncellendi:', totalItems);
-    }
-    
-    // Toplam tutar
-    const total = calculateTotal();
-    if (orderTotal) orderTotal.textContent = money(total);
-    
-    // Sepet içeriği
-    updateCartItems();
-    
-    // Ödeme özeti
-    updateCartTotals();
-       
-     // Sepet sayılarını güncelle
-    updateProductCartCounts();
-       
-    // ÖNEMLİ DÜZELTME: Sepet durumuna göre kilit yönetimi
-    console.log('🔍 Kilit kontrolü - Sepet:', totalItems, 'ürün, Kilitli mi:', isSellerLocked);
-    
-    if (totalItems === 0) {
-        // Sepet BOŞSA kesinlikle kilidi kaldır
-        if (isSellerLocked) {
-            console.log('🗑️ Sepet boş, kilidi kaldırılıyor...');
-            unlockStoreAndSeller();
-        }
-    } else {
-        // Sepet DOLUYSA ve kilit yoksa kilitle
-        if (!isSellerLocked && selectedSellerId) {
-            console.log('🛒 Sepet dolu, kilitleme aktif ediliyor...');
-            lockStoreAndSeller();
-        }
-    }
-    
-    // Kilit UI'ını güncelle
-    updateLockUI();
-}
-        
-        function updateCartItems() {
-    const cartItems = document.getElementById('cartItems');
-    if (!cartItems) return;
-    
-    console.log('📦 updateCartItems çağrıldı, sepet:', cart.length, 'ürün');
-    
-    if (cart.length === 0) {
-        cartItems.innerHTML = `
-            <div class="text-center" style="padding: 30px; color: var(--gray);">
-                <i class="fas fa-shopping-cart fa-2x mb-3"></i>
-                <p>Sepetiniz boş</p>
-            </div>
-        `;
-        console.log('🛒 Sepet görseli: BOŞ');
-    } else {
-        cartItems.innerHTML = '';
-        
-        cart.forEach((item, index) => {
-            const cartItem = document.createElement('div');
-            cartItem.className = 'cart-item';
-            
-            cartItem.innerHTML = `
-                <div class="cart-item-info">
-                    <img src="${item.image || 'https://via.placeholder.com/50x50?text=Ürün'}" 
-                         alt="${item.name}" 
-                         class="cart-item-image">
-                    <div class="cart-item-details">
-                        <div class="cart-item-name">${item.name}</div>
-                        <div class="cart-item-price">${money(item.price)} / ${item.unit_type}</div>
-                    </div>
-                </div>
-                <div class="cart-item-controls">
-                    <button class="quantity-btn decrease" data-index="${index}">-</button>
-                    <span class="quantity">${item.quantity}</span>
-                    <button class="quantity-btn increase" data-index="${index}">+</button>
-                    <button class="quantity-btn remove" data-index="${index}">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `;
-            
-            cartItems.appendChild(cartItem);
-        });
-        
-        console.log('🛒 Sepet görseli:', cart.length, 'ürün listelendi');
-        
-        // Event listener'ları ekle
-        setTimeout(() => {
-            setupCartItemEvents();
-        }, 100);
-    }
-    
-    // Temizleme butonunu kontrol et
-    addClearCartButton();
-}
-
-// Sepet item event'lerini ayarla
+// 🎯 Sepet ürün butonları
 function setupCartItemEvents() {
-    console.log('🎯 Sepet event listenerları kuruluyor...');
-    
-    document.querySelectorAll('.quantity-btn.decrease').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const index = parseInt(this.dataset.index);
-            console.log('➖ Azalt butonu:', index);
-            
-            if (cart[index].quantity > 1) {
-                cart[index].quantity--;
-            } else {
-                cart.splice(index, 1);
-            }
-            updateCartUI(); // HEMEN GÜNCELLE
-        });
-    });
-    
-    document.querySelectorAll('.quantity-btn.increase').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const index = parseInt(this.dataset.index);
-            console.log('➕ Artır butonu:', index);
-            
-            cart[index].quantity++;
-            updateCartUI(); // HEMEN GÜNCELLE
-        });
-    });
-    
-    document.querySelectorAll('.quantity-btn.remove').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const index = parseInt(this.dataset.index);
-            console.log('🗑️ Sil butonu:', index, cart[index].name);
-            
-            cart.splice(index, 1);
-            updateCartUI(); // HEMEN GÜNCELLE
-        });
-    });
-}
-        // 🔹 KDV dahil fiyat mantığına göre updateCartTotals()
-function updateCartTotals() {
-    console.log('📊 updateCartTotals çağrıldı (vergi dahil hesaplama)');
-    
-    let subtotal = 0;  // KDV hariç toplam
-    let totalTax = 0;  // KDV toplamı
-    let total = 0;     // KDV dahil toplam
-
-    cart.forEach(item => {
-        const taxDecimal = (item.tax_rate || 0) / 100;
-        const itemTotal = (item.price || 0) * (item.quantity || 0); // fiyat zaten KDV dahil
-        const itemSubtotal = itemTotal / (1 + taxDecimal); // matrah (KDV hariç)
-        const itemTax = itemTotal - itemSubtotal; // vergi tutarı
-
-        item.subtotal = itemSubtotal;
-        item.tax_amount = itemTax;
-        item.total = itemTotal;
-
-        subtotal += itemSubtotal;
-        totalTax += itemTax;
-        total += itemTotal;
-    });
-
-    // 🧮 UI Güncelle
-    if (subtotalEl) subtotalEl.textContent = money(subtotal);
-    if (vatAmountEl) vatAmountEl.textContent = money(totalTax);
-    if (totalAmountEl) totalAmountEl.textContent = money(total);
-
-    console.log(`💰 Sepet Güncellendi | Matrah: ${subtotal.toFixed(2)}₺ | KDV: ${totalTax.toFixed(2)}₺ | Toplam: ${total.toFixed(2)}₺`);
+  document.querySelectorAll('.quantity-btn.decrease').forEach(btn =>
+    btn.onclick = () => { const i = +btn.dataset.index; cart[i].quantity > 1 ? cart[i].quantity-- : cart.splice(i, 1); updateCartUI(); }
+  );
+  document.querySelectorAll('.quantity-btn.increase').forEach(btn =>
+    btn.onclick = () => { cart[+btn.dataset.index].quantity++; updateCartUI(); }
+  );
+  document.querySelectorAll('.quantity-btn.remove').forEach(btn =>
+    btn.onclick = () => { cart.splice(+btn.dataset.index, 1); updateCartUI(); }
+  );
 }
 
-     // 🔹 calculateTotal() — sadece KDV dahil toplam döndürür
-function calculateTotal() {
-    let total = 0;
+// 🔁 Ana UI güncelleme
+function updateCartUI() {
+  const totalItems = cart.reduce((s, i) => s + (i.quantity || 0), 0);
+  if (orderCount) orderCount.textContent = totalItems;
 
-    cart.forEach(item => {
-        const itemTotal = (item.price || 0) * (item.quantity || 0); // KDV dahil
-        total += itemTotal;
-    });
+  updateCartItems();
+  updateCartTotals();
 
-    console.log('💰 Sepet toplamı hesaplandı (KDV dahil):', total, '| Ürün sayısı:', cart.length);
-    return total;
+  const total = calculateTotal();
+  if (orderTotal) orderTotal.textContent = money(total);
+
+  updateProductCartCounts();
+
+  if (totalItems === 0) unlockStoreAndSeller();
+  else if (!isSellerLocked && selectedSellerId) lockStoreAndSeller();
+
+  updateLockUI();
 }
 
         // =============================================
@@ -9214,6 +9051,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
