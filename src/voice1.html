@@ -1560,104 +1560,6 @@
    gap: 15px;
    overflow-x: auto;
 }
-
-
-const universalMicrophoneStyles = `
-.voice-indicator {
-    display: flex;
-    align-items: end;
-    height: 50px;
-    gap: 3px;
-}
-
-.voice-bar {
-    width: 6px;
-    height: 10px;
-    background: #ddd;
-    border-radius: 3px;
-    transition: height 0.1s ease;
-}
-
-.permission-guide-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100000;
-}
-
-.permission-guide {
-    background: white;
-    padding: 20px;
-    border-radius: 12px;
-    max-width: 400px;
-    margin: 20px;
-}
-
-.permission-guide h3 {
-    color: var(--primary);
-    margin-bottom: 10px;
-}
-
-.permission-guide h4 {
-    color: var(--dark);
-    margin: 15px 0 8px 0;
-}
-
-.permission-guide ol {
-    margin-left: 20px;
-}
-
-.permission-guide button {
-    margin: 10px 5px 0 0;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-.install-prompt {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--primary);
-    color: white;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    z-index: 10000;
-}
-
-.install-content h3 {
-    margin: 0 0 5px 0;
-}
-
-.install-buttons {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.install-buttons button {
-    padding: 8px 15px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-}
-`;
-
-// Stilleri ekle
-const microphoneStyleSheet = document.createElement('style');
-microphoneStyleSheet.textContent = universalMicrophoneStyles;
-document.head.appendChild(microphoneStyleSheet);
-
-
     </style>
 </head>
 <body>
@@ -1903,577 +1805,6 @@ document.head.appendChild(microphoneStyleSheet);
         const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-
-/**
- * EVRENSEL SES TANIMA SİSTEMİ
- */
-async function initializeUniversalSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-        throw new Error('Ses tanıma desteklenmiyor');
-    }
-
-    // Mevcut recognition'ı temizle
-    if (microphoneState.recognition) {
-        try {
-            microphoneState.recognition.stop();
-        } catch (e) {}
-    }
-
-    // Yeni recognition oluştur
-    microphoneState.recognition = new SpeechRecognition();
-    microphoneState.recognition.continuous = true;
-    microphoneState.recognition.interimResults = true;
-    microphoneState.recognition.lang = 'tr-TR';
-
-    // Event listeners
-    microphoneState.recognition.onstart = () => {
-        console.log('✅ Ses tanıma başladı');
-        microphoneState.isListening = true;
-        updateMicrophoneUI(true);
-    };
-
-    microphoneState.recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript;
-        const confidence = event.results[event.results.length - 1][0].confidence;
-        
-        console.log('🎯 Ses tanındı:', transcript, 'Güven:', confidence);
-        
-        if (confidence > 0.6) {
-            processVoiceCommand(transcript);
-        }
-    };
-
-    microphoneState.recognition.onerror = (event) => {
-        console.log('⚠️ Ses tanıma hatası:', event.error);
-    };
-
-    microphoneState.recognition.onend = () => {
-        console.log('🔚 Ses tanıma sonlandı');
-        microphoneState.isListening = false;
-        updateMicrophoneUI(false);
-        
-        // Otomatik yeniden başlatma
-        setTimeout(() => {
-            if (microphoneState.isGranted) {
-                startRecognitionWithRetry();
-            }
-        }, 1000);
-    };
-
-    // Başlat
-    await startRecognitionWithRetry();
-}
-        
-/**
- * CİHAZA ÖZEL SES TANIMA AYARLARI
- */
-function configureRecognitionForDevice(recognition) {
-    // Temel ayarlar
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'tr-TR';
-    recognition.maxAlternatives = 3;
-
-    // iOS ayarları
-    if (deviceInfo.isIOS) {
-        recognition.continuous = false; // iOS'ta continuous sorunlu
-        recognition.interimResults = false;
-    }
-
-    // Android ayarları
-    if (deviceInfo.isAndroid) {
-        recognition.continuous = true;
-        recognition.interimResults = true;
-    }
-
-    // Safari ayarları
-    if (deviceInfo.isSafari) {
-        recognition.continuous = false;
-        recognition.interimResults = false;
-    }
-}
-
-/**
- * SES TANIMA EVENT LISTENERS
- */
-function setupRecognitionEventListeners() {
-    const recognition = microphoneState.recognition;
-
-    recognition.onstart = () => {
-        console.log('✅ Ses tanıma başladı');
-        microphoneState.isListening = true;
-        updateMicrophoneUI(true);
-        showListeningIndicator();
-    };
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript;
-        const confidence = event.results[event.results.length - 1][0].confidence;
-        
-        console.log('🎯 Ses tanındı:', transcript, 'Güven:', confidence);
-        
-        if (confidence > 0.6) { // %60 güven eşiği
-            processVoiceCommand(transcript);
-        }
-    };
-
-    recognition.onerror = (event) => {
-        console.log('⚠️ Ses tanıma hatası:', event.error);
-        handleRecognitionError(event.error);
-    };
-
-    recognition.onend = () => {
-        console.log('🔚 Ses tanıma sonlandı');
-        microphoneState.isListening = false;
-        updateMicrophoneUI(false);
-        
-        // Otomatik yeniden başlatma (cihaza göre)
-        setTimeout(() => {
-            if (microphoneState.isGranted) {
-                startRecognitionWithRetry();
-            }
-        }, getRestartDelay());
-    };
-}
-
-/**
- * OTOMATİK İZİN YÖNETİMİ
- */
-async function setupAutoPermissionManagement() {
-    // İzin durumu değişikliklerini izle
-    if (navigator.permissions && navigator.permissions.query) {
-        try {
-            const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-            
-            permissionStatus.onchange = () => {
-                console.log('🔔 Mikrofon izni değişti:', permissionStatus.state);
-                microphoneState.isGranted = permissionStatus.state === 'granted';
-                
-                if (permissionStatus.state === 'granted') {
-                    initializeUniversalMicrophone();
-                } else {
-                    showPermissionGuide();
-                }
-            };
-        } catch (error) {
-            console.log('İzin izleme desteklenmiyor');
-        }
-    }
-}
-
-/**
- * MİKROFON HATA YÖNETİMİ
- */
-async function handleMicrophoneError(error) {
-    console.error('🎤 Mikrofon hatası:', error);
-    
-    microphoneState.retryCount++;
-    
-    if (microphoneState.retryCount <= microphoneState.maxRetries) {
-        console.log(`🔄 Yeniden deneme ${microphoneState.retryCount}/${microphoneState.maxRetries}`);
-        
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return initializeUniversalMicrophone();
-    }
-    
-    // Maksimum deneme sayısına ulaşıldı
-    showMicrophoneErrorGuide(error);
-}
-
-/**
- * SES TANIMA HATA YÖNETİMİ
- */
-function handleRecognitionError(error) {
-    const errorHandlers = {
-        'not-allowed': () => {
-            console.log('❌ Mikrofon izni reddedildi');
-            showPermissionGuide();
-        },
-        'no-speech': () => {
-            console.log('🔇 Konuşma algılanmadı');
-            // Bu hatayı görmezden gel, sessiz ortam normal
-        },
-        'audio-capture': () => {
-            console.log('🎤 Ses yakalama hatası');
-            restartMicrophone();
-        },
-        'network': () => {
-            console.log('🌐 Ağ hatası');
-            // İnternet bağlantısı gerekiyor
-        },
-        'default': () => {
-            console.log('❌ Bilinmeyen ses tanıma hatası');
-        }
-    };
-    
-    const handler = errorHandlers[error] || errorHandlers.default;
-    handler();
-}
-
-/**
- * OTOMATİK YENİDEN BAŞLATMA GECİKMESİ
- */
-function getRestartDelay() {
-    if (deviceInfo.isIOS) return 2000; // iOS'ta daha uzun bekle
-    if (deviceInfo.isAndroid) return 1000; // Android'de hızlı başlat
-    if (deviceInfo.isSafari) return 1500; // Safari'de orta bekleme
-    return 1000; // Varsayılan
-}
-
-
-
-/**
- * MİKROFONU YENİDEN BAŞLAT
- */
-async function restartMicrophone() {
-    console.log('🔄 Mikrofon yeniden başlatılıyor...');
-    
-    // Mevcut kaynakları temizle
-    if (microphoneState.stream) {
-        microphoneState.stream.getTracks().forEach(track => track.stop());
-    }
-    
-    if (microphoneState.recognition) {
-        try {
-            microphoneState.recognition.stop();
-        } catch (e) {}
-    }
-    
-    if (microphoneState.audioContext) {
-        microphoneState.audioContext.close();
-    }
-    
-    // State'i sıfırla
-    microphoneState = {
-        ...microphoneState,
-        stream: null,
-        recognition: null,
-        audioContext: null,
-        analyser: null,
-        isListening: false
-    };
-    
-    // Yeniden başlat
-    await initializeUniversalMicrophone();
-}
-
-
-
-// =============================================
-// KULLANICI ARAYÜZÜ GÜNCELLEMELERİ
-// =============================================
-
-/**
- * MİKROFON UI GÜNCELLEME
- */
-function updateMicrophoneUI(isListening) {
-    const microphoneToggle = document.getElementById('microphoneToggle');
-    if (!microphoneToggle) return;
-    
-    if (isListening) {
-        microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Dinleniyor</span>';
-        microphoneToggle.style.background = 'var(--success)';
-    } else {
-        microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon</span>';
-        microphoneToggle.style.background = 'var(--danger)';
-    }
-}
-        
-/**
- * DİNLEME GÖSTERGESİ
- */
-function showListeningIndicator() {
-    const indicator = document.getElementById('voiceIndicator') || createListeningIndicator();
-    indicator.style.display = 'flex';
-}
-
-function createListeningIndicator() {
-    const indicator = document.createElement('div');
-    indicator.id = 'voiceIndicator';
-    indicator.className = 'voice-indicator';
-    indicator.innerHTML = `
-        <div class="voice-bar"></div>
-        <div class="voice-bar"></div>
-        <div class="voice-bar"></div>
-        <div class="voice-bar"></div>
-        <div class="voice-bar"></div>
-    `;
-    indicator.style.cssText = `
-        position: fixed;
-        bottom: 100px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: none;
-        gap: 4px;
-        z-index: 10000;
-    `;
-    
-    document.body.appendChild(indicator);
-    return indicator;
-}
-
-/**
- * SES ÇUBUKLARINI GÜNCELLE
- */
-function updateVoiceBars(volume) {
-    const bars = document.querySelectorAll('.voice-bar');
-    bars.forEach((bar, index) => {
-        const height = 10 + (volume / 255) * 30 * (index + 1);
-        bar.style.height = `${height}px`;
-        bar.style.background = volume > 50 ? 'var(--accent)' : 'var(--primary)';
-    });
-}
-
-// =============================================
-// OTOMATİK İZİN REHBERLİĞİ
-// =============================================
-
-function showPermissionGuide() {
-    const guideHTML = `
-        <div class="permission-guide-overlay">
-            <div class="permission-guide">
-                <h3>Mikrofon İzni Gerekli</h3>
-                <p>Sesli komutları kullanabilmek için mikrofon erişimine izin vermeniz gerekiyor.</p>
-                
-                ${deviceInfo.isIOS ? `
-                <div class="ios-steps">
-                    <h4>iOS Ayarları:</h4>
-                    <ol>
-                        <li>Ayarlar > Safari > Mikrofon</li>
-                        <li>"İzin İste" veya "Açık" seçeneğini seçin</li>
-                        <li>Sayfayı yenileyin ve izin isteğini kabul edin</li>
-                    </ol>
-                </div>
-                ` : ''}
-                
-                ${deviceInfo.isAndroid ? `
-                <div class="android-steps">
-                    <h4>Android Ayarları:</h4>
-                    <ol>
-                        <li>Chrome > Site Ayarları > Mikrofon</li>
-                        <li>"Sitede Mikrofon Kullan"ı açın</li>
-                        <li>Sayfayı yenileyin</li>
-                    </ol>
-                </div>
-                ` : ''}
-                
-                <button onclick="closePermissionGuide()">Tamam</button>
-                <button onclick="retryMicrophonePermission()">Tekrar Dene</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', guideHTML);
-}
-
-function closePermissionGuide() {
-    const overlay = document.querySelector('.permission-guide-overlay');
-    if (overlay) overlay.remove();
-}
-
-async function retryMicrophonePermission() {
-    closePermissionGuide();
-    await initializeUniversalMicrophone();
-}
-
-// =============================================
-// PWA KURULUMU ve MOBİL OPTİMİZASYONU
-// =============================================
-
-/**
- * PWA KURULUMU
- */
-function setupPWA() {
-    // Service Worker kayıt
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-                console.log('✅ Service Worker kaydedildi:', registration);
-            })
-            .catch(error => {
-                console.log('❌ Service Worker kaydı başarısız:', error);
-            });
-    }
-
-    // PWA kurulum istemi
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        showInstallPrompt();
-    });
-
-    // App kurulduğunda
-    window.addEventListener('appinstalled', () => {
-        console.log('📱 Uygulama kuruldu');
-        deferredPrompt = null;
-    });
-}
-
-/**
- * KURULUM İSTEMİ GÖSTER
- */
-function showInstallPrompt() {
-    const installPrompt = document.createElement('div');
-    installPrompt.className = 'install-prompt';
-    installPrompt.innerHTML = `
-        <div class="install-content">
-            <h3>Uygulamayı Yükle</h3>
-            <p>Sesli Sipariş'i ana ekranınıza ekleyerek daha hızlı erişin.</p>
-            <div class="install-buttons">
-                <button onclick="installApp()">Yükle</button>
-                <button onclick="closeInstallPrompt()">Sonra</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(installPrompt);
-}
-
-async function installApp() {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        
-        if (outcome === 'accepted') {
-            console.log('✅ Kullanıcı uygulamayı yükledi');
-        }
-        
-        deferredPrompt = null;
-        closeInstallPrompt();
-    }
-}
-
-function closeInstallPrompt() {
-    const prompt = document.querySelector('.install-prompt');
-    if (prompt) prompt.remove();
-}
-
-// =============================================
-// MANİFEST DOSYASI ve META AYARLARI
-// =============================================
-
-/**
- * MANİFEST DOSYASI ÖRNEĞİ (manifest.json)
- */
-const manifestExample = {
-    "name": "Sesli Sipariş",
-    "short_name": "SesliSipariş",
-    "description": "Sesli komutlarla kolay alışveriş",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#5d3ebc",
-    "theme_color": "#5d3ebc",
-    "orientation": "portrait",
-    "icons": [
-        {
-            "src": "/icons/icon-72x72.png",
-            "sizes": "72x72",
-            "type": "image/png"
-        },
-        {
-            "src": "/icons/icon-96x96.png",
-            "sizes": "96x96",
-            "type": "image/png"
-        },
-        {
-            "src": "/icons/icon-128x128.png",
-            "sizes": "128x128",
-            "type": "image/png"
-        },
-        {
-            "src": "/icons/icon-144x144.png",
-            "sizes": "144x144",
-            "type": "image/png"
-        },
-        {
-            "src": "/icons/icon-152x152.png",
-            "sizes": "152x152",
-            "type": "image/png"
-        },
-        {
-            "src": "/icons/icon-192x192.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "/icons/icon-384x384.png",
-            "sizes": "384x384",
-            "type": "image/png"
-        },
-        {
-            "src": "/icons/icon-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ],
-    "permissions": [
-        "microphone"
-    ]
-};
-
-// =============================================
-// SAYFA YÜKLENDİĞİNDE BAŞLATMA
-// =============================================
-
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('🚀 Evrensel mikrofon sistemi başlatılıyor...');
-    
-    // PWA kurulumu
-    setupPWA();
-    
-    // Mikrofon başlatma
-    await initializeUniversalMicrophone();
-    
-    // Cihaz bilgilerini logla
-    console.log('📱 Cihaz Bilgisi:', deviceInfo);
-    
-    // Performans izleme
-    monitorPerformance();
-});
-
-/**
- * PERFORMANS İZLEME
- */
-function monitorPerformance() {
-    // CPU kullanımı izleme
-    let lastTime = performance.now();
-    let frameCount = 0;
-    
-    function checkPerformance() {
-        frameCount++;
-        const currentTime = performance.now();
-        
-        if (currentTime - lastTime >= 1000) {
-            const fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
-            
-            if (fps < 30) {
-                console.warn('⚠️ Düşük FPS:', fps);
-                // Gereksiz animasyonları durdur
-                optimizeForPerformance();
-            }
-            
-            frameCount = 0;
-            lastTime = currentTime;
-        }
-        
-        requestAnimationFrame(checkPerformance);
-    }
-    
-    checkPerformance();
-}
-
-function optimizeForPerformance() {
-    // Performans düşükse görsel efektleri azalt
-    const heavyAnimations = document.querySelectorAll('.voice-bar, .pulse-animation');
-    heavyAnimations.forEach(el => {
-        el.style.animation = 'none';
-    });
-}
-
 
         // =============================================
         // UI YÖNETİM FONKSİYONLARI
@@ -3333,9 +2664,9 @@ function speakToUser(message) {
 
 // Mikrofon açma fonksiyonunu güncelle
 async function enableDynamicMicrophone() {
-    console.log('🎤 Evrensel mikrofon açılıyor...', deviceInfo);
+    console.log('🎤 Mikrofon açılmak isteniyor...');
     
-    // Konum kontrolü - KORUNDU
+    // Konum kontrolü - TAMAM
     if (!selectedLocation) {
         showDynamicLocationModal();
         displayMessage("Lütfen önce bir konum seçiniz.");
@@ -3343,261 +2674,54 @@ async function enableDynamicMicrophone() {
         return;
     }
     
-    // Zaten açıksa kapat - KORUNDU
+    // Zaten açıksa kapat - TAMAM
     if (isMicrophoneEnabled) {
         disableDynamicMicrophone();
         return;
     }
     
     try {
-        console.log('🔐 Evrensel mikrofon izni isteniyor...');
+        console.log('🔐 Mikrofon izni isteniyor...');
         
-        // Önce izin durumunu kontrol et
-        const permissionState = await checkPermissionState();
-        if (permissionState === 'denied') {
-            showPermissionGuide();
-            throw new Error('Mikrofon izni reddedildi');
-        }
+        // ⚠️ DÜZELTME: Stream'i globalde tut, hemen kapatma!
+        window.microphoneStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                sampleRate: 16000 // ⭐ Ek optimizasyon
+            }
+        });
         
-        // Cihaza özel mikrofon ayarlarını kullan
-        const constraints = getDeviceSpecificConstraints();
+        console.log('✅ Mikrofon izni alındı');
         
-        // ⚠️ GÜNCELLENDİ: Evrensel mikrofon erişimi
-        window.microphoneStream = await navigator.mediaDevices.getUserMedia(constraints);
-        
-        console.log('✅ Mikrofon izni alındı - Cihaz:', deviceInfo);
-        
-        // Durumu güncelle - KORUNDU
+        // Durumu güncelle
         isMicrophoneEnabled = true;
-        microphoneState.isGranted = true;
-        microphoneState.stream = window.microphoneStream;
         
-        // UI güncelleme - KORUNDU
+        // UI güncelleme
         if (microphoneToggle) {
             microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (AÇIK)</span>';
             microphoneToggle.style.color = 'var(--success)';
-            microphoneToggle.style.background = 'var(--success)';
         }
         
-        // Ses analizi başlat - YENİ
-        initializeAudioAnalysis();
-        
-        // ⚠️ GÜNCELLENDİ: Evrensel ses tanımayı başlat
+        // ⚠️ DÜZELTME: Doğru fonksiyonu çağır
         setTimeout(() => {
-            initializeUniversalSpeechRecognition();
-        }, getDeviceStartDelay());
+            initializeSimpleSpeechRecognition(); // initializeDynamicSpeechRecognition yerine
+        }, 1000);
         
-        // Otomatik izin yönetimi - YENİ
-        setupAutoPermissionManagement();
-        
-        // Başarı mesajı - KORUNDU (optimize edildi)
+        // Başarı mesajı
         setTimeout(() => {
             displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
             speakToUser("mikrofon açıldı");
-            showMicrophoneReadyNotification();
-        }, 1000);
+        }, 1500);
         
     } catch (error) {
-        console.error('❌ Evrensel mikrofon hatası:', error);
-        await handleMicrophoneError(error);
-        
-        // Hata mesajı - GÜNCELLENDİ
-        displayMessage("Mikrofon erişimi sağlanamadı. Cihaz ayarlarını kontrol edin.");
+        console.error('❌ Mikrofon hatası:', error);
+        displayMessage("Mikrofon erişimi sağlanamadı.");
         speakToUser("mikrofon hatası");
-        
-        // Hata durumunda mikrofonu kapat
         disableDynamicMicrophone();
     }
 }
-
-// YARDIMCI FONKSİYONLAR - Evrensel sistem için
-
-/**
- * Cihaz başlatma gecikmesi
- */
-function getDeviceStartDelay() {
-    if (deviceInfo.isIOS) return 1500; // iOS'ta daha uzun bekle
-    if (deviceInfo.isAndroid) return 800; // Android'de hızlı
-    if (deviceInfo.isSafari) return 1200; // Safari'de orta
-    return 1000; // Varsayılan
-}
-
-/**
- * Mikrofon hazır bildirimi
- */
-function showMicrophoneReadyNotification() {
-    updateVoiceNotification('🎤 Mikrofon hazır! Konuşmaya başlayın...', 'success', true, 3000);
-}
-
-/**
- * İzin durumu kontrolü
- */
-async function checkPermissionState() {
-    if (navigator.permissions && navigator.permissions.query) {
-        try {
-            const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
-            return permissionStatus.state;
-        } catch (error) {
-            console.log('İzin sorgulama desteklenmiyor');
-        }
-    }
-    return 'prompt'; // Varsayılan olarak izin istenecek
-}
-
-/**
- * Cihaza özel kısıtlamalar
- */
-function getDeviceSpecificConstraints() {
-    const baseConstraints = {
-        audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            channelCount: 1,
-            sampleRate: 16000
-        }
-    };
-
-    // iOS özel ayarları
-    if (deviceInfo.isIOS) {
-        return {
-            audio: {
-                ...baseConstraints.audio,
-                sampleRate: 22050,
-                sampleSize: 16,
-                // iOS'ta daha az agresif ayarlar
-                echoCancellation: { exact: true },
-                noiseSuppression: { exact: true }
-            }
-        };
-    }
-
-    // Android özel ayarları
-    if (deviceInfo.isAndroid) {
-        return {
-            audio: {
-                ...baseConstraints.audio,
-                sampleRate: 48000,
-                latency: 0.01,
-                // Android'de daha yüksek kalite
-                channelCount: { ideal: 1, exact: 1 }
-            }
-        };
-    }
-
-    // Safari özel ayarları
-    if (deviceInfo.isSafari) {
-        return {
-            audio: {
-                ...baseConstraints.audio,
-                sampleRate: 44100,
-                sampleSize: 16,
-                // Safari'de basit ayarlar
-                echoCancellation: true,
-                noiseSuppression: true
-            }
-        };
-    }
-
-    return baseConstraints;
-}
-
-/**
- * Ses analizi başlatma
- */
-function initializeAudioAnalysis() {
-    try {
-        microphoneState.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        microphoneState.analyser = microphoneState.audioContext.createAnalyser();
-        const source = microphoneState.audioContext.createMediaStreamSource(microphoneState.stream);
-        source.connect(microphoneState.analyser);
-        
-        // Ses seviyesi görselleştirme
-        startAudioVisualization();
-    } catch (error) {
-        console.log('Ses analizi başlatılamadı:', error);
-    }
-}
-
-/**
- * Ses görselleştirme
- */
-function startAudioVisualization() {
-    // Fonksiyonu ayrı tanımla - her frame'de yeniden oluşturma
-    function updateVisualization() {
-        if (!microphoneState.analyser || !microphoneState.isListening) {
-            // Dinleme durduysa animasyonu durdur
-            cancelAnimationFrame(animationFrameId);
-            return;
-        }
-        
-        const dataArray = new Uint8Array(microphoneState.analyser.frequencyBinCount);
-        microphoneState.analyser.getByteFrequencyData(dataArray);
-        
-        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-        updateVoiceBars(average);
-        
-        // Sonraki frame için devam et
-        animationFrameId = requestAnimationFrame(updateVisualization);
-    }
-    
-    // Animation frame ID'sini takip et
-    let animationFrameId;
-    
-    // Görselleştirmeyi başlat
-    animationFrameId = requestAnimationFrame(updateVisualization);
-    
-    // Cleanup fonksiyonunu döndür (opsiyonel)
-    return () => {
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-        }
-    };
-}
-
-/**
- * Ses çubuklarını güncelle - EKSİK OLAN FONKSİYON
- */
-function updateVoiceBars(volume) {
-    const bars = document.querySelectorAll('.voice-bar');
-    if (!bars.length) return;
-    
-    bars.forEach((bar, index) => {
-        // Her çubuğa farklı yükseklik ver (sıralı animasyon)
-        const height = 10 + (volume / 255) * 40 * (index + 1);
-        bar.style.height = `${Math.max(10, height)}px`;
-        bar.style.background = volume > 50 ? 'var(--accent)' : 'var(--primary)';
-        bar.style.transition = 'height 0.1s ease, background 0.3s ease';
-    });
-}
-
-  
-// Device info detection - Sayfa yüklendiğinde çalışsın
-const deviceInfo = {
-    isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
-    isAndroid: /Android/.test(navigator.userAgent),
-    isChrome: /Chrome/.test(navigator.userAgent),
-    isSafari: /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent),
-    isMobile: /Mobi|Android|iPhone|iPad/.test(navigator.userAgent)
-};
-
-// Mikrofon state management
-let microphoneState = {
-    isAvailable: false,
-    isGranted: false,
-    isListening: false,
-    stream: null,
-    recognition: null,
-    audioContext: null,
-    analyser: null,
-    retryCount: 0,
-    maxRetries: 3
-};
-
-// Sayfa yüklendiğinde device info'yu logla
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('📱 Cihaz Bilgisi:', deviceInfo);
-});
                 
  function disableDynamicMicrophone() {
     console.log('🔇 Mikrofon kapatılıyor...');
@@ -3737,50 +2861,6 @@ function setupVisualFeedback() {
         updateRecognitionStatus('waiting');
     };
 }
-
-        async function initializeUniversalMicrophone() {
-    console.log('🎤 Evrensel mikrofon açılıyor...', deviceInfo);
-    
-    try {
-        // İzin kontrolü
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('Tarayıcınız mikrofonu desteklemiyor');
-        }
-
-        // Cihaza özel ayarlar
-        const constraints = {
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                channelCount: 1
-            }
-        };
-
-        // iOS için özel ayarlar
-        if (deviceInfo.isIOS) {
-            constraints.audio.sampleRate = 22050;
-        } else {
-            constraints.audio.sampleRate = 16000;
-        }
-
-        // Mikrofon erişimi
-        microphoneState.stream = await navigator.mediaDevices.getUserMedia(constraints);
-        microphoneState.isAvailable = true;
-        microphoneState.isGranted = true;
-
-        // Ses tanımayı başlat
-        await initializeUniversalSpeechRecognition();
-
-        console.log('✅ Mikrofon başarıyla başlatıldı');
-        return true;
-
-    } catch (error) {
-        console.error('❌ Mikrofon başlatma hatası:', error);
-        return false;
-    }
-}
-        
 // Basitleştirilmiş ses tanıma (no-speech hatalarını yoksay)
 function initializeSimpleSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -3997,23 +3077,7 @@ function setupManualMode() {
     return true;
 }
         
-// Eksik fonksiyon
-async function startRecognitionWithRetry() {
-    try {
-        if (microphoneState.recognition && !microphoneState.isListening) {
-            microphoneState.recognition.start();
-        }
-    } catch (error) {
-        console.log('❌ Recognition başlatma hatası:', error);
-        // 3 saniye sonra tekrar dene
-        setTimeout(() => {
-            if (microphoneState.isGranted) {
-                startRecognitionWithRetry();
-            }
-        }, 3000);
-    }
-}
-        
+
 // Ses tanıma başlatma fonksiyonunu güncelle
 function startRecognition() {
     // ⭐ DEĞİŞİKLİK: Daha kapsamlı kontrol
@@ -4114,7 +3178,12 @@ function startRecognition() {
     }, 1000);
 }
 
-       
+        // =============================================
+        // EKSİK FONKSİYONLARIN TAMAMLANMASI
+        // =============================================
+
+        // Önceki cevaptaki tüm dinamik fonksiyonlar buraya eklenecek
+        // (processVoiceCommand, executeDynamicAction, handleDynamicStoreTypeSelection, vb.)
 
 // =============================================
 // TAMAMEN DİNAMİK SESLİ SİPARİŞ SİSTEMİ
@@ -4152,8 +3221,7 @@ let commandRules = new Map();
 let lastRecognizedProduct = null;
 let lastSpokenMessage = "";
 let lastSpeakTime = 0;
-let isLocationDetected = false;     
-let isAssistantSpeaking = false;
+let isLocationDetected = false;        
 
 // Konum state
 let userLocation = {
@@ -7439,32 +6507,32 @@ function extractProductInfoFromCommand(message) {
 // testExtractionFixed()
         
 function testExtractProduct() {
-    console.log('🧪 ACİL TEST BAŞLIYOR...');
+    console.log('🧪 ACİL EXTRACT TESTİ BAŞLIYOR...');
     
     const testCases = [
         "1 kilo domates",
-        "bir kilo soğan", 
+        "bir kilo soğan",
         "2 paket süt",
         "domates",
         "1 kilo çarliston biber",
-        "yarım kilo peynir"
+        "yarım kilo peynir",
+        "3 adet ekmek"
     ];
     
     testCases.forEach((testCase, index) => {
         console.log(`\n--- TEST ${index + 1}: "${testCase}" ---`);
         const result = extractProductInfoFromCommand(testCase);
         console.log('📦 SONUÇ:', result);
+        
+        if (result && products.length > 0) {
+            const found = findProductByName(result.productName);
+            console.log('🔍 BULUNDU MU?:', found ? `EVET - ${found.name}` : 'HAYIR');
+        }
     });
     
     console.log('\n🎯 TEST TAMAMLANDI');
 }
 
-// Hemen test et
-setTimeout(() => {
-    testExtractProduct();
-}, 2000);
-
-        
 // HEMEN ÇALIŞTIRIN:
 // testExtractProduct()
 
@@ -9948,22 +9016,3 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
