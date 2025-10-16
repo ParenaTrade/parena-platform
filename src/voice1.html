@@ -2648,14 +2648,33 @@ async function speakToUser(message) {
 // MİKROFON ve SES TANIMA
 // =============================================
 
+// 🔧 Yardımcı fonksiyon: Platform algılama
+function getPlatform() {
+    const ua = navigator.userAgent.toLowerCase();
+    if (/android/.test(ua)) return 'android';
+    if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+    if (/windows/.test(ua)) return 'windows';
+    if (/mac os/.test(ua)) return 'mac';
+    return 'other';
+}
 
+// 🔧 Yardımcı fonksiyon: Mikrofon erişim testi
+async function testMicrophoneAccess() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+        return true;
+    } catch (err) {
+        console.warn('🎤 Mikrofon test hatası:', err);
+        return false;
+    }
+}
 
-        
-// Mikrofon açma fonksiyonunu güncelle
+// 🎤 Mikrofon açma fonksiyonu
 async function enableDynamicMicrophone() {
     console.log('🎤 Mikrofon açılmak isteniyor...');
     
-    // Konum kontrolü - TAMAM
+    // Konum kontrolü
     if (!selectedLocation) {
         showDynamicLocationModal();
         displayMessage("Lütfen önce bir konum seçiniz.");
@@ -2663,83 +2682,78 @@ async function enableDynamicMicrophone() {
         return;
     }
 
+    // Mikrofon testi
     const micOK = await testMicrophoneAccess();
-if (!micOK) {
-    displayMessage('Mikrofon bulunamadı veya engellenmiş.');
-    speakToUser('mikrofon bulunamadı');
-    return;
-}
+    if (!micOK) {
+        displayMessage('Mikrofon bulunamadı veya engellenmiş.');
+        speakToUser('mikrofon bulunamadı');
+        return;
+    }
     
-    // Zaten açıksa kapat - TAMAM
+    // Zaten açıksa kapat
     if (isMicrophoneEnabled) {
         disableDynamicMicrophone();
         return;
     }
 
-    // Mobil cihazlar için güvenli izin alma - önemli
-const platform = getPlatform();
-console.log('📱 Platform:', platform);
+    // Mobil cihazlarda ses kanalı aktivasyonu
+    const platform = getPlatform();
+    console.log('📱 Platform:', platform);
 
-if (platform === 'android' || platform === 'ios') {
-    // Kullanıcıdan jest bekleniyor
-    await new Promise(resolve => {
-        const unlockAudio = () => {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = ctx.createOscillator();
-                oscillator.connect(ctx.destination);
-                oscillator.start(0);
-                oscillator.stop(0);
-                ctx.resume();
-                console.log('🔊 Mobil ses kanalı etkinleştirildi');
-            } catch (e) {
-                console.warn('Mobil ses başlatılamadı:', e);
-            }
-            document.removeEventListener('touchstart', unlockAudio);
-            document.removeEventListener('click', unlockAudio);
-            resolve();
-        };
-        document.addEventListener('touchstart', unlockAudio);
-        document.addEventListener('click', unlockAudio);
-    });
-}
+    if (platform === 'android' || platform === 'ios') {
+        await new Promise(resolve => {
+            const unlockAudio = () => {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = ctx.createOscillator();
+                    oscillator.connect(ctx.destination);
+                    oscillator.start();
+                    oscillator.stop();
+                    ctx.resume();
+                    console.log('🔊 Mobil ses kanalı etkinleştirildi');
+                } catch (e) {
+                    console.warn('Mobil ses başlatılamadı:', e);
+                }
+                document.removeEventListener('touchstart', unlockAudio);
+                document.removeEventListener('click', unlockAudio);
+                resolve();
+            };
+            document.addEventListener('touchstart', unlockAudio);
+            document.addEventListener('click', unlockAudio);
+        });
+    }
 
-    
     try {
         console.log('🔐 Mikrofon izni isteniyor...');
         
-        // ⚠️ DÜZELTME: Stream'i globalde tut, hemen kapatma!
         window.microphoneStream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true,
-                sampleRate: 16000 // ⭐ Ek optimizasyon
+                sampleRate: 16000
             }
         });
         
         console.log('✅ Mikrofon izni alındı');
-        
-        // Durumu güncelle
         isMicrophoneEnabled = true;
-        
-        // UI güncelleme
+
+        // UI güncelle
         if (microphoneToggle) {
             microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Mikrofon (AÇIK)</span>';
             microphoneToggle.style.color = 'var(--success)';
         }
-        
-        // ⚠️ DÜZELTME: Doğru fonksiyonu çağır
+
+        // Tanıma başlat
         setTimeout(() => {
-            initializeSimpleSpeechRecognition(); // initializeDynamicSpeechRecognition yerine
+            initializeSimpleSpeechRecognition();
         }, 1000);
-        
-        // Başarı mesajı
+
         setTimeout(() => {
             displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
             speakToUser("mikrofon açıldı");
         }, 1500);
-        
+
     } catch (error) {
         console.error('❌ Mikrofon hatası:', error);
         displayMessage("Mikrofon erişimi sağlanamadı.");
@@ -8948,6 +8962,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
