@@ -2562,106 +2562,62 @@ function updateCartUI() {
 // =============================================
 // SESSİZ ASİSTAN MESAJLARI
 // =============================================
-// speakToUser fonksiyonunu güncelle - ÖDEME MESAJLARI İÇİN SESLİ OLSUN
+// speakToUser fonksiyonunu güncelle - TÜM CİHAZLARDA SESLİ DESTEKLİ
 async function speakToUser(message) {
     console.log(`🗣️ Asistan (SESLİ): ${message}`);
 
+    // 1️⃣ Speech API kontrolü
     if (typeof window.speechSynthesis === 'undefined') {
-    console.warn('🚫 speechSynthesis desteklenmiyor (Safari sessiz modda olabilir)');
-    return;
-}
+        console.warn('🚫 speechSynthesis desteklenmiyor (Safari sessiz modda olabilir)');
+        return;
+    }
 
-if (getPlatform() === 'ios') {
-    try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
-    } catch(e) { console.log('🔈 iOS ses açma başarısız:', e); }
-}
+    // 2️⃣ iOS için sessiz mod fix
+    if (getPlatform() === 'ios') {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+        } catch (e) {
+            console.log('🔈 iOS ses açma başarısız:', e);
+        }
+    }
 
-    
+    // 3️⃣ Mesaj temizleme
     const cleanMessage = message.trim();
     if (!cleanMessage) return;
-    
+
     const now = Date.now();
-    
-    // 1. AYNI MESAJ KONTROLÜ
+
+    // 4️⃣ Aynı mesaj tekrarı engelle
     if (cleanMessage === lastSpokenMessage) {
         console.log("🛑 Aynı sesli mesaj tekrarı engellendi:", cleanMessage);
         return;
     }
-    
-    // 2. SIKLIK KONTROLÜ
-    if (now - lastSpeakTime < SPEAK_COOLDOWN) {
-        console.log("🛑 Sık sesli mesaj engellendi (cooldown):", cleanMessage);
-        return;
-    }
-    
-    // 3. ÖDEME AKIŞI MESAJLARI DA SESLİ OLSUN
-    const allowedVoiceMessages = [
-        // SEÇİM ÖNCESİ MESAJLAR
-        "mağaza seçin", "satıcı seçin", "reyon seçin", "ürün seçin",
-        "hangi mağaza", "hangi satıcı", "hangi reyon", "hangi ürün",
-        "numara söyleyin", "isim söyleyin",
-        
-        // TEMEL ONAYLAR
-        "seçildi", "eklendi", "bulundu",
-        
-        // TEMEL UYARILAR
-        "hata", "bulunamadı", "sepet dolu", "seçilmedi",
-        
-        // SİSTEM MESAJLARI
-        "mikrofon açıldı", "mikrofon kapandı", "hoş geldiniz",
-        
-        // ✅ ÖDEME AKIŞI MESAJLARI - EKLENDİ
-        "telefon numaranızı söyleyin", "telefon numarası",
-        "adınızı ve soyadınızı söyleyin", "ad soyad",
-        "bina numarasını söyleyin", "bina numarası",
-        "daire numarasını söyleyin", "daire numarası",
-        "kayıtlı adresinize teslimat", "adres", "teslimat",
-        "ödeme yöntemi seçin", "nakit", "kart", "bonus",
-        "siparişi onaylıyor musunuz", "onay",
-        "kaydınız tamamlandı", "hoş geldiniz",
-        "geçersiz telefon numarası", "geçersiz bina numarası", "geçersiz daire numarası",
-        "sistem hatası", "kayıt hatası"
-    ];
-    
-    // Mesajın izin verilenlerden birini içerip içermediğini kontrol et
-    const isAllowed = allowedVoiceMessages.some(allowedMsg => 
-        cleanMessage.toLowerCase().includes(allowedMsg.toLowerCase())
-    );
-    
-    if (!isAllowed) {
-        console.log("🔇 Sadece seçim ve ödeme mesajları sesli söylenecek:", cleanMessage);
-        return;
-    }
-    
-    // SESLİ OKUMA (izin verilen mesajlar için)
-    if ('speechSynthesis' in window && isMicrophoneEnabled) {
-        const speech = new SpeechSynthesisUtterance(cleanMessage);
-        speech.lang = currentLanguage === 'tr' ? 'tr-TR' : 'en-US';
-        speech.volume = 0.7;
-        speech.rate = 1.0;
-        
-        // Konuşma bitince mikrofonu yeniden başlat
-        speech.onend = function() {
-            console.log("✅ Sesli mesaj bitti");
-            setTimeout(() => {
-                if (isMicrophoneEnabled && !isListening) {
-                    restartRecognition();
-                }
-            }, 1000);
-        };
-        
-        // Önceki konuşmayı durdur
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(speech);
-    }
-    
-    // KAYDET
+
     lastSpokenMessage = cleanMessage;
-    lastSpeakTime = now;
-    
-    console.log("✅ Yeni sesli mesaj söylendi:", cleanMessage);
+    lastSpeechTime = now;
+
+    // 5️⃣ Asistan konuşma kilidi
+    isAssistantSpeaking = true;
+
+    const utterance = new SpeechSynthesisUtterance(cleanMessage);
+    utterance.lang = 'tr-TR';
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    utterance.onend = () => {
+        isAssistantSpeaking = false;
+        console.log('✅ Sesli mesaj tamamlandı:', cleanMessage);
+    };
+
+    utterance.onerror = (err) => {
+        isAssistantSpeaking = false;
+        console.error('❌ Konuşma hatası:', err);
+    };
+
+    // 6️⃣ Konuşmayı başlat
+    window.speechSynthesis.cancel(); // önceki sesi kes
+    window.speechSynthesis.speak(utterance);
 }
         
     function isSimilarMessage(newMessage, oldMessage) {
@@ -8992,5 +8948,6 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
