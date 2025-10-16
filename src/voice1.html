@@ -1806,6 +1806,129 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+
+
+// =============================================
+// TAMAMEN DİNAMİK SESLİ SİPARİŞ SİSTEMİ
+// =============================================
+
+// Global state - Dinamik
+let currentCustomer = null;
+let sellers = [];
+let products = [];
+let categories = [];
+let storeTypes = [];
+let cart = [];
+let recognition = null;
+let isListening = false;
+let isMicrophoneEnabled = false;
+let conversationStep = 0;
+let currentPaymentMethod = null;
+let selectedSellerId = null;
+let selectedSellerType = null;
+let selectedStoreTypeId = null;
+let selectedStoreTypeName = null;
+let selectedCategoryId = null;
+let isSellerLocked = false;
+let selectedLocation = null;
+let referralCode = null;
+let referralGroupCode = null;
+let allSellersInLocation = [];
+let filteredSellers = [];
+let pendingCart = [];
+let isGuestMode = false;
+let pendingOrder = null;
+let currentRoot = "0:0";
+let pendingResponse = null;
+let commandRules = new Map();
+let lastRecognizedProduct = null;
+let lastSpokenMessage = "";
+let lastSpeakTime = 0;
+let isLocationDetected = false;        
+
+// Konum state
+let userLocation = {
+    latitude: null,
+    longitude: null,
+    address: null,
+    city: null,
+    district: null
+};
+
+
+
+
+// DOM Elements
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        const profileAvatar = document.getElementById('profileAvatar');
+        const profileName = document.getElementById('profileName');
+        const profilePhone = document.getElementById('profilePhone');
+        const profileCity = document.getElementById('profileCity');
+        const profileAddress = document.getElementById('profileAddress');
+        const profileBonus = document.getElementById('profileBonus');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userName = document.getElementById('userName');
+        const microphoneToggle = document.getElementById('microphoneToggle');
+        const sellerTypeGrid = document.getElementById('sellerTypeGrid');
+        const scrollSellerTypesLeft = document.getElementById('scrollSellerTypesLeft');
+        const scrollSellerTypesRight = document.getElementById('scrollSellerTypesRight');
+        const categoriesSection = document.getElementById('categoriesSection');
+        const categoriesTitle = document.getElementById('categoriesTitle');
+        const categoriesGrid = document.getElementById('categoriesGrid');
+        const scrollCategoriesLeft = document.getElementById('scrollCategoriesLeft');
+        const scrollCategoriesRight = document.getElementById('scrollCategoriesRight');
+        const sellersSection = document.getElementById('sellersSection');
+        const sellerGrid = document.getElementById('sellerGrid');
+        const scrollSellersLeft = document.getElementById('scrollSellersLeft');
+        const scrollSellersRight = document.getElementById('scrollSellersRight');
+        const productsSection = document.getElementById('productsSection');
+        const selectedSellerInfo = document.getElementById('selectedSellerInfo');
+        const productsGrid = document.getElementById('productsGrid');
+        const cartContainer = document.getElementById('cartContainer');
+        const cartClose = document.getElementById('cartClose');
+        const cartItems = document.getElementById('cartItems');
+        const orderSummary = document.getElementById('orderSummary');
+        const orderCount = document.getElementById('orderCount');
+        const orderTotal = document.getElementById('orderTotal');
+        const subtotalEl = document.getElementById('subtotal');
+        const discountEl = document.getElementById('discount');
+        const vatAmountEl = document.getElementById('vatAmount');
+        const totalAmountEl = document.getElementById('totalAmount');
+        const payCashBtn = document.getElementById('payCash');
+        const payCardBtn = document.getElementById('payCard');
+        const payBonusBtn = document.getElementById('payBonus');
+        const assistantMessage = document.getElementById('assistantMessage');
+        const userMessage = document.getElementById('userMessage');
+        const voiceIndicator = document.getElementById('voiceIndicator');
+        const closeVoiceStatus = document.getElementById('closeVoiceStatus');
+        const voiceStatusPanel = document.getElementById('voiceStatusPanel');
+        const howItWorks = document.getElementById('howItWorks');
+        const locationMarker = document.getElementById('locationMarker');
+        const locationText = document.getElementById('locationText');
+        const locationModal = document.getElementById('locationModal');
+        const referralLink = document.getElementById('referralLink');
+        const whatsappOrder = document.getElementById('whatsappOrder');
+        const SPEAK_COOLDOWN = 3000; // 3 saniye
+        const SIMILARITY_THRESHOLD = 0.8; // %80 benzerlik
+
+
+        // Utility functions
+        function money(n) { 
+            return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; 
+        }
+
+        // Debug modu
+        const DEBUG_MODE = true;
+
+        // Debug fonksiyonu
+        function debugLog(message, data = null) {
+            if (DEBUG_MODE) {
+                console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
+            }
+        }
+
+        
         // =============================================
         // UI YÖNETİM FONKSİYONLARI
         // =============================================
@@ -1933,7 +2056,7 @@
     });
 }
         // Kategorileri göster
-        function displayCategories(categoriesToShow) {
+    function displayCategories(categoriesToShow) {
     const categoriesGrid = document.getElementById('categoriesGrid');
     if (!categoriesGrid) return;
     
@@ -3185,125 +3308,6 @@ function startRecognition() {
         // Önceki cevaptaki tüm dinamik fonksiyonlar buraya eklenecek
         // (processVoiceCommand, executeDynamicAction, handleDynamicStoreTypeSelection, vb.)
 
-// =============================================
-// TAMAMEN DİNAMİK SESLİ SİPARİŞ SİSTEMİ
-// =============================================
-
-// Global state - Dinamik
-let currentCustomer = null;
-let sellers = [];
-let products = [];
-let categories = [];
-let storeTypes = [];
-let cart = [];
-let recognition = null;
-let isListening = false;
-let isMicrophoneEnabled = false;
-let conversationStep = 0;
-let currentPaymentMethod = null;
-let selectedSellerId = null;
-let selectedSellerType = null;
-let selectedStoreTypeId = null;
-let selectedStoreTypeName = null;
-let selectedCategoryId = null;
-let isSellerLocked = false;
-let selectedLocation = null;
-let referralCode = null;
-let referralGroupCode = null;
-let allSellersInLocation = [];
-let filteredSellers = [];
-let pendingCart = [];
-let isGuestMode = false;
-let pendingOrder = null;
-let currentRoot = "0:0";
-let pendingResponse = null;
-let commandRules = new Map();
-let lastRecognizedProduct = null;
-let lastSpokenMessage = "";
-let lastSpeakTime = 0;
-let isLocationDetected = false;        
-
-// Konum state
-let userLocation = {
-    latitude: null,
-    longitude: null,
-    address: null,
-    city: null,
-    district: null
-};
-
-
-
-
-// DOM Elements
-        const profileBtn = document.getElementById('profileBtn');
-        const profileDropdown = document.getElementById('profileDropdown');
-        const profileAvatar = document.getElementById('profileAvatar');
-        const profileName = document.getElementById('profileName');
-        const profilePhone = document.getElementById('profilePhone');
-        const profileCity = document.getElementById('profileCity');
-        const profileAddress = document.getElementById('profileAddress');
-        const profileBonus = document.getElementById('profileBonus');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const userName = document.getElementById('userName');
-        const microphoneToggle = document.getElementById('microphoneToggle');
-        const sellerTypeGrid = document.getElementById('sellerTypeGrid');
-        const scrollSellerTypesLeft = document.getElementById('scrollSellerTypesLeft');
-        const scrollSellerTypesRight = document.getElementById('scrollSellerTypesRight');
-        const categoriesSection = document.getElementById('categoriesSection');
-        const categoriesTitle = document.getElementById('categoriesTitle');
-        const categoriesGrid = document.getElementById('categoriesGrid');
-        const scrollCategoriesLeft = document.getElementById('scrollCategoriesLeft');
-        const scrollCategoriesRight = document.getElementById('scrollCategoriesRight');
-        const sellersSection = document.getElementById('sellersSection');
-        const sellerGrid = document.getElementById('sellerGrid');
-        const scrollSellersLeft = document.getElementById('scrollSellersLeft');
-        const scrollSellersRight = document.getElementById('scrollSellersRight');
-        const productsSection = document.getElementById('productsSection');
-        const selectedSellerInfo = document.getElementById('selectedSellerInfo');
-        const productsGrid = document.getElementById('productsGrid');
-        const cartContainer = document.getElementById('cartContainer');
-        const cartClose = document.getElementById('cartClose');
-        const cartItems = document.getElementById('cartItems');
-        const orderSummary = document.getElementById('orderSummary');
-        const orderCount = document.getElementById('orderCount');
-        const orderTotal = document.getElementById('orderTotal');
-        const subtotalEl = document.getElementById('subtotal');
-        const discountEl = document.getElementById('discount');
-        const vatAmountEl = document.getElementById('vatAmount');
-        const totalAmountEl = document.getElementById('totalAmount');
-        const payCashBtn = document.getElementById('payCash');
-        const payCardBtn = document.getElementById('payCard');
-        const payBonusBtn = document.getElementById('payBonus');
-        const assistantMessage = document.getElementById('assistantMessage');
-        const userMessage = document.getElementById('userMessage');
-        const voiceIndicator = document.getElementById('voiceIndicator');
-        const closeVoiceStatus = document.getElementById('closeVoiceStatus');
-        const voiceStatusPanel = document.getElementById('voiceStatusPanel');
-        const howItWorks = document.getElementById('howItWorks');
-        const locationMarker = document.getElementById('locationMarker');
-        const locationText = document.getElementById('locationText');
-        const locationModal = document.getElementById('locationModal');
-        const referralLink = document.getElementById('referralLink');
-        const whatsappOrder = document.getElementById('whatsappOrder');
-        const SPEAK_COOLDOWN = 3000; // 3 saniye
-        const SIMILARITY_THRESHOLD = 0.8; // %80 benzerlik
-
-
-        // Utility functions
-        function money(n) { 
-            return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺'; 
-        }
-
-        // Debug modu
-        const DEBUG_MODE = true;
-
-        // Debug fonksiyonu
-        function debugLog(message, data = null) {
-            if (DEBUG_MODE) {
-                console.log(`[DEBUG] ${new Date().toLocaleTimeString()}: ${message}`, data || '');
-            }
-        }
 
 // =============================================
 // ANA UYGULAMA BAŞLATMA - DİNAMİK
@@ -9016,3 +9020,4 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
