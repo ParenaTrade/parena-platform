@@ -1,7 +1,7 @@
 const CACHE_NAME = 'sesli-siparis-v1.0.0';
 const urlsToCache = [
   '/',
-  '/index.html',
+  '/src/voicex.html',
   '/styles/main.css',
   '/scripts/app.js',
   '/icons/icon-192x192.png',
@@ -53,4 +53,5 @@ self.addEventListener('fetch', event => {
         })
     );
   }
+
 });
