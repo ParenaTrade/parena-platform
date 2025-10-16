@@ -1924,17 +1924,49 @@ async function initializeUniversalSpeechRecognition() {
 
     // Yeni recognition oluştur
     microphoneState.recognition = new SpeechRecognition();
-    
-    // Cihaza özel ayarlar
-    configureRecognitionForDevice(microphoneState.recognition);
+    microphoneState.recognition.continuous = true;
+    microphoneState.recognition.interimResults = true;
+    microphoneState.recognition.lang = 'tr-TR';
 
     // Event listeners
-    setupRecognitionEventListeners();
+    microphoneState.recognition.onstart = () => {
+        console.log('✅ Ses tanıma başladı');
+        microphoneState.isListening = true;
+        updateMicrophoneUI(true);
+    };
+
+    microphoneState.recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        const confidence = event.results[event.results.length - 1][0].confidence;
+        
+        console.log('🎯 Ses tanındı:', transcript, 'Güven:', confidence);
+        
+        if (confidence > 0.6) {
+            processVoiceCommand(transcript);
+        }
+    };
+
+    microphoneState.recognition.onerror = (event) => {
+        console.log('⚠️ Ses tanıma hatası:', event.error);
+    };
+
+    microphoneState.recognition.onend = () => {
+        console.log('🔚 Ses tanıma sonlandı');
+        microphoneState.isListening = false;
+        updateMicrophoneUI(false);
+        
+        // Otomatik yeniden başlatma
+        setTimeout(() => {
+            if (microphoneState.isGranted) {
+                startRecognitionWithRetry();
+            }
+        }, 1000);
+    };
 
     // Başlat
     await startRecognitionWithRetry();
 }
-
+        
 /**
  * CİHAZA ÖZEL SES TANIMA AYARLARI
  */
@@ -2144,14 +2176,12 @@ function updateMicrophoneUI(isListening) {
     if (isListening) {
         microphoneToggle.innerHTML = '<i class="fas fa-microphone"></i> <span>Dinleniyor</span>';
         microphoneToggle.style.background = 'var(--success)';
-        microphoneToggle.style.color = 'white';
     } else {
         microphoneToggle.innerHTML = '<i class="fas fa-microphone-slash"></i> <span>Mikrofon</span>';
         microphoneToggle.style.background = 'var(--danger)';
-        microphoneToggle.style.color = 'white';
     }
 }
-
+        
 /**
  * DİNLEME GÖSTERGESİ
  */
@@ -3707,6 +3737,50 @@ function setupVisualFeedback() {
         updateRecognitionStatus('waiting');
     };
 }
+
+        async function initializeUniversalMicrophone() {
+    console.log('🎤 Evrensel mikrofon açılıyor...', deviceInfo);
+    
+    try {
+        // İzin kontrolü
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('Tarayıcınız mikrofonu desteklemiyor');
+        }
+
+        // Cihaza özel ayarlar
+        const constraints = {
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                channelCount: 1
+            }
+        };
+
+        // iOS için özel ayarlar
+        if (deviceInfo.isIOS) {
+            constraints.audio.sampleRate = 22050;
+        } else {
+            constraints.audio.sampleRate = 16000;
+        }
+
+        // Mikrofon erişimi
+        microphoneState.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        microphoneState.isAvailable = true;
+        microphoneState.isGranted = true;
+
+        // Ses tanımayı başlat
+        await initializeUniversalSpeechRecognition();
+
+        console.log('✅ Mikrofon başarıyla başlatıldı');
+        return true;
+
+    } catch (error) {
+        console.error('❌ Mikrofon başlatma hatası:', error);
+        return false;
+    }
+}
+        
 // Basitleştirilmiş ses tanıma (no-speech hatalarını yoksay)
 function initializeSimpleSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -3923,7 +3997,23 @@ function setupManualMode() {
     return true;
 }
         
-
+// Eksik fonksiyon
+async function startRecognitionWithRetry() {
+    try {
+        if (microphoneState.recognition && !microphoneState.isListening) {
+            microphoneState.recognition.start();
+        }
+    } catch (error) {
+        console.log('❌ Recognition başlatma hatası:', error);
+        // 3 saniye sonra tekrar dene
+        setTimeout(() => {
+            if (microphoneState.isGranted) {
+                startRecognitionWithRetry();
+            }
+        }, 3000);
+    }
+}
+        
 // Ses tanıma başlatma fonksiyonunu güncelle
 function startRecognition() {
     // ⭐ DEĞİŞİKLİK: Daha kapsamlı kontrol
@@ -4062,7 +4152,8 @@ let commandRules = new Map();
 let lastRecognizedProduct = null;
 let lastSpokenMessage = "";
 let lastSpeakTime = 0;
-let isLocationDetected = false;        
+let isLocationDetected = false;     
+let isAssistantSpeaking = false;
 
 // Konum state
 let userLocation = {
@@ -7348,32 +7439,32 @@ function extractProductInfoFromCommand(message) {
 // testExtractionFixed()
         
 function testExtractProduct() {
-    console.log('🧪 ACİL EXTRACT TESTİ BAŞLIYOR...');
+    console.log('🧪 ACİL TEST BAŞLIYOR...');
     
     const testCases = [
         "1 kilo domates",
-        "bir kilo soğan",
+        "bir kilo soğan", 
         "2 paket süt",
         "domates",
         "1 kilo çarliston biber",
-        "yarım kilo peynir",
-        "3 adet ekmek"
+        "yarım kilo peynir"
     ];
     
     testCases.forEach((testCase, index) => {
         console.log(`\n--- TEST ${index + 1}: "${testCase}" ---`);
         const result = extractProductInfoFromCommand(testCase);
         console.log('📦 SONUÇ:', result);
-        
-        if (result && products.length > 0) {
-            const found = findProductByName(result.productName);
-            console.log('🔍 BULUNDU MU?:', found ? `EVET - ${found.name}` : 'HAYIR');
-        }
     });
     
     console.log('\n🎯 TEST TAMAMLANDI');
 }
 
+// Hemen test et
+setTimeout(() => {
+    testExtractProduct();
+}, 2000);
+
+        
 // HEMEN ÇALIŞTIRIN:
 // testExtractProduct()
 
@@ -9857,6 +9948,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
