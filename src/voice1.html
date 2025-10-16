@@ -1810,6 +1810,23 @@
         // UI YÖNETİM FONKSİYONLARI
         // =============================================
 
+    function getPlatform() {
+    const ua = navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+    if (/android/.test(ua)) return 'android';
+    if (/win/.test(ua)) return 'windows';
+    if (/mac/.test(ua)) return 'mac';
+    return 'unknown';
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && isMicrophoneEnabled) {
+        console.log('📲 Sayfa görünür oldu, mikrofon tekrar başlatılıyor...');
+        restartRecognition();
+    }
+});
+
+        
         // Store type'ları göster
         function displayStoreTypes(types) {
     const sellerTypeGrid = document.getElementById('sellerTypeGrid');
@@ -2548,6 +2565,19 @@ function updateCartUI() {
 // speakToUser fonksiyonunu güncelle - ÖDEME MESAJLARI İÇİN SESLİ OLSUN
 function speakToUser(message) {
     console.log(`🗣️ Asistan (SESLİ): ${message}`);
+
+    if (typeof window.speechSynthesis === 'undefined') {
+    console.warn('🚫 speechSynthesis desteklenmiyor (Safari sessiz modda olabilir)');
+    return;
+}
+
+if (getPlatform() === 'ios') {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+    } catch(e) { console.log('🔈 iOS ses açma başarısız:', e); }
+}
+
     
     const cleanMessage = message.trim();
     if (!cleanMessage) return;
@@ -2662,6 +2692,9 @@ function speakToUser(message) {
 // MİKROFON ve SES TANIMA
 // =============================================
 
+
+
+        
 // Mikrofon açma fonksiyonunu güncelle
 async function enableDynamicMicrophone() {
     console.log('🎤 Mikrofon açılmak isteniyor...');
@@ -2673,12 +2706,48 @@ async function enableDynamicMicrophone() {
         speakToUser("konum seçin");
         return;
     }
+
+    const micOK = await testMicrophoneAccess();
+if (!micOK) {
+    displayMessage('Mikrofon bulunamadı veya engellenmiş.');
+    speakToUser('mikrofon bulunamadı');
+    return;
+}
     
     // Zaten açıksa kapat - TAMAM
     if (isMicrophoneEnabled) {
         disableDynamicMicrophone();
         return;
     }
+
+    // Mobil cihazlar için güvenli izin alma - önemli
+const platform = getPlatform();
+console.log('📱 Platform:', platform);
+
+if (platform === 'android' || platform === 'ios') {
+    // Kullanıcıdan jest bekleniyor
+    await new Promise(resolve => {
+        const unlockAudio = () => {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = ctx.createOscillator();
+                oscillator.connect(ctx.destination);
+                oscillator.start(0);
+                oscillator.stop(0);
+                ctx.resume();
+                console.log('🔊 Mobil ses kanalı etkinleştirildi');
+            } catch (e) {
+                console.warn('Mobil ses başlatılamadı:', e);
+            }
+            document.removeEventListener('touchstart', unlockAudio);
+            document.removeEventListener('click', unlockAudio);
+            resolve();
+        };
+        document.addEventListener('touchstart', unlockAudio);
+        document.addEventListener('click', unlockAudio);
+    });
+}
+
     
     try {
         console.log('🔐 Mikrofon izni isteniyor...');
@@ -3061,21 +3130,22 @@ function setupManualMode() {
     };
     
     recognition.onend = function() {
-        console.log('🔚 Ses tanıma sonlandı');
-        isListening = false;
-        if (voiceIndicator) voiceIndicator.classList.remove('listening');
-        
-        // ⭐ DEĞİŞİKLİK: Sadece aktifse ve asistan konuşmuyorsa yeniden başlat
-        if (isMicrophoneEnabled && !isAssistantSpeaking) {
-            restartTimeout = setTimeout(() => {
-                startRecognition();
-            }, 1000);
-        }
-    };
-    
-    // ⭐ DEĞİŞİKLİK: Hemen başlatma, startRecognition ile başlat
-    return true;
-}
+    console.log('🔚 Ses tanıma oturumu kapandı.');
+    isListening = false;
+    if (voiceIndicator) voiceIndicator.classList.remove('listening');
+
+    if (isMicrophoneEnabled && !isAssistantSpeaking) {
+        console.log('🔁 Mobil fallback: Ses tanıma yeniden başlatılıyor...');
+        setTimeout(() => {
+            try {
+                if (recognition && !isListening) recognition.start();
+            } catch (e) {
+                console.log('Yeniden başlatma hatası:', e);
+                initializeSimpleSpeechRecognition();
+            }
+        }, 1200);
+    }
+};
         
 
 // Ses tanıma başlatma fonksiyonunu güncelle
@@ -3178,6 +3248,20 @@ function startRecognition() {
     }, 1000);
 }
 
+async function testMicrophoneAccess() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const track = stream.getAudioTracks()[0];
+        console.log('🎙️ Mikrofon bulundu:', track.label || 'Bilinmiyor');
+        track.stop();
+        return true;
+    } catch (err) {
+        console.error('❌ Mikrofon erişimi başarısız:', err);
+        return false;
+    }
+}
+
+        
         // =============================================
         // EKSİK FONKSİYONLARIN TAMAMLANMASI
         // =============================================
@@ -8908,3 +8992,4 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
