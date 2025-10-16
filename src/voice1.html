@@ -6510,7 +6510,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 function extractProductInfoFromCommand(message) {
-  try {
     console.log('🎧 extractProductInfoFromCommand çağrıldı:', message);
 
     if (!message || message.trim() === '') {
@@ -6525,14 +6524,21 @@ function extractProductInfoFromCommand(message) {
 
     console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
 
+    // "numara" ifadesi geçmiyorsa sesli bildirim için null döndür
+    if (!cleanMessage.includes('numara')) {
+        console.log('❌ "numara" ifadesi bulunamadı');
+        // Sesli bildirim: "Lütfen geçerli ürün ekleme komutu söyleyiniz!!!"
+        // Display: "Örneğin: '1 numara 5 kilo' şeklinde kullanınız!!!"
+        return null;
+    }
+
     let quantity = 1;
     let unit = 'adet';
     let productName = '';
 
     console.log('🔍 Pattern kontrolü başlıyor...');
 
-
-       // 1. ÖNCE "numara kilo" PATTERN'İ - EN ÖNCELİKLİ
+    // 1. ÖNCE "numara kilo" PATTERN'İ - EN ÖNCELİKLİ
     const numaraKiloMatch = cleanMessage.match(/(\d+)\s*numara\s*(\d+[,.]?\d*)\s*kilo/);
     if (numaraKiloMatch) {
         const targetNumber = parseInt(numaraKiloMatch[1]);
@@ -6619,57 +6625,11 @@ function extractProductInfoFromCommand(message) {
         console.log(`✅ Sadece numara pattern eşleşti: ${quantity} ${unit} ${productName}`);
         return { productName, quantity, unit };
     }
- 
-    // ÜRÜN ADI DÜZELTMELERİ - GÜVENLİ VERSİYON
-    if (productName) {
-        const fixes = {
-            'domat': 'domates', 'domate': 'domates', 'domatess': 'domates',
-            'sogan': 'soğan', 'sogann': 'soğan',
-            'salatalik': 'salatalık', 'patat': 'patates',
-            'carliston': 'çarliston biber', 'viber': 'çarliston biber',
-            'kabakk': 'kabak', 'marull': 'marul',
-            'peynirr': 'peynir', 'sütt': 'süt', 'sut': 'süt',
-            'ekmekk': 'ekmek'
-        };
 
-        let originalName = productName;
-        for (const [wrong, correct] of Object.entries(fixes)) {
-            if (productName === wrong || productName.includes(wrong + ' ')) {
-                productName = productName.replace(wrong, correct);
-                console.log(`🔄 Düzeltme: "${wrong}" -> "${correct}"`);
-            }
-        }
-
-        if (productName.includes('numara') && !productName.match(/^\d+\s*numara$/)) {
-            productName = productName.replace(/numara/g, '').trim();
-        }
-
-        productName = productName.replace(/\s+/g, ' ').trim();
-
-        if (originalName !== productName) {
-            console.log(`🔄 Ürün adı düzeltildi: "${originalName}" -> "${productName}"`);
-        }
-    }
-
-    // SON KONTROL
-    if (!productName || productName.trim() === '') {
-        console.log('❌ Ürün adı çıkarılamadı');
-        return null;
-    }
-
-    productName = productName.trim();
-    console.log('🎯 SONUÇ:', { productName, quantity, unit });
-    return { productName, quantity, unit };
-
-  } catch (err) {
-    console.error('🚨 extractProductInfoFromCommand kritik hata:', err);
+    // Hiçbir pattern eşleşmezse
+    console.log('❌ Hiçbir numara patterni eşleşmedi');
     return null;
-  }
 }
-
-        
-
-
         
 // Hemen kullanabileceğiniz basit versiyon
 function setupVoiceRecognitionLearning() {
@@ -9149,6 +9109,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
