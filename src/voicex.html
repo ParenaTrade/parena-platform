@@ -8494,6 +8494,7 @@ let pendingCustomerInfo = null;
 let pendingAddressInfo = null;
 let orderNotes = null;
 let deliveryaddress = null;
+let customers_full_Addrees = null;
         
 // =============================================
 // ÖDEME ve SİPARİŞ TAMAMLAMA SİSTEMİ (SESLİ + TIKLAMA)
@@ -8769,7 +8770,12 @@ async function processApartmentInfo(apartmentInfo) {
     
     displayMessage("🔄 Müşteri kaydı oluşturuluyor...");
     speakToUser("Bilgileriniz kaydediliyor, lütfen bekleyin");
+
+    const buildingText = pendingAddressInfo?.building ? `Bina: ${pendingAddressInfo.building}` : "";
+    const apartmentText = pendingAddressInfo?.apartment ? `Daire: ${pendingAddressInfo.apartment}` : "";
     
+    customers_full_Addrees = `Teslimat adresi: ${userLocation.fullAddress || "Adres bulunamadı"} ${buildingText ? ", " + buildingText : ""}${apartmentText ? ", " + apartmentText : ""}`;
+ 
     try {
         const { data: newCustomer, error } = await supabase
             .from('customers')
@@ -8779,11 +8785,7 @@ async function processApartmentInfo(apartmentInfo) {
                 status: 'active', // ✅ burada artık hata vermez
                 district: userLocation.district,
                 city: userLocation.city,
-                address: {
-                adres: userLocation.fullAddress || '',
-                building: pendingCustomerInfo.buildingNumber,
-                apartment: pendingCustomerInfo.apartmentNumber
-              },
+                address: customers_full_Addrees,
                 created_at: new Date().toISOString()
             }])
             .select()
@@ -9220,6 +9222,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
