@@ -8776,6 +8776,7 @@ async function processApartmentInfo(apartmentInfo) {
                 name: `${pendingCustomerInfo.firstName} ${pendingCustomerInfo.lastName}`,
                 phone: pendingCustomerInfo.phone,
                 address: JSON.stringify({
+                    adres: userLocation.fullAddress
                     building: pendingCustomerInfo.buildingNumber,
                     apartment: pendingCustomerInfo.apartmentNumber,
                     district: userLocation.district,
@@ -9030,69 +9031,15 @@ async function processOrderConfirmation(response) {
     }
 }
 
-// ✅ Nihai saveOrder fonksiyonu
+// saveOrder fonksiyonunu güncelle
 async function saveOrder() {
   console.log('💾 Sipariş kaydediliyor...');
   displayMessage("🔄 Siparişiniz kaydediliyor...");
 
   try {
     const totalAmount = calculateTotal();
-    let finalAddress = "";
-    const deliveryConfirmed = selectedLocation === "delivery"; // EVET/HAYIR durumu
 
-    // 1️⃣ TESLİMAT EVET → Müşteri adresi
-    if (deliveryConfirmed) {
-      const { data: customerData, error: customerError } = await supabase
-        .from("customers")
-        .select("id, address, city, district")
-        .eq("id", currentCustomer.id)
-        .single();
-
-      if (customerError && customerError.code !== "PGRST116") throw customerError;
-
-      if (customerData) {
-        // Müşteri zaten kayıtlı
-        finalAddress = `${customerData.address}, ${customerData.district}, ${customerData.city}`;
-      } else {
-        // Yeni müşteri kaydı (ilk sipariş)
-        const fullAddressParts = [
-          userLocation.fullAddress || userLocation.address || '',
-          pendingAddressInfo?.building ? `Bina: ${pendingAddressInfo.building}` : '',
-          pendingAddressInfo?.apartment ? `Daire: ${pendingAddressInfo.apartment}` : ''
-        ].filter(Boolean);
-
-        const fullAddress = fullAddressParts.join(', ').trim();
-
-        const { data: newCustomer, error: insertError } = await supabase
-          .from("customers")
-          .insert([
-            {
-              id: currentCustomer.id,
-              name: currentCustomer.name || "Yeni Müşteri",
-              address: fullAddress,
-              city: userLocation.city || '',
-              district: userLocation.district || ''
-            }
-          ])
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        finalAddress = fullAddress;
-      }
-    } 
-    // 2️⃣ TESLİMAT HAYIR → Lokasyondan alınan adres + bina + daire
-    else {
-      const fullAddressParts = [
-        userLocation.fullAddress || userLocation.address || '',
-        pendingAddressInfo?.building ? `Bina: ${pendingAddressInfo.building}` : '',
-        pendingAddressInfo?.apartment ? `Daire: ${pendingAddressInfo.apartment}` : ''
-      ].filter(Boolean);
-
-      finalAddress = fullAddressParts.join(', ').trim();
-    }
-
-    // 3️⃣ DEMO kontrolü
+    // 1️⃣ DEMO sipariş kontrolü
     if (currentCustomer.id && currentCustomer.id.startsWith('demo-')) {
       const demoOrder = {
         id: 'demo-order-' + Date.now(),
@@ -9101,8 +9048,13 @@ async function saveOrder() {
         total: totalAmount,
         payment_method: currentPaymentMethod,
         status: 'confirmed',
-        order_notes: finalAddress,
-        delivery_address: finalAddress,
+        order_notes: orderNotes || '',
+        delivery_address: JSON.stringify({
+          district: userLocation.district,
+          city: userLocation.city,
+          building: pendingAddressInfo?.building || '',
+          apartment: pendingAddressInfo?.apartment || ''
+        }),
         created_at: new Date().toISOString()
       };
 
@@ -9110,16 +9062,19 @@ async function saveOrder() {
       displayMessage("✅ Demo siparişiniz kaydedildi! Teşekkür ederiz.");
       speakToUser("Siparişiniz için teşekkür ederiz");
     } 
-    // 4️⃣ GERÇEK sipariş kaydı
     else {
+      // 2️⃣ Gerçek sipariş kaydı
       const orderData = {
         customer_id: currentCustomer.id,
         seller_id: selectedSellerId,
         total_amount: totalAmount,
         payment_method: currentPaymentMethod,
         status: 'confirmed',
-        order_notes: finalAddress,
-        delivery_address: finalAddress
+        order_notes: orderNotes || 'Sesli sipariş',
+        delivery_address: JSON.stringify({
+          district: userLocation.district || 'Bilinmiyor',
+          city: userLocation.city || 'Bilinmiyor'
+        })
       };
 
       console.log('📦 Sipariş verisi:', orderData);
@@ -9132,7 +9087,7 @@ async function saveOrder() {
 
       if (orderError) throw orderError;
 
-      // 5️⃣ Sipariş detayları
+      // 3️⃣ Sipariş detayları
       const orderDetails = cart.map(item => ({
         order_id: order.id,
         product_id: item.id,
@@ -9141,6 +9096,8 @@ async function saveOrder() {
         discount: 0,
         tax_rate: item.tax_rate
       }));
+
+      console.log('📦 Order Details:', orderDetails);
 
       const { error: detailsError } = await supabase
         .from('order_details')
@@ -9152,12 +9109,13 @@ async function saveOrder() {
       speakToUser("Siparişiniz için teşekkür ederiz, iyi günler dileriz");
     }
 
-    // 6️⃣ Temizlik
+    // 4️⃣ Başarılı işlem sonrası temizlik
     setTimeout(() => resetAfterSuccessfulOrder(), 3000);
 
   } catch (error) {
     console.error('❌ Sipariş kaydetme hatası:', error);
 
+    // Fallback: Demo kayıt oluştur
     const demoOrder = {
       id: 'demo-fallback-' + Date.now(),
       customer: currentCustomer || { name: "Müşteri" },
@@ -9262,6 +9220,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
