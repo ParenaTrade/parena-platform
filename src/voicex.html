@@ -1560,66 +1560,6 @@
    gap: 15px;
    overflow-x: auto;
 }
-
- .popup-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.popup-content {
-  background: #fff;
-  border-radius: 16px;
-  padding: 20px;
-  width: 90%;
-  max-width: 420px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-  animation: fadeIn 0.3s ease;
-}
-
-.input-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
-.repeat-btn {
-  background: #ffcc00;
-  border: none;
-  border-radius: 8px;
-  padding: 5px 8px;
-  cursor: pointer;
-}
-
-.btn-save {
-  background: #00c851;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 10px;
-}
-
-.btn-cancel {
-  background: #ff4444;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 10px;
-}
-
-.hidden {
-  display: none;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
-}
-
     </style>
 </head>
 <body>
@@ -1832,46 +1772,6 @@
             <p>&copy; 2023 Sesli Sipariş Sistemi. <span data-translate="all_rights_reserved">Tüm hakları saklıdır.</span></p>
         </div>
     </footer>
-    <!-- 🧾 Sipariş Onay Formu (footer altı) -->
-<div id="orderConfirmSection" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:2px solid #ccc; z-index:9999; padding:16px; box-shadow:0 -3px 10px rgba(0,0,0,0.15);">
-  <h3 style="margin-bottom:10px;">🧾 Sipariş Bilgilerini Onayla</h3>
-
-  <div class="input-row">
-    <label>📞 Telefon:</label>
-    <input id="confirmPhone" type="text" placeholder="Telefon numarası" style="width:60%">
-    <button onclick="repeatField('phone')">🔁</button>
-  </div>
-
-  <div class="input-row">
-    <label>👤 Ad Soyad:</label>
-    <input id="confirmName" type="text" placeholder="Ad Soyad" style="width:60%">
-    <button onclick="repeatField('name')">🔁</button>
-  </div>
-
-  <div class="input-row">
-    <label>📍 Adres:</label>
-    <input id="confirmAddress" type="text" placeholder="Adres" style="width:60%">
-    <button onclick="repeatField('address')">🔁</button>
-  </div>
-
-  <div class="input-row">
-    <label>🏠 Bina No:</label>
-    <input id="confirmBuilding" type="text" placeholder="Bina No" style="width:60%">
-    <button onclick="repeatField('building')">🔁</button>
-  </div>
-
-  <div class="input-row">
-    <label>🏢 Daire No:</label>
-    <input id="confirmApartment" type="text" placeholder="Daire No" style="width:60%">
-    <button onclick="repeatField('apartment')">🔁</button>
-  </div>
-
-  <div style="text-align:right; margin-top:10px;">
-    <button onclick="confirmOrderForm()">💾 Kaydet & Siparişi Tamamla</button>
-    <button onclick="hideOrderConfirmSection()">❌ İptal</button>
-  </div>
-</div>
-
     <!-- Voice Assistant -->
     <div class="voice-status" id="voiceStatusPanel">
         <div class="status-header">
@@ -3256,6 +3156,12 @@ function setupVisualFeedback() {
         });
     }
     
+    // Dinleme durumuna göre animasyonu kontrol et
+    recognition.onstart = function() {
+        startAnimation();
+        updateRecognitionStatus('listening');
+    };
+    
     recognition.onspeechstart = function() {
         updateRecognitionStatus('processing');
     };
@@ -3266,7 +3172,100 @@ function setupVisualFeedback() {
     };
 }
         
-    
+// Basitleştirilmiş ses tanıma (no-speech hatalarını yoksay)
+function initializeSimpleSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = 'tr-TR';
+    recognition.interimResults = false;
+
+    let isRestarting = false;
+
+    recognition.onstart = function() {
+        console.log('✅ Dinliyorum...');
+        isListening = true;
+        if (voiceIndicator) voiceIndicator.classList.add('listening');
+    };
+
+    recognition.onresult = function(event) {
+        // 💡 Konuşma devam ederken gelen sesleri yoksay
+        if (typeof isSpeaking !== 'undefined' && isSpeaking) {
+            console.log('🚫 Asistan konuşurken gelen ses yoksayıldı.');
+            return;
+        }
+
+        const transcript = event.results[0][0].transcript.trim().toLowerCase();
+        console.log('🎯 Tanınan:', transcript);
+
+        // 🔹 Sistem mesajlarını filtrele (asistanın kendi sesi)
+        const ignoredPhrases = [
+            "bina numarasını söyleyin",
+            "daire numarasını söyleyin",
+            "adresinize teslimat",
+            "evet veya hayır",
+            "adresinize",
+            "kayısı",
+            "teslimat adresi",
+            "geçersiz bina numarası",
+            "geçersiz daire numarası"
+        ];
+
+        if (ignoredPhrases.some(p => transcript.includes(p))) {
+            console.log("🧱 Sistem kendi sesini algıladı, yoksayıldı:", transcript);
+            return;
+        }
+
+        if (userMessage) userMessage.textContent = transcript;
+        processVoiceCommand(transcript);
+    };
+
+    recognition.onerror = function(event) {
+        console.log('⚠️ Hata (yoksayılıyor):', event.error);
+        isListening = false;
+        if (voiceIndicator) voiceIndicator.classList.remove('listening');
+    };
+
+    recognition.onend = function() {
+        isListening = false;
+        if (voiceIndicator) voiceIndicator.classList.remove('listening');
+
+        // 🔁 Daha güvenli yeniden başlatma
+        if (isMicrophoneEnabled && !isRestarting) {
+            isRestarting = true;
+            setTimeout(() => {
+                try {
+                    if (isMicrophoneEnabled && recognition && !isSpeaking) {
+                        recognition.start();
+                        console.log("🎧 Dinleme yeniden başlatıldı.");
+                    } else {
+                        console.log("⏸️ Asistan konuştuğu için yeniden başlatma ertelendi.");
+                    }
+                } catch (error) {
+                    console.log('Yeniden başlatma hatası:', error);
+                    setTimeout(() => {
+                        if (isMicrophoneEnabled) {
+                            initializeSimpleSpeechRecognition();
+                        }
+                    }, 3000);
+                } finally {
+                    isRestarting = false;
+                }
+            }, 1000);
+        }
+    };
+
+    // 🎬 Başlat
+    try {
+        recognition.start();
+        console.log("🎤 Dinleme başlatıldı.");
+    } catch (error) {
+        console.error('Başlatma hatası:', error);
+    }
+}
+
         // Acil durum fallback'leri
 function setupEmergencyFallbacks() {
     // Languages tablosu yoksa
@@ -3315,24 +3314,46 @@ function setupManualMode() {
 }
 
         
-    // Basitleştirilmiş ses tanıma (no-speech hatalarını yoksay)
-function initializeSimpleSpeechRecognition() {
+    function initializeDynamicSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+        console.error('❌ Ses tanıma desteklenmiyor');
+        displayMessage("Tarayıcınız ses tanımayı desteklemiyor.");
+        return false;
+    }
+    
+    // ⭐ ÖNEMLİ: Eski recognition'ı temizle
+    if (recognition) {
+        try {
+            recognition.stop();
+        } catch (e) {
+            // Stop hatasını yoksay
+        }
+        recognition = null;
+    }
     
     recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.lang = 'tr-TR';
     recognition.interimResults = false;
     
-    // Değişken tanımla
-    let isRestarting = false;
+    // ⭐ DEĞİŞİKLİK: Dinleme durumu yönetimi
+    let restartTimeout = null;
+    let errorCount = 0;
+    const MAX_ERROR_COUNT = 5;
     
     recognition.onstart = function() {
         console.log('✅ Dinliyorum...');
         isListening = true;
+        errorCount = 0; // Başarılı başlangıçta hata sayacını sıfırla
         if (voiceIndicator) voiceIndicator.classList.add('listening');
+        
+        // ⭐ DEĞİŞİKLİK: Bekleyen restart'ı temizle
+        if (restartTimeout) {
+            clearTimeout(restartTimeout);
+            restartTimeout = null;
+        }
     };
     
     recognition.onresult = function(event) {
@@ -3344,115 +3365,55 @@ function initializeSimpleSpeechRecognition() {
     };
     
     recognition.onerror = function(event) {
-        console.log('⚠️ Hata (yoksayılıyor):', event.error);
+        console.log('⚠️ Hata:', event.error);
         isListening = false;
+        errorCount++;
+        
         if (voiceIndicator) voiceIndicator.classList.remove('listening');
+        
+        // ⭐ DEĞİŞİKLİK: Kritik hatalarda yeniden başlat
+        const criticalErrors = ['not-allowed', 'service-not-allowed'];
+        if (criticalErrors.includes(event.error)) {
+            console.error('❌ Kritik hata, ses tanıma durduruluyor:', event.error);
+            disableDynamicMicrophone();
+            return;
+        }
+        
+        // ⭐ DEĞİŞİKLİK: Çok fazla hata alındıysa bekle
+        if (errorCount > MAX_ERROR_COUNT) {
+            console.log('🔄 Çok fazla hata, 5 saniye bekleniyor...');
+            setTimeout(() => {
+                if (isMicrophoneEnabled) {
+                    restartRecognition();
+                }
+            }, 5000);
+            return;
+        }
+        
+        // ⭐ DEĞİŞİKLİK: Normal hatalarda kontrollü yeniden başlat
+        if (isMicrophoneEnabled && !isListening) {
+            restartTimeout = setTimeout(() => {
+                startRecognition();
+            }, 1500);
+        }
     };
     
     recognition.onend = function() {
+        console.log('🔚 Ses tanıma sonlandı');
         isListening = false;
         if (voiceIndicator) voiceIndicator.classList.remove('listening');
         
-        // DÜZELTME: Daha güvenli yeniden başlatma
-        if (isMicrophoneEnabled && !isRestarting) {
-            isRestarting = true;
-            setTimeout(() => {
-                try {
-                    if (isMicrophoneEnabled && recognition) {
-                        recognition.start();
-                    }
-                } catch (error) {
-                    console.log('Yeniden başlatma hatası:', error);
-                    // Hata durumunda 3 saniye bekle
-                    setTimeout(() => {
-                        if (isMicrophoneEnabled) {
-                            initializeSimpleSpeechRecognition();
-                        }
-                    }, 3000);
-                } finally {
-                    isRestarting = false;
-                }
+        // ⭐ DEĞİŞİKLİK: Sadece aktifse ve asistan konuşmuyorsa yeniden başlat
+        if (isMicrophoneEnabled && !isAssistantSpeaking) {
+            restartTimeout = setTimeout(() => {
+                startRecognition();
             }, 1000);
         }
-    }; // ⭐ BURASI KAPATILDI
+    };
     
-    try {
-        recognition.start();
-    } catch (error) {
-        console.error('Başlatma hatası:', error);
-    }
-}        
-
-
-// Ses tanıma başlatma fonksiyonunu güncelle
-function startRecognition() {
-    // ⭐ DEĞİŞİKLİK: Daha kapsamlı kontrol
-    if (!recognition) {
-        console.log('🔄 Recognition objesi yok, yeniden oluşturuluyor...');
-        if (!initializeDynamicSpeechRecognition()) {
-            return;
-        }
-    }
-    
-    // Kontroller
-    if (!isMicrophoneEnabled) {
-        console.log('⏸️ Mikrofon kapalı');
-        return;
-    }
-    
-    if (isAssistantSpeaking) {
-        console.log('⏸️ Asistan konuşuyor, ses tanıma ertelendi');
-        // Asistan konuşması bitince yeniden dene
-        setTimeout(() => {
-            if (isMicrophoneEnabled && !isAssistantSpeaking) {
-                startRecognition();
-            }
-        }, 2000);
-        return;
-    }
-    
-    if (isListening) {
-        console.log('ℹ️ Zaten dinleniyor');
-        return;
-    }
-    
-    try {
-        console.log('🚀 Ses tanıma başlatılıyor...');
-        recognition.start();
-        console.log('✅ Ses tanıma başlatma komutu gönderildi');
-    } catch (error) {
-        console.error('❌ Ses tanıma başlatma hatası:', error);
-        
-        // "already started" hatasını yoksay
-        if (error.toString().includes('already started')) {
-            console.log('ℹ️ Ses tanıma zaten başlamış');
-            return;
-        }
-        
-        // ⭐ DEĞİŞİKLİK: Obje bozuksa yeniden oluştur
-        if (error.toString().includes('not running') || error.toString().includes('invalid state')) {
-            console.log('🔄 Recognition objesi bozuk, yeniden oluşturuluyor...');
-            recognition = null;
-            setTimeout(() => {
-                if (isMicrophoneEnabled) {
-                    initializeDynamicSpeechRecognition();
-                    startRecognition();
-                }
-            }, 1000);
-            return;
-        }
-        
-        // Diğer hatalar için 3 saniye sonra yeniden dene
-        setTimeout(() => {
-            if (isMicrophoneEnabled && !isListening && !isAssistantSpeaking) {
-                console.log('🔄 Hata sonrası yeniden deneme...');
-                startRecognition();
-            }
-        }, 3000);
-    }
-}        
-    
-
+    // ⭐ DEĞİŞİKLİK: Hemen başlatma, startRecognition ile başlat
+    return true;
+}
         
 
 function startRecognition() {
@@ -3592,7 +3553,6 @@ let lastSpokenMessage = "";
 let lastSpeakTime = 0;
 let isLocationDetected = false;   
 let isSpeaking = false;
-let recognitionTimer;
       
 
 // Konum state
@@ -7183,10 +7143,10 @@ function setupDynamicEventHandlers() {
     if (microphoneToggle) {
         microphoneToggle.addEventListener('click', handleDynamicMicrophoneToggle);
     }
-
+    
     // Konum
     setupDynamicLocationEvents();
-
+    
     // Sepet
     if (orderSummary) {
         orderSummary.addEventListener('click', toggleDynamicCart);
@@ -7194,13 +7154,12 @@ function setupDynamicEventHandlers() {
     if (cartClose) {
         cartClose.addEventListener('click', closeDynamicCart);
     }
-
-    // 💳 Ödeme butonları (finalizeDynamicOrder yerine popup göster)
-    if (payCashBtn) payCashBtn.addEventListener('click', () => showOrderConfirmSection('nakit'));
-    if (payCardBtn) payCardBtn.addEventListener('click', () => showOrderConfirmSection('kart'));
-    if (payBonusBtn) payBonusBtn.addEventListener('click', () => showOrderConfirmSection('bonus'));
+    
+    // Ödeme butonları
+    if (payCashBtn) payCashBtn.addEventListener('click', () => finalizeDynamicOrder('nakit'));
+    if (payCardBtn) payCardBtn.addEventListener('click', () => finalizeDynamicOrder('kart'));
+    if (payBonusBtn) payBonusBtn.addEventListener('click', () => finalizeDynamicOrder('bonus'));
 }
-
 
 function handleDynamicMicrophoneToggle() {
     if (!selectedLocation) {
@@ -9101,60 +9060,6 @@ async function processOrderConfirmation(response) {
     }
 }
 
-// 🧩 Sipariş onay formunu göster
-function showOrderConfirmSection() {
-  const el = document.getElementById("orderConfirmSection");
-  el.style.display = "block";
-
-  // Sesle alınan mevcut bilgileri doldur
-  document.getElementById("confirmPhone").value = pendingCustomerInfo?.phone || "";
-  document.getElementById("confirmName").value = `${pendingCustomerInfo?.firstName || ""} ${pendingCustomerInfo?.lastName || ""}`.trim();
-  document.getElementById("confirmAddress").value = userLocation?.fullAddress || "";
-  document.getElementById("confirmBuilding").value = pendingAddressInfo?.building || "";
-  document.getElementById("confirmApartment").value = pendingAddressInfo?.apartment || "";
-}
-
-// 🧩 Formu gizle
-function hideOrderConfirmSection() {
-  document.getElementById("orderConfirmSection").style.display = "none";
-}
-
-// 🧩 Tekrarla (alanı sesle güncelle)
-function repeatField(field) {
-  speakToUser(`${field} bilgisini tekrar söyleyin`);
-  // Sesli dinleme başlatılır, sonucu inputa yazılır
-  listenForField(field);
-}
-
-async function listenForField(field) {
-  console.log(`🎤 ${field} için ses dinleniyor...`);
-  // Burada mevcut recognition sistemiyle yakalayıp inputa yazarız
-  // Örn: document.getElementById('confirmPhone').value = transcript;
-}
-
-// 🧩 Kaydet & Siparişi Tamamla
-async function confirmOrderForm() {
-  // 🧩 Hataları önle: objeler boşsa oluştur
-  if (!window.pendingCustomerInfo) window.pendingCustomerInfo = {};
-  if (!window.pendingAddressInfo) window.pendingAddressInfo = {};
-  if (!window.userLocation) window.userLocation = {};
-
-  // Şimdi güvenle değerleri aktarabiliriz
-  pendingCustomerInfo.phone = document.getElementById('confirmPhone').value;
-  const nameParts = document.getElementById('confirmName').value.split(" ");
-  pendingCustomerInfo.firstName = nameParts[0];
-  pendingCustomerInfo.lastName = nameParts.slice(1).join(" ");
-  
-  userLocation.fullAddress = document.getElementById('confirmAddress').value;
-  pendingAddressInfo.building = document.getElementById('confirmBuilding').value;
-  pendingAddressInfo.apartment = document.getElementById('confirmApartment').value;
-
-  hideOrderConfirmSection();
-  await saveOrder();
-}
-
-
-        
 // saveOrder fonksiyonunu güncelle
 async function saveOrder() {
   console.log('💾 Sipariş kaydediliyor...');
@@ -9338,12 +9243,3 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
