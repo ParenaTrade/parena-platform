@@ -1560,6 +1560,66 @@
    gap: 15px;
    overflow-x: auto;
 }
+
+ .popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.popup-content {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  animation: fadeIn 0.3s ease;
+}
+
+.input-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.repeat-btn {
+  background: #ffcc00;
+  border: none;
+  border-radius: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.btn-save {
+  background: #00c851;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+}
+
+.btn-cancel {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+}
+
+.hidden {
+  display: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
     </style>
 </head>
 <body>
@@ -1772,6 +1832,46 @@
             <p>&copy; 2023 Sesli Sipariş Sistemi. <span data-translate="all_rights_reserved">Tüm hakları saklıdır.</span></p>
         </div>
     </footer>
+    <!-- 🧾 Sipariş Onay Formu (footer altı) -->
+<div id="orderConfirmSection" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:2px solid #ccc; z-index:9999; padding:16px; box-shadow:0 -3px 10px rgba(0,0,0,0.15);">
+  <h3 style="margin-bottom:10px;">🧾 Sipariş Bilgilerini Onayla</h3>
+
+  <div class="input-row">
+    <label>📞 Telefon:</label>
+    <input id="confirmPhone" type="text" placeholder="Telefon numarası" style="width:60%">
+    <button onclick="repeatField('phone')">🔁</button>
+  </div>
+
+  <div class="input-row">
+    <label>👤 Ad Soyad:</label>
+    <input id="confirmName" type="text" placeholder="Ad Soyad" style="width:60%">
+    <button onclick="repeatField('name')">🔁</button>
+  </div>
+
+  <div class="input-row">
+    <label>📍 Adres:</label>
+    <input id="confirmAddress" type="text" placeholder="Adres" style="width:60%">
+    <button onclick="repeatField('address')">🔁</button>
+  </div>
+
+  <div class="input-row">
+    <label>🏠 Bina No:</label>
+    <input id="confirmBuilding" type="text" placeholder="Bina No" style="width:60%">
+    <button onclick="repeatField('building')">🔁</button>
+  </div>
+
+  <div class="input-row">
+    <label>🏢 Daire No:</label>
+    <input id="confirmApartment" type="text" placeholder="Daire No" style="width:60%">
+    <button onclick="repeatField('apartment')">🔁</button>
+  </div>
+
+  <div style="text-align:right; margin-top:10px;">
+    <button onclick="confirmOrderForm()">💾 Kaydet & Siparişi Tamamla</button>
+    <button onclick="hideOrderConfirmSection()">❌ İptal</button>
+  </div>
+</div>
+
     <!-- Voice Assistant -->
     <div class="voice-status" id="voiceStatusPanel">
         <div class="status-header">
@@ -7143,10 +7243,10 @@ function setupDynamicEventHandlers() {
     if (microphoneToggle) {
         microphoneToggle.addEventListener('click', handleDynamicMicrophoneToggle);
     }
-    
+
     // Konum
     setupDynamicLocationEvents();
-    
+
     // Sepet
     if (orderSummary) {
         orderSummary.addEventListener('click', toggleDynamicCart);
@@ -7154,12 +7254,13 @@ function setupDynamicEventHandlers() {
     if (cartClose) {
         cartClose.addEventListener('click', closeDynamicCart);
     }
-    
-    // Ödeme butonları
-    if (payCashBtn) payCashBtn.addEventListener('click', () => finalizeDynamicOrder('nakit'));
-    if (payCardBtn) payCardBtn.addEventListener('click', () => finalizeDynamicOrder('kart'));
-    if (payBonusBtn) payBonusBtn.addEventListener('click', () => finalizeDynamicOrder('bonus'));
+
+    // 💳 Ödeme butonları (finalizeDynamicOrder yerine popup göster)
+    if (payCashBtn) payCashBtn.addEventListener('click', () => showOrderConfirmSection('nakit'));
+    if (payCardBtn) payCardBtn.addEventListener('click', () => showOrderConfirmSection('kart'));
+    if (payBonusBtn) payBonusBtn.addEventListener('click', () => showOrderConfirmSection('bonus'));
 }
+
 
 function handleDynamicMicrophoneToggle() {
     if (!selectedLocation) {
@@ -9060,6 +9161,54 @@ async function processOrderConfirmation(response) {
     }
 }
 
+// 🧩 Sipariş onay formunu göster
+function showOrderConfirmSection() {
+  const el = document.getElementById("orderConfirmSection");
+  el.style.display = "block";
+
+  // Sesle alınan mevcut bilgileri doldur
+  document.getElementById("confirmPhone").value = pendingCustomerInfo?.phone || "";
+  document.getElementById("confirmName").value = `${pendingCustomerInfo?.firstName || ""} ${pendingCustomerInfo?.lastName || ""}`.trim();
+  document.getElementById("confirmAddress").value = userLocation?.fullAddress || "";
+  document.getElementById("confirmBuilding").value = pendingAddressInfo?.building || "";
+  document.getElementById("confirmApartment").value = pendingAddressInfo?.apartment || "";
+}
+
+// 🧩 Formu gizle
+function hideOrderConfirmSection() {
+  document.getElementById("orderConfirmSection").style.display = "none";
+}
+
+// 🧩 Tekrarla (alanı sesle güncelle)
+function repeatField(field) {
+  speakToUser(`${field} bilgisini tekrar söyleyin`);
+  // Sesli dinleme başlatılır, sonucu inputa yazılır
+  listenForField(field);
+}
+
+async function listenForField(field) {
+  console.log(`🎤 ${field} için ses dinleniyor...`);
+  // Burada mevcut recognition sistemiyle yakalayıp inputa yazarız
+  // Örn: document.getElementById('confirmPhone').value = transcript;
+}
+
+// 🧩 Kaydet & Siparişi Tamamla
+async function confirmOrderForm() {
+  pendingCustomerInfo.phone = document.getElementById('confirmPhone').value;
+  const nameParts = document.getElementById('confirmName').value.split(" ");
+  pendingCustomerInfo.firstName = nameParts[0];
+  pendingCustomerInfo.lastName = nameParts.slice(1).join(" ");
+  
+  userLocation.fullAddress = document.getElementById('confirmAddress').value;
+  pendingAddressInfo.building = document.getElementById('confirmBuilding').value;
+  pendingAddressInfo.apartment = document.getElementById('confirmApartment').value;
+
+  hideOrderConfirmSection();
+  await saveOrder();
+}
+
+
+        
 // saveOrder fonksiyonunu güncelle
 async function saveOrder() {
   console.log('💾 Sipariş kaydediliyor...');
@@ -9243,3 +9392,4 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
