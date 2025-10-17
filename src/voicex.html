@@ -3256,11 +3256,7 @@ function setupVisualFeedback() {
         });
     }
     
-    // Dinleme durumuna göre animasyonu kontrol et
-    recognition.onstart = function() {
-        startAnimation();
-        updateRecognitionStatus('listening');
-    };
+   
     
     recognition.onspeechstart = function() {
         updateRecognitionStatus('processing');
@@ -3284,88 +3280,7 @@ function initializeSimpleSpeechRecognition() {
 
     let isRestarting = false;
 
-    recognition.onstart = function() {
-        console.log('✅ Dinliyorum...');
-        isListening = true;
-        if (voiceIndicator) voiceIndicator.classList.add('listening');
-    };
-
-    recognition.onresult = function(event) {
-        // 💡 Konuşma devam ederken gelen sesleri yoksay
-        if (typeof isSpeaking !== 'undefined' && isSpeaking) {
-            console.log('🚫 Asistan konuşurken gelen ses yoksayıldı.');
-            return;
-        }
-
-        const transcript = event.results[0][0].transcript.trim().toLowerCase();
-        console.log('🎯 Tanınan:', transcript);
-
-        // 🔹 Sistem mesajlarını filtrele (asistanın kendi sesi)
-        const ignoredPhrases = [
-            "bina numarasını söyleyin",
-            "daire numarasını söyleyin",
-            "adresinize teslimat",
-            "evet veya hayır",
-            "adresinize",
-            "kayısı",
-            "teslimat adresi",
-            "geçersiz bina numarası",
-            "geçersiz daire numarası"
-        ];
-
-        if (ignoredPhrases.some(p => transcript.includes(p))) {
-            console.log("🧱 Sistem kendi sesini algıladı, yoksayıldı:", transcript);
-            return;
-        }
-
-        if (userMessage) userMessage.textContent = transcript;
-        processVoiceCommand(transcript);
-    };
-
-    recognition.onerror = function(event) {
-        console.log('⚠️ Hata (yoksayılıyor):', event.error);
-        isListening = false;
-        if (voiceIndicator) voiceIndicator.classList.remove('listening');
-    };
-
-    recognition.onend = function() {
-        isListening = false;
-        if (voiceIndicator) voiceIndicator.classList.remove('listening');
-
-        // 🔁 Daha güvenli yeniden başlatma
-        if (isMicrophoneEnabled && !isRestarting) {
-            isRestarting = true;
-            setTimeout(() => {
-                try {
-                    if (isMicrophoneEnabled && recognition && !isSpeaking) {
-                        recognition.start();
-                        console.log("🎧 Dinleme yeniden başlatıldı.");
-                    } else {
-                        console.log("⏸️ Asistan konuştuğu için yeniden başlatma ertelendi.");
-                    }
-                } catch (error) {
-                    console.log('Yeniden başlatma hatası:', error);
-                    setTimeout(() => {
-                        if (isMicrophoneEnabled) {
-                            initializeSimpleSpeechRecognition();
-                        }
-                    }, 3000);
-                } finally {
-                    isRestarting = false;
-                }
-            }, 1000);
-        }
-    };
-
-    // 🎬 Başlat
-    try {
-        recognition.start();
-        console.log("🎤 Dinleme başlatıldı.");
-    } catch (error) {
-        console.error('Başlatma hatası:', error);
-    }
-}
-
+    
         // Acil durum fallback'leri
 function setupEmergencyFallbacks() {
     // Languages tablosu yoksa
@@ -3443,18 +3358,147 @@ function setupManualMode() {
     let errorCount = 0;
     const MAX_ERROR_COUNT = 5;
     
+    function initializeSimpleSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = 'tr-TR';
+    recognition.interimResults = true; // ✅ konuşma devam ederken ara sonuçlar da gelir
+
+    let isRestarting = false;
+    let recognitionTimer;
+    const LISTEN_TIMEOUT = 5000; // 5 saniye dinleme süresi (gerektiğinde ayarlanabilir)
+
+    // 🎬 Başlangıçta dinleme başladığında
     recognition.onstart = function() {
-        console.log('✅ Dinliyorum...');
+        console.log('✅ Dinleme başladı...');
         isListening = true;
-        errorCount = 0; // Başarılı başlangıçta hata sayacını sıfırla
+        startAnimation();
+        updateRecognitionStatus('listening');
+
         if (voiceIndicator) voiceIndicator.classList.add('listening');
-        
-        // ⭐ DEĞİŞİKLİK: Bekleyen restart'ı temizle
-        if (restartTimeout) {
-            clearTimeout(restartTimeout);
-            restartTimeout = null;
+
+        // 🕒 5 saniye içinde ses gelmezse resetle
+        clearTimeout(recognitionTimer);
+        recognitionTimer = setTimeout(() => {
+            console.log("⏰ Dinleme zaman aşımı — yeniden başlatılıyor...");
+            recognition.stop();
+        }, LISTEN_TIMEOUT);
+    };
+
+    // 🎙️ Konuşma tespit edilince
+    recognition.onspeechstart = function() {
+        updateRecognitionStatus('processing');
+        console.log("🎙️ Ses algılandı, işleniyor...");
+    };
+
+    // 🎯 Tanıma sonucu geldiğinde
+    recognition.onresult = function(event) {
+        clearTimeout(recognitionTimer);
+
+        // 💡 Eğer asistan konuşuyorsa sesi yoksay
+        if (typeof isSpeaking !== 'undefined' && isSpeaking) {
+            console.log('🚫 Asistan konuşurken gelen ses yoksayıldı.');
+            return;
+        }
+
+        const transcript = event.results[0][0].transcript.trim().toLowerCase();
+        console.log('🎯 Tanınan:', transcript);
+
+        // 🧱 Sistem kendi sesini algılarsa yoksay
+        const ignoredPhrases = [
+            "bina numarasını söyleyin",
+            "daire numarasını söyleyin",
+            "adresinize teslimat",
+            "evet veya hayır",
+            "adresinize",
+            "kayısı",
+            "teslimat adresi",
+            "geçersiz bina numarası",
+            "geçersiz daire numarası"
+        ];
+        if (ignoredPhrases.some(p => transcript.includes(p))) {
+            console.log("🧱 Sistem kendi sesini algıladı, yoksayıldı:", transcript);
+            return;
+        }
+
+        // 🧾 Display alanına yaz
+        if (userMessage) userMessage.textContent = transcript;
+        displayMessage(`🗣️ Söylenen: ${transcript}`);
+
+        // Komutu işle
+        processVoiceCommand(transcript);
+    };
+
+    recognition.onerror = function(event) {
+        console.log('⚠️ Ses tanıma hatası:', event.error);
+        isListening = false;
+        if (voiceIndicator) voiceIndicator.classList.remove('listening');
+        updateRecognitionStatus('waiting');
+        stopAnimation();
+    };
+
+    recognition.onend = function() {
+        clearTimeout(recognitionTimer);
+        isListening = false;
+        if (voiceIndicator) voiceIndicator.classList.remove('listening');
+        updateRecognitionStatus('waiting');
+        stopAnimation();
+
+        // 🔁 Hızlı yeniden başlatma (0.3s)
+        if (isMicrophoneEnabled && !isRestarting) {
+            isRestarting = true;
+            setTimeout(() => {
+                try {
+                    if (isMicrophoneEnabled && recognition && !isSpeaking) {
+                        recognition.start();
+                        console.log("🎧 Dinleme yeniden başlatıldı.");
+                    } else {
+                        console.log("⏸️ Asistan konuştuğu için yeniden başlatma ertelendi.");
+                    }
+                } catch (error) {
+                    console.log('🔁 Yeniden başlatma hatası:', error);
+                    setTimeout(() => {
+                        if (isMicrophoneEnabled) {
+                            initializeSimpleSpeechRecognition();
+                        }
+                    }, 3000);
+                } finally {
+                    isRestarting = false;
+                }
+            }, 300);
         }
     };
+
+    // 🎤 Dinlemeyi başlat
+    try {
+        recognition.start();
+        console.log("🎤 Dinleme başlatıldı.");
+    } catch (error) {
+        console.error('Başlatma hatası:', error);
+    }
+}
+
+recognition.onstart = function() {
+    console.log('✅ Dinliyorum...');
+    isListening = true;
+
+    // 🎧 Görsel bildirim
+    if (voiceIndicator) voiceIndicator.classList.add('listening');
+
+    // 💡 Başlangıç animasyonu istiyorsan ekle
+    if (typeof startAnimation === 'function') startAnimation();
+
+    // 🟢 Sistem durumunu güncelle
+    if (typeof updateRecognitionStatus === 'function') {
+        updateRecognitionStatus('listening');
+    }
+};
+
+
+        
     
     recognition.onresult = function(event) {
         const transcript = event.results[0][0].transcript;
@@ -3653,6 +3697,7 @@ let lastSpokenMessage = "";
 let lastSpeakTime = 0;
 let isLocationDetected = false;   
 let isSpeaking = false;
+let recognitionTimer;
       
 
 // Konum state
@@ -9398,5 +9443,6 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
