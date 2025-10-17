@@ -3416,52 +3416,44 @@ function setupManualMode() {
 }
         
 
-// Ses tanıma başlatma fonksiyonunu güncelle
 function startRecognition() {
-    // ⭐ DEĞİŞİKLİK: Daha kapsamlı kontrol
     if (!recognition) {
         console.log('🔄 Recognition objesi yok, yeniden oluşturuluyor...');
-        if (!initializeDynamicSpeechRecognition()) {
-            return;
-        }
+        if (!initializeDynamicSpeechRecognition()) return;
     }
-    
-    // Kontroller
+
     if (!isMicrophoneEnabled) {
         console.log('⏸️ Mikrofon kapalı');
         return;
     }
-    
-    if (isAssistantSpeaking) {
+
+    if (isSpeaking) { // 🔧 DÜZELTİLDİ
         console.log('⏸️ Asistan konuşuyor, ses tanıma ertelendi');
-        // Asistan konuşması bitince yeniden dene
         setTimeout(() => {
-            if (isMicrophoneEnabled && !isAssistantSpeaking) {
+            if (isMicrophoneEnabled && !isSpeaking) { // 🔧 DÜZELTİLDİ
                 startRecognition();
             }
         }, 2000);
         return;
     }
-    
+
     if (isListening) {
         console.log('ℹ️ Zaten dinleniyor');
         return;
     }
-    
+
     try {
         console.log('🚀 Ses tanıma başlatılıyor...');
         recognition.start();
         console.log('✅ Ses tanıma başlatma komutu gönderildi');
     } catch (error) {
         console.error('❌ Ses tanıma başlatma hatası:', error);
-        
-        // "already started" hatasını yoksay
+
         if (error.toString().includes('already started')) {
             console.log('ℹ️ Ses tanıma zaten başlamış');
             return;
         }
-        
-        // ⭐ DEĞİŞİKLİK: Obje bozuksa yeniden oluştur
+
         if (error.toString().includes('not running') || error.toString().includes('invalid state')) {
             console.log('🔄 Recognition objesi bozuk, yeniden oluşturuluyor...');
             recognition = null;
@@ -3473,16 +3465,16 @@ function startRecognition() {
             }, 1000);
             return;
         }
-        
-        // Diğer hatalar için 3 saniye sonra yeniden dene
+
         setTimeout(() => {
-            if (isMicrophoneEnabled && !isListening && !isAssistantSpeaking) {
+            if (isMicrophoneEnabled && !isListening && !isSpeaking) { // 🔧 DÜZELTİLDİ
                 console.log('🔄 Hata sonrası yeniden deneme...');
                 startRecognition();
             }
         }, 3000);
     }
-}        
+}
+
  function restartRecognition() {
     console.log('🔄 Ses tanıma yeniden başlatılıyor...');
     
@@ -3560,7 +3552,8 @@ let lastRecognizedProduct = null;
 let lastSpokenMessage = "";
 let lastSpeakTime = 0;
 let isLocationDetected = false;   
-let isSpeaking = false;        
+let isSpeaking = false;
+      
 
 // Konum state
 let userLocation = {
@@ -9250,6 +9243,7 @@ async function linkCartToCustomer(customerId) {
     </script>
 </body>
 </html>
+
 
 
 
