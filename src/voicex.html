@@ -11636,24 +11636,34 @@ async function saveOrder() {
         console.log('✅ Sipariş kaydedildi:', order);
         
         // 2️⃣ SİPARİŞ DETAYLARINI KAYDET
-        if (cart.length === 0) {
-            throw new Error('Sepet boş, sipariş detayı kaydedilemedi');
-        }
-        
-        const orderDetails = cart.map(item => ({
-            order_id: order.id,
-            product_id: item.id,
-            product_name: item.name,
-            quantity: item.quantity,
-            unit_price: item.price,
-            unit_type: item.unit_type || 'adet',
-            discount: 0,
-            tax_rate: item.tax_rate || 0,
-            total_price: item.price * item.quantity
-        }));
-        
-        console.log('📦 Sipariş detayları:', orderDetails);
-        
+if (cart.length === 0) {
+    console.error('❌ Sepet boş, sipariş detayı kaydedilemedi');
+    throw new Error('Sepet boş, sipariş detayı kaydedilemedi');
+}
+
+console.log('📦 Sipariş detayları hazırlanıyor:', cart);
+
+const orderDetails = cart.map(item => {
+    // Eksik alanları kontrol et
+    if (!item.id || !item.name || !item.price) {
+        console.error('❌ Geçersiz sepet öğesi:', item);
+        throw new Error(`Geçersiz sepet öğesi: ${item.name}`);
+    }
+    
+    return {
+        order_id: order.id,
+        product_id: item.id,
+        product_name: item.name,
+        quantity: item.quantity || 1,
+        unit_price: item.price,
+        unit_type: item.unit_type || 'adet',
+        discount: item.discount || 0,
+        tax_rate: item.tax_rate || 0,
+        total_price: (item.price * (item.quantity || 1))
+    };
+});
+
+console.log('✅ Sipariş detayları hazır:', orderDetails);        
         const { error: detailsError } = await supabase
             .from('order_details')
             .insert(orderDetails);
