@@ -5224,31 +5224,7 @@ async function processVoiceCommand(transcript) {
 
     try {
         // =============================================
-        // REFERRAL KOMUTLARI - ÖNCELİKLİ
-        // =============================================
-        
-        // Referral kodu kullanma
-        if (message.includes('referans') || message.includes('tavsiye') || message.includes('ref') || message.includes('kod')) {
-            const codeMatch = message.match(/(ref|kod|referans)[:\s]*([a-zA-Z0-9]{4,8})/i);
-            if (codeMatch && codeMatch[2]) {
-                const referralCode = codeMatch[2].toUpperCase();
-                await applyReferralCode(referralCode);
-                return;
-            } else {
-                displayMessage("🎯 Referral kodunu söyleyin: 'Referans kodu ABC123' şeklinde");
-                speakToUser("Referans kodunu söyleyin");
-                return;
-            }
-        }
-        
-        // Referral linki oluşturma
-        if (message.includes('referans linki') || message.includes('tavsiye linki') || message.includes('davet linki')) {
-            await generateAndShowReferralLink();
-            return;
-        }
-        
-        // =============================================
-        // ÖDEME AKIŞI KONTROLLERİ - ÖNCELİKLİ
+        // 1. ÖNCELİK: ÖDEME SÜRECİ KONTROLLERİ (EN ÖNCELİKLİ)
         // =============================================
         
         // Telefon numarası bekleniyor
@@ -5300,7 +5276,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // ÖDEME KOMUTLARI - DOĞRUDAN ÖDEME SÜRECİ
+        // 2. ÖDEME KOMUTLARI (2. ÖNCELİK)
         // =============================================
         
         if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
@@ -5351,33 +5327,31 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // TESLİMAT KONTROL KOMUTLARI
+        // 3. REFERRAL KOMUTLARI (3. ÖNCELİK)
         // =============================================
         
-        if (message.includes('mesafe') || message.includes('uzaklık') || message.includes('kaç km')) {
-            if (selectedSellerId && userLocation.latitude) {
-                await showDeliveryDistanceInfo();
+        // Referral kodu kullanma
+        if (message.includes('referans') || message.includes('tavsiye') || message.includes('ref') || message.includes('kod')) {
+            const codeMatch = message.match(/(ref|kod|referans)[:\s]*([a-zA-Z0-9]{4,8})/i);
+            if (codeMatch && codeMatch[2]) {
+                const referralCode = codeMatch[2].toUpperCase();
+                await applyReferralCode(referralCode);
                 return;
             } else {
-                displayMessage("❌ Mesafe bilgisi için önce satıcı seçin ve konumunuzu belirleyin.");
-                speakToUser("Önce satıcı seçin");
+                displayMessage("🎯 Referral kodunu söyleyin: 'Referans kodu ABC123' şeklinde");
+                speakToUser("Referans kodunu söyleyin");
                 return;
             }
         }
         
-        if (message.includes('teslimat ücreti') || message.includes('kargo ücreti')) {
-            if (selectedSellerId) {
-                await showDeliveryFeeInfo();
-                return;
-            } else {
-                displayMessage("❌ Teslimat ücreti için önce bir satıcı seçin.");
-                speakToUser("Önce satıcı seçin");
-                return;
-            }
+        // Referral linki oluşturma
+        if (message.includes('referans linki') || message.includes('tavsiye linki') || message.includes('davet linki')) {
+            await generateAndShowReferralLink();
+            return;
         }
 
         // =============================================
-        // SEPET YÖNETİMİ KOMUTLARI
+        // 4. SEPET YÖNETİMİ KOMUTLARI (4. ÖNCELİK)
         // =============================================
         
         const clearCartCommands = [
@@ -5406,10 +5380,36 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // ALIŞVERİŞ AKIŞI KOMUTLARI
+        // 5. TESLİMAT KONTROL KOMUTLARI (5. ÖNCELİK)
+        // =============================================
+        
+        if (message.includes('mesafe') || message.includes('uzaklık') || message.includes('kaç km')) {
+            if (selectedSellerId && userLocation.latitude) {
+                await showDeliveryDistanceInfo();
+                return;
+            } else {
+                displayMessage("❌ Mesafe bilgisi için önce satıcı seçin ve konumunuzu belirleyin.");
+                speakToUser("Önce satıcı seçin");
+                return;
+            }
+        }
+        
+        if (message.includes('teslimat ücreti') || message.includes('kargo ücreti')) {
+            if (selectedSellerId) {
+                await showDeliveryFeeInfo();
+                return;
+            } else {
+                displayMessage("❌ Teslimat ücreti için önce bir satıcı seçin.");
+                speakToUser("Önce satıcı seçin");
+                return;
+            }
+        }
+
+        // =============================================
+        // 6. ALIŞVERİŞ AKIŞI KOMUTLARI (AKIŞ SIRASINA GÖRE)
         // =============================================
 
-         // MAĞAZA TİPİ SEÇİMİ
+        // MAĞAZA TİPİ SEÇİMİ - Kök 2:0 veya 2:1
         if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
             console.log('🏪 Mağaza seçim komutu algılandı');
             const success = await handleVoiceStoreSelection(filteredMessage);
@@ -5419,53 +5419,54 @@ async function processVoiceCommand(transcript) {
             }
         }      
 
-         // MAĞAZA TİPİ FİLTRELEME KOMUTLARI
-    if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
-        console.log('🏪 Mağaza tipi filtreleme komutu algılandı');
-        const success = await handleVoiceStoreSelection(filteredMessage);
-        if (success) {
-            console.log('✅ Mağaza tipi filtresi uygulandı, kök sabit:', currentRoot);
+        // MAĞAZA TİPİ FİLTRELEME KOMUTLARI
+        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
+            console.log('🏪 Mağaza tipi filtreleme komutu algılandı');
+            const success = await handleVoiceStoreSelection(filteredMessage);
+            if (success) {
+                console.log('✅ Mağaza tipi filtresi uygulandı, kök sabit:', currentRoot);
+                return;
+            }
+        }
+        
+        // TÜM SATICILARI GÖSTER KOMUTU
+        if (message.includes('tüm satıcılar') || message.includes('tüm mağazalar') || message.includes('hepsini göster')) {
+            showAllSellers();
+            speakToUser("Tüm satıcılar gösteriliyor");
             return;
         }
-    }
-    
-    // TÜM SATICILARI GÖSTER KOMUTU
-    if (message.includes('tüm satıcılar') || message.includes('tüm mağazalar') || message.includes('hepsini göster')) {
-        showAllSellers();
-        speakToUser("Tüm satıcılar gösteriliyor");
-        return;
-    }
-         // SATICI SEÇİMİ
+
+        // SATICI SEÇİMİ - Kök 2:0, 2:1 veya 3:0
         if ((currentRoot === "2:0" || currentRoot === "2:1" || currentRoot === "3:0") && hasSellerKeywords(filteredMessage)) {
             console.log('🏬 Satıcı seçim komutu algılandı');
             const success = await handleVoiceSellerSelection(filteredMessage);
             if (success) return;
         }
 
-         // SATICI DURUMU KOMUTLARI
-    if (message.includes('açık mağaza') || message.includes('açık satıcı') || message.includes('hangi mağaza açık')) {
-        await showOpenSellers();
-        return;
-    }
-    
-    if (message.includes('mağaza durumu') || message.includes('satıcı durumu')) {
-        if (selectedSellerId) {
-            await showCurrentSellerStatus();
-        } else {
-            displayMessage("❌ Önce bir satıcı seçin.");
-            speakToUser("Önce satıcı seçin");
+        // SATICI DURUMU KOMUTLARI
+        if (message.includes('açık mağaza') || message.includes('açık satıcı') || message.includes('hangi mağaza açık')) {
+            await showOpenSellers();
+            return;
         }
-        return;
-    }
+        
+        if (message.includes('mağaza durumu') || message.includes('satıcı durumu')) {
+            if (selectedSellerId) {
+                await showCurrentSellerStatus();
+            } else {
+                displayMessage("❌ Önce bir satıcı seçin.");
+                speakToUser("Önce satıcı seçin");
+            }
+            return;
+        }
 
-        // REYON SEÇİMİ - current:3 veya satıcı seçili ama kategori seçilmemiş
+        // REYON SEÇİMİ - Kök 3:0, 4:0 veya satıcı seçili ama kategori seçilmemiş
         if ((currentRoot === "3:0" || currentRoot === "4:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
             console.log('📦 Reyon seçim komutu algılandı');
             const success = await handleVoiceCategorySelection(filteredMessage);
             if (success) return;
         }
 
-        // ÜRÜN EKLEME - current:5 veya kategori seçili
+        // ÜRÜN EKLEME - Kök 5:0 veya kategori seçili
         if ((currentRoot === "5:0" || selectedCategoryId) && products.length > 0) {
             console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
             const success = await handleVoiceProductAdd(filteredMessage);
@@ -5476,7 +5477,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // NAVİGASYON KOMUTLARI
+        // 7. NAVİGASYON KOMUTLARI (7. ÖNCELİK)
         // =============================================
         
         // Geri gitme
@@ -5498,7 +5499,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // SİSTEM KOMUTLARI
+        // 8. SİSTEM KOMUTLARI (8. ÖNCELİK)
         // =============================================
         
         // Mikrofon kontrolü
@@ -5523,7 +5524,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // FALLBACK MESAJI
+        // 9. FALLBACK MESAJI (SON ÇARE)
         // =============================================
         
         console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
@@ -5540,8 +5541,8 @@ async function processVoiceCommand(transcript) {
             speakToUser("Bir hata oluştu, tekrar deneyin.");
         }
     }
-}  
-
+}
+        
 // =============================================
 // REFERAL İŞLEM FONKSİYONLARI
 // =============================================
@@ -10699,6 +10700,23 @@ let customers_full_Addrees = null;
 // ÖDEME ve SİPARİŞ TAMAMLAMA SİSTEMİ (SESLİ + TIKLAMA)
 // =============================================
 
+function checkProductCommands(command) {
+    // Eğer ödeme sürecindeysek, ürün komutlarını işleme
+    if (currentPaymentMethod) {
+        console.log('⏸️ Ödeme sürecinde, ürün komutları pasif');
+        return false;
+    }
+    
+    // Mevcut ürün ekleme mantığını buraya taşı
+    const productMatch = extractProductInfoFromCommand(command);
+    if (productMatch) {
+        addToCart(productMatch.product, productMatch.quantity, productMatch.unitType);
+        return true;
+    }
+    
+    return false;
+}
+        
 // Ödeme butonlarına event listener EKLE - HEM SESLİ HEM TIKLAMA
 // setupPaymentButtons fonksiyonunu değiştir - yeni fonksiyon
 function setupPaymentButtons() {
@@ -10968,7 +10986,31 @@ function calculateDeliveryFeeByDistance(distance, sellerId) {
 // =============================================
 // ÖDEME BUTONLARI İÇİN MANUEL İŞLEYİŞ
 // =============================================        
-function startPaymentProcess(paymentMethod) {
+function checkPaymentCommands(command) {
+    const paymentKeywords = {
+        'nakit': 'cash',
+        'kart': 'card', 
+        'bonus': 'bonus',
+        'ödeme': 'cash',
+        'öde': 'cash'
+    };
+    
+    for (const [keyword, method] of Object.entries(paymentKeywords)) {
+        if (command.includes(keyword)) {
+            console.log(`💰 Ödeme komutu algılandı: ${keyword} -> ${method}`);
+            
+            // Eğer ödeme sürecinde değilsek başlat
+            if (!currentPaymentMethod) {
+                startPaymentProcess(method);
+            }
+            return true;
+        }
+    }
+    
+    return false;
+}
+        
+        function startPaymentProcess(paymentMethod) {
     console.log(`💰 Ödeme süreci başlatılıyor: ${paymentMethod}`);
     
     if (cart.length === 0) {
@@ -11061,7 +11103,77 @@ function resetPaymentState() {
     apartmentNumber = null;
     useRegisteredAddress = false;
 }
+        
+function checkExpectedInput(command) {
+    console.log('🔍 Beklenen input kontrolü:', { 
+        command, 
+        isWaitingForAddressConfirm, 
+        isWaitingForOrderConfirm,
+        expectedInput 
+    });
+    
+    // Adres onayı bekleniyorsa
+    if (isWaitingForAddressConfirm) {
+        console.log('🏠 Adres onayı bekleniyor, komut:', command);
+        
+        if (command.includes('evet') || command === 'evet') {
+            processAddressConfirmation('evet');
+            return true;
+        } else if (command.includes('hayır') || command === 'hayır') {
+            processAddressConfirmation('hayır');
+            return true;
+        } else {
+            displayMessage("❌ Lütfen 'evet' veya 'hayır' olarak cevap verin");
+            speakToUser("evet veya hayır");
+            return true; // Yine de true dön ki ürün ekleme kısmına geçmesin
+        }
+    }
+    
+    // Sipariş onayı bekleniyorsa
+    if (isWaitingForOrderConfirm) {
+        console.log('✅ Sipariş onayı bekleniyor, komut:', command);
+        
+        if (command.includes('evet') || command === 'evet') {
+            processOrderConfirmation('evet');
+            return true;
+        } else if (command.includes('hayır') || command === 'hayır') {
+            processOrderConfirmation('hayır');
+            return true;
+        } else {
+            displayMessage("❌ Lütfen 'evet' veya 'hayır' olarak cevap verin");
+            speakToUser("evet veya hayır");
+            return true;
+        }
+    }
+    
+    // Telefon bekleniyorsa
+    if (isWaitingForPhone && expectedInput === 'phone') {
+        processPhoneNumber(command);
+        return true;
+    }
+    
+    // İsim bekleniyorsa
+    if (isWaitingForName && expectedInput === 'name') {
+        processCustomerName(command);
+        return true;
+    }
+    
+    // Bina numarası bekleniyorsa
+    if (isWaitingForBuilding && expectedInput === 'building') {
+        processBuildingInfo(command);
+        return true;
+    }
+    
+    // Daire numarası bekleniyorsa
+    if (isWaitingForApartment && expectedInput === 'apartment') {
+        processApartmentInfo(command);
+        return true;
+    }
+    
+    return false;
+}
 
+        
 function requestPhoneNumber() {
     console.log('📞 Telefon numarası isteniyor...');
     
@@ -11087,6 +11199,8 @@ function requestPhoneNumber() {
     displayMessage("📞 Lütfen telefon numaranızı söyleyin (05XX XXX XX XX formatında)");
     speakToUser("telefon numaranızı söyleyin");
 }
+
+        
 // =============================================
 // TELEFON NUMARASI İŞLEME
 // =============================================
@@ -12223,6 +12337,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
