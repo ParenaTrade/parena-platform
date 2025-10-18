@@ -9661,30 +9661,25 @@ async function loadAllSellersByLocation() {
     try {
         debugLog(`🔍 Tüm satıcılar yükleniyor (filtresiz)`);
         
-        // ÖNCE sellers tablosundan başla - daha temiz query
+        // Sadece seller_profiles tablosundan query
         let query = supabase
-            .from('sellers')
+            .from('seller_profiles')
             .select(`
                 *,
-                store_types(*),
-                seller_profiles!inner(
-                    *
-                )
+                store_types(*)
             `)
-            // .eq('is_active', true)  // sellers.is_active kontrolü
-            .eq('seller_profiles.status', true);  // seller_profiles status kontrolü
-            
+            .eq('status', true);  // seller_profiles.status kontrolü
 
-        // Konum bilgisi varsa filtrele (DOĞRU SYNTAX)
+        // Konum bilgisi varsa filtrele - DOĞRU SYNTAX
         if (userLocation.city && userLocation.district) {
             const customerCity = userLocation.city;
             const customerDistrict = userLocation.district;
             
-            // DOĞRU KULLANIM: sellers tablosundaki field'lar doğrudan kullanılır
+            // DOĞRU KULLANIM: seller_profiles tablosundaki field'lar
             query = query.or(`city.ilike.%${customerCity}%,district.ilike.%${customerDistrict}%,address.ilike.%${customerCity}%,address.ilike.%${customerDistrict}%`);
         }
 
-        // DOĞRU ORDER SYNTAX
+        // DOĞRU ORDER - artık foreign table yok
         query = query.order('business_name', { ascending: true });
 
         const { data: sellersData, error } = await query;
@@ -9699,41 +9694,31 @@ async function loadAllSellersByLocation() {
         if (sellersData && sellersData.length > 0) {
             // Çalışma saatlerini cache'le
             sellersData.forEach(seller => {
-                if (seller.id && seller.seller_profiles) {
+                if (seller.id) {
                     sellerWorkingHours.set(seller.id, {
-                        start_time: seller.seller_profiles.start_time,
-                        end_time: seller.seller_profiles.end_time,
-                        status: seller.seller_profiles.status,
+                        start_time: seller.start_time,
+                        end_time: seller.end_time,
+                        status: seller.status,
                         is_open: false
                     });
                 }
             });
 
             // Açık/kapalı durumunu HESAPLA
-            const sellersWithStatus = await calculateSellersOpenStatus(sellersData.map(seller => ({
-                ...seller.seller_profiles,
-                sellers: seller // ana seller bilgisi
-            })));
+            const sellersWithStatus = await calculateSellersOpenStatus(sellersData);
 
-            // Satıcıları formatla (YENİ YAPILANDIRMA)
-            allSellersInLocation = sellersWithStatus
-                .filter(item => item.sellers)
-                .map(item => ({
-                    ...item.sellers, // ana seller bilgileri
-                    store_type_id: item.sellers.store_types?.id,
-                    store_type_name: item.sellers.store_types?.name,
-                    working_hours: {
-                        start_time: item.start_time,
-                        end_time: item.end_time,
-                        status: item.status,
-                        is_open: item.is_open
-                    },
-                    seller_profile: { // seller_profiles bilgileri ayrıca
-                        start_time: item.start_time,
-                        end_time: item.end_time,
-                        status: item.status
-                    }
-                }));
+            // Satıcıları formatla - TEK TABLO YAPISI
+            allSellersInLocation = sellersWithStatus.map(seller => ({
+                ...seller,
+                store_type_id: seller.store_types?.id,
+                store_type_name: seller.store_types?.name,
+                working_hours: {
+                    start_time: seller.start_time,
+                    end_time: seller.end_time,
+                    status: seller.status,
+                    is_open: seller.is_open
+                }
+            }));
 
             // Teslimat bilgilerini ekle
             await addDeliveryInfoToSellers(allSellersInLocation);
@@ -9761,7 +9746,6 @@ async function loadAllSellersByLocation() {
         speakToUser("Satıcılar yüklenirken hata oluştu. Demo satıcılar gösteriliyor.");
     }
 }
-
 // =============================================
 // AÇIK/KAPALI DURUMU HESAPLAMA
 // =============================================
@@ -11655,6 +11639,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
