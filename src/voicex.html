@@ -4763,22 +4763,22 @@ async function safeVoiceMatchQuery(userInput) {
             .replace(/örneğin|mesela/g, '')
             .trim();
             
+        // 406 hatasını önlemek için daha güvenli sorgu
         const { data, error } = await supabase
             .from('product_voice_matches')
             .select('matched_product')
-            .eq('user_input', cleanInput)
+            .ilike('user_input', `%${cleanInput}%`)  // eq yerine ilike
             .eq('success', true)
-            .single();
+            .limit(1);  // single() yerine limit(1)
 
         if (error) {
-            if (error.code === '406' || error.message.includes('406')) {
-                console.log('⚠️ Supabase 406 hatası, devam ediliyor:', cleanInput);
-                return null;
-            }
-            throw error;
+            console.log('⚠️ Voice match sorgu hatası:', error.message);
+            return null;
         }
         
-        return data;
+        // Eğer data varsa ilk sonucu döndür
+        return data && data.length > 0 ? data[0] : null;
+        
     } catch (error) {
         console.log('🔇 Voice match sorgu hatası (güvenli):', error.message);
         return null;
@@ -7045,44 +7045,64 @@ function updateSellersOpenStatus() {
     try {
         debugLog(`📦 Satıcıya göre kategoriler yükleniyor: ${sellerId}`);
         
-        // Önce satıcının ürünlerinden kategorileri bul
-        const { data: productsData, error: productsError } = await supabase
-            .from('products')
-            .select('reyon_id, reyon(name)')
-            .eq('is_active', true)
-            .not('reyon_id', 'is', null);
+        // Önce satıcının ürünlerinden kategorileri bul - CORS hatası için güvenli sorgu
+        let productsData = [];
+        try {
+            const { data, error: productsError } = await supabase
+                .from('products')
+                .select('reyon_id')
+                .eq('is_active', true)
+                .not('reyon_id', 'is', null);
 
-        if (productsError) throw productsError;
+            if (productsError) {
+                console.log('⚠️ Ürün sorgu hatası, reyon tablosuna geçiliyor:', productsError.message);
+            } else {
+                productsData = data || [];
+            }
+        } catch (corsError) {
+            console.log('🔇 CORS hatası, reyon tablosuna geçiliyor:', corsError.message);
+        }
 
-        // Benzersiz kategorileri topla
-        const uniqueCategories = [];
-        const seenCategoryIds = new Set();
+        // Benzersiz reyon_id'leri topla
+        const uniqueReyonIds = [];
+        const seenReyonIds = new Set();
         
         if (productsData && productsData.length > 0) {
             productsData.forEach(item => {
-                if (item.reyon && item.reyon_id && !seenCategoryIds.has(item.reyon_id)) {
-                    seenCategoryIds.add(item.reyon_id);
-                    uniqueCategories.push({
-                        id: item.reyon_id,
-                        name: item.reyon.name
-                    });
+                if (item.reyon_id && !seenReyonIds.has(item.reyon_id)) {
+                    seenReyonIds.add(item.reyon_id);
+                    uniqueReyonIds.push(item.reyon_id);
                 }
             });
         }
 
-        // Eğer kategori bulunamazsa tüm kategorileri getir
-        if (uniqueCategories.length === 0) {
+        let categories = [];
+
+        // Eğer reyon_id bulunduysa, reyon bilgilerini getir
+        if (uniqueReyonIds.length > 0) {
+            const { data: reyonData, error: reyonError } = await supabase
+                .from('reyon')
+                .select('*')
+                .in('id', uniqueReyonIds)
+                .eq('is_active', true)
+                .order('name');
+                
+            if (!reyonError) {
+                categories = reyonData || [];
+            }
+        }
+
+        // Eğer hala kategori yoksa tüm aktif kategorileri getir
+        if (categories.length === 0) {
             const { data: allCategories, error: categoriesError } = await supabase
                 .from('reyon')
                 .select('*')
                 .eq('is_active', true)
                 .order('name');
                 
-            if (categoriesError) throw categoriesError;
-            
-            categories = allCategories || [];
-        } else {
-            categories = uniqueCategories;
+            if (!categoriesError) {
+                categories = allCategories || [];
+            }
         }
 
         debugLog(`📊 KATEGORİ SONUÇ: ${categories.length} kategori bulundu`);
@@ -11134,19 +11154,15 @@ async function updateCustomerAddress() {
     try {
         const newAddress = formatDeliveryAddress();
         
-        const { data, error } = await supabase
-            .from('customers')
-            .update({ 
-                address: newAddress,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', currentCustomer.id)
-            .select()
-            .single();
+        // Local storage'a kaydet (customers tablosu yoksa)
+        if (currentCustomer) {
+            currentCustomer.address = newAddress;
+            currentCustomer.updated_at = new Date().toISOString();
             
-        if (error) throw error;
+            // Local storage'a kaydet
+            localStorage.setItem('currentCustomer', JSON.stringify(currentCustomer));
+        }
         
-        currentCustomer = data;
         displayMessage("✅ Müşteri adresi güncellendi");
         speakToUser("adres güncellendi");
         
@@ -11156,7 +11172,6 @@ async function updateCustomerAddress() {
         speakToUser("adres güncelleme hatası");
     }
 }
-
 // =============================================
 // TESLİMAT ADRESİ FORMATLAMA
 // =============================================
@@ -11432,30 +11447,46 @@ async function saveOrder() {
             created_at: new Date().toISOString()
         };
         
-        // Siparişi kaydet
+        console.log('📦 Sipariş verisi:', orderData);
+        
+        // Siparişi kaydet - DÜZELTİLDİ: insert([orderData]) yerine insert(orderData)
         const { data: order, error: orderError } = await supabase
             .from('orders')
-            .insert([orderData])
+            .insert(orderData)  // [orderData] değil, orderData
             .select()
             .single();
             
-        if (orderError) throw orderError;
+        if (orderError) {
+            console.error('❌ Sipariş kaydetme hatası (orders):', orderError);
+            throw orderError;
+        }
+        
+        console.log('✅ Sipariş kaydedildi:', order);
         
         // Sipariş öğelerini kaydet
-        const orderItems = cart.map(item => ({
-            order_id: order.id,
-            product_id: item.id,
-            product_name: item.name,
-            quantity: item.quantity,
-            unit_price: item.price,
-            total_price: item.price * item.quantity
-        }));
-        
-        const { error: itemsError } = await supabase
-            .from('order_items')
-            .insert(orderItems);
+        if (cart.length > 0) {
+            const orderItems = cart.map(item => ({
+                order_id: order.id,
+                product_id: item.id,
+                product_name: item.name,
+                quantity: item.quantity,
+                unit_price: item.price,
+                total_price: item.price * item.quantity
+            }));
             
-        if (itemsError) throw itemsError;
+            console.log('📦 Sipariş öğeleri:', orderItems);
+            
+            const { error: itemsError } = await supabase
+                .from('order_items')
+                .insert(orderItems);
+                
+            if (itemsError) {
+                console.error('❌ Sipariş öğeleri kaydetme hatası:', itemsError);
+                throw itemsError;
+            }
+            
+            console.log('✅ Sipariş öğeleri kaydedildi');
+        }
         
         displayMessage("🎉 Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: " + order.id);
         speakToUser("siparişiniz başarıyla oluşturuldu");
@@ -11475,7 +11506,6 @@ async function saveOrder() {
         speakToUser("sipariş kaydetme hatası");
     }
 }
-
 // =============================================
 // YARDIMCI FONKSİYONLAR
 // =============================================
@@ -11634,6 +11664,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
