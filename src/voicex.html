@@ -3894,8 +3894,32 @@ function updateCartUI() {
 let isAssistantSpeaking = false;
 let speechQueue = [];
 let speechSynthesisSupported = 'speechSynthesis' in window;
+const SPEAK_COOLDOWN = 2000; // 2 saniye
+const SIMILARITY_THRESHOLD = 0.6;
 
-// ✅ REVİZE EDİLMİŞ speakToUser FONKSİYONU
+// ✅ İZİN VERİLEN SESLİ MESAJLAR
+const allowedVoiceMessages = [
+    "mağaza seçin", "satıcı seçin", "reyon seçin", "ürün seçin",
+    "hangi mağaza", "hangi satıcı", "hangi reyon", "hangi ürün",
+    "numara söyleyin", "isim söyleyin",
+    "seçildi", "eklendi", "bulundu",
+    "hata", "bulunamadı", "sepet dolu", "seçilmedi",
+    "mikrofon açıldı", "mikrofon kapandı", "hoş geldiniz",
+    "telefon numaranızı söyleyin", "telefon numarası",
+    "adınızı ve soyadınızı söyleyin", "ad soyad",
+    "bina numarasını söyleyin", "bina numarası",
+    "daire numarasını söyleyin", "daire numarası",
+    "kayıtlı adresinize teslimat", "adres", "teslimat",
+    "ödeme yöntemi seçin", "nakit", "kart", "bonus",
+    "siparişi onaylıyor musunuz", "onay",
+    "kaydınız tamamlandı", "hoş geldiniz",
+    "geçersiz telefon numarası", "geçersiz bina numarası", "geçersiz daire numarası",
+    "sistem hatası", "kayıt hatası",
+    "evet", "hayır", "onaylıyorum", "onaylamıyorum", // ✅ ÖNEMLİ: Onay komutları eklendi
+    "tamam", "devam", "ileri", "geri"
+];
+
+// ✅ SESLİ KONUŞMA SİSTEMİ
 function speakToUser(message, priority = false) {
     console.log(`🗣️ Asistan (SESLİ): ${message}`);
     
@@ -3922,39 +3946,48 @@ function speakToUser(message, priority = false) {
         return;
     }
 
-    // 4️⃣ Asistan zaten konuşuyorsa kuyruğa ekle
+    // 4️⃣ İZİN KONTROLÜ - Sadece allowedVoiceMessages'taki mesajlar sesli söylensin
+    const isAllowed = allowedVoiceMessages.some(allowedMsg =>
+        cleanMessage.toLowerCase().includes(allowedMsg.toLowerCase())
+    );
+    
+    if (!isAllowed && !priority) {
+        console.log("🔇 İzin verilmeyen mesaj türü (sadece gösterilecek):", cleanMessage);
+        return; // ❌ SESLİ SÖYLEME, sadece ekranda göster
+    }
+
+    // 5️⃣ Asistan zaten konuşuyorsa kuyruğa ekle
     if (isAssistantSpeaking) {
         console.log("⏳ Asistan konuşuyor, kuyruğa eklendi:", cleanMessage);
         if (priority) {
-            speechQueue.unshift(cleanMessage); // Öncelikli mesaj
+            speechQueue.unshift(cleanMessage);
         } else {
             speechQueue.push(cleanMessage);
         }
         return;
     }
 
-    // 5️⃣ Konuşma izin kontrolü
+    // 6️⃣ Konuşma izin kontrolü
     if (!isMicrophoneEnabled) {
         console.log("🔇 Mikrofon kapalı, sesli mesaj iptal:", cleanMessage);
         return;
     }
 
-    // 6️⃣ ÖNEMLİ: Dinlemeyi DURDURMA, sadece konuşma durumunu güncelle
+    // 7️⃣ ÖNEMLİ: Dinlemeyi DURDURMA, sadece konuşma durumunu güncelle
     isAssistantSpeaking = true;
     
     try {
         console.log("🎤 Asistan konuşuyor (dinleme aktif):", cleanMessage);
         
         const speech = new SpeechSynthesisUtterance(cleanMessage);
-        speech.lang = currentLanguage === 'tr' ? 'tr-TR' : 'en-US';
+        speech.lang = 'tr-TR';
         speech.volume = 0.7;
-        speech.rate = 0.9; // Daha yavaş ve anlaşılır
+        speech.rate = 0.9;
         speech.pitch = 1.0;
 
         // Konuşma başladığında
         speech.onstart = function() {
             console.log("✅ Asistan konuşmaya başladı");
-            // ⚠️ DİNLEMEYİ DURDURMA - sadece UI güncelle
             updateSpeakingIndicator(true);
         };
 
@@ -3976,8 +4009,6 @@ function speakToUser(message, priority = false) {
             console.error("❌ Konuşma hatası:", event.error);
             isAssistantSpeaking = false;
             updateSpeakingIndicator(false);
-            
-            // Hata durumunda bile kuyruğu işlemeye devam et
             processNextSpeech();
         };
 
@@ -3992,23 +4023,29 @@ function speakToUser(message, priority = false) {
         processNextSpeech();
     }
 }
-        
-// ✅ Kuyruktaki bir sonraki konuşmayı işle
+
 function processNextSpeech() {
     if (speechQueue.length > 0 && !isAssistantSpeaking) {
         const nextMessage = speechQueue.shift();
         console.log("📣 Kuyruktaki mesaj işleniyor:", nextMessage);
         
-        // 500ms bekle ve konuş
         setTimeout(() => {
             speakToUser(nextMessage);
         }, 500);
     }
 }
 
-// ✅ Konuşma indikatörü güncelleme
+function speakToUserForce(message) {
+    console.log("🚨 ZORLA KONUŞMA:", message);
+    
+    speechQueue = [];
+    lastSpokenMessage = "";
+    lastSpeakTime = 0;
+    
+    speakToUser(message, true);
+}
+
 function updateSpeakingIndicator(speaking) {
-    // Mevcut indikatörü bul veya oluştur
     let indicator = document.getElementById('speaking-indicator');
     
     if (!indicator) {
@@ -4044,26 +4081,13 @@ function updateSpeakingIndicator(speaking) {
     indicator.style.display = 'block';
 }
 
-// ✅ Zorla konuşma fonksiyonu (önemli mesajlar için)
-function speakToUserForce(message) {
-    console.log("🚨 ZORLA KONUŞMA:", message);
-    
-    // Kuyruğu temizle ve öncelikli konuş
-    speechQueue = [];
-    lastSpokenMessage = "";
-    lastSpeakTime = 0;
-    
-    speakToUser(message, true); // priority = true
-}
-
-// ✅ Benzerlik kontrol fonksiyonu (mevcut korunsun)
+// ✅ YARDIMCI FONKSİYONLAR
 function isSimilarMessage(newMessage, oldMessage) {
     if (!oldMessage) return false;
     
     const newWords = newMessage.toLowerCase().split(' ');
     const oldWords = oldMessage.toLowerCase().split(' ');
     
-    // Ortak kelime sayısını bul
     const commonWords = newWords.filter(word => 
         oldWords.includes(word) && word.length > 3
     );
@@ -4074,120 +4098,10 @@ function isSimilarMessage(newMessage, oldMessage) {
     
     return similarity > SIMILARITY_THRESHOLD;
 }
-
-// ✅ SES TANIMA BAŞLATMA FONKSİYONU (Revize Edilmiş)
-function restartRecognition() {
-    console.log("🔄 Ses tanıma yeniden başlatılıyor...");
-    
-    // Asistan konuşuyorsa bekle
-    if (isAssistantSpeaking) {
-        console.log("⏳ Asistan konuşuyor, dinleme başlatma ertelendi");
-        setTimeout(restartRecognition, 1000);
-        return;
-    }
-    
-    if (!isMicrophoneEnabled) {
-        console.log("🔇 Mikrofon kapalı, dinleme başlatılmıyor");
-        return;
-    }
-    
-    if (recognition && !isListening) {
-        try {
-            recognition.start();
-            console.log("✅ Dinleme başlatıldı");
-            isListening = true;
-        } catch (error) {
-            console.error("❌ Dinleme başlatma hatası:", error);
-            // Hata durumunda 2 saniye sonra tekrar dene
-            setTimeout(restartRecognition, 2000);
-        }
-    }
-}
-
-// ✅ SES TANIMA DURDURMA FONKSİYONU (Sadece Gerekli Durumlarda)
-function stopRecognition() {
-    console.log("⏸️ Ses tanıma durduruluyor...");
-    
-    if (recognition && isListening) {
-        try {
-            recognition.stop();
-            isListening = false;
-            console.log("✅ Dinleme durduruldu");
-        } catch (error) {
-            console.error("❌ Dinleme durdurma hatası:", error);
-        }
-    }
-}
-
-// ✅ MİKROFON AÇ/KAPA FONKSİYONU (Revize Edilmiş)
-function toggleMicrophone() {
-    if (isMicrophoneEnabled) {
-        // Mikrofon kapatılıyor
-        isMicrophoneEnabled = false;
-        
-        // Ses tanımayı durdur
-        if (recognition) {
-            stopRecognition();
-        }
-        
-        // Konuşmayı durdur
-        if (speechSynthesisSupported) {
-            window.speechSynthesis.cancel();
-            isAssistantSpeaking = false;
-        }
-        
-        // Kuyruğu temizle
-        speechQueue = [];
-        
-        console.log("🔇 Mikrofon kapatıldı");
-        displayMessage("🔇 Mikrofon kapatıldı");
-        
-    } else {
-        // Mikrofon açılıyor
-        isMicrophoneEnabled = true;
-        
-        // Ses tanımayı başlat
-        setTimeout(() => {
-            restartRecognition();
-        }, 500);
-        
-        console.log("🎤 Mikrofon açıldı");
-        displayMessage("🎤 Mikrofon açıldı. Konuşabilirsiniz...");
-        speakToUser("mikrofon açıldı");
-    }
-    
-    // UI güncelle
-    updateMicrophoneButton();
-}
-
-// ✅ ÖNEMLİ MESAJLAR İÇİN İZİN LİSTESİ (Korundu)
-const allowedVoiceMessages = [
-    "mağaza seçin", "satıcı seçin", "reyon seçin", "ürün seçin",
-    "hangi mağaza", "hangi satıcı", "hangi reyon", "hangi ürün",
-    "numara söyleyin", "isim söyleyin",
-    "seçildi", "eklendi", "bulundu",
-    "hata", "bulunamadı", "sepet dolu", "seçilmedi",
-    "mikrofon açıldı", "mikrofon kapandı", "hoş geldiniz",
-    "telefon numaranızı söyleyin", "telefon numarası",
-    "adınızı ve soyadınızı söyleyin", "ad soyad",
-    "bina numarasını söyleyin", "bina numarası",
-    "daire numarasını söyleyin", "daire numarası",
-    "kayıtlı adresinize teslimat", "adres", "teslimat",
-    "ödeme yöntemi seçin", "nakit", "kart", "bonus",
-    "siparişi onaylıyor musunuz", "onay",
-    "kaydınız tamamlandı", "hoş geldiniz",
-    "geçersiz telefon numarası", "geçersiz bina numarası", "geçersiz daire numarası",
-    "sistem hatası", "kayıt hatası"
-];
         
 // =============================================
 // MİKROFON ve SES TANIMA
 // =============================================
-// ✅ SES SİSTEMİ DEĞİŞKENLERİ
-
-const SPEAK_COOLDOWN = 2000; // 2 saniye
-const SIMILARITY_THRESHOLD = 0.6;
-
 // ✅ MİKROFON YÖNETİMİ
 async function enableDynamicMicrophone() {
     console.log('🎤 Mikrofon açılmak isteniyor...');
@@ -4743,25 +4657,7 @@ function initializeDynamicVoiceAssistant() {
     }, 1000);
 }
 
-// ✅ İZİN VERİLEN SESLİ MESAJLAR
-const allowedVoiceMessages = [
-    "mağaza seçin", "satıcı seçin", "reyon seçin", "ürün seçin",
-    "hangi mağaza", "hangi satıcı", "hangi reyon", "hangi ürün",
-    "numara söyleyin", "isim söyleyin",
-    "seçildi", "eklendi", "bulundu",
-    "hata", "bulunamadı", "sepet dolu", "seçilmedi",
-    "mikrofon açıldı", "mikrofon kapandı", "hoş geldiniz",
-    "telefon numaranızı söyleyin", "telefon numarası",
-    "adınızı ve soyadınızı söyleyin", "ad soyad",
-    "bina numarasını söyleyin", "bina numarası",
-    "daire numarasını söyleyin", "daire numarası",
-    "kayıtlı adresinize teslimat", "adres", "teslimat",
-    "ödeme yöntemi seçin", "nakit", "kart", "bonus",
-    "siparişi onaylıyor musunuz", "onay",
-    "kaydınız tamamlandı", "hoş geldiniz",
-    "geçersiz telefon numarası", "geçersiz bina numarası", "geçersiz daire numarası",
-    "sistem hatası", "kayıt hatası"
-];
+
 
 
         
@@ -12547,6 +12443,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
