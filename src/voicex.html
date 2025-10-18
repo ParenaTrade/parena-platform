@@ -2137,6 +2137,36 @@ const storeTypeFilterStyles = `
     transform: none;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
+
+        /* ============================================= */
+/* YENİ DURUM STİLLERİ */
+/* ============================================= */
+
+.seller-status-badge.manual-closed {
+    background: #ff6b00;
+    color: white;
+}
+
+.seller-status-message {
+    font-size: 12px;
+    color: #666;
+    margin: 3px 0;
+    font-style: italic;
+}
+
+.seller-card.seller-closed {
+    opacity: 0.6;
+    filter: grayscale(0.5);
+}
+
+.seller-card.seller-closed .seller-image {
+    filter: brightness(0.8);
+}
+
+/* Manuel kapalı durumu için özel stil */
+.seller-card .seller-status-badge.manual-closed {
+    background: linear-gradient(135deg, #ff6b00, #ff8c00);
+}
 </style>
 
 </head>
@@ -2803,20 +2833,23 @@ function displayStoreTypes(types) {
 // SATICI GRID GÜNCELLEME
 // =============================================
 
+// =============================================
+// GÜNCELLENMİŞ SELLER KARTLARI
+// =============================================
+
 function updateSellersGrid() {
     const sellerGrid = document.getElementById('sellerGrid');
     if (!sellerGrid) return;
     
     sellerGrid.innerHTML = '';
     
-    const sellersToShow = sellers; // Filtrelenmiş satıcıları göster
+    const sellersToShow = sellers;
     
     if (sellersToShow.length === 0) {
         sellerGrid.innerHTML = `
             <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
                 <i class="fas fa-store fa-3x mb-3"></i>
-                <p>${selectedStoreTypeId ? 'Bu mağaza tipinde satıcı bulunamadı' : 'Bu konumda satıcı bulunamadı'}</p>
-                ${selectedStoreTypeId ? '<button class="action-btn" onclick="showAllSellers()" style="margin-top: 10px;"><i class="fas fa-list"></i> Tüm Satıcıları Göster</button>' : ''}
+                <p>Satıcı bulunamadı</p>
             </div>
         `;
         return;
@@ -2824,37 +2857,58 @@ function updateSellersGrid() {
     
     sellersToShow.forEach((seller, index) => {
         const sellerCard = document.createElement('div');
-        sellerCard.className = `seller-card ${!seller.working_hours.is_open ? 'seller-closed' : ''}`;
+        sellerCard.className = `seller-card ${!seller.working_hours?.is_open ? 'seller-closed' : ''}`;
         sellerCard.dataset.sellerId = seller.id;
         sellerCard.dataset.sellerIndex = index + 1;
         sellerCard.dataset.storeTypeId = seller.store_type_id;
+        
+        // Kilit durumuna göre stil
+        if (isSellerLocked && seller.id !== selectedSellerId) {
+            sellerCard.style.opacity = '0.6';
+            sellerCard.style.pointerEvents = 'none';
+            sellerCard.title = 'Sepet dolu - Başka satıcı seçemezsiniz';
+        }
         
         if (selectedSellerId === seller.id) {
             sellerCard.classList.add('selected');
         }
         
-        // Açık/kapalı durumu
-        const statusBadge = seller.working_hours.is_open ? 
-            `<div class="seller-status-badge open">🟢 AÇIK</div>` :
-            `<div class="seller-status-badge closed">🔴 KAPALI</div>`;
+        // AÇIK/KAPALI DURUMU
+        const isOpen = seller.working_hours?.is_open;
+        const isManualClosed = seller.working_hours?.status === false;
         
-        // Çalışma saatleri
-        const workingHours = seller.working_hours.start_time && seller.working_hours.end_time ?
+        let statusBadge = '';
+        let statusMessage = '';
+        
+        if (isManualClosed) {
+            statusBadge = `<div class="seller-status-badge manual-closed">🚫 MANUEL KAPALI</div>`;
+            statusMessage = 'Bu mağaza geçici olarak kapalıdır';
+        } else if (isOpen) {
+            statusBadge = `<div class="seller-status-badge open">🟢 AÇIK</div>`;
+            statusMessage = 'Mağaza açık - Hemen sipariş verebilirsiniz';
+        } else {
+            statusBadge = `<div class="seller-status-badge closed">🔴 KAPALI</div>`;
+            statusMessage = 'Mağaza şu anda kapalı';
+        }
+        
+        // ÇALIŞMA SAATLERİ
+        const workingHours = seller.working_hours?.start_time && seller.working_hours?.end_time ?
             `<div class="working-hours">⏰ ${formatTimeDisplay(seller.working_hours.start_time)} - ${formatTimeDisplay(seller.working_hours.end_time)}</div>` :
-            `<div class="working-hours">⏰ Çalışma saati belirtilmemiş</div>`;
-        
-        // Manuel kapalı durumu
-        const manualClosed = seller.working_hours.status === false ?
-            `<div class="manual-closed-notice">🚫 Manuel Kapalı</div>` : '';
+            `<div class="working-hours">⏰ 7/24 Açık</div>`;
         
         // Mağaza tipi badge'i
         const storeTypeBadge = seller.store_type_name ?
             `<div class="store-type-badge">${seller.store_type_name}</div>` : '';
         
+        // Kilit ikonu
+        const lockIcon = (isSellerLocked && seller.id !== selectedSellerId) ?
+            `<div class="seller-lock-icon">🔒</div>` : '';
+        
+        // TESLİMAT BİLGİSİ
         let deliveryInfo = '';
         if (selectedLocation === 'delivery') {
             if (seller.delivery_available === false) {
-                deliveryInfo = `<div class="delivery-fee" style="color: #dc3545;"><i class="fas fa-times-circle"></i> Bu Konuma Teslimat Yok</div>`;
+                deliveryInfo = `<div class="delivery-fee" style="color: #dc3545;"><i class="fas fa-times-circle"></i> Teslimat Yok</div>`;
             } else if (seller.delivery_fee > 0) {
                 deliveryInfo = `<div class="delivery-fee"><i class="fas fa-motorcycle"></i> Teslimat: ${money(seller.delivery_fee)}</div>`;
             } else if (seller.delivery_fee === 0) {
@@ -2868,8 +2922,8 @@ function updateSellersGrid() {
         
         sellerCard.innerHTML = `
             ${statusBadge}
-            ${manualClosed}
             ${storeTypeBadge}
+            ${lockIcon}
             <div class="seller-number">${index + 1}</div>
             <img src="${seller.store_image || getDefaultSellerImage(seller)}" 
                  alt="${seller.business_name}" 
@@ -2878,6 +2932,7 @@ function updateSellersGrid() {
             <div class="seller-info">
                 <div class="seller-name">${seller.business_name}</div>
                 ${workingHours}
+                <div class="seller-status-message">${statusMessage}</div>
                 <div class="seller-details">
                     <span><i class="fas fa-map-marker-alt"></i> ${seller.district || ''}, ${seller.city || 'Şehir belirtilmemiş'}</span>
                     <span><i class="fas fa-star" style="color: gold;"></i> ${seller.rating || '4.5'}</span>
@@ -2887,23 +2942,46 @@ function updateSellersGrid() {
         `;
         
         sellerCard.addEventListener('click', () => {
-            if (!seller.working_hours.is_open) {
-                displayMessage(`❌ ${seller.business_name} şu anda kapalı. Çalışma saatleri: ${formatTimeDisplay(seller.working_hours.start_time)} - ${formatTimeDisplay(seller.working_hours.end_time)}`);
+            // Kilit kontrolü
+            if (isSellerLocked && seller.id !== selectedSellerId) {
+                const currentSeller = sellers.find(s => s.id === selectedSellerId);
+                displayMessage(`❌ Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut satıcı'} ile alışveriş yapabilirsiniz.`);
+                speakToUser("Sepet dolu, satıcı değiştiremezsiniz");
+                return;
+            }
+            
+            // MANUEL KAPALI kontrolü
+            if (seller.working_hours?.status === false) {
+                displayMessage(`❌ ${seller.business_name} geçici olarak kapalıdır.`);
+                speakToUser("Bu mağaza geçici olarak kapalı");
+                return;
+            }
+            
+            // AÇIK/KAPALI kontrolü
+            if (!seller.working_hours?.is_open) {
+                const hours = seller.working_hours?.start_time && seller.working_hours?.end_time ?
+                    `Çalışma saatleri: ${formatTimeDisplay(seller.working_hours.start_time)} - ${formatTimeDisplay(seller.working_hours.end_time)}` :
+                    '7/24 açık';
+                
+                displayMessage(`❌ ${seller.business_name} şu anda kapalı. ${hours}`);
                 speakToUser("Bu mağaza şu anda kapalı");
                 return;
             }
             
+            // Teslimat kontrolü
             if (selectedLocation === 'delivery' && seller.delivery_available === false) {
-                speakToUser("Bu satıcı konumunuza teslimat yapmıyor.");
+                displayMessage(`❌ ${seller.business_name} konumunuza teslimat yapmıyor.`);
+                speakToUser("Bu satıcı konumunuza teslimat yapmıyor");
                 return;
             }
+            
+            // TÜM KONTROLLER GEÇTİ - SATICI SEÇİLEBİLİR
             selectDynamicSeller(seller);
         });
         
         sellerGrid.appendChild(sellerCard);
     });
 }
-
  // Zaman görüntüleme formatı
 function formatTimeDisplay(timeString) {
     if (!timeString) return '--:--';
@@ -9578,9 +9656,9 @@ function getStoreTypeName(storeTypeId) {
 
 async function loadAllSellersByLocation() {
     try {
-        debugLog(`🔍 Konumdaki tüm satıcılar yükleniyor`);
+        debugLog(`🔍 Tüm satıcılar yükleniyor (filtresiz)`);
         
-        // Base query - seller_profiles ile sellers join
+        // TÜM satıcıları getir - is_active filtresi YOK
         let query = supabase
             .from('seller_profiles')
             .select(`
@@ -9590,30 +9668,28 @@ async function loadAllSellersByLocation() {
                     store_types(*)
                 )
             `)
-            .eq('sellers.is_active', true)
-            .eq('status', true);
+            // .eq('sellers.is_active', true)  // BU SATIR KALDIRILDI - TÜM SATICILAR GELSİN
+            .eq('status', true);  // seller_profiles.status kontrolü (manuel açık/kapalı)
 
-        // Konum bilgisi varsa filtrele
+        // Konum bilgisi varsa filtrele (opsiyonel)
         if (userLocation.city && userLocation.district) {
             const customerCity = userLocation.city;
             const customerDistrict = userLocation.district;
             
-            // Doğru filtreleme syntax'ı
             query = query.or(`sellers.city.ilike.%${customerCity}%,sellers.district.ilike.%${customerDistrict}%,sellers.address.ilike.%${customerCity}%,sellers.address.ilike.%${customerDistrict}%`);
         }
 
-        // Doğru sıralama syntax'ı
         const { data: sellersData, error } = await query.order('business_name', { 
             foreignTable: 'sellers',
             ascending: true 
         });
 
         if (error) {
-            console.error('❌ Supabase sorgu hatası:', error);
+            console.error('❌ Satıcılar yükleme hatası:', error);
             throw error;
         }
 
-        debugLog(`📊 Konumdaki tüm satıcılar: ${sellersData?.length || 0} adet`);
+        debugLog(`📊 Tüm satıcılar: ${sellersData?.length || 0} adet`);
 
         if (sellersData && sellersData.length > 0) {
             // Çalışma saatlerini cache'le
@@ -9622,17 +9698,18 @@ async function loadAllSellersByLocation() {
                     sellerWorkingHours.set(seller.sellers.id, {
                         start_time: seller.start_time,
                         end_time: seller.end_time,
-                        status: seller.status
+                        status: seller.status,  // manuel açık/kapalı durumu
+                        is_open: false // başlangıçta false, aşağıda hesaplanacak
                     });
                 }
             });
 
-            // Açık/kapalı durumunu kontrol et
-            const sellersWithStatus = await checkSellersOpenStatus(sellersData);
+            // Açık/kapalı durumunu HESAPLA
+            const sellersWithStatus = await calculateSellersOpenStatus(sellersData);
 
             // Satıcıları formatla
             allSellersInLocation = sellersWithStatus
-                .filter(item => item.sellers) // sellers null kontrolü
+                .filter(item => item.sellers)
                 .map(item => ({
                     ...item.sellers,
                     store_type_id: item.sellers.store_types?.id,
@@ -9640,8 +9717,8 @@ async function loadAllSellersByLocation() {
                     working_hours: {
                         start_time: item.start_time,
                         end_time: item.end_time,
-                        status: item.status,
-                        is_open: item.is_open
+                        status: item.status,  // manuel durum
+                        is_open: item.is_open // hesaplanan açık/kapalı durumu
                     }
                 }));
 
@@ -9653,13 +9730,13 @@ async function loadAllSellersByLocation() {
             // Tüm satıcıları göster
             showAllSellers();
             
-            speakToUser(`Konumunuzda ${allSellersInLocation.length} satıcı bulundu. Hangi mağaza tipini seçmek istersiniz?`);
+            speakToUser(`Sistemde ${allSellersInLocation.length} satıcı bulundu.`);
             
         } else {
-            debugLog('⚠️ Bu konumda satıcı bulunamadı');
+            debugLog('⚠️ Hiç satıcı bulunamadı');
             allSellersInLocation = [];
             showAllSellers();
-            speakToUser("Bu konumda satıcı bulunamadı. Lütfen konumunuzu değiştirin.");
+            speakToUser("Sistemde satıcı bulunamadı.");
         }
 
     } catch (error) {
@@ -9670,8 +9747,71 @@ async function loadAllSellersByLocation() {
         showAllSellers();
         speakToUser("Satıcılar yüklenirken hata oluştu. Demo satıcılar gösteriliyor.");
     }
-}
+}        
+
+
+        // =============================================
+// AÇIK/KAPALI DURUMU HESAPLAMA
+// =============================================
+
+async function calculateSellersOpenStatus(sellersData) {
+    const now = new Date();
+    const currentDay = now.getDay(); // 0: Pazar, 1: Pazartesi, ..., 6: Cumartesi
+    const currentTime = now.getHours() * 60 + now.getMinutes(); // Dakika cinsinden
+
+    return sellersData.map(seller => {
+        // MANUEL KAPALI kontrolü (seller_profiles.status = false)
+        if (seller.status === false) {
+            console.log(`🔴 ${seller.sellers.business_name} - MANUEL KAPALI`);
+            return {
+                ...seller,
+                is_open: false
+            };
+        }
+
+        // ÇALIŞMA SAATLERİ kontrolü
+        const isOpenByHours = calculateOpenByWorkingHours(seller, currentDay, currentTime);
         
+        return {
+            ...seller,
+            is_open: isOpenByHours
+        };
+    });
+}
+
+// Çalışma saatlerine göre açık/kapalı hesapla
+function calculateOpenByWorkingHours(seller, currentDay, currentTime) {
+    // Çalışma saati yoksa varsayılan olarak AÇIK
+    if (!seller.start_time || !seller.end_time) {
+        console.log(`🟡 ${seller.sellers.business_name} - Çalışma saati tanımlı değil, AÇIK kabul ediliyor`);
+        return true;
+    }
+
+    // Zaman formatını parse et
+    const startTime = parseTimeString(seller.start_time);
+    const endTime = parseTimeString(seller.end_time);
+
+    if (!startTime || !endTime) {
+        console.log(`🟡 ${seller.sellers.business_name} - Geçersiz zaman formatı, AÇIK kabul ediliyor`);
+        return true;
+    }
+
+    // Gece yarısını aşan çalışma saatleri için kontrol
+    let isOpen = false;
+    
+    if (endTime > startTime) {
+        // Normal çalışma saati (aynı gün içinde)
+        isOpen = currentTime >= startTime && currentTime <= endTime;
+    } else {
+        // Gece yarısını aşan çalışma saati
+        isOpen = currentTime >= startTime || currentTime <= endTime;
+    }
+
+    const status = isOpen ? '🟢 AÇIK' : '🔴 KAPALI';
+    console.log(`🏪 ${seller.sellers.business_name} - ${status} (${formatTime(startTime)}-${formatTime(endTime)})`);
+    
+    return isOpen;
+}
 // =============================================
 // TÜM SATICILARI GÖSTER
 // =============================================
@@ -11503,6 +11643,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
