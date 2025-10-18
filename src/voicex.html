@@ -6989,17 +6989,14 @@ async function updateAllSellersStatus() {
     try {
         const { data: sellersData, error } = await supabase
             .from('seller_profiles')
-            .select(`
-                *,
-                sellers (*)
-            `)
-            .eq('sellers.is_active', true);
+            .select('*')  // sadece seller_profiles field'ları
+            .eq('is_active', true);  // seller_profiles.is_active
 
         if (error) throw error;
 
-        // Çalışma saatlerini güncelle
+        // Çalışma saatlerini güncelle  
         sellersData.forEach(seller => {
-            sellerWorkingHours.set(seller.seller_id, {
+            sellerWorkingHours.set(seller.id, {  // seller.seller_id değil seller.id
                 start_time: seller.start_time,
                 end_time: seller.end_time,
                 status: seller.status
@@ -7015,7 +7012,6 @@ async function updateAllSellersStatus() {
         console.error('❌ Satıcı durum güncelleme hatası:', error);
     }
 }
-
 // Satıcıların açık/kapalı durumunu güncelle (cache'den)
 function updateSellersOpenStatus() {
     const now = new Date();
@@ -9705,18 +9701,18 @@ async function loadAllSellersByLocation() {
             // Açık/kapalı durumunu HESAPLA
             const sellersWithStatus = await calculateSellersOpenStatus(sellersData);
 
-            // Satıcıları formatla
+            // YENİ - DÜZELTİLMİŞ (doğrudan item kullan)
             allSellersInLocation = sellersWithStatus.map(seller => ({
-                ...seller,
-                store_type_id: seller.store_type?.id,  // store_type olarak
-                store_type_name: seller.store_type?.name,
-                working_hours: {
-                    start_time: seller.start_time,
-                    end_time: seller.end_time,
-                    status: seller.status,
-                    is_open: seller.is_open
-                }
-            }));
+            ...seller,  // doğrudan seller objesi
+            store_type_id: seller.store_type?.id || seller.store_type_id,
+            store_type_name: seller.store_type?.name,
+            working_hours: {
+                start_time: seller.start_time,
+                end_time: seller.end_time,
+                status: seller.status,
+                is_open: seller.is_open
+    }
+}));
 
             // Teslimat bilgilerini ekle
             await addDeliveryInfoToSellers(allSellersInLocation);
@@ -9743,10 +9739,12 @@ async function loadAllSellersByLocation() {
         showAllSellers();
         speakToUser("Satıcılar yüklenirken hata oluştu. Demo satıcılar gösteriliyor.");
     }
-}// =============================================
+}
+
+// =============================================
 // AÇIK/KAPALI DURUMU HESAPLAMA
 // =============================================
-
+    
 async function calculateSellersOpenStatus(sellersData) {
     const now = new Date();
     const currentDay = now.getDay(); // 0: Pazar, 1: Pazartesi, ..., 6: Cumartesi
@@ -9755,7 +9753,7 @@ async function calculateSellersOpenStatus(sellersData) {
     return sellersData.map(seller => {
         // MANUEL KAPALI kontrolü (seller_profiles.status = false)
         if (seller.status === false) {
-            console.log(`🔴 ${seller.sellers.business_name} - MANUEL KAPALI`);
+            console.log(`🔴 ${seller.business_name} - MANUEL KAPALI`);
             return {
                 ...seller,
                 is_open: false
@@ -9771,11 +9769,12 @@ async function calculateSellersOpenStatus(sellersData) {
         };
     });
 }
+
 // Çalışma saatlerine göre açık/kapalı hesapla
 function calculateOpenByWorkingHours(seller, currentDay, currentTime) {
     // Çalışma saati yoksa varsayılan olarak AÇIK
     if (!seller.start_time || !seller.end_time) {
-        console.log(`🟡 ${seller.sellers.business_name} - Çalışma saati tanımlı değil, AÇIK kabul ediliyor`);
+        console.log(`🟡 ${seller.business_name} - Çalışma saati tanımlı değil, AÇIK kabul ediliyor`);
         return true;
     }
 
@@ -9784,7 +9783,7 @@ function calculateOpenByWorkingHours(seller, currentDay, currentTime) {
     const endTime = parseTimeString(seller.end_time);
 
     if (!startTime || !endTime) {
-        console.log(`🟡 ${seller.sellers.business_name} - Geçersiz zaman formatı, AÇIK kabul ediliyor`);
+        console.log(`🟡 ${seller.business_name} - Geçersiz zaman formatı, AÇIK kabul ediliyor`);
         return true;
     }
 
@@ -9800,11 +9799,10 @@ function calculateOpenByWorkingHours(seller, currentDay, currentTime) {
     }
 
     const status = isOpen ? '🟢 AÇIK' : '🔴 KAPALI';
-    console.log(`🏪 ${seller.sellers.business_name} - ${status} (${formatTime(startTime)}-${formatTime(endTime)})`);
+    console.log(`🏪 ${seller.business_name} - ${status} (${formatTime(startTime)}-${formatTime(endTime)})`);
     
     return isOpen;
 }
-
 // =============================================
 // TÜM SATICILARI GÖSTER
 // =============================================
