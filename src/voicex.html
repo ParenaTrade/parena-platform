@@ -5109,7 +5109,25 @@ async function processVoiceCommand(transcript) {
 
     try {
         // =============================================
-        // 1. ÖNCELİK: ÖDEME SÜRECİ KONTROLLERİ (EN ÖNCELİKLİ)
+        // 0. ÖZEL: EVET/HAYIR KONTROLÜ (EN ÖNCELİKLİ)
+        // =============================================
+        
+        // Adres onayı bekleniyorsa
+        if (isWaitingForAddressConfirm && (message === 'evet' || message === 'hayır')) {
+            console.log('🏠 Adres onayı için evet/hayır algılandı');
+            await processAddressConfirmation(message);
+            return;
+        }
+        
+        // Sipariş onayı bekleniyorsa
+        if (isWaitingForOrderConfirm && (message === 'evet' || message === 'hayır')) {
+            console.log('✅ Sipariş onayı için evet/hayır algılandı');
+            await processOrderConfirmation(message);
+            return;
+        }
+
+        // =============================================
+        // 1. ÖNCELİK: ÖDEME SÜRECİ KONTROLLERİ
         // =============================================
         
         // Telefon numarası bekleniyor
@@ -5136,12 +5154,6 @@ async function processVoiceCommand(transcript) {
             return;
         }
         
-        // Adres onayı bekleniyor
-        if (isWaitingForAddressConfirm && expectedInput === 'address_confirm') {
-            await processAddressConfirmation(message);
-            return;
-        }
-        
         // Yeni bina numarası bekleniyor
         if (isWaitingForNewBuilding && expectedInput === 'new_building') {
             await processNewBuildingInfo(message);
@@ -5153,15 +5165,9 @@ async function processVoiceCommand(transcript) {
             await processNewApartmentInfo(message);
             return;
         }
-        
-        // Sipariş onayı bekleniyor
-        if (isWaitingForOrderConfirm && expectedInput === 'order_confirm') {
-            await processOrderConfirmation(message);
-            return;
-        }
 
         // =============================================
-        // 2. ÖDEME KOMUTLARI (2. ÖNCELİK)
+        // 2. ÖDEME KOMUTLARI
         // =============================================
         
         if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
@@ -5211,7 +5217,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // 3. REFERRAL KOMUTLARI (3. ÖNCELİK)
+        // 3. REFERRAL KOMUTLARI
         // =============================================
         
         // Referral kodu kullanma
@@ -5235,7 +5241,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // 4. SEPET YÖNETİMİ KOMUTLARI (4. ÖNCELİK)
+        // 4. SEPET YÖNETİMİ KOMUTLARI
         // =============================================
         
         const clearCartCommands = [
@@ -5264,7 +5270,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // 5. TESLİMAT KONTROL KOMUTLARI (5. ÖNCELİK)
+        // 5. TESLİMAT KONTROL KOMUTLARI
         // =============================================
         
         if (message.includes('mesafe') || message.includes('uzaklık') || message.includes('kaç km')) {
@@ -5290,7 +5296,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // 6. ALIŞVERİŞ AKIŞI KOMUTLARI (AKIŞ SIRASINA GÖRE)
+        // 6. ALIŞVERİŞ AKIŞI KOMUTLARI
         // =============================================
 
         // MAĞAZA TİPİ SEÇİMİ - Kök 2:0 veya 2:1
@@ -5343,6 +5349,15 @@ async function processVoiceCommand(transcript) {
         // ÜRÜN EKLEME - Kök 5:0 veya kategori seçili
         if ((currentRoot === "5:0" || selectedCategoryId) && products.length > 0) {
             console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
+            
+            // "evet" ve "hayır" ürün olarak algılanmasın
+            if (message === 'evet' || message === 'hayır') {
+                console.log('🚫 "evet/hayır" ürün olarak algılanmadı');
+                displayMessage("❌ Lütfen ürün ismi söyleyin");
+                speakToUser("Ürün ismi söyleyin");
+                return;
+            }
+            
             const success = await handleVoiceProductAdd(filteredMessage);
             if (success) {
                 console.log('✅ Ürün başarıyla eklendi');
@@ -5351,7 +5366,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // 7. NAVİGASYON KOMUTLARI (7. ÖNCELİK)
+        // 7. NAVİGASYON KOMUTLARI
         // =============================================
         
         // Geri gitme
@@ -5373,7 +5388,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // 8. SİSTEM KOMUTLARI (8. ÖNCELİK)
+        // 8. SİSTEM KOMUTLARI
         // =============================================
         
         // Mikrofon kontrolü
@@ -12210,6 +12225,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
