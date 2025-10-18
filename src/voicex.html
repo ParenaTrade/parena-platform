@@ -8535,6 +8535,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 3000);
 });       
+
+
 function extractProductInfoFromCommand(message) {
     console.log('🎧 extractProductInfoFromCommand çağrıldı:', message);
 
@@ -8550,20 +8552,88 @@ function extractProductInfoFromCommand(message) {
 
     console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
 
-    // "numara" ifadesi geçmiyorsa sesli bildirim için null döndür
-    if (!cleanMessage.includes('numara')) {
-        console.log('❌ "numara" ifadesi bulunamadı');
-        // Sesli bildirim: "Lütfen geçerli ürün ekleme komutu söyleyiniz!!!"
-        // Display: "Örneğin: '1 numara 5 kilo' şeklinde kullanınız!!!"
-        return null;
-    }
+    // ✅ DEĞİŞİKLİK: "numara" kontrolünü KALDIR - TÜM KOMUTLARI İŞLE
+    console.log('🔍 Tüm komut pattern kontrolü başlıyor...');
 
     let quantity = 1;
     let unit = 'adet';
     let productName = '';
 
-    console.log('🔍 Pattern kontrolü başlıyor...');
+    // 1. ÖNCE NORMAL ÜRÜN KOMUTLARI (EN ÖNCELİKLİ)
+    
+    // "1 kilo domates" pattern'i
+    const normalKiloMatch = cleanMessage.match(/(\d+[,.]?\d*)\s*kilo\s+(.+)/);
+    if (normalKiloMatch) {
+        quantity = parseFloat(normalKiloMatch[1].replace(',', '.'));
+        productName = normalKiloMatch[2].trim();
+        unit = 'kg';
+        console.log(`✅ Normal kilo pattern eşleşti: ${quantity} ${unit} ${productName}`);
+        return { productName, quantity, unit };
+    }
 
+    // "2 paket süt" pattern'i  
+    const normalPaketMatch = cleanMessage.match(/(\d+)\s*paket\s+(.+)/);
+    if (normalPaketMatch) {
+        quantity = parseInt(normalPaketMatch[1]);
+        productName = normalPaketMatch[2].trim();
+        unit = 'paket';
+        console.log(`✅ Normal paket pattern eşleşti: ${quantity} ${unit} ${productName}`);
+        return { productName, quantity, unit };
+    }
+
+    // "3 adet ekmek" pattern'i
+    const normalAdetMatch = cleanMessage.match(/(\d+)\s*(adet|tane)\s+(.+)/);
+    if (normalAdetMatch) {
+        quantity = parseInt(normalAdetMatch[1]);
+        productName = normalAdetMatch[3].trim();
+        unit = 'adet';
+        console.log(`✅ Normal adet pattern eşleşti: ${quantity} ${unit} ${productName}`);
+        return { productName, quantity, unit };
+    }
+
+    // "yarım kilo peynir" pattern'i
+    const yarimKiloMatch = cleanMessage.match(/(yarım|çeyrek)\s*kilo\s+(.+)/);
+    if (yarimKiloMatch) {
+        quantity = yarimKiloMatch[1] === 'yarım' ? 0.5 : 0.25;
+        productName = yarimKiloMatch[2].trim();
+        unit = 'kg';
+        console.log(`✅ Yarım kilo pattern eşleşti: ${quantity} ${unit} ${productName}`);
+        return { productName, quantity, unit };
+    }
+
+    // "bir kilo soğan" pattern'i
+    const yaziliKiloMatch = cleanMessage.match(/(bir|iki|üç|dört|beş)\s*kilo\s+(.+)/);
+    if (yaziliKiloMatch) {
+        const sayilar = { 'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5 };
+        quantity = sayilar[yaziliKiloMatch[1]] || 1;
+        productName = yaziliKiloMatch[2].trim();
+        unit = 'kg';
+        console.log(`✅ Yazılı kilo pattern eşleşti: ${quantity} ${unit} ${productName}`);
+        return { productName, quantity, unit };
+    }
+
+    // Sadece ürün adı "domates"
+    const sadeceUrunMatch = cleanMessage.match(/^([a-zA-ZğüşıöçĞÜŞİÖÇ\s]+)$/);
+    if (sadeceUrunMatch) {
+        productName = sadeceUrunMatch[1].trim();
+        console.log(`✅ Sadece ürün pattern eşleşti: ${quantity} ${unit} ${productName}`);
+        return { productName, quantity, unit };
+    }
+
+    // 2. SONRA NUMARA PATTERNLERİ (MEVCUT KODUNUZ)
+    
+    // "1 numara 5 kilo" pattern'i - MEVCUT
+    const numaraKiloMatch = cleanMessage.match(/(\d+)\s*numara\s*(\d+[,.]?\d*)\s*kilo/);
+    if (numaraKiloMatch) {
+        const targetNumber = parseInt(numaraKiloMatch[1]);
+        quantity = parseFloat(numaraKiloMatch[2].replace(',', '.'));
+        productName = targetNumber + ' numara';
+        unit = 'kg';
+        console.log(`✅ Numara-kilo pattern eşleşti: ${quantity} ${unit} ${productName}`);
+        return { productName, quantity, unit };
+    }
+
+   
     // 1. ÖNCE "numara kilo" PATTERN'İ - EN ÖNCELİKLİ
     const numaraKiloMatch = cleanMessage.match(/(\d+)\s*numara\s*(\d+[,.]?\d*)\s*kilo/);
     if (numaraKiloMatch) {
@@ -8653,9 +8723,10 @@ function extractProductInfoFromCommand(message) {
     }
 
     // Hiçbir pattern eşleşmezse
-    console.log('❌ Hiçbir numara patterni eşleşmedi');
+    console.log('❌ Hiçbir pattern eşleşmedi');
     return null;
 }
+        
 
         
 // Hemen kullanabileceğiniz basit versiyon
@@ -12225,6 +12296,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
