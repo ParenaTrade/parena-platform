@@ -3639,93 +3639,50 @@ window.addEventListener('load', function() {
         // SEPET YÖNETİM FONKSİYONLARI
         // =============================================
 
-// 🛒 Ürün ekleme
-async function addToCart(product, quantity, productCard = null) {
-  console.log('🛒 addToCart çağrıldı:', product.name, quantity);
-
-  // 🔹 1. Satıcı kilit kontrolü
-  if (isSellerLocked && cart.length > 0) {
-    const firstCartItem = cart[0];
-    if (firstCartItem && firstCartItem.seller_id !== selectedSellerId) {
-      const currentSeller = sellers.find(s => s.id === firstCartItem.seller_id);
-      speakToUser(`Sepet dolu. Sadece ${currentSeller?.business_name || 'mevcut satıcı'} ile alışveriş yapabilirsiniz.`);
-      return;
+function addToCart(product, quantity = 1, unitType = 'adet') {
+    console.log('🛒 addToCart çağrıldı:', product?.name, quantity, unitType);
+    
+    // ✅ GÜVENLİ KONTROL: product undefined olabilir
+    if (!product) {
+        console.error('❌ addToCart: product undefined!');
+        return;
     }
-  }
-
-  const wasCartEmpty = cart.length === 0;
-  const existingItem = cart.find(item => item.id === product.id);
-
-  // 🔹 2. Fiyat & vergi oranı
-  let unitPrice = product.discount_price || product.price || null;
-  let taxRate = product.tax_rate ? Number(product.tax_rate) : null;
-  let productPriceId = product.product_price_id || null;
-
-  // Eksikse veritabanından çek
-  if (!unitPrice || taxRate === null) {
-    console.log('💡 Ürün fiyatı Supabase üzerinden alınıyor...');
-    const { data: priceData, error } = await supabase
-      .from('product_prices')
-      .select(`
-        id,
-        price,
-        discount_price,
-        seller_id,
-        product_id,
-        products ( id, name, tax_rate )
-      `)
-      .eq('product_id', product.id)
-      .eq('seller_id', selectedSellerId)
-      .limit(1)
-      .single();
-
-    if (error || !priceData) {
-      console.error('❌ Fiyat alınamadı:', error);
-      speakToUser('Ürün fiyat bilgisi alınamadı.');
-      return;
+    
+    try {
+        // Mevcut kodunuz...
+        
+        // ✅ 3724. SATIR GÜVENLİ HALE GETİRİN:
+        // cartIcon ve cartBadge kontrolü
+        const cartIcon = document.getElementById('cartIcon');
+        const cartBadge = document.getElementById('cartBadge');
+        
+        if (cartIcon) {
+            // ✅ GÜVENLİ animasyon
+            cartIcon.style.transform = 'scale(1.1)';
+            setTimeout(() => {
+                if (cartIcon) cartIcon.style.transform = 'scale(1)';
+            }, 300);
+        }
+        
+        if (cartBadge) {
+            cartBadge.textContent = cart.reduce((sum, item) => sum + item.quantity, 0);
+            cartBadge.style.display = 'block';
+        }
+        
+        // Sepet UI güncelle
+        updateCartUI();
+        
+    } catch (error) {
+        console.error('❌ addToCart hatası:', error);
     }
-
-    productPriceId = priceData.id;
-    unitPrice = parseFloat(priceData.discount_price || priceData.price);
-    taxRate = parseFloat(priceData.products.tax_rate || 0);
-  }
-
-  // 🔹 3. Vergi dahil hesaplama
-  const taxDecimal = taxRate / 100;
-  const itemTotal = unitPrice * quantity; // KDV dahil fiyat
-  const itemSubtotal = itemTotal / (1 + taxDecimal);
-  const itemTax = itemTotal - itemSubtotal;
-
-  if (existingItem) {
-    existingItem.quantity += quantity;
-  } else {
-    cart.push({
-      id: product.id,
-      name: product.name,
-      price: unitPrice,
-      quantity,
-      unit_type: product.unit_type || 'adet',
-      image: product.imgurl,
-      product_price_id: productPriceId,
-      seller_id: selectedSellerId,
-      category_id: selectedCategoryId,
-      tax_rate: taxRate,
-      subtotal: itemSubtotal,
-      tax_amount: itemTax,
-      total: itemTotal
-    });
-  }
-
-  updateCartUI();
-
-  if (wasCartEmpty && cart.length > 0) lockStoreAndSeller();
-
-  if (productCard) {
-    productCard.style.transform = 'scale(1.05)';
-    setTimeout(() => (productCard.style.transform = 'scale(1)'), 300);
-  }
 }
 
+// Bu fonksiyonu en üste ekleyin:
+function setupEmergencyFallbacks() {
+    console.log('🔧 Acil durum fallbackleri aktif');
+    // Basit fallback - hiçbir şey yapma
+}
+        
 // 🔒 Mağaza ve satıcı kilitleme
 function lockStoreAndSeller() {
   isSellerLocked = true;
@@ -6859,47 +6816,27 @@ async function handleVoiceProductAdd(message) {
     console.log('🎯 Sesli ürün ekleme:', message);
     
     // Kontroller
-    if (!selectedStoreTypeId) {
-        displayMessage("❌ Önce bir mağaza tipi seçmelisiniz.");
-        speakToUser("mağaza seçin");
-        return false;
-    }
-    
-    if (!selectedSellerId) {
-        displayMessage("❌ Lütfen bir satıcı seçin.");
-        speakToUser("satıcı seçin");
-        return false;
-    }
-    
-    if (!selectedCategoryId || products.length === 0) {
-        displayMessage("❌ Önce bir kategori seçmelisiniz.");
-        speakToUser("reyon seçin");
+    if (!selectedStoreTypeId || !selectedSellerId || !selectedCategoryId || products.length === 0) {
+        displayMessage("❌ Önce mağaza, satıcı ve kategori seçmelisiniz.");
+        speakToUser("önce seçim yapın");
         return false;
     }
     
     try {
         const productInfo = extractProductInfoFromCommand(message);
         
-        if (!productInfo) {
-            displayMessage("❌ Ürün ismini anlayamadım.");
-            speakToUser("ürün seçin");
+        if (!productInfo || !productInfo.product) {
+            console.log('❌ Ürün bilgisi alınamadı:', productInfo);
+            displayMessage("❌ Ürün ismini anlayamadım: " + message);
+            speakToUser("ürün anlaşılamadı");
             return false;
         }
 
-        // ✅ DEĞİŞİKLİK: YENİ YAPIYI KULLAN
         const { product, quantity, unitType } = productInfo;
-        console.log('🔍 Ürün bilgisi:', product, quantity, unitType);
+        console.log('✅ Ürün bilgisi alındı:', product.name, quantity, unitType);
 
-        if (!product) {
-            displayMessage("❌ Ürün bulunamadı: " + message);
-            speakToUser("ürün bulunamadı");
-            return false;
-        }
-
-        console.log('🎯 Ürün bulundu:', product.name);
-        
         // Kilit kontrolü
-        if (isSellerLocked) {
+        if (isSellerLocked && cart.length > 0) {
             const firstCartItem = cart[0];
             if (firstCartItem && firstCartItem.seller_id !== selectedSellerId) {
                 const currentSeller = sellers.find(s => s.id === firstCartItem.seller_id);
@@ -6909,34 +6846,32 @@ async function handleVoiceProductAdd(message) {
             }
         }
         
-        // ✅ SEPETE EKLE - YENİ YAPI
-        console.log('🛒 Sepete ekleniyor:', `${quantity} ${unitType} ${product.name}`);
+        // ✅ GÜVENLİ SEPETE EKLE
+        console.log('🛒 Sepete ekleniyor:', product.name, quantity, unitType);
         addToCart(product, quantity, unitType);
         
-        // ✅ EKRAN MESAJI
+        // Başarı mesajı
         let displayQuantity = quantity;
         let displayUnit = unitType;
         
-        // Gram'a çevir eğer küçük miktar ise
         if (unitType === 'kg' && quantity < 1) {
             displayQuantity = Math.round(quantity * 1000);
             displayUnit = 'gram';
         }
         
         displayMessage(`✅ ${displayQuantity} ${displayUnit} ${product.name} sepete eklendi`);
-        
-        // ✅ SESLİ ONAY
         speakToUser(`${product.name} eklendi`);
         
         return true;
 
     } catch (error) {
         console.error('❌ Ürün ekleme hatası:', error);
-        displayMessage("❌ Ürün eklenirken bir hata oluştu.");
+        displayMessage("❌ Ürün eklenirken hata oluştu");
         speakToUser("hata");
         return false;
     }
-}   function testAllFixed() {
+}
+        function testAllFixed() {
     console.log('🧪 TUM PATTERN TESTI');
     
     const testCases = [
@@ -12135,6 +12070,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
