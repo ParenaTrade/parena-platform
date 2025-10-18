@@ -2922,7 +2922,8 @@ function formatTimeDisplay(timeString) {
 async function addDeliveryInfoToSellers(sellersList) {
     console.log('🚚 Teslimat bilgileri ekleniyor...');
     
-    for (const seller of sellersList) {
+    // Paralel işlem için Promise.all kullan
+    const promises = sellersList.map(async (seller) => {
         try {
             // Teslimat bölgesi kontrolü
             if (selectedLocation === 'delivery' && userLocation.latitude && userLocation.longitude) {
@@ -2944,16 +2945,62 @@ async function addDeliveryInfoToSellers(sellersList) {
                 seller.delivery_available = seller.delivery_available !== false;
                 seller.delivery_fee = seller.delivery_fee || 0;
             }
+            
+            return seller;
         } catch (error) {
             console.error(`❌ ${seller.business_name} teslimat bilgisi hatası:`, error);
+            // Hata durumunda varsayılan değerler
             seller.delivery_available = true;
             seller.delivery_fee = seller.delivery_fee || 5;
+            return seller;
         }
-    }
+    });
     
-    console.log('✅ Teslimat bilgileri eklendi');
-}
+    try {
+        await Promise.all(promises);
+        console.log('✅ Teslimat bilgileri eklendi');
+    } catch (error) {
+        console.error('❌ Teslimat bilgileri ekleme hatası:', error);
+    }
+}      
+
+
+   // =============================================
+// SUPABASE SORGULARI İÇİN GÜVENLİ FONKSİYON
+// =============================================
+
+async function safeSupabaseQuery(queryFunction, fallbackData = []) {
+    try {
+        const { data, error } = await queryFunction;
         
+        if (error) {
+            console.error('❌ Supabase sorgu hatası:', error);
+            throw error;
+        }
+        
+        return data || fallbackData;
+    } catch (error) {
+        console.error('❌ Sorgu hatası:', error);
+        return fallbackData;
+    }
+}
+
+// Güvenli sıralama için yardımcı fonksiyon
+function safeOrder(query, column, direction = 'asc', foreignTable = null) {
+    try {
+        if (foreignTable) {
+            return query.order(column, { 
+                foreignTable: foreignTable,
+                ascending: direction === 'asc' 
+            });
+        } else {
+            return query.order(column, { ascending: direction === 'asc' });
+        }
+    } catch (error) {
+        console.error('❌ Sıralama hatası:', error);
+        return query;
+    }
+}     
         // Kategorileri göster
         function displayCategories(categoriesToShow) {
     const categoriesGrid = document.getElementById('categoriesGrid');
@@ -9525,18 +9572,22 @@ function getStoreTypeName(storeTypeId) {
     return storeType ? storeType.name : 'Seçilen';
 }
         
-// Tüm satıcıları konuma göre yükle
+// =============================================
+// TÜM SATICILARI KONUMA GÖRE YÜKLE - DÜZELTİLMİŞ
+// =============================================
+
 async function loadAllSellersByLocation() {
     try {
         debugLog(`🔍 Konumdaki tüm satıcılar yükleniyor`);
         
-        // Seller_profiles tablosundan çalışma saatleri ile birlikte satıcıları getir
+        // Base query - seller_profiles ile sellers join
         let query = supabase
             .from('seller_profiles')
             .select(`
                 *,
-                sellers (*,
-                    store_types (*)
+                sellers!inner(
+                    *,
+                    store_types(*)
                 )
             `)
             .eq('sellers.is_active', true)
@@ -9547,40 +9598,52 @@ async function loadAllSellersByLocation() {
             const customerCity = userLocation.city;
             const customerDistrict = userLocation.district;
             
+            // Doğru filtreleme syntax'ı
             query = query.or(`sellers.city.ilike.%${customerCity}%,sellers.district.ilike.%${customerDistrict}%,sellers.address.ilike.%${customerCity}%,sellers.address.ilike.%${customerDistrict}%`);
         }
 
-        const { data: sellersData, error } = await query.order('sellers.business_name');
+        // Doğru sıralama syntax'ı
+        const { data: sellersData, error } = await query.order('business_name', { 
+            foreignTable: 'sellers',
+            ascending: true 
+        });
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Supabase sorgu hatası:', error);
+            throw error;
+        }
 
         debugLog(`📊 Konumdaki tüm satıcılar: ${sellersData?.length || 0} adet`);
 
         if (sellersData && sellersData.length > 0) {
             // Çalışma saatlerini cache'le
             sellersData.forEach(seller => {
-                sellerWorkingHours.set(seller.seller_id, {
-                    start_time: seller.start_time,
-                    end_time: seller.end_time,
-                    status: seller.status
-                });
+                if (seller.sellers && seller.sellers.id) {
+                    sellerWorkingHours.set(seller.sellers.id, {
+                        start_time: seller.start_time,
+                        end_time: seller.end_time,
+                        status: seller.status
+                    });
+                }
             });
 
             // Açık/kapalı durumunu kontrol et
             const sellersWithStatus = await checkSellersOpenStatus(sellersData);
 
             // Satıcıları formatla
-            allSellersInLocation = sellersWithStatus.map(item => ({
-                ...item.sellers,
-                store_type_id: item.sellers.store_types?.id,
-                store_type_name: item.sellers.store_types?.name,
-                working_hours: {
-                    start_time: item.start_time,
-                    end_time: item.end_time,
-                    status: item.status,
-                    is_open: item.is_open
-                }
-            }));
+            allSellersInLocation = sellersWithStatus
+                .filter(item => item.sellers) // sellers null kontrolü
+                .map(item => ({
+                    ...item.sellers,
+                    store_type_id: item.sellers.store_types?.id,
+                    store_type_name: item.sellers.store_types?.name,
+                    working_hours: {
+                        start_time: item.start_time,
+                        end_time: item.end_time,
+                        status: item.status,
+                        is_open: item.is_open
+                    }
+                }));
 
             // Teslimat bilgilerini ekle
             await addDeliveryInfoToSellers(allSellersInLocation);
@@ -9601,6 +9664,8 @@ async function loadAllSellersByLocation() {
 
     } catch (error) {
         console.error('❌ Tüm satıcılar yükleme hatası:', error);
+        
+        // Fallback: Demo satıcılar
         allSellersInLocation = getDemoSellers();
         showAllSellers();
         speakToUser("Satıcılar yüklenirken hata oluştu. Demo satıcılar gösteriliyor.");
@@ -9702,19 +9767,24 @@ async function addDeliveryInfoToSellers(sellers) {
     }
 }
 
-// Demo satıcılar (fallback)
+// =============================================
+// DEMO SATICILAR (FALLBACK)
+// =============================================
+
 function getDemoSellers() {
     return [
         {
-            id: 1,
+            id: "demo-1",
             business_name: "Demo Market",
-            city: "İstanbul",
-            district: "Kadıköy",
+            city: "Batum",
+            district: "Merkez",
             store_image: null,
             delivery_available: true,
             delivery_fee: 5,
             min_order_amount: 20,
             rating: 4.5,
+            store_type_id: 1,
+            store_type_name: "Market",
             working_hours: {
                 start_time: "08:00",
                 end_time: "22:00",
@@ -9723,15 +9793,17 @@ function getDemoSellers() {
             }
         },
         {
-            id: 2,
+            id: "demo-2",
             business_name: "Demo Restoran",
-            city: "İstanbul",
-            district: "Beşiktaş",
+            city: "Batum", 
+            district: "Sahil",
             store_image: null,
             delivery_available: true,
             delivery_fee: 8,
             min_order_amount: 25,
             rating: 4.2,
+            store_type_id: 2,
+            store_type_name: "Restoran",
             working_hours: {
                 start_time: "10:00",
                 end_time: "23:00",
@@ -9741,7 +9813,7 @@ function getDemoSellers() {
         }
     ];
 }
-// Reyonaları yükle
+        // Reyonaları yükle
 async function loadReyonsBySeller(sellerId) {
     try {
         debugLog(`📦 Satıcıya göre reyonlar yükleniyor: ${sellerId}`);
@@ -10208,40 +10280,58 @@ async function checkDeliveryArea(sellerId, userLat, userLon) {
     console.log(`🏪 Teslimat bölgesi kontrolü: Satıcı ${sellerId}`);
     
     try {
+        // UUID formatını kontrol et ve düzelt
+        let validSellerId = sellerId;
+        
+        // Eğer sellerId string değilse veya UUID formatında değilse
+        if (typeof sellerId !== 'string' || !sellerId.includes('-')) {
+            console.log('⚠️ Seller ID UUID formatında değil, stringe çevriliyor:', sellerId);
+            validSellerId = sellerId.toString();
+        }
+        
         // Satıcının teslimat bölgelerini getir
         const { data: deliveryAreas, error } = await supabase
             .from('seller_delivery_areas')
             .select('*')
-            .eq('seller_id', sellerId)
+            .eq('seller_id', validSellerId)
             .eq('is_active', true);
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Teslimat bölgeleri sorgu hatası:', error);
+            // Hata durumunda devam et
+        }
 
         // Satıcı bilgilerini getir
         const { data: seller, error: sellerError } = await supabase
             .from('sellers')
             .select('latitude, longitude, max_delivery_distance')
-            .eq('id', sellerId)
+            .eq('id', validSellerId)
             .single();
 
-        if (sellerError) throw sellerError;
+        if (sellerError) {
+            console.error('❌ Satıcı bilgisi sorgu hatası:', sellerError);
+            // Hata durumunda varsayılan değerlerle devam et
+        }
 
         // 1. Özel teslimat bölgeleri kontrolü
         if (deliveryAreas && deliveryAreas.length > 0) {
             for (const area of deliveryAreas) {
+                // Eğer bölge koordinatları yoksa atla
+                if (!area.latitude || !area.longitude) continue;
+                
                 const distance = calculateDistance(
                     area.latitude, area.longitude,
                     userLat, userLon
                 );
                 
-                if (distance <= area.radius_km) {
-                    console.log(`✅ Teslimat bölgesi içinde: ${area.area_name}`);
+                if (distance <= (area.radius_km || 10)) {
+                    console.log(`✅ Teslimat bölgesi içinde: ${area.area_name || 'Bilinmeyen Bölge'}`);
                     return {
                         allowed: true,
                         distance: distance,
                         areaName: area.area_name,
                         deliveryFee: area.delivery_fee || 0,
-                        message: `${area.area_name} bölgesi - Teslimat ücreti: ${money(area.delivery_fee || 0)}`
+                        message: `${area.area_name || 'Bölge'} - Teslimat ücreti: ${money(area.delivery_fee || 0)}`
                     };
                 }
             }
@@ -10267,7 +10357,7 @@ async function checkDeliveryArea(sellerId, userLat, userLon) {
                 console.log(`✅ Teslimat mesafesi uygun: ${distance.toFixed(2)}/${maxDistance}km`);
                 
                 // Mesafe bazlı teslimat ücreti hesapla
-                const deliveryFee = calculateDeliveryFeeByDistance(distance, sellerId);
+                const deliveryFee = calculateDeliveryFeeByDistance(distance, validSellerId);
                 
                 return {
                     allowed: true,
@@ -10305,7 +10395,6 @@ async function checkDeliveryArea(sellerId, userLat, userLon) {
         };
     }
 }
-
 // Mesafe bazlı teslimat ücreti hesaplama
 function calculateDeliveryFeeByDistance(distance, sellerId) {
     console.log(`💰 Mesafe bazlı teslimat ücreti: ${distance.toFixed(2)}km`);
@@ -11414,5 +11503,6 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
