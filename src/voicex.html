@@ -7073,64 +7073,44 @@ function updateSellersOpenStatus() {
     try {
         debugLog(`📦 Satıcıya göre kategoriler yükleniyor: ${sellerId}`);
         
-        // Önce satıcının ürünlerinden kategorileri bul - CORS hatası için güvenli sorgu
-        let productsData = [];
-        try {
-            const { data, error: productsError } = await supabase
-                .from('products')
-                .select('reyon_id')
-                .eq('is_active', true)
-                .not('reyon_id', 'is', null);
+        // Önce satıcının ürünlerinden kategorileri bul
+        const { data: productsData, error: productsError } = await supabase
+            .from('products')
+            .select('reyon_id, reyon(name)')
+            .eq('is_active', true)
+            .not('reyon_id', 'is', null);
 
-            if (productsError) {
-                console.log('⚠️ Ürün sorgu hatası, reyon tablosuna geçiliyor:', productsError.message);
-            } else {
-                productsData = data || [];
-            }
-        } catch (corsError) {
-            console.log('🔇 CORS hatası, reyon tablosuna geçiliyor:', corsError.message);
-        }
+        if (productsError) throw productsError;
 
-        // Benzersiz reyon_id'leri topla
-        const uniqueReyonIds = [];
-        const seenReyonIds = new Set();
+        // Benzersiz kategorileri topla
+        const uniqueCategories = [];
+        const seenCategoryIds = new Set();
         
         if (productsData && productsData.length > 0) {
             productsData.forEach(item => {
-                if (item.reyon_id && !seenReyonIds.has(item.reyon_id)) {
-                    seenReyonIds.add(item.reyon_id);
-                    uniqueReyonIds.push(item.reyon_id);
+                if (item.reyon && item.reyon_id && !seenCategoryIds.has(item.reyon_id)) {
+                    seenCategoryIds.add(item.reyon_id);
+                    uniqueCategories.push({
+                        id: item.reyon_id,
+                        name: item.reyon.name
+                    });
                 }
             });
         }
 
-        let categories = [];
-
-        // Eğer reyon_id bulunduysa, reyon bilgilerini getir
-        if (uniqueReyonIds.length > 0) {
-            const { data: reyonData, error: reyonError } = await supabase
-                .from('reyon')
-                .select('*')
-                .in('id', uniqueReyonIds)
-                .eq('is_active', true)
-                .order('name');
-                
-            if (!reyonError) {
-                categories = reyonData || [];
-            }
-        }
-
-        // Eğer hala kategori yoksa tüm aktif kategorileri getir
-        if (categories.length === 0) {
+        // Eğer kategori bulunamazsa tüm kategorileri getir
+        if (uniqueCategories.length === 0) {
             const { data: allCategories, error: categoriesError } = await supabase
                 .from('reyon')
                 .select('*')
                 .eq('is_active', true)
                 .order('name');
                 
-            if (!categoriesError) {
-                categories = allCategories || [];
-            }
+            if (categoriesError) throw categoriesError;
+            
+            categories = allCategories || [];
+        } else {
+            categories = uniqueCategories;
         }
 
         debugLog(`📊 KATEGORİ SONUÇ: ${categories.length} kategori bulundu`);
@@ -7151,7 +7131,6 @@ function updateSellersOpenStatus() {
         speakToUser("Kategoriler yüklenirken hata oluştu. Demo kategoriler gösteriliyor.");
     }
 }
-
 // SESLİ SATICI SEÇİM - REYON YÜKLEME 
 async function handleVoiceSellerSelection(message) {
     console.log('🎯 Sesli satıcı seçimi:', message);
@@ -11692,6 +11671,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
