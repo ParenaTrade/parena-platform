@@ -11657,62 +11657,215 @@ async function saveOrder() {
         
         console.log('📦 Sipariş verisi:', orderData);
         
-        // Siparişi kaydet - DÜZELTİLDİ: insert([orderData]) yerine insert(orderData)
+        // 1️⃣ SİPARİŞİ KAYDET
         const { data: order, error: orderError } = await supabase
             .from('orders')
-            .insert(orderData)  // [orderData] değil, orderData
+            .insert([orderData])
             .select()
             .single();
             
         if (orderError) {
-            console.error('❌ Sipariş kaydetme hatası (orders):', orderError);
-            throw orderError;
+            console.error('❌ Sipariş kaydetme hatası:', orderError);
+            throw new Error(`Sipariş kaydedilemedi: ${orderError.message}`);
         }
         
         console.log('✅ Sipariş kaydedildi:', order);
         
-        // Sipariş öğelerini kaydet
-        if (cart.length > 0) {
-            const orderItems = cart.map(item => ({
-                order_id: order.id,
-                product_id: item.id,
-                product_name: item.name,
-                quantity: item.quantity,
-                unit_price: item.price,
-                total_price: item.price * item.quantity
-            }));
-            
-            console.log('📦 Sipariş öğeleri:', orderItems);
-            
-            const { error: itemsError } = await supabase
-                .from('order_items')
-                .insert(orderItems);
-                
-            if (itemsError) {
-                console.error('❌ Sipariş öğeleri kaydetme hatası:', itemsError);
-                throw itemsError;
-            }
-            
-            console.log('✅ Sipariş öğeleri kaydedildi');
+        // 2️⃣ SİPARİŞ DETAYLARINI KAYDET
+        if (cart.length === 0) {
+            throw new Error('Sepet boş, sipariş detayı kaydedilemedi');
         }
         
+        const orderDetails = cart.map(item => ({
+            order_id: order.id,
+            product_id: item.id,
+            product_name: item.name,
+            quantity: item.quantity,
+            unit_price: item.price,
+            unit_type: item.unit_type || 'adet',
+            discount: 0,
+            tax_rate: item.tax_rate || 0,
+            total_price: item.price * item.quantity
+        }));
+        
+        console.log('📦 Sipariş detayları:', orderDetails);
+        
+        const { error: detailsError } = await supabase
+            .from('order_details')
+            .insert(orderDetails);
+            
+        if (detailsError) {
+            console.error('❌ Sipariş detayları kaydetme hatası:', detailsError);
+            throw new Error(`Sipariş detayları kaydedilemedi: ${detailsError.message}`);
+        }
+        
+        console.log('✅ Sipariş detayları kaydedildi');
+        
+        // 3️⃣ BAŞARILI MESAJ
         displayMessage("🎉 Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: " + order.id);
         speakToUser("siparişiniz başarıyla oluşturuldu");
         
-        // Sepeti temizle
-        cart = [];
-        updateCartUI();
-        unlockStoreAndSeller();
-        
-        // Modalı kapat
-        closePaymentModal();
-        resetPaymentState();
+        // 4️⃣ TEMİZLİK
+        resetAfterSuccessfulOrder();
         
     } catch (error) {
-        console.error('❌ Sipariş kaydetme hatası:', error);
-        displayMessage("❌ Sipariş kaydedilirken hata oluştu");
-        speakToUser("sipariş kaydetme hatası");
+        console.error('❌ SİPARİŞ KAYDETME HATASI:', error);
+        
+        // NET HATA MESAJI
+        const errorMessage = `
+❌ SİPARİŞ HATASI
+
+Siparişiniz kaydedilemedi:
+${error.message}
+
+Lütfen:
+• İnternet bağlantınızı kontrol edin
+• Bilgilerinizi kontrol edin  
+• Tekrar deneyin
+
+Teknik Detay: ${error.code || 'Bilinmeyen hata'}
+        `;
+        
+        displayMessage(errorMessage);
+        speakToUser("Siparişiniz kaydedilemedi. Lütfen tekrar deneyin.");
+        
+        // Sepeti koru, kullanıcı tekrar denesin
+        console.log('⚠️ Sepet korunuyor, kullanıcı tekrar deneyebilir');
     }
+}
+
+// Başarılı sipariş sonrası reset
+function resetAfterSuccessfulOrder() {
+    console.log('🔄 Sipariş sonrası temizlik...');
+    
+    // Sepeti temizle
+    cart = [];
+    updateCartUI();
+    
+    // Kilitleri kaldır
+    unlockStoreAndSeller();
+    
+    // Ödeme sürecini resetle
+    resetPaymentProcess();
+    
+    // Modalı kapat
+    closePaymentModal();
+    
+    // Ana sayfaya dön
+    resetToHomepage();
+    
+    console.log('✅ Sipariş sonrası temizlik tamamlandı');
+}
+
+// Ödeme sürecini resetle
+function resetPaymentProcess() {
+    isWaitingForPhone = false;
+    isWaitingForName = false;
+    isWaitingForBuilding = false;
+    isWaitingForApartment = false;
+    isWaitingForAddressConfirm = false;
+    isWaitingForNewBuilding = false;
+    isWaitingForNewApartment = false;
+    isWaitingForOrderConfirm = false;
+    expectedInput = null;
+    
+    customerPhone = null;
+    customerName = null;
+    buildingNumber = null;
+    apartmentNumber = null;
+    useRegisteredAddress = false;
+    currentPaymentMethod = null;
+    
+    console.log('✅ Ödeme süreci resetlendi');
+}
+
+// Ana sayfaya dön
+function resetToHomepage() {
+    selectedStoreTypeId = null;
+    selectedSellerId = null;
+    selectedCategoryId = null;
+    products = [];
+    
+    document.querySelectorAll('.seller-type-card, .seller-card, .category-card, .product-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    if (sellersSection) sellersSection.style.display = 'none';
+    if (categoriesSection) categoriesSection.style.display = 'none';
+    if (productsSection) productsSection.style.display = 'none';
+    
+    closeDynamicCart();
+    
+    displayMessage("🔄 Ana sayfaya dönülüyor...");
+    speakToUser("Ana sayfaya dönülüyor");
+}
+
+// Hata durumunda kullanıcıya yardımcı olacak fonksiyon
+function showOrderRetryOptions() {
+    const modalBody = document.getElementById('paymentModalBody');
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="error-retry-section">
+                <div class="error-icon">❌</div>
+                <h4>Sipariş Kaydedilemedi</h4>
+                <p>Siparişiniz şu anda kaydedilemiyor. Lütfen aşağıdaki seçeneklerden birini deneyin:</p>
+                
+                <div class="retry-options">
+                    <button class="retry-btn primary" onclick="retryOrder()">
+                        <i class="fas fa-redo"></i> Tekrar Dene
+                    </button>
+                    <button class="retry-btn secondary" onclick="saveOrderForLater()">
+                        <i class="fas fa-save"></i> Siparişi Kaydet (Geçici)
+                    </button>
+                    <button class="retry-btn danger" onclick="cancelOrder()">
+                        <i class="fas fa-times"></i> İptal Et
+                    </button>
+                </div>
+                
+                <div class="error-help">
+                    <p><strong>Yardım:</strong></p>
+                    <ul>
+                        <li>İnternet bağlantınızı kontrol edin</li>
+                        <li>Sayfayı yenileyip tekrar deneyin</li>
+                        <li>Müşteri hizmetlerini arayın</li>
+                    </ul>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Tekrar deneme fonksiyonu
+async function retryOrder() {
+    displayMessage("🔄 Sipariş tekrar deneniyor...");
+    speakToUser("Sipariş tekrar deneniyor");
+    await saveOrder();
+}
+
+// Geçici kaydetme (sadece localStorage)
+function saveOrderForLater() {
+    const tempOrder = {
+        customer: {
+            name: customerName,
+            phone: customerPhone
+        },
+        items: cart,
+        total: calculateTotal(),
+        delivery_address: formatDeliveryAddress(),
+        timestamp: new Date().toISOString()
+    };
+    
+    localStorage.setItem('pendingOrder', JSON.stringify(tempOrder));
+    displayMessage("💾 Sipariş geçici olarak kaydedildi. Daha sonra tamamlayabilirsiniz.");
+    speakToUser("Sipariş geçici kaydedildi");
+    resetAfterSuccessfulOrder();
+}
+
+// İptal fonksiyonu
+function cancelOrder() {
+    displayMessage("❌ Sipariş iptal edildi");
+    speakToUser("Sipariş iptal edildi");
+    resetAfterSuccessfulOrder();
 }
 // =============================================
 // YARDIMCI FONKSİYONLAR
@@ -11872,6 +12025,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
