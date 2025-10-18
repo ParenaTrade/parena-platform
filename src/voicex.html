@@ -7850,61 +7850,8 @@ async function selectCategoryByName(categoryName) {
     }
 }
 
-// BASİT ve ETKİLİ findProductByName
-function findProductByName(productName) {
-    console.log('🔍 findProductByName çağrıldı:', productName);
-    
-    if (!productName || !products || products.length === 0) {
-        console.log('❌ Ürün listesi boş');
-        return null;
-    }
-
-    const cleanProductName = productName.toLowerCase().trim();
-    console.log('🔎 Aranan ürün:', cleanProductName);
-    console.log('📦 Mevcut ürünler:', products.map(p => p.name));
-
-    // ÇOK BASİT EŞLEŞME
-    for (const product of products) {
-        const productNameLower = product.name.toLowerCase();
         
-        // Tam eşleşme
-        if (productNameLower === cleanProductName) {
-            console.log(`✅ Tam eşleşme: "${product.name}"`);
-            return product;
-        }
-        
-        // İçerme
-        if (productNameLower.includes(cleanProductName) || cleanProductName.includes(productNameLower)) {
-            console.log(`✅ İçerme eşleşmesi: "${product.name}"`);
-            return product;
-        }
-        
-        // Kelime eşleşmesi
-        const searchWords = cleanProductName.split(' ');
-        const productWords = productNameLower.split(' ');
-        
-        let matchCount = 0;
-        for (const searchWord of searchWords) {
-            if (searchWord.length > 2) {
-                for (const productWord of productWords) {
-                    if (productWord.includes(searchWord)) {
-                        matchCount++;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (matchCount >= Math.min(searchWords.length, 1)) {
-            console.log(`✅ Kelime eşleşmesi: "${product.name}"`);
-            return product;
-        }
-    }
-
-    console.log(`❌ Ürün bulunamadı: "${cleanProductName}"`);
-    return null;
-}
-        // ACİL DEBUG - Hemen çalıştırın!
+// ACİL DEBUG - Hemen çalıştırın!
 function debugExtractProduct() {
     console.log('🐛 ACİL DEBUG: extractProductInfoFromCommand Testi');
     
@@ -8552,79 +8499,139 @@ function extractProductInfoFromCommand(message) {
 
     console.log('🧹 Temizlenmiş mesaj:', cleanMessage);
 
-    // ✅ DEĞİŞİKLİK: "numara" kontrolünü KALDIR - TÜM KOMUTLARI İŞLE
-    console.log('🔍 Tüm komut pattern kontrolü başlıyor...');
+    // ✅ KRİTİK DEĞİŞİKLİK: "numara" kontrolünü TAMAMEN KALDIR
+    // ❌ ESKİ: if (!cleanMessage.includes('numara')) { return null; }
+    // ✅ YENİ: Tüm komutları işle
 
     let quantity = 1;
     let unit = 'adet';
     let productName = '';
 
-    // 1. ÖNCE NORMAL ÜRÜN KOMUTLARI (EN ÖNCELİKLİ)
-    
-    // "1 kilo domates" pattern'i
-    const normalKiloMatch = cleanMessage.match(/(\d+[,.]?\d*)\s*kilo\s+(.+)/);
-    if (normalKiloMatch) {
-        quantity = parseFloat(normalKiloMatch[1].replace(',', '.'));
-        productName = normalKiloMatch[2].trim();
-        unit = 'kg';
-        console.log(`✅ Normal kilo pattern eşleşti: ${quantity} ${unit} ${productName}`);
-        return { productName, quantity, unit };
+    console.log('🔍 Tüm komut pattern kontrolü başlıyor...');
+
+    // 1. ÖNCE BASİT ÜRÜN ADI (domates, soğan, ekmek)
+    if (products && products.length > 0) {
+        const directProduct = findProductByName(cleanMessage);
+        if (directProduct) {
+            console.log('✅ Doğrudan ürün bulundu:', directProduct.name);
+            return { 
+                product: directProduct, 
+                quantity: 1, 
+                unitType: 'adet' 
+            };
+        }
     }
 
-    // "2 paket süt" pattern'i  
-    const normalPaketMatch = cleanMessage.match(/(\d+)\s*paket\s+(.+)/);
-    if (normalPaketMatch) {
-        quantity = parseInt(normalPaketMatch[1]);
-        productName = normalPaketMatch[2].trim();
-        unit = 'paket';
-        console.log(`✅ Normal paket pattern eşleşti: ${quantity} ${unit} ${productName}`);
-        return { productName, quantity, unit };
+    // 2. "1 kilo domates" pattern'i
+    const kiloMatch = cleanMessage.match(/(\d+[,.]?\d*)\s*kilo\s+(.+)/);
+    if (kiloMatch) {
+        quantity = parseFloat(kiloMatch[1].replace(',', '.'));
+        productName = kiloMatch[2].trim();
+        const product = findProductByName(productName);
+        if (product) {
+            console.log(`✅ Kilo pattern eşleşti: ${quantity} kg ${product.name}`);
+            return { product, quantity, unitType: 'kg' };
+        }
     }
 
-    // "3 adet ekmek" pattern'i
-    const normalAdetMatch = cleanMessage.match(/(\d+)\s*(adet|tane)\s+(.+)/);
-    if (normalAdetMatch) {
-        quantity = parseInt(normalAdetMatch[1]);
-        productName = normalAdetMatch[3].trim();
-        unit = 'adet';
-        console.log(`✅ Normal adet pattern eşleşti: ${quantity} ${unit} ${productName}`);
-        return { productName, quantity, unit };
+    // 3. "2 paket süt" pattern'i  
+    const paketMatch = cleanMessage.match(/(\d+)\s*paket\s+(.+)/);
+    if (paketMatch) {
+        quantity = parseInt(paketMatch[1]);
+        productName = paketMatch[2].trim();
+        const product = findProductByName(productName);
+        if (product) {
+            console.log(`✅ Paket pattern eşleşti: ${quantity} paket ${product.name}`);
+            return { product, quantity, unitType: 'paket' };
+        }
     }
 
-    // "yarım kilo peynir" pattern'i
-    const yarimKiloMatch = cleanMessage.match(/(yarım|çeyrek)\s*kilo\s+(.+)/);
-    if (yarimKiloMatch) {
-        quantity = yarimKiloMatch[1] === 'yarım' ? 0.5 : 0.25;
-        productName = yarimKiloMatch[2].trim();
-        unit = 'kg';
-        console.log(`✅ Yarım kilo pattern eşleşti: ${quantity} ${unit} ${productName}`);
-        return { productName, quantity, unit };
+    // 4. "3 adet ekmek" pattern'i
+    const adetMatch = cleanMessage.match(/(\d+)\s*(adet|tane)\s+(.+)/);
+    if (adetMatch) {
+        quantity = parseInt(adetMatch[1]);
+        productName = adetMatch[3].trim();
+        const product = findProductByName(productName);
+        if (product) {
+            console.log(`✅ Adet pattern eşleşti: ${quantity} adet ${product.name}`);
+            return { product, quantity, unitType: 'adet' };
+        }
     }
 
-    // "bir kilo soğan" pattern'i
-    const yaziliKiloMatch = cleanMessage.match(/(bir|iki|üç|dört|beş)\s*kilo\s+(.+)/);
-    if (yaziliKiloMatch) {
+    // 5. "yarım kilo peynir" pattern'i
+    const yarimMatch = cleanMessage.match(/(yarım|çeyrek)\s*kilo\s+(.+)/);
+    if (yarimMatch) {
+        quantity = yarimMatch[1] === 'yarım' ? 0.5 : 0.25;
+        productName = yarimMatch[2].trim();
+        const product = findProductByName(productName);
+        if (product) {
+            console.log(`✅ Yarım kilo pattern eşleşti: ${quantity} kg ${product.name}`);
+            return { product, quantity, unitType: 'kg' };
+        }
+    }
+
+    // 6. "bir kilo soğan" pattern'i
+    const yaziliMatch = cleanMessage.match(/(bir|iki|üç|dört|beş)\s*kilo\s+(.+)/);
+    if (yaziliMatch) {
         const sayilar = { 'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5 };
-        quantity = sayilar[yaziliKiloMatch[1]] || 1;
-        productName = yaziliKiloMatch[2].trim();
-        unit = 'kg';
-        console.log(`✅ Yazılı kilo pattern eşleşti: ${quantity} ${unit} ${productName}`);
-        return { productName, quantity, unit };
+        quantity = sayilar[yaziliMatch[1]] || 1;
+        productName = yaziliMatch[2].trim();
+        const product = findProductByName(productName);
+        if (product) {
+            console.log(`✅ Yazılı kilo pattern eşleşti: ${quantity} kg ${product.name}`);
+            return { product, quantity, unitType: 'kg' };
+        }
     }
 
-    // Sadece ürün adı "domates"
-    const sadeceUrunMatch = cleanMessage.match(/^([a-zA-ZğüşıöçĞÜŞİÖÇ\s]+)$/);
-    if (sadeceUrunMatch) {
-        productName = sadeceUrunMatch[1].trim();
-        console.log(`✅ Sadece ürün pattern eşleşti: ${quantity} ${unit} ${productName}`);
-        return { productName, quantity, unit };
+    // 7. SONRA NUMARA PATTERNLERİ (mevcut sisteminiz)
+    const numaraKiloMatch = cleanMessage.match(/(\d+)\s*numara\s*(\d+[,.]?\d*)\s*kilo/);
+    if (numaraKiloMatch) {
+        const targetNumber = parseInt(numaraKiloMatch[1]);
+        quantity = parseFloat(numaraKiloMatch[2].replace(',', '.'));
+        productName = targetNumber + ' numara';
+        const product = findProductByName(productName);
+        if (product) {
+            console.log(`✅ Numara-kilo pattern eşleşti: ${quantity} kg ${product.name}`);
+            return { product, quantity, unitType: 'kg' };
+        }
     }
 
-    // Hiçbir pattern eşleşmezse
     console.log('❌ Hiçbir pattern eşleşmedi');
+    
+    // Fallback: Son çare olarak tüm mesajı ürün adı olarak dene
+    const fallbackProduct = findProductByName(cleanMessage);
+    if (fallbackProduct) {
+        console.log('🔄 Fallback: Doğrudan ürün bulundu:', fallbackProduct.name);
+        return { product: fallbackProduct, quantity: 1, unitType: 'adet' };
+    }
+
     return null;
 }
+
         
+  // Yardımcı fonksiyon
+function findProductByName(productName) {
+    if (!products || products.length === 0) {
+        console.log('❌ Ürün listesi boş');
+        return null;
+    }
+    
+    const cleanName = productName.toLowerCase().trim();
+    
+    // Tam eşleşme
+    const exactMatch = products.find(p => p.name.toLowerCase() === cleanName);
+    if (exactMatch) return exactMatch;
+    
+    // Kısmi eşleşme
+    const partialMatch = products.find(p => p.name.toLowerCase().includes(cleanName));
+    if (partialMatch) return partialMatch;
+    
+    // Ürün adı komutun içinde geçiyor mu?
+    const containedMatch = products.find(p => cleanName.includes(p.name.toLowerCase()));
+    if (containedMatch) return containedMatch;
+    
+    return null;
+}      
 
         
 // Hemen kullanabileceğiniz basit versiyon
@@ -12194,6 +12201,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
