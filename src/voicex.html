@@ -9661,25 +9661,23 @@ async function loadAllSellersByLocation() {
     try {
         debugLog(`🔍 Tüm satıcılar yükleniyor (filtresiz)`);
         
-        // Sadece seller_profiles tablosundan query
+        // store_types değil store_type ilişkisi var
         let query = supabase
             .from('seller_profiles')
             .select(`
                 *,
-                store_types(*)
+                store_type(*)  // TEKİL - store_types değil store_type
             `)
-            .eq('status', true);  // seller_profiles.status kontrolü
+            .eq('status', true);
 
-        // Konum bilgisi varsa filtrele - DOĞRU SYNTAX
+        // Konum bilgisi varsa filtrele
         if (userLocation.city && userLocation.district) {
             const customerCity = userLocation.city;
             const customerDistrict = userLocation.district;
             
-            // DOĞRU KULLANIM: seller_profiles tablosundaki field'lar
             query = query.or(`city.ilike.%${customerCity}%,district.ilike.%${customerDistrict}%,address.ilike.%${customerCity}%,address.ilike.%${customerDistrict}%`);
         }
 
-        // DOĞRU ORDER - artık foreign table yok
         query = query.order('business_name', { ascending: true });
 
         const { data: sellersData, error } = await query;
@@ -9707,11 +9705,11 @@ async function loadAllSellersByLocation() {
             // Açık/kapalı durumunu HESAPLA
             const sellersWithStatus = await calculateSellersOpenStatus(sellersData);
 
-            // Satıcıları formatla - TEK TABLO YAPISI
+            // Satıcıları formatla
             allSellersInLocation = sellersWithStatus.map(seller => ({
                 ...seller,
-                store_type_id: seller.store_types?.id,
-                store_type_name: seller.store_types?.name,
+                store_type_id: seller.store_type?.id,  // store_type olarak
+                store_type_name: seller.store_type?.name,
                 working_hours: {
                     start_time: seller.start_time,
                     end_time: seller.end_time,
@@ -9745,8 +9743,7 @@ async function loadAllSellersByLocation() {
         showAllSellers();
         speakToUser("Satıcılar yüklenirken hata oluştu. Demo satıcılar gösteriliyor.");
     }
-}
-// =============================================
+}// =============================================
 // AÇIK/KAPALI DURUMU HESAPLAMA
 // =============================================
 
@@ -11639,6 +11636,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
