@@ -2396,6 +2396,42 @@ const storeTypeFilterStyles = `
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: 3px;
 }
+
+        /* SESLİ INPUT STİLLERİ */
+.voice-input-success {
+    border: 2px solid var(--success) !important;
+    background-color: rgba(40, 167, 69, 0.05) !important;
+    animation: voicePulseSuccess 2s infinite;
+}
+
+.voice-input-error {
+    border: 2px solid var(--danger) !important;
+    background-color: rgba(220, 53, 69, 0.05) !important;
+    animation: voicePulseError 2s infinite;
+}
+
+.voice-field-highlight {
+    border: 2px solid var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(93, 62, 188, 0.2) !important;
+    animation: voiceFieldPulse 1.5s infinite;
+}
+
+@keyframes voicePulseSuccess {
+    0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+}
+
+@keyframes voicePulseError {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+@keyframes voiceFieldPulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(93, 62, 188, 0.2); }
+    50% { box-shadow: 0 0 0 6px rgba(93, 62, 188, 0.1); }
+}
 </style>
 </head>
 <body>
@@ -11050,6 +11086,78 @@ function checkExpectedInput(command) {
     return false;
 }
 
+
+        // SESLİ VERİYİ INPUT'TA GÖSTERME FONKSİYONLARI
+function showVoiceInputInField(inputId, value, isSuccess = true) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.value = value;
+        
+        // Görsel feedback
+        input.classList.remove('voice-input-success', 'voice-input-error');
+        input.classList.add(isSuccess ? 'voice-input-success' : 'voice-input-error');
+        
+        // 3 saniye sonra normal haline dön
+        setTimeout(() => {
+            input.classList.remove('voice-input-success', 'voice-input-error');
+        }, 3000);
+    }
+}
+
+function highlightVoiceField(inputId) {
+    // Önceki vurguları temizle
+    document.querySelectorAll('.voice-field-highlight').forEach(el => {
+        el.classList.remove('voice-field-highlight');
+    });
+    
+    // Yeni input'u vurgula
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.classList.add('voice-field-highlight');
+        
+        // Input görünür alana getir
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // 5 saniye sonra vurguyu kaldır
+        setTimeout(() => {
+            input.classList.remove('voice-field-highlight');
+        }, 5000);
+    }
+}
+
+function showVoiceFeedback(message, isSuccess = true) {
+    // Mevcut feedback'i temizle
+    const existingFeedback = document.getElementById('voice-input-feedback');
+    if (existingFeedback) {
+        existingFeedback.remove();
+    }
+    
+    // Yeni feedback oluştur
+    const feedback = document.createElement('div');
+    feedback.id = 'voice-input-feedback';
+    feedback.textContent = message;
+    feedback.style.cssText = `
+        position: fixed;
+        top: 100px;
+        right: 20px;
+        background: ${isSuccess ? 'var(--success)' : 'var(--danger)'};
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        z-index: 10000;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    `;
+    
+    document.body.appendChild(feedback);
+    
+    // 3 saniye sonra kaldır
+    setTimeout(() => {
+        if (feedback.parentNode) {
+            feedback.parentNode.removeChild(feedback);
+        }
+    }, 3000);
+}
 function requestPhoneNumber() {
     console.log('📞 Telefon numarası isteniyor...');
     
@@ -12212,6 +12320,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
