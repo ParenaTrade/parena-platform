@@ -5908,74 +5908,6 @@ async function processVoiceCommand(transcript) {
 
 
 // =============================================
-// GELİŞMİŞ BONUS ÖDEME SİSTEMİ
-// =============================================
-
-async function handleBonusPayment(orderId, customerId, totalAmount) {
-    try {
-        // 1. Kullanıcı bonus bakiyesini kontrol et
-        const { data: customer, error: customerError } = await supabase
-            .from('customers')
-            .select('bonus_balance')
-            .eq('id', customerId)
-            .single();
-
-        if (customerError) throw customerError;
-
-        const bonusBalance = customer.bonus_balance || 0;
-        
-        // 2. Bonus bakiyesini kullanıcıya söyle
-        displayMessage(`💰 Bonus bakiyeniz: ${money(bonusBalance)}`);
-        speakToUser(`Bonus bakiyeniz ${money(bonusBalance)}`);
-
-        // 3. Yeterli bonus varsa
-        if (bonusBalance >= totalAmount) {
-            const confirm = await askConfirmation(
-                `🎯 ${money(bonusBalance)} bonus bakiyeniz var. Sipariş tutarı: ${money(totalAmount)}. Tamamını bonus ile ödemek istiyor musunuz?`
-            );
-            
-            if (confirm) {
-                // Tamamı bonus ile ödeme
-                return await processFullBonusPayment(orderId, customerId, totalAmount, bonusBalance);
-            } else {
-                // Kısmi ödeme seçeneğine geç
-                return await processPartialPayment(orderId, customerId, totalAmount, bonusBalance);
-            }
-        } 
-        // 4. Yetersiz bonus varsa
-        else if (bonusBalance > 0) {
-            displayMessage(`💰 Bonus bakiyeniz: ${money(bonusBalance)}. Sipariş tutarı: ${money(totalAmount)}. Kısmi ödeme yapmak ister misiniz?`);
-            speakToUser(`Bonus bakiyeniz yetersiz, kısmi ödeme yapabilirsiniz`);
-            
-            const confirm = await askConfirmation(
-                `${money(bonusBalance)} bonus kullanılsın mı? Kalan ${money(totalAmount - bonusBalance)} için ödeme yöntemi seçeceksiniz.`
-            );
-            
-            if (confirm) {
-                return await processPartialPayment(orderId, customerId, totalAmount, bonusBalance);
-            } else {
-                // Bonus kullanmadan diğer ödeme yöntemlerine geç
-                return await processNonBonusPayment(orderId, customerId, totalAmount);
-            }
-        }
-        // 5. Hiç bonus yoksa
-        else {
-            displayMessage("❌ Bonus bakiyeniz bulunmamaktadır.");
-            speakToUser("Bonus bakiyeniz yok");
-            return await processNonBonusPayment(orderId, customerId, totalAmount);
-        }
-
-    } catch (error) {
-        console.error('Bonus ödeme işlemi hatası:', error);
-        return false;
-    }
-}
-
-// =============================================
-// TAM BONUS ÖDEME
-// =============================================
-
-// =============================================
 // DÜZELTİLMİŞ TAM BONUS ÖDEME
 // =============================================
 
@@ -6036,70 +5968,7 @@ async function processFullBonusPayment(orderId, customerId, totalAmount, bonusBa
         return false;
     }
 }
-
-
-        // =============================================
-// BONUSSUZ ÖDEME (Nakit/Kart)
-// =============================================
-
-async function processNonBonusPayment(orderId, customerId, totalAmount) {
-    try {
-        // 1. Ödeme yöntemini sor
-        const paymentMethod = await askPaymentMethod(totalAmount);
         
-        if (!paymentMethod) {
-            displayMessage("❌ Ödeme yöntemi seçilmedi.");
-            return false;
-        }
-
-        // 2. Ödeme kaydını oluştur
-        const paymentData = {
-            order_id: orderId,
-            customer_id: customerId,
-            payment_method: paymentMethod, // cash veya card
-            payment_type: 'full', // full olacak
-            amount: totalAmount,
-            bonus_amount: 0,
-            status: 'completed',
-            payment_date: new Date().toISOString()
-        };
-
-        // Ödeme yöntemine göre alanları doldur
-        if (paymentMethod === 'cash') {
-            paymentData.cash_amount = totalAmount;
-            paymentData.card_amount = 0;
-        } else if (paymentMethod === 'card') {
-            paymentData.card_amount = totalAmount;
-            paymentData.cash_amount = 0;
-        }
-
-        console.log('Bonussuz ödeme verisi:', paymentData);
-
-        // 3. Ödeme kaydını veritabanına ekle
-        const { data: payment, error: paymentError } = await supabase
-            .from('customer_payments')
-            .insert([paymentData])
-            .select()
-            .single();
-
-        if (paymentError) {
-            console.error('Bonussuz ödeme kaydı hatası:', paymentError);
-            throw paymentError;
-        }
-
-        // 4. Sipariş durumunu güncelle
-        await updateOrderStatus(orderId, 'paid');
-
-        displayMessage(`✅ Ödeme tamamlandı! ${money(totalAmount)} ${paymentMethod === 'cash' ? 'nakit' : 'kart'} ile ödendi.`);
-
-        return true;
-
-    } catch (error) {
-        console.error('Bonussuz ödeme hatası:', error);
-        displayMessage("❌ Ödeme işlemi sırasında hata oluştu");
-        return false;
-    }
-}
 // =============================================
 // BONUSSUZ ÖDEME (Nakit/Kart)
 // =============================================
@@ -6162,8 +6031,8 @@ async function processNonBonusPayment(orderId, customerId, totalAmount) {
         return false;
     }
 }
-
-        // =============================================
+        
+// =============================================
 // TEST İÇİN ÖRNEK KULLANIM
 // =============================================
 
@@ -6187,9 +6056,6 @@ async function testBonusPayment() {
 function debugLog(message, data = null) {
     console.log(`🔍 ${message}`, data || '');
 }
-// =============================================
-// KISMI ÖDEME SİSTEMİ
-// =============================================
 
 // =============================================
 // DÜZELTİLMİŞ KISMI ÖDEME SİSTEMİ
@@ -14055,6 +13921,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
