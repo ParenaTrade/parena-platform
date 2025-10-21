@@ -2716,10 +2716,7 @@ const storeTypeFilterStyles = `
     </div>
 
     <script>
-        // =============================================
-        // EKSİK FONKSİYONLAR - SİSTEMİ TAMAMLAYAN
-        // =============================================
-
+       
         // Supabase configuration
         const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
@@ -3183,6 +3180,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
+
+
+
+
+        
 // =============================================
 // UYGULAMA BAŞLANGICI
 // =============================================
@@ -3281,16 +3283,6 @@ function displayStoreTypes(types) {
     });
 }
  
-        
-
-// =============================================
-// SATICI GRID GÜNCELLEME
-// =============================================
-
-// =============================================
-// GÜNCELLENMİŞ SELLER KARTLARI
-// =============================================
-
 // =============================================
 // GÜNCELLENMİŞ SELLER KARTLARI
 // =============================================
@@ -4790,7 +4782,7 @@ function startRecognition() {
 
     if (isListening) {
         console.log('ℹ️ Zaten dinleniyor');
-        return;
+        return; // Zaten dinliyorsa tekrar başlatma
     }
 
     try {
@@ -4801,10 +4793,11 @@ function startRecognition() {
         console.error('❌ Ses tanıma başlatma hatası:', error);
 
         if (error.toString().includes('already started')) {
-            console.log('ℹ️ Ses tanıma zaten başlamış');
+            console.log('ℹ️ Ses tanıma zaten başlamış, state güncelleniyor');
+            isListening = true; // State'i manuel güncelle
             return;
         }
-
+        
         if (error.toString().includes('not running') || error.toString().includes('invalid state')) {
             console.log('🔄 Recognition objesi bozuk, yeniden oluşturuluyor...');
             recognition = null;
@@ -4941,57 +4934,60 @@ class AppInitializer {
     }
 
     // Başlatma adımlarını yürüt
-    async executeSteps() {
-        this.initStartTime = Date.now();
-        console.log('🚀 Uygulama başlatma başlıyor...');
+    async function executeSteps() {
+    this.initStartTime = Date.now();
+    console.log('🚀 Uygulama başlatma başlıyor...');
 
-        let executedCount = 0;
-        let maxAttempts = this.initializationSteps.length * 2; // Sonsuz döngü önleme
+    let executedCount = 0;
+    let maxAttempts = this.initializationSteps.length * 3; // Daha fazla deneme hakkı
 
-        while (executedCount < this.initializationSteps.length && maxAttempts > 0) {
-            let stepExecuted = false;
+    while (executedCount < this.initializationSteps.length && maxAttempts > 0) {
+        let stepExecuted = false;
 
-            for (const step of this.initializationSteps) {
-                if (!step.executed && this.checkDependencies(step)) {
-                    try {
-                        console.log(`⚡ ${step.name} başlatılıyor...`);
-                        await step.function();
-                        step.executed = true;
-                        step.success = true;
-                        executedCount++;
-                        stepExecuted = true;
-                        
-                        console.log(`✅ ${step.name} tamamlandı`);
-                    } catch (error) {
-                        console.error(`❌ ${step.name} hatası:`, error);
-                        step.executed = true;
-                        step.success = false;
-                        executedCount++;
-                        
-                        // Kritik olmayan hatalarda devam et
-                        if (!this.isCriticalStep(step.name)) {
-                            console.warn(`⚠️ ${step.name} hatası atlanıyor...`);
-                        } else {
-                            throw new Error(`Kritik başlatma hatası: ${step.name}`);
-                        }
+        for (const step of this.initializationSteps) {
+            if (!step.executed && this.checkDependencies(step)) {
+                try {
+                    console.log(`⚡ ${step.name} başlatılıyor...`);
+                    await step.function();
+                    step.executed = true;
+                    step.success = true;
+                    executedCount++;
+                    stepExecuted = true;
+                    
+                    console.log(`✅ ${step.name} tamamlandı`);
+                } catch (error) {
+                    console.error(`❌ ${step.name} hatası:`, error);
+                    step.executed = true;
+                    step.success = false;
+                    executedCount++;
+                    
+                    // Kritik olmayan hatalarda devam et
+                    if (!this.isCriticalStep(step.name)) {
+                        console.warn(`⚠️ ${step.name} hatası atlanıyor...`);
+                    } else {
+                        console.warn(`⚠️ Kritik hata ama devam ediliyor: ${step.name}`);
+                        // Kritik hatalarda bile uygulamayı durdurma, devam et
                     }
                 }
             }
-
-            if (!stepExecuted) {
-                maxAttempts--;
-                await this.delay(100); // Bağımlılıkların hazır olmasını bekle
-            }
         }
 
-        if (maxAttempts <= 0) {
-            throw new Error('Başlatma zaman aşımı: Bazı bağımlılıklar hazır değil');
+        if (!stepExecuted) {
+            maxAttempts--;
+            console.log(`⏳ Bağımlılıklar bekleniyor... (${maxAttempts} deneme kaldı)`);
+            await this.delay(500); // Daha kısa bekleme süresi
         }
-
-        const initTime = Date.now() - this.initStartTime;
-        console.log(`🎉 Uygulama başlatma tamamlandı (${initTime}ms)`);
-        this.isInitialized = true;
     }
+
+    if (maxAttempts <= 0) {
+        console.warn('⚠️ Başlatma zaman aşımı, ancak uygulama devam edecek');
+        // Zaman aşımında bile uygulamayı durdurma
+    }
+
+    const initTime = Date.now() - this.initStartTime;
+    console.log(`🎉 Uygulama başlatma tamamlandı (${initTime}ms)`);
+    this.isInitialized = true;
+}
 
     isCriticalStep(stepName) {
         const criticalSteps = [
@@ -5213,6 +5209,51 @@ function showEmergencyUI() {
     document.body.appendChild(emergencyBar);
 }
 
+// =============================================
+// EKSİK FONKSİYONLAR
+// =============================================
+
+// reportErrorToAnalytics fonksiyonunu ekleyin
+async function reportErrorToAnalytics(error) {
+    console.error('Hata raporu:', error);
+    // İsterseniz buraya analytics servisi entegrasyonu ekleyebilirsiniz
+    return Promise.resolve();
+}
+
+// initializeDemoMode fonksiyonunu ekleyin
+function initializeDemoMode() {
+    console.log('🔧 Demo modu başlatılıyor...');
+    
+    // Temel işlevleri etkinleştir
+    setupManualMode();
+    setupOfflineDataManagement();
+    
+    // Demo verileri yükle
+    loadDemoData();
+    
+    displayMessage("Demo modu aktif. Temel işlevler kullanılabilir.");
+    speakToUser("Demo modu başlatıldı");
+}
+
+function loadDemoData() {
+    // Demo mağaza tipleri
+    const demoStoreTypes = [
+        { id: 1, name: 'Market' },
+        { id: 2, name: 'Restoran' },
+        { id: 3, name: 'Eczane' }
+    ];
+    displayStoreTypes(demoStoreTypes);
+    
+    // Demo kategoriler
+    const demoCategories = [
+        { id: 1, name: 'Meyve & Sebze' },
+        { id: 2, name: 'Süt Ürünleri' },
+        { id: 3, name: 'İçecekler' }
+    ];
+    displayCategories(demoCategories);
+}
+
+        
 // =============================================
 // UYGULAMA DURUM YÖNETİMİ
 // =============================================
@@ -5523,26 +5564,26 @@ async function createDefaultCommandRules() {
 
 // product_voice_matches tablosu için güvenli sorgu fonksiyonu
 // Güvenli ses eşleştirme sorgusu
+// Güvenli ses eşleştirme sorgusunu güncelleyin
 async function safeVoiceMatchQuery(userInput) {
     try {
         const cleanInput = userInput.toLowerCase()
             .replace(/örneğin|mesela/g, '')
             .trim();
             
-        // 406 hatasını önlemek için daha güvenli sorgu
+        // Daha güvenli sorgu - ilike yerine text arama
         const { data, error } = await supabase
             .from('product_voice_matches')
             .select('matched_product')
-            .ilike('user_input', `%${cleanInput}%`)  // eq yerine ilike
+            .textSearch('user_input', cleanInput) // ilike yerine textSearch
             .eq('success', true)
-            .limit(1);  // single() yerine limit(1)
+            .limit(1);
 
         if (error) {
             console.log('⚠️ Voice match sorgu hatası:', error.message);
             return null;
         }
         
-        // Eğer data varsa ilk sonucu döndür
         return data && data.length > 0 ? data[0] : null;
         
     } catch (error) {
@@ -6237,23 +6278,26 @@ async function useBonusForPayment(userId, usedAmount, orderId) {
 // =============================================
 
 // İsimden referral kuralını getir
+// URL encode sorununu çözmek için
 async function getReferralRuleByName(ruleName) {
     try {
+        // URL encode problemi için daha basit sorgu
         const { data, error } = await supabase
             .from('referral_rules')
             .select('*')
-            .eq('name', ruleName)
-            .eq('is_active', true)
-            .single();
+            .eq('is_active', true);
 
         if (error) throw error;
-        return data;
+        
+        // İstemci tarafında filtrele
+        const rule = data.find(r => r.name === ruleName);
+        return rule || null;
+        
     } catch (error) {
         console.error('Kural getirme hatası:', error);
         return null;
     }
 }
-
 // Kullanıcının bonus bakiyesini getir
 async function getUserBonusBalance(userId) {
     try {
@@ -10765,6 +10809,7 @@ function setupDynamicModalCloseEvents() {
         }
     ];
 }
+        
 // =============================================
 // ÇOKLU DİL DESTEĞİ - BASİT VERSİYON
 // =============================================
@@ -13371,3 +13416,4 @@ function savePaymentInfoManually() {
 </body>
 
 </html>
+
