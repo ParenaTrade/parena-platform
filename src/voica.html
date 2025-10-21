@@ -4933,61 +4933,61 @@ class AppInitializer {
         });
     }
 
-    // Başlatma adımlarını yürüt
-    async function executeSteps() {
-    this.initStartTime = Date.now();
-    console.log('🚀 Uygulama başlatma başlıyor...');
+    // Başlatma adımlarını yürüt - DÜZELTİLDİ: function anahtar kelimesi kaldırıldı
+    async executeSteps() {
+        this.initStartTime = Date.now();
+        console.log('🚀 Uygulama başlatma başlıyor...');
 
-    let executedCount = 0;
-    let maxAttempts = this.initializationSteps.length * 3; // Daha fazla deneme hakkı
+        let executedCount = 0;
+        let maxAttempts = this.initializationSteps.length * 3; // Daha fazla deneme hakkı
 
-    while (executedCount < this.initializationSteps.length && maxAttempts > 0) {
-        let stepExecuted = false;
+        while (executedCount < this.initializationSteps.length && maxAttempts > 0) {
+            let stepExecuted = false;
 
-        for (const step of this.initializationSteps) {
-            if (!step.executed && this.checkDependencies(step)) {
-                try {
-                    console.log(`⚡ ${step.name} başlatılıyor...`);
-                    await step.function();
-                    step.executed = true;
-                    step.success = true;
-                    executedCount++;
-                    stepExecuted = true;
-                    
-                    console.log(`✅ ${step.name} tamamlandı`);
-                } catch (error) {
-                    console.error(`❌ ${step.name} hatası:`, error);
-                    step.executed = true;
-                    step.success = false;
-                    executedCount++;
-                    
-                    // Kritik olmayan hatalarda devam et
-                    if (!this.isCriticalStep(step.name)) {
-                        console.warn(`⚠️ ${step.name} hatası atlanıyor...`);
-                    } else {
-                        console.warn(`⚠️ Kritik hata ama devam ediliyor: ${step.name}`);
-                        // Kritik hatalarda bile uygulamayı durdurma, devam et
+            for (const step of this.initializationSteps) {
+                if (!step.executed && this.checkDependencies(step)) {
+                    try {
+                        console.log(`⚡ ${step.name} başlatılıyor...`);
+                        await step.function();
+                        step.executed = true;
+                        step.success = true;
+                        executedCount++;
+                        stepExecuted = true;
+                        
+                        console.log(`✅ ${step.name} tamamlandı`);
+                    } catch (error) {
+                        console.error(`❌ ${step.name} hatası:`, error);
+                        step.executed = true;
+                        step.success = false;
+                        executedCount++;
+                        
+                        // Kritik olmayan hatalarda devam et
+                        if (!this.isCriticalStep(step.name)) {
+                            console.warn(`⚠️ ${step.name} hatası atlanıyor...`);
+                        } else {
+                            console.warn(`⚠️ Kritik hata ama devam ediliyor: ${step.name}`);
+                            // Kritik hatalarda bile uygulamayı durdurma, devam et
+                        }
                     }
                 }
             }
+
+            if (!stepExecuted) {
+                maxAttempts--;
+                console.log(`⏳ Bağımlılıklar bekleniyor... (${maxAttempts} deneme kaldı)`);
+                await this.delay(500); // Daha kısa bekleme süresi
+            }
         }
 
-        if (!stepExecuted) {
-            maxAttempts--;
-            console.log(`⏳ Bağımlılıklar bekleniyor... (${maxAttempts} deneme kaldı)`);
-            await this.delay(500); // Daha kısa bekleme süresi
+        if (maxAttempts <= 0) {
+            console.warn('⚠️ Başlatma zaman aşımı, ancak uygulama devam edecek');
+            // Zaman aşımında bile uygulamayı durdurma
         }
-    }
 
-    if (maxAttempts <= 0) {
-        console.warn('⚠️ Başlatma zaman aşımı, ancak uygulama devam edecek');
-        // Zaman aşımında bile uygulamayı durdurma
+        const initTime = Date.now() - this.initStartTime;
+        console.log(`🎉 Uygulama başlatma tamamlandı (${initTime}ms)`);
+        this.isInitialized = true;
     }
-
-    const initTime = Date.now() - this.initStartTime;
-    console.log(`🎉 Uygulama başlatma tamamlandı (${initTime}ms)`);
-    this.isInitialized = true;
-}
 
     isCriticalStep(stepName) {
         const criticalSteps = [
@@ -13416,4 +13416,5 @@ function savePaymentInfoManually() {
 </body>
 
 </html>
+
 
