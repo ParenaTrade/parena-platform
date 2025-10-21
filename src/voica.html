@@ -3496,7 +3496,7 @@ async function addDeliveryInfoToSellers(sellersList) {
 }      
 
 
-   // =============================================
+ // =============================================
 // SUPABASE SORGULARI İÇİN GÜVENLİ FONKSİYON
 // =============================================
 
@@ -3595,193 +3595,6 @@ function safeOrder(query, column, direction = 'asc', foreignTable = null) {
     });
 }
 
-
-// =============================================
-// VERİTABANI ODAKLI AKILLI FİLTRELEME
-// =============================================
-
-async function findProductByNameForFilter(searchTerm) {
-    if (!products || products.length === 0) return false;
-    
-    const cleanSearch = searchTerm.toLowerCase().trim();
-    
-    try {
-        // ⭐ VERİTABANINDA AKILLI ARAMA
-        const { data: categoryResults, error: categoryError } = await supabase
-            .from('categories')
-            .select('id, name')
-            .ilike('name', `%${cleanSearch}%`);
-        
-        const { data: reyonResults, error: reyonError } = await supabase
-            .from('reyon')
-            .select('id, name') 
-            .ilike('name', `%${cleanSearch}%`);
-        
-        // Mevcut products array'inde arama
-        const productMatches = products.filter(product => 
-            product.name.toLowerCase().includes(cleanSearch) ||
-            (product.category_name && product.category_name.toLowerCase().includes(cleanSearch)) ||
-            (product.reyon_name && product.reyon_name.toLowerCase().includes(cleanSearch))
-        );
-        
-        // Eşleşme varsa true döndür
-        const hasMatches = productMatches.length > 0 || 
-                          (categoryResults && categoryResults.length > 0) ||
-                          (reyonResults && reyonResults.length > 0);
-        
-        console.log(`🔍 Veritabanı arama: "${cleanSearch}" -> ${hasMatches ? 'EŞLEŞME' : 'EŞLEŞME YOK'}`);
-        return hasMatches;
-        
-    } catch (error) {
-        console.error('❌ Veritabanı arama hatası:', error);
-        
-        // Fallback: Local array'de arama
-        return products.some(product => 
-            product.name.toLowerCase().includes(cleanSearch)
-        );
-    }
-}
-
-// =============================================
-// GELİŞMİŞ FİLTRELEME SİSTEMİ
-// =============================================
-
-async function smartFilterProducts(searchTerm) {
-    const cleanSearch = searchTerm.toLowerCase().trim();
-    
-    try {
-        // ⭐ VERİTABANINDA KAPSAMLI ARAMA
-        const { data: filteredProducts, error } = await supabase
-            .from('products')
-            .select(`
-                *,
-                categories (name),
-                reyon (name),
-                store_type (name)
-            `)
-            .or(`name.ilike.%${cleanSearch}%,description.ilike.%${cleanSearch}%,categories.name.ilike.%${cleanSearch}%,reyon.name.ilike.%${cleanSearch}%`)
-            .eq('is_active', true);
-        
-        if (error) throw error;
-        
-        console.log(`🎯 Veritabanı filtreleme: "${cleanSearch}" -> ${filteredProducts?.length || 0} ürün`);
-        return filteredProducts || [];
-        
-    } catch (error) {
-        console.error('❌ Veritabanı filtreleme hatası:', error);
-        
-        // ⭐ FALLBACK: Local array filtreleme
-        return products.filter(product => 
-            product.name.toLowerCase().includes(cleanSearch) ||
-            (product.description && product.description.toLowerCase().includes(cleanSearch)) ||
-            (product.category_name && product.category_name.toLowerCase().includes(cleanSearch)) ||
-            (product.reyon_name && product.reyon_name.toLowerCase().includes(cleanSearch)) ||
-            (product.brand && product.brand.toLowerCase().includes(cleanSearch))
-        );
-    }
-}
-
-// =============================================
-// GÜNCELLENMİŞ displayProducts FONKSİYONU
-// =============================================
-
-function displayProducts(productsToShow, searchTerm = null, filteredFrom = null) {
-    const productsGrid = document.getElementById('productsGrid');
-    if (!productsGrid) return;
-
-    productsGrid.innerHTML = '';
-
-    // Başlık bilgisi
-    let headerInfo = '';
-    if (searchTerm) {
-        headerInfo = `🔍 "${searchTerm}" - ${productsToShow.length} ürün`;
-    } else if (filteredFrom) {
-        headerInfo = `🎯 ${filteredFrom} - ${productsToShow.length} ürün`;
-    }
-
-    if (productsToShow.length === 0) {
-        productsGrid.innerHTML = `
-            <div class="text-center" style="min-width: 100%; padding: 40px; color: #6c757d;">
-                <i class="fas fa-search fa-3x mb-3"></i>
-                <p>${searchTerm ? `"${searchTerm}" için ürün bulunamadı` : 'Ürün bulunamadı'}</p>
-                ${searchTerm ? `
-                    <div style="margin-top: 15px;">
-                        <button class="add-to-cart-btn" onclick="displayProducts(products, '')" 
-                                style="margin: 5px;">Tüm Ürünleri Göster</button>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-        return;
-    }
-
-    // Ürünleri göster
-    productsToShow.forEach((product, index) => {
-        const productCard = createProductCard(product, index + 1);
-        productsGrid.appendChild(productCard);
-    });
-
-    updateProductCartCounts();
-    
-    // Slider'ı göster
-    const slider = document.querySelector('.command-slider-header');
-    if (slider) slider.style.display = 'block';
-}
-
-// =============================================
-// ÜRÜN KARTI OLUŞTURMA (AYRI FONKSİYON)
-// =============================================
-
-function createProductCard(product, displayIndex) {
-    const productCard = document.createElement('div');
-    productCard.className = 'product-card';
-    productCard.dataset.productId = product.id;
-    productCard.dataset.productIndex = displayIndex;
-
-    let badgeHTML = '';
-    let priceHTML = '';
-    let categoryInfo = '';
-
-    // Kategori/Reyon bilgisi
-    if (product.category_name || product.reyon_name) {
-        categoryInfo = `<div class="product-category">${product.category_name || ''} ${product.reyon_name ? `• ${product.reyon_name}` : ''}</div>`;
-    }
-
-    if (product.discount_price && product.discount_price < product.price) {
-        badgeHTML = `<div class="product-badge">İndirim</div>`;
-        priceHTML = `
-            <span class="product-price">${money(product.discount_price)}</span>
-            <span class="product-discount">${money(product.price)}</span>
-        `;
-    } else {
-        priceHTML = `<span class="product-price">${money(product.price)}</span>`;
-    }
-
-    productCard.innerHTML = `
-        ${badgeHTML}
-        <div class="product-number">${displayIndex}</div>
-        <div class="voice-command-hint">
-            <i class="fas fa-microphone"></i>
-            <span>"${displayIndex} numara"</span>
-        </div>
-        <img src="${product.imgurl || 'https://via.placeholder.com/150x100?text=Ürün'}"
-             alt="${product.name}" 
-             class="product-image">
-        <div class="product-info">
-            <div class="product-name">${product.name}</div>
-            ${categoryInfo}
-            <div class="product-price">${priceHTML}</div>
-            <button class="add-to-cart-btn" data-id="${product.id}">Sepete Ekle</button>
-        </div>
-    `;
-
-    const addToCartBtn = productCard.querySelector('.add-to-cart-btn');
-    addToCartBtn.addEventListener('click', function() {
-        addToCart(product, 1, productCard);
-    });
-
-    return productCard;
-}
 
         
 // ÜRÜN GÖSTERİM FONKSİYONUNU GÜNCELLE (searchTerm parametresi eklendi)
@@ -13860,6 +13673,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
