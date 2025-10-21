@@ -5923,6 +5923,222 @@ async function processVoiceCommand(transcript) {
             return;
         }
 
+
+// =============================================
+// GELİŞMİŞ BONUS ÖDEME SİSTEMİ
+// =============================================
+
+async function handleBonusPayment(orderId, customerId, totalAmount) {
+    try {
+        // 1. Kullanıcı bonus bakiyesini kontrol et
+        const { data: customer, error: customerError } = await supabase
+            .from('customers')
+            .select('bonus_balance')
+            .eq('id', customerId)
+            .single();
+
+        if (customerError) throw customerError;
+
+        const bonusBalance = customer.bonus_balance || 0;
+        
+        // 2. Bonus bakiyesini kullanıcıya söyle
+        displayMessage(`💰 Bonus bakiyeniz: ${money(bonusBalance)}`);
+        speakToUser(`Bonus bakiyeniz ${money(bonusBalance)}`);
+
+        // 3. Yeterli bonus varsa
+        if (bonusBalance >= totalAmount) {
+            const confirm = await askConfirmation(
+                `🎯 ${money(bonusBalance)} bonus bakiyeniz var. Sipariş tutarı: ${money(totalAmount)}. Tamamını bonus ile ödemek istiyor musunuz?`
+            );
+            
+            if (confirm) {
+                // Tamamı bonus ile ödeme
+                return await processFullBonusPayment(orderId, customerId, totalAmount, bonusBalance);
+            } else {
+                // Kısmi ödeme seçeneğine geç
+                return await processPartialPayment(orderId, customerId, totalAmount, bonusBalance);
+            }
+        } 
+        // 4. Yetersiz bonus varsa
+        else if (bonusBalance > 0) {
+            displayMessage(`💰 Bonus bakiyeniz: ${money(bonusBalance)}. Sipariş tutarı: ${money(totalAmount)}. Kısmi ödeme yapmak ister misiniz?`);
+            speakToUser(`Bonus bakiyeniz yetersiz, kısmi ödeme yapabilirsiniz`);
+            
+            const confirm = await askConfirmation(
+                `${money(bonusBalance)} bonus kullanılsın mı? Kalan ${money(totalAmount - bonusBalance)} için ödeme yöntemi seçeceksiniz.`
+            );
+            
+            if (confirm) {
+                return await processPartialPayment(orderId, customerId, totalAmount, bonusBalance);
+            } else {
+                // Bonus kullanmadan diğer ödeme yöntemlerine geç
+                return await processNonBonusPayment(orderId, customerId, totalAmount);
+            }
+        }
+        // 5. Hiç bonus yoksa
+        else {
+            displayMessage("❌ Bonus bakiyeniz bulunmamaktadır.");
+            speakToUser("Bonus bakiyeniz yok");
+            return await processNonBonusPayment(orderId, customerId, totalAmount);
+        }
+
+    } catch (error) {
+        console.error('Bonus ödeme işlemi hatası:', error);
+        return false;
+    }
+}
+
+// =============================================
+// TAM BONUS ÖDEME
+// =============================================
+
+async function processFullBonusPayment(orderId, customerId, totalAmount, bonusBalance) {
+    try {
+        // 1. Bonus kullanım kaydı
+        const { data: payment, error: paymentError } = await supabase
+            .from('customer_payments')
+            .insert([{
+                order_id: orderId,
+                customer_id: customerId,
+                payment_method: 'bonus',
+                amount: totalAmount,
+                payment_type: 'bonus_only',
+                bonus_amount: totalAmount,
+                status: 'completed'
+            }])
+            .select()
+            .single();
+
+        if (paymentError) throw paymentError;
+
+        // 2. Bonus bakiyesini güncelle
+        const newBalance = bonusBalance - totalAmount;
+        const { error: updateError } = await supabase
+            .from('customers')
+            .update({ bonus_balance: newBalance })
+            .eq('id', customerId);
+
+        if (updateError) throw updateError;
+
+        // 3. Sipariş durumunu güncelle
+        await updateOrderStatus(orderId, 'paid');
+
+        displayMessage(`✅ Ödeme tamamlandı! ${money(totalAmount)} bonus kullanıldı. Yeni bakiye: ${money(newBalance)}`);
+        speakToUser(`Ödeme tamamlandı, bonus kullanıldı`);
+
+        return true;
+
+    } catch (error) {
+        console.error('Tam bonus ödeme hatası:', error);
+        return false;
+    }
+}
+
+// =============================================
+// KISMI ÖDEME SİSTEMİ
+// =============================================
+
+async function processPartialPayment(orderId, customerId, totalAmount, bonusBalance) {
+    const usedBonus = Math.min(bonusBalance, totalAmount);
+    const remainingAmount = totalAmount - usedBonus;
+
+    // 1. Kalan ödeme yöntemini sor
+    displayMessage(`💰 ${money(usedBonus)} bonus kullanılacak. Kalan ${money(remainingAmount)} için ödeme yöntemi seçin.`);
+    speakToUser(`Kalan tutar için ödeme yöntemi seçin`);
+
+    const paymentMethod = await askPaymentMethod(remainingAmount);
+    
+    if (!paymentMethod) {
+        displayMessage("❌ Ödeme yöntemi seçilmedi.");
+        return false;
+    }
+
+    try {
+        // 2. Karma ödeme kaydı
+        const paymentData = {
+            order_id: orderId,
+            customer_id: customerId,
+            payment_method: 'mixed',
+            amount: totalAmount,
+            payment_type: 'partial',
+            bonus_amount: usedBonus,
+            status: 'completed'
+        };
+
+        // Ödeme yöntemine göre alanları doldur
+        if (paymentMethod === 'cash') {
+            paymentData.cash_amount = remainingAmount;
+        } else if (paymentMethod === 'card') {
+            paymentData.card_amount = remainingAmount;
+        }
+
+        const { data: payment, error: paymentError } = await supabase
+            .from('customer_payments')
+            .insert([paymentData])
+            .select()
+            .single();
+
+        if (paymentError) throw paymentError;
+
+        // 3. Bonus bakiyesini güncelle
+        const newBalance = bonusBalance - usedBonus;
+        const { error: updateError } = await supabase
+            .from('customers')
+            .update({ bonus_balance: newBalance })
+            .eq('id', customerId);
+
+        if (updateError) throw updateError;
+
+        // 4. Sipariş durumunu güncelle
+        await updateOrderStatus(orderId, 'paid');
+
+        displayMessage(`✅ Ödeme tamamlandı! ${money(usedBonus)} bonus + ${money(remainingAmount)} ${paymentMethod === 'cash' ? 'nakit' : 'kart'} kullanıldı.`);
+        speakToUser(`Karma ödeme tamamlandı`);
+
+        return true;
+
+    } catch (error) {
+        console.error('Kısmi ödeme hatası:', error);
+        return false;
+    }
+}
+
+// =============================================
+// YARDIMCI FONKSİYONLAR
+// =============================================
+
+async function askConfirmation(question) {
+    return new Promise((resolve) => {
+        displayMessage(`${question} (Evet/Hayır)`);
+        speakToUser(question);
+        
+        // Burada kullanıcıdan sesli veya butonla onay bekleyecek kod
+        // Şimdilik basitçe true döndürüyoruz
+        resolve(true);
+    });
+}
+
+async function askPaymentMethod(amount) {
+    return new Promise((resolve) => {
+        displayMessage(`💳 Kalan ${money(amount)} için ödeme yöntemi: Nakit mi Kart mı?`);
+        speakToUser(`Nakit mi kart mı?`);
+        
+        // Burada kullanıcıdan sesli veya butonla ödeme yöntemi seçimi
+        // Şimdilik 'cash' döndürüyoruz
+        resolve('cash');
+    });
+}
+
+async function updateOrderStatus(orderId, status) {
+    const { error } = await supabase
+        .from('orders')
+        .update({ status: status })
+        .eq('id', orderId);
+
+    if (error) throw error;
+}
+
+        
         // =============================================
         // 3. REFERRAL KOMUTLARI - YENİ SİSTEM İLE ENTEGRE
         // =============================================
@@ -13644,6 +13860,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
