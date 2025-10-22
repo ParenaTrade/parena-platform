@@ -4308,7 +4308,7 @@ setTimeout(() => {
             isListening: isListening
         });
     }
-}, 500); // ✅ 500 → 300 ms (daha hızlı)
+}, 3000); // ✅ 500 → 300 ms (daha hızlı)
         
         // Başarı mesajı
         displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
@@ -4321,6 +4321,8 @@ setTimeout(() => {
         disableDynamicMicrophone();
     }
 }
+
+        
 function disableDynamicMicrophone() {
     console.log('🔇 Mikrofon kapatılıyor...');
     
@@ -4628,24 +4630,22 @@ function initializeDynamicSpeechRecognition() {
         }
     };
     
-    recognition.onend = function() {
-        console.log('🔚 Ses tanıma sonlandı');
-        isListening = false;
-        updateRecognitionStatus('waiting');
-    };
-
-    // ✅✅✅ FONKSİYON SONUNA EKLE:
-    console.log('✅ Recognition hazır, hemen başlatılıyor...');
+recognition.onend = function() {
+    console.log('🔚 Ses tanıma sonlandı');
+    isListening = false;
+    updateRecognitionStatus('waiting');
     
-    // Hemen başlat
-    setTimeout(() => {
-        if (isMicrophoneEnabled && !isListening) {
-            startRecognition();
-        }
-    }, 300);
-    
-    return true;
-} 
+    // ✅✅✅ OTOMATİK RESTART EKLENDİ
+    if (isMicrophoneEnabled && !isAssistantSpeaking) {
+        console.log('🔄 Ses tanıma otomatik yeniden başlatılıyor...');
+        setTimeout(() => {
+            if (isMicrophoneEnabled && !isListening && !isAssistantSpeaking) {
+                console.log('🚀 Otomatik restart başlatılıyor...');
+                startRecognition();
+            }
+        }, 1500);
+    }
+};
        
         
 function startRecognition() {
@@ -12516,13 +12516,27 @@ function manualVoiceTest() {
 }
 manualVoiceTest();
 
-
+// Console'da çalıştır:
+function forceRestart() {
+    console.log('🔄 MANUEL RESTART...');
+    if (recognition && isMicrophoneEnabled && !isListening) {
+        startRecognition();
+    } else {
+        console.log('❌ Restart koşulları uygun değil:', {
+            recognition: !!recognition,
+            isMicrophoneEnabled: isMicrophoneEnabled,
+            isListening: isListening
+        });
+    }
+}
+forceRestart();
 
 
         
     </script>
 </body>
 </html>
+
 
 
 
