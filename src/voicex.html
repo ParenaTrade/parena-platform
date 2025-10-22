@@ -4255,7 +4255,7 @@ function isSimilarMessage(newMessage, oldMessage) {
 // MİKROFON ve SES TANIMA
 // =============================================
 // ✅ MİKROFON YÖNETİMİ
-async function enableDynamicMicrophone() {
+    async function enableDynamicMicrophone() {
     console.log('🎤 Mikrofon açılmak isteniyor...');
     
     // Konum kontrolü
@@ -4293,16 +4293,20 @@ async function enableDynamicMicrophone() {
         // UI güncelleme
         updateMicrophoneUI(true);
         
-        // Ses tanımayı başlat
+        // ✅✅✅ CRITICAL FIX - setTimeout KALDIR, HEMEN BAŞLAT:
+        console.log('🚀 Ses tanıma HEMEN başlatılıyor...');
+        initializeDynamicSpeechRecognition();
+        
+        // ✅ RECOGNITION'ı HEMEN BAŞLAT:
         setTimeout(() => {
-            initializeDynamicSpeechRecognition();
-        }, 500);
+            if (recognition && !isListening) {
+                startRecognition();
+            }
+        }, 100);
         
         // Başarı mesajı
-        setTimeout(() => {
-            displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
-            speakToUser("mikrofon açıldı");
-        }, 1000);
+        displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
+        speakToUser("mikrofon açıldı");
         
     } catch (error) {
         console.error('❌ Mikrofon hatası:', error);
@@ -4311,7 +4315,6 @@ async function enableDynamicMicrophone() {
         disableDynamicMicrophone();
     }
 }
-
 function disableDynamicMicrophone() {
     console.log('🔇 Mikrofon kapatılıyor...');
     
@@ -4626,6 +4629,19 @@ function initializeDynamicSpeechRecognition() {
     };
     return true;
 }
+
+    // ✅✅✅ FONKSİYON SONUNA EKLE:
+    console.log('✅ Recognition hazır, hemen başlatılıyor...');
+    
+    // Hemen başlat
+    setTimeout(() => {
+        if (isMicrophoneEnabled && !isListening) {
+            startRecognition();
+        }
+    }, 300);
+    
+    return true;
+}        
         
 function startRecognition() {
     if (!recognition) {
@@ -12418,6 +12434,7 @@ fixRecognition();
     </script>
 </body>
 </html>
+
 
 
 
