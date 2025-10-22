@@ -6083,7 +6083,7 @@ async function processVoiceCommand(transcript) {
 
     try {
         // =============================================
-        // 0. ÖZEL: EVET/HAYIR KONTROLÜ (EN ÖNCELİKLİ)
+        // 1. ÖZEL: EVET/HAYIR KONTROLÜ (EN ÖNCELİKLİ)
         // =============================================
         
         // Adres onayı bekleniyorsa
@@ -6101,7 +6101,7 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // 1. ÖNCELİK: ÖDEME SÜRECİ KONTROLLERİ
+        // 2. ÖDEME SÜRECİ INPUT KONTROLLERİ
         // =============================================
         
         // Telefon numarası bekleniyor
@@ -6141,9 +6141,10 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // 2. ÖDEME KOMUTLARI
+        // 3. ÖDEME KOMUTLARI (checkPaymentCommands KULLANARAK)
         // =============================================
         
+        // ÖDEME MODALI AÇMA
         if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
             if (cart.length === 0) {
                 displayMessage("❌ Sepetiniz boş. Ödeme yapabilmek için sepete ürün ekleyin.");
@@ -6157,51 +6158,31 @@ async function processVoiceCommand(transcript) {
             return;
         }
         
-        // Nakit ödeme
-        if (message.includes('nakit') || message.includes('para ile')) {
+        // checkPaymentCommands İLE ÖDEME YÖNTEMİ SEÇİMİ
+        const paymentMethod = checkPaymentCommands(message);
+        if (paymentMethod) {
             if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
+                displayMessage("❌ Sepetiniz boş. Ödeme yapabilmek için sepete ürün ekleyin.");
                 speakToUser("Sepetiniz boş");
                 return;
             }
-            startPaymentProcess('cash');
-            return;
-        }
-        
-        // Kart ile ödeme
-        if (message.includes('kart') || message.includes('kredi kartı') || message.includes('bank kartı')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
-                speakToUser("Sepetiniz boş");
-                return;
-            }
-            startPaymentProcess('card');
-            return;
-        }
-        
-        // Bonus ile ödeme
-        if (message.includes('bonus') || message.includes('puan') || message.includes('puanla')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
-                speakToUser("Sepetiniz boş");
-                return;
-            }
-            startPaymentProcess('bonus');
+            console.log(`💰 Ödeme komutu algılandı: ${paymentMethod}`);
+            startPaymentProcess(paymentMethod);
             return;
         }
 
         // =============================================
-        // 3. REFERRAL KOMUTLARI - YENİ SİSTEM İLE ENTEGRE
+        // 4. REFERRAL KOMUTLARI
         // =============================================
         
-        // Yeni referral sistemi ile entegre
         const referralHandled = await handleReferralVoiceCommand(message);
         if (referralHandled) return;
 
         // =============================================
-        // 4. SEPET YÖNETİMİ KOMUTLARI
+        // 5. SEPET YÖNETİMİ KOMUTLARI
         // =============================================
         
+        // SEPETİ TEMİZLEME
         const clearCartCommands = [
             'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
             'clear cart', 'empty cart', 'reset cart', 'temizle',
@@ -6214,21 +6195,22 @@ async function processVoiceCommand(transcript) {
             return;
         }
         
-        // Sepet görüntüleme
+        // SEPET GÖRÜNTÜLEME
         if (message.includes('sepet') || message.includes('sepetim') || message.includes('sepeti göster')) {
             if (cart.length === 0) {
                 displayMessage("🛒 Sepetiniz boş");
                 speakToUser("Sepetiniz boş");
             } else {
                 openDynamicCart();
+                const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
                 displayMessage(`🛒 Sepetinizde ${cart.length} ürün bulunuyor`);
-                speakToUser(`Sepetinizde ${cart.reduce((sum, item) => sum + item.quantity, 0)} adet ürün var`);
+                speakToUser(`Sepetinizde ${totalItems} adet ürün var`);
             }
             return;
         }
 
         // =============================================
-        // 5. TESLİMAT KONTROL KOMUTLARI
+        // 6. TESLİMAT KONTROL KOMUTLARI
         // =============================================
         
         if (message.includes('mesafe') || message.includes('uzaklık') || message.includes('kaç km')) {
@@ -6254,17 +6236,24 @@ async function processVoiceCommand(transcript) {
         }
 
         // =============================================
-        // 6. AKILLI ÜRÜN FİLTRELEME SİSTEMİ (YENİ EKLENDİ)
+        // 7. ÜRÜN FİLTRELEME VE EKLEME
         // =============================================
         
-        // Ürün filtreleme - sadece kategori/reyn seçiliyse ve numara içermiyorsa
+        // AKILLI ÜRÜN FİLTRELEME
         if ((currentRoot === "5:0" || selectedCategoryId) && products.length > 0 && !message.includes('numara')) {
             console.log('🔍 Akıllı filtreleme deneniyor:', message);
+            
+            // "evet" ve "hayır" ürün olarak algılanmasın
+            if (message === 'evet' || message === 'hayır') {
+                console.log('🚫 "evet/hayır" ürün olarak algılanmadı');
+                displayMessage("❌ Lütfen ürün ismi söyleyin");
+                speakToUser("Ürün ismi söyleyin");
+                return;
+            }
             
             const hasMatches = await findProductByNameForFilter(message);
             
             if (hasMatches) {
-                // Veritabanından filtreli ürünleri getir
                 const filteredProducts = await smartFilterProducts(message);
                 
                 if (filteredProducts.length > 0) {
@@ -6275,15 +6264,25 @@ async function processVoiceCommand(transcript) {
                 }
             }
             
-            // Eşleşme yoksa kullanıcıyı bilgilendir ama işlemi durdurma
             console.log(`❌ "${message}" için eşleşme bulunamadı, normal akışa devam`);
         }
 
+        // ÜRÜN EKLEME
+        if ((currentRoot === "5:0" || selectedCategoryId) && products.length > 0) {
+            console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
+            
+            const success = await handleVoiceProductAdd(filteredMessage);
+            if (success) {
+                console.log('✅ Ürün başarıyla eklendi');
+                return;
+            }
+        }
+
         // =============================================
-        // 7. ALIŞVERİŞ AKIŞI KOMUTLARI
+        // 8. ALIŞVERİŞ AKIŞI KOMUTLARI
         // =============================================
 
-        // MAĞAZA TİPİ SEÇİMİ - Kök 2:0 veya 2:1
+        // MAĞAZA TİPİ SEÇİMİ
         if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
             console.log('🏪 Mağaza seçim komutu algılandı');
             const success = await handleVoiceStoreSelection(filteredMessage);
@@ -6293,21 +6292,21 @@ async function processVoiceCommand(transcript) {
             }
         }
         
-        // TÜM SATICILARI GÖSTER KOMUTU
+        // TÜM SATICILARI GÖSTER
         if (message.includes('tüm satıcılar') || message.includes('tüm mağazalar') || message.includes('hepsini göster')) {
             showAllSellers();
             speakToUser("Tüm satıcılar gösteriliyor");
             return;
         }
 
-        // SATICI SEÇİMİ - Kök 2:0, 2:1 veya 3:0
+        // SATICI SEÇİMİ
         if ((currentRoot === "2:0" || currentRoot === "2:1" || currentRoot === "3:0") && hasSellerKeywords(filteredMessage)) {
             console.log('🏬 Satıcı seçim komutu algılandı');
             const success = await handleVoiceSellerSelection(filteredMessage);
             if (success) return;
         }
 
-        // SATICI DURUMU KOMUTLARI
+        // SATICI DURUMU
         if (message.includes('açık mağaza') || message.includes('açık satıcı') || message.includes('hangi mağaza açık')) {
             await showOpenSellers();
             return;
@@ -6323,59 +6322,40 @@ async function processVoiceCommand(transcript) {
             return;
         }
 
-        // REYON SEÇİMİ - Kök 3:0, 4:0 veya satıcı seçili ama kategori seçilmemiş
+        // REYON SEÇİMİ
         if ((currentRoot === "3:0" || currentRoot === "4:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
             console.log('📦 Reyon seçim komutu algılandı');
             const success = await handleVoiceCategorySelection(filteredMessage);
             if (success) return;
         }
 
-        // ÜRÜN EKLEME - Kök 5:0 veya kategori seçili
-        if ((currentRoot === "5:0" || selectedCategoryId) && products.length > 0) {
-            console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
-            
-            // "evet" ve "hayır" ürün olarak algılanmasın
-            if (message === 'evet' || message === 'hayır') {
-                console.log('🚫 "evet/hayır" ürün olarak algılanmadı');
-                displayMessage("❌ Lütfen ürün ismi söyleyin");
-                speakToUser("Ürün ismi söyleyin");
-                return;
-            }
-            
-            const success = await handleVoiceProductAdd(filteredMessage);
-            if (success) {
-                console.log('✅ Ürün başarıyla eklendi');
-                return;
-            }
-        }
-
         // =============================================
-        // 8. NAVİGASYON KOMUTLARI
+        // 9. NAVİGASYON KOMUTLARI
         // =============================================
         
-        // Geri gitme
+        // GERİ GİTME
         if (message.includes('geri') || message.includes('geri git') || message.includes('back')) {
             await handleBackNavigation();
             return;
         }
         
-        // Ana sayfa
+        // ANA SAYFA
         if (message.includes('ana sayfa') || message.includes('başlangıç') || message.includes('home')) {
             resetToHome();
             return;
         }
         
-        // Yardım
+        // YARDIM
         if (message.includes('yardım') || message.includes('help') || message.includes('nasıl')) {
             showHelp();
             return;
         }
 
         // =============================================
-        // 9. SİSTEM KOMUTLARI
+        // 10. SİSTEM KOMUTLARI
         // =============================================
         
-        // Mikrofon kontrolü
+        // MİKROFON KONTROLÜ
         if (message.includes('mikrofon') || message.includes('ses')) {
             if (message.includes('aç') || message.includes('başlat')) {
                 if (!isMicrophoneEnabled) {
@@ -6390,14 +6370,14 @@ async function processVoiceCommand(transcript) {
             }
         }
         
-        // Konum değiştirme
+        // KONUM DEĞİŞTİRME
         if (message.includes('konum') || message.includes('yer') || message.includes('location')) {
             showDynamicLocationModal();
             return;
         }
 
         // =============================================
-        // 10. FALLBACK MESAJI (SON ÇARE)
+        // 11. FALLBACK MESAJI (SON ÇARE)
         // =============================================
         
         console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
@@ -6415,14 +6395,7 @@ async function processVoiceCommand(transcript) {
         }
     }
 }
-
-        
-
-
-        
-        
-
-        
+          
 
 // =============================================
 // YENİ REFERRAL VE BONUS SİSTEMİ
@@ -13031,6 +13004,137 @@ function showVoiceInputInField(inputId, value, isSuccess = true) {
     }
 }
 
+   // VEYA processOrderConfirmation YENİDEN TANIMLAYALIM
+async function processOrderConfirmation(response) {
+    console.log('✅ Sipariş onayı işleniyor:', response);
+    
+    // Butonları devre dışı bırak (çift tıklamayı önle)
+    const yesBtn = document.querySelector('.yes-btn');
+    const noBtn = document.querySelector('.no-btn');
+    
+    if (yesBtn) yesBtn.disabled = true;
+    if (noBtn) noBtn.disabled = true;
+    
+    if (response === 'evet') {
+        displayMessage("⏳ Siparişiniz onaylanıyor...");
+        speakToUser("Sipariş onaylanıyor");
+        
+        // Bonus ödeme validasyonu
+        if (currentPaymentMethod === 'bonus') {
+            const totalAmount = calculateTotal();
+            const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
+            const usedBonus = window.usedBonusAmount || Math.min(bonusBalance, totalAmount);
+            const remainingAmount = totalAmount - usedBonus;
+            
+            if (remainingAmount > 0 && !window.remainingPaymentMethod) {
+                displayMessage("❌ Lütfen kalan ödeme yöntemini seçin!");
+                speakToUser("Kalan ödeme yöntemi seçilmedi");
+                
+                // Butonları tekrar aktif et
+                if (yesBtn) yesBtn.disabled = false;
+                if (noBtn) noBtn.disabled = false;
+                return;
+            }
+        }
+        
+        // Sesli komutları temizle
+        if (typeof window.restoreVoiceCommands === 'function') {
+            window.restoreVoiceCommands();
+        }
+        
+        // Siparişi onayla
+        try {
+            await completeOrder();
+            displayMessage("🎉 Siparişiniz onaylandı! Teşekkür ederiz.");
+            speakToUser("Siparişiniz onaylandı, teşekkür ederiz");
+        } catch (error) {
+            console.error('❌ Sipariş tamamlama hatası:', error);
+            displayMessage("❌ Sipariş işlenirken hata oluştu.");
+            speakToUser("Teknik bir hata oluştu");
+        }
+        
+    } else {
+        displayMessage("❌ Sipariş iptal edildi.");
+        speakToUser("Sipariş iptal edildi");
+        
+        // Sesli komutları temizle
+        if (typeof window.restoreVoiceCommands === 'function') {
+            window.restoreVoiceCommands();
+        }
+        
+        // Modalı kapat ve temizle
+        setTimeout(() => {
+            closePaymentModal();
+            resetPaymentState();
+        }, 2000);
+    }
+    
+    isWaitingForOrderConfirm = false;
+}
+
+// EKSİK FONKSİYONLARI TANIMLAYALIM (eğer yoksa)
+if (typeof completeOrder === 'undefined') {
+    async function completeOrder() {
+        console.log('✅ Sipariş tamamlanıyor...');
+        
+        try {
+            // Sipariş verilerini hazırla
+            const orderData = {
+                customer_id: currentCustomer?.id,
+                seller_id: selectedSellerId,
+                products: cart,
+                total_amount: calculateTotal(),
+                payment_method: currentPaymentMethod,
+                used_bonus: window.usedBonusAmount || 0,
+                remaining_payment_method: window.remainingPaymentMethod,
+                address: currentAddress
+            };
+            
+            // API'ye gönder
+            const response = await submitOrderToAPI(orderData);
+            
+            if (response.success) {
+                console.log('🎉 Sipariş başarıyla oluşturuldu:', response.order_id);
+                
+                // Sepeti temizle
+                clearCart();
+                
+                // Ödeme durumunu sıfırla
+                resetPaymentState();
+                
+                return response;
+            } else {
+                throw new Error(response.message || 'Sipariş oluşturulamadı');
+            }
+            
+        } catch (error) {
+            console.error('❌ Sipariş tamamlama hatası:', error);
+            throw error;
+        }
+    }
+}
+
+if (typeof resetPaymentState === 'undefined') {
+    function resetPaymentState() {
+        console.log('🔄 Ödeme durumu sıfırlanıyor...');
+        currentPaymentMethod = null;
+        window.usedBonusAmount = 0;
+        window.remainingPaymentMethod = null;
+        isWaitingForOrderConfirm = false;
+        isWaitingForAddressConfirm = false;
+    }
+}
+
+if (typeof closePaymentModal === 'undefined') {
+    function closePaymentModal() {
+        console.log('❌ Ödeme modalı kapatılıyor...');
+        const modal = document.getElementById('paymentModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+}
+
 function highlightVoiceField(inputId) {
     // Önceki vurguları temizle
     document.querySelectorAll('.voice-field-highlight').forEach(el => {
@@ -13777,6 +13881,7 @@ function requestOrderConfirmation() {
 // TÜM SESLİ KOMUTLAR TEK FONKSİYONDA
 // =============================================
 
+// MEVCUT KOD - AYNI KALSIN
 function setupBonusPaymentVoiceCommands() {
     console.log('🎤 Bonus ödeme sesli komutları kuruluyor...');
     
@@ -13877,7 +13982,7 @@ function setupBonusPaymentVoiceCommands() {
     
     console.log(`✅ ${voiceCommands.length} bonus ödeme komutu eklendi`);
 }
-
+        
 function toggleBonusManualEdit() {
     const manualSection = document.getElementById('manualBonusEditSection');
     const toggleBtn = document.querySelector('.manual-edit-toggle-btn');
@@ -14222,6 +14327,22 @@ function handleManualPaymentApply() {
     speakToUser(`Manuel ayar uygulandı. ${money(remainingAmount)} ${manualPaymentMethod === 'cash' ? 'nakit' : 'kart'} ile ödenecek.`);
 }
 
+
+        // Fallback fonksiyonu
+function handleVoiceCommandError(error, transcript) {
+    console.error('Sesli komut hatası:', {
+        error: error.message,
+        transcript: transcript,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Kullanıcıya anlamlı mesaj ver
+    const errorMessage = "Teknik bir hata oluştu. Lütfen tekrar deneyin.";
+    if (Date.now() - lastSpeakTime > SPEAK_COOLDOWN) {
+        displayMessage(`❌ ${errorMessage}`);
+        speakToUser("Teknik bir hata oluştu");
+    }
+}
 // =============================================
 // YARDIMCI FONKSİYON
 // =============================================
@@ -15777,6 +15898,7 @@ async function processRegularPayment(orderId, customerId, totalAmount, paymentMe
     </script>
 </body>
 </html>
+
 
 
 
