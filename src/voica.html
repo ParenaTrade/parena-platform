@@ -12397,6 +12397,81 @@ function getPaymentMethodName(method) {
     return names[method] || 'Ödeme';
 }
 
+        // =============================================
+// EKSİK FONKSİYON: showPaymentModal
+// =============================================
+function showPaymentModal() {
+    console.log('💰 Ödeme modalı açılıyor...');
+    
+    // Modal HTML'ini oluştur
+    const modalHTML = `
+        <div class="payment-modal" id="paymentModal" style="display: flex;">
+            <div class="payment-modal-content">
+                <div class="payment-modal-header">
+                    <h3>Ödeme Yöntemi Seçin</h3>
+                    <button class="close-payment-modal" onclick="closePaymentModal()">&times;</button>
+                </div>
+                <div class="payment-modal-body" id="paymentModalBody">
+                    <div class="payment-method-selection">
+                        <h4>Nasıl ödemek istersiniz?</h4>
+                        <div class="payment-method-buttons">
+                            <button class="payment-method-btn cash-btn" onclick="selectPaymentMethod('cash')">
+                                <i class="fas fa-money-bill-wave"></i> Nakit
+                            </button>
+                            <button class="payment-method-btn card-btn" onclick="selectPaymentMethod('card')">
+                                <i class="fas fa-credit-card"></i> Kart ile
+                            </button>
+                            <button class="payment-method-btn bonus-btn" onclick="selectPaymentMethod('bonus')">
+                                <i class="fas fa-gift"></i> Bonus ile
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="order-summary-details" style="margin-top: 20px;">
+                        <h5>Sipariş Özeti</h5>
+                        <p><strong>Toplam Tutar:</strong> ${money(calculateTotal())}</p>
+                        <p><strong>Ürün Sayısı:</strong> ${cart.reduce((sum, item) => sum + item.quantity, 0)} adet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Modalı ekle
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// =============================================
+// DİĞER EKSİK FONKSİYONLAR (SADECE EKSİK OLANLAR)
+// =============================================
+
+function selectPaymentMethod(method) {
+    console.log(`💰 Ödeme yöntemi seçildi: ${method}`);
+    currentPaymentMethod = method;
+    closePaymentModal();
+    
+    if (method === 'bonus') {
+        showBonusPaymentSelection();
+    } else {
+        requestPhoneNumber();
+    }
+}
+
+function closePaymentModal() {
+    const paymentModal = document.getElementById('paymentModal');
+    if (paymentModal) {
+        paymentModal.remove();
+    }
+}
+
+function requestPhoneNumber() {
+    console.log('📞 Telefon numarası isteniyor...');
+    displayMessage("📞 Lütfen telefon numarası söyleyin:");
+    speakToUser("Telefon numaranızı söyleyin");
+    isWaitingForPhone = true;
+    expectedInput = 'phone';
+}
+
 // EKSİK FONKSİYONU EKLEYELİM
 function formatPhoneNumber(phoneInput) {
     console.log('📞 formatPhoneNumber çağrıldı:', phoneInput);
@@ -12426,6 +12501,8 @@ function formatPhoneNumber(phoneInput) {
     };
 }
 
+
+        
 
     // EĞER cleanPhoneNumber YOKSA BUNU EKLEYİN
 function cleanPhoneNumber(phone) {
@@ -12672,6 +12749,8 @@ function checkPaymentCommands(command) {
     }
 }
 
+
+        
 // YENİ FONKSİYON: BONUS ÖDEME SEÇİMİ
 function showBonusPaymentSelection() {
     console.log('🎁 Bonus ödeme seçimi gösteriliyor...');
@@ -15698,6 +15777,7 @@ async function processRegularPayment(orderId, customerId, totalAmount, paymentMe
     </script>
 </body>
 </html>
+
 
 
 
