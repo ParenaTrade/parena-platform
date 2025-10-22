@@ -12373,45 +12373,67 @@ function getPaymentMethodName(method) {
 // =============================================
 // EKSİK FONKSİYON: showPaymentModal
 // =============================================
+// ÖDEME MODALI AÇMA FONKSİYONU
 function showPaymentModal() {
     console.log('💰 Ödeme modalı açılıyor...');
     
-    // Modal HTML'ini oluştur
-    const modalHTML = `
-        <div class="payment-modal" id="paymentModal" style="display: flex;">
-            <div class="payment-modal-content">
-                <div class="payment-modal-header">
-                    <h3>Ödeme Yöntemi Seçin</h3>
-                    <button class="close-payment-modal" onclick="closePaymentModal()">&times;</button>
-                </div>
-                <div class="payment-modal-body" id="paymentModalBody">
-                    <div class="payment-method-selection">
-                        <h4>Nasıl ödemek istersiniz?</h4>
-                        <div class="payment-method-buttons">
-                            <button class="payment-method-btn cash-btn" onclick="selectPaymentMethod('cash')">
-                                <i class="fas fa-money-bill-wave"></i> Nakit
-                            </button>
-                            <button class="payment-method-btn card-btn" onclick="selectPaymentMethod('card')">
-                                <i class="fas fa-credit-card"></i> Kart ile
-                            </button>
-                            <button class="payment-method-btn bonus-btn" onclick="selectPaymentMethod('bonus')">
-                                <i class="fas fa-gift"></i> Bonus ile
-                            </button>
-                        </div>
+    try {
+        // Modal içeriğini oluştur
+        const modalContent = `
+            <div class="payment-modal" id="paymentModal">
+                <div class="modal-content">
+                    <span class="close-btn" onclick="closePaymentModal()">&times;</span>
+                    <h3>💳 Ödeme Yöntemi Seçin</h3>
+                    <div class="payment-options">
+                        <button onclick="selectPaymentMethod('cash')" class="payment-btn">
+                            💵 Nakit
+                        </button>
+                        <button onclick="selectPaymentMethod('card')" class="payment-btn">
+                            💳 Kart ile Öde
+                        </button>
+                        <button onclick="selectPaymentMethod('bonus')" class="payment-btn">
+                            🎁 Bonus ile Öde
+                        </button>
                     </div>
-                    
-                    <div class="order-summary-details" style="margin-top: 20px;">
-                        <h5>Sipariş Özeti</h5>
-                        <p><strong>Toplam Tutar:</strong> ${money(calculateTotal())}</p>
-                        <p><strong>Ürün Sayısı:</strong> ${cart.reduce((sum, item) => sum + item.quantity, 0)} adet</p>
-                    </div>
+                    <p class="voice-hint">"Nakit", "Kart" veya "Bonus" diyebilirsiniz</p>
                 </div>
             </div>
-        </div>
-    `;
+        `;
+        
+        // Modalı göster
+        document.body.insertAdjacentHTML('beforeend', modalContent);
+        console.log('✅ Ödeme modalı oluşturuldu');
+        
+        // Sesli komutları kur
+        setupPaymentVoiceCommands();
+        
+    } catch (error) {
+        console.error('❌ Ödeme modalı hatası:', error);
+        displayMessage("❌ Ödeme sistemi geçici olarak kullanılamıyor.");
+    }
+}
+
+// ÖDEME YÖNTEMİ SEÇİMİ
+function selectPaymentMethod(method) {
+    console.log(`💰 Ödeme yöntemi seçildi: ${method}`);
     
-    // Modalı ekle
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    try {
+        currentPaymentMethod = method;
+        
+        if (method === 'bonus') {
+            showBonusPaymentSelection();
+        } else {
+            // Nakit veya kart için direkt telefon numarası iste
+            requestPhoneNumber();
+        }
+        
+        // Modalı kapat
+        closePaymentModal();
+        
+    } catch (error) {
+        console.error('❌ Ödeme yöntemi seçim hatası:', error);
+        displayMessage("❌ Ödeme yöntemi seçilemedi. Lütfen tekrar deneyin.");
+    }
 }
 
 // =============================================
@@ -15898,6 +15920,7 @@ async function processRegularPayment(orderId, customerId, totalAmount, paymentMe
     </script>
 </body>
 </html>
+
 
 
 
