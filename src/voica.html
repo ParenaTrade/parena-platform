@@ -13863,6 +13863,39 @@ async function saveOrder() {
         const totalAmount = calculateTotal();
         const deliveryAddress = formatDeliveryAddress();
         
+        // Ödeme detaylarını hazırla
+        let paymentNotes = `Teslimat adresi: ${deliveryAddress}. Ödeme: ${getPaymentMethodName(currentPaymentMethod)}`;
+        let usedBonus = 0;
+        let remainingPaymentMethod = null;
+        let remainingAmount = 0;
+        
+        // Manuel ödeme verilerini kontrol et
+        if (window.manualPaymentData) {
+            usedBonus = window.manualPaymentData.bonus;
+            remainingAmount = window.manualPaymentData.cash + window.manualPaymentData.card;
+            remainingPaymentMethod = window.manualPaymentData.cash > 0 ? 'cash' : 'card';
+        } else if (currentPaymentMethod === 'bonus') {
+            const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
+            usedBonus = window.usedBonusAmount || Math.min(bonusBalance, totalAmount);
+            remainingAmount = totalAmount - usedBonus;
+            remainingPaymentMethod = window.remainingPaymentMethod;
+        }
+        
+        // Orders tablosu için ödeme yöntemi metnini hazırla
+        let paymentMethodText = getPaymentMethodName(currentPaymentMethod);
+        if (usedBonus > 0 && remainingAmount > 0) {
+            paymentMethodText = `(bonus): ${money(usedBonus)} Ödendi, (${remainingPaymentMethod}): ${money(remainingAmount)} Ödenecek`;
+        } else if (usedBonus > 0) {
+            paymentMethodText = `(bonus): ${money(usedBonus)} Ödendi`;
+        }
+        
+        if (usedBonus > 0) {
+            paymentNotes += `, Kullanılan Bonus: ${money(usedBonus)}`;
+        }
+        if (remainingPaymentMethod) {
+            paymentNotes += `, Kalan Ödeme: ${money(remainingAmount)} ${remainingPaymentMethod === 'cash' ? 'Nakit' : 'Kart'}`;
+        }
+        
         // Sipariş verilerini hazırla
         const orderData = {
             customer_id: currentCustomer ? currentCustomer.id : null,
@@ -13870,9 +13903,9 @@ async function saveOrder() {
             customer_phone: currentCustomer ? currentCustomer.phone : customerPhone,
             seller_id: selectedSellerId,
             total_amount: totalAmount,
-            payment_method: currentPaymentMethod,
+            payment_method: paymentMethodText,
             delivery_address: deliveryAddress,
-            order_notes: `Teslimat adresi: ${deliveryAddress}. Ödeme: ${getPaymentMethodName(currentPaymentMethod)}`,
+            order_notes: paymentNotes,
             status: 'pending',
             created_at: new Date().toISOString()
         };
@@ -13932,7 +13965,7 @@ async function saveOrder() {
         
         console.log('✅ Sipariş detayları kaydedildi');
         
-        // 3️⃣ BONUS HESAPLA - YENİ EKLENEN KOD
+        // 3️⃣ BONUS HESAPLA - ESKİ FONKSİYONDAN EKLENDİ
         if (currentCustomer) {
             console.log('🎁 Sipariş bonusu hesaplanıyor...');
             try {
@@ -13949,21 +13982,44 @@ async function saveOrder() {
             }
         }
         
-        // 4️⃣ BAŞARILI MESAJ
+        // 4️⃣ ÖDEME KAYITLARINI OLUŞTUR - YENİ EKLENEN
+        if (currentPaymentMethod === 'bonus' && usedBonus > 0) {
+            await processBonusPayment(order.id, currentCustomer.id, totalAmount, usedBonus, remainingPaymentMethod);
+        } else {
+            await processRegularPayment(order.id, currentCustomer.id, totalAmount, currentPaymentMethod);
+        }
+        
+        // 5️⃣ REFERRAL KAZANÇLARINI İŞLE - YENİ EKLENEN
+        if (currentCustomer) {
+            await processReferralPayouts(currentCustomer.id);
+        }
+        
+        // 6️⃣ BAŞARILI MESAJ
         const bonusMessage = currentCustomer ? 
             ` Bonus bakiyeniz güncellendi: ${money(referralBonusBalance)}` : 
             '';
             
-        displayMessage(`🎉 Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: ${order.id}${bonusMessage}`);
+        // Ödeme detayı mesajı - YENİ EKLENEN
+        let paymentDetailMessage = '';
+        if (currentPaymentMethod === 'bonus' && usedBonus > 0) {
+            paymentDetailMessage = ` ${money(usedBonus)} bonus kullanıldı.`;
+            if (remainingAmount > 0) {
+                paymentDetailMessage += ` Kalan ${money(remainingAmount)} ${remainingPaymentMethod === 'cash' ? 'nakit' : 'kart'} ile ödendi.`;
+            }
+        }
+            
+        displayMessage(`🎉 Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: ${order.id}${paymentDetailMessage}${bonusMessage}`);
         speakToUser("siparişiniz başarıyla oluşturuldu" + (bonusMessage ? " bonusunuz eklendi" : ""));
         
-        // 5️⃣ TEMİZLİK
+        // 7️⃣ TEMİZLİK
         resetAfterSuccessfulOrder();
+        
+        return order;
         
     } catch (error) {
         console.error('❌ SİPARİŞ KAYDETME HATASI:', error);
         
-        // NET HATA MESAJI
+        // NET HATA MESAJI - ESKİ FONKSİYONDAN EKLENDİ
         const errorMessage = `
 ❌ SİPARİŞ HATASI
 
@@ -13981,11 +14037,13 @@ Teknik Detay: ${error.code || 'Bilinmeyen hata'}
         displayMessage(errorMessage);
         speakToUser("Siparişiniz kaydedilemedi. Lütfen tekrar deneyin.");
         
-        // Sepeti koru, kullanıcı tekrar denesin
+        // Sepeti koru, kullanıcı tekrar denesin - ESKİ FONKSİYONDAN EKLENDİ
         console.log('⚠️ Sepet korunuyor, kullanıcı tekrar deneyebilir');
+        
+        throw error;
     }
 }
-
+        
 // Başarılı sipariş sonrası reset
 function resetAfterSuccessfulOrder() {
     console.log('🔄 Sipariş sonrası temizlik...');
@@ -15315,6 +15373,7 @@ async function processRegularPayment(orderId, customerId, totalAmount, paymentMe
     </script>
 </body>
 </html>
+
 
 
 
