@@ -12453,9 +12453,27 @@ function selectPaymentMethod(method) {
 }
 
 function closePaymentModal() {
-    const paymentModal = document.getElementById('paymentModal');
-    if (paymentModal) {
-        paymentModal.remove();
+    console.log('❌ Ödeme modalı kapatılıyor...');
+    
+    try {
+        const modal = document.getElementById('paymentModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.remove(); // DOM'dan tamamen kaldır
+            console.log('✅ Modal DOMdan kaldırıldı');
+        }
+        
+        // Sesli komutları temizle
+        if (typeof window.restoreBonusCommands === 'function') {
+            window.restoreBonusCommands();
+            console.log('✅ Bonus komutları temizlendi');
+        }
+        
+        // Ödeme durumunu sıfırla
+        resetPaymentState();
+        
+    } catch (error) {
+        console.error('❌ Modal kapatma hatası:', error);
     }
 }
 
@@ -12746,16 +12764,25 @@ function checkPaymentCommands(command) {
 
 
         
-// YENİ FONKSİYON: BONUS ÖDEME SEÇİMİ
+// BONUS ÖDEME SEÇİMİNDE HATA AYIKLAMA
 function showBonusPaymentSelection() {
     console.log('🎁 Bonus ödeme seçimi gösteriliyor...');
     
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    const remainingAfterBonus = Math.max(0, totalAmount - bonusBalance);
-    
-    const modalBody = document.getElementById('paymentModalBody');
-    if (modalBody) {
+    try {
+        const totalAmount = calculateTotal();
+        const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
+        const remainingAfterBonus = Math.max(0, totalAmount - bonusBalance);
+        
+        const modalBody = document.getElementById('paymentModalBody');
+        if (!modalBody) {
+            console.error('❌ paymentModalBody bulunamadı!');
+            displayMessage("❌ Ödeme sistemi hatası. Lütfen tekrar deneyin.");
+            return;
+        }
+        
+        console.log('✅ Modal body bulundu, içerik güncelleniyor...');
+        
+        // Modal içeriğini güncelle (MEVCUT KODUNUZ AYNI)
         modalBody.innerHTML = `
             <div class="bonus-payment-selection">
                 <h3>🎁 Bonus Ödeme Seçimi</h3>
@@ -12802,35 +12829,7 @@ function showBonusPaymentSelection() {
                 </div>
                 `}
                 
-                <!-- MANUEL DÜZENLEME -->
-                <div class="manual-edit-section" id="manualBonusEditSection" style="display: none;">
-                    <h4>✏️ Manuel Bonus Ayarları</h4>
-                    <div class="manual-edit-form">
-                        <div class="form-group">
-                            <label>Kullanılacak Bonus:</label>
-                            <input type="number" id="manualBonusInput" 
-                                   value="${Math.min(bonusBalance, totalAmount)}" 
-                                   min="0" max="${bonusBalance}" step="1" 
-                                   class="form-control">
-                            <small>Maksimum: ${money(bonusBalance)}</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Kalan Tutar Ödeme Yöntemi:</label>
-                            <select id="manualPaymentSelect" class="form-control">
-                                <option value="cash">💵 Nakit</option>
-                                <option value="card">💳 Kart</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-success btn-sm" onclick="applyManualBonusSettings()">
-                            ✅ Uygula
-                        </button>
-                    </div>
-                </div>
-                
                 <div class="action-buttons">
-                    <button type="button" class="manual-edit-toggle-btn" onclick="toggleBonusManualEdit()">
-                        <i class="fas fa-edit"></i> Manuel Düzenle
-                    </button>
                     <button type="button" class="btn btn-secondary" onclick="cancelBonusPayment()">
                         ❌ İptal
                     </button>
@@ -12838,70 +12837,100 @@ function showBonusPaymentSelection() {
             </div>
         `;
         
+        console.log('✅ Modal içeriği güncellendi');
+        
         // SESLİ KOMUTLARI AYARLA
         setupBonusPaymentVoiceCommands();
-    }
-    
-    // Sesli bildirim
-    if (remainingAfterBonus > 0) {
-        speakToUser(`Bonus bakiyeniz ${money(bonusBalance)}. ${money(remainingAfterBonus)} nakit veya kart ile ödenecek. Nasıl ödemek istersiniz?`);
-    } else {
-        speakToUser(`Tamamı bonus ile ödenebilir. Toplam tutar ${money(totalAmount)}, bonus bakiyeniz ${money(bonusBalance)}.`);
+        
+    } catch (error) {
+        console.error('❌ Bonus ödeme seçimi hatası:', error);
+        displayMessage("❌ Bonus ödeme işlemi sırasında hata oluştu.");
+        closePaymentModal();
     }
 }
         
 
+// BONUS ÖDEME İŞLEMLERİNİ GÜÇLENDİRELİM
 function selectBonusRemainingPayment(method) {
-    console.log(`💰 Kalan ödeme seçildi: ${method}`);
+    console.log(`💰 Kalan ödeme yöntemi seçildi: ${method}`);
     
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    const usedBonus = Math.min(bonusBalance, totalAmount);
-    const remainingAmount = totalAmount - usedBonus;
+    try {
+        const totalAmount = calculateTotal();
+        const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
+        
+        window.usedBonusAmount = Math.min(bonusBalance, totalAmount);
+        window.remainingPaymentMethod = method;
+        
+        console.log('✅ Bonus ayarları kaydedildi:', {
+            usedBonus: window.usedBonusAmount,
+            remainingMethod: window.remainingPaymentMethod
+        });
+        
+        // Modalı KESİNLİKLE kapat
+        closePaymentModal();
+        
+        // Telefon numarası iste (biraz gecikmeyle)
+        setTimeout(() => {
+            requestPhoneNumber();
+        }, 300);
+        
+    } catch (error) {
+        console.error('❌ Bonus ödeme seçim hatası:', error);
+        displayMessage("❌ Ödeme yöntemi seçilemedi.");
+        closePaymentModal();
+    }
+}
+function confirmFullBonusPayment() {
+    console.log('✅ Tam bonus ödeme onaylandı');
     
-    // Seçimi kaydet
-    window.usedBonusAmount = usedBonus;
-    window.remainingPaymentMethod = method;
+    try {
+        const totalAmount = calculateTotal();
+        window.usedBonusAmount = totalAmount;
+        window.remainingPaymentMethod = null;
+        
+        console.log('✅ Tam bonus ödeme ayarları:', {
+            usedBonus: window.usedBonusAmount,
+            remainingMethod: window.remainingPaymentMethod
+        });
+        
+        // Modalı KESİNLİKLE kapat
+        closePaymentModal();
+        
+        // Telefon numarası iste (biraz gecikmeyle)
+        setTimeout(() => {
+            requestPhoneNumber();
+        }, 300);
+        
+    } catch (error) {
+        console.error('❌ Tam bonus ödeme hatası:', error);
+        displayMessage("❌ Bonus ödeme işlemi başarısız.");
+        closePaymentModal();
+    }
+}
+
+        // ACİL DEBUG FONKSİYONLARI
+function debugPaymentState() {
+    console.log('🔍 ÖDEME DURUMU DEBUG:');
+    console.log('currentPaymentMethod:', currentPaymentMethod);
+    console.log('usedBonusAmount:', window.usedBonusAmount);
+    console.log('remainingPaymentMethod:', window.remainingPaymentMethod);
+    console.log('Modal durumu:', document.getElementById('paymentModal'));
+    console.log('Modal body durumu:', document.getElementById('paymentModalBody'));
+}
+
+function forceCloseAllModals() {
+    console.log('🚨 TÜM MODALLARI ZORLA KAPAT');
     
-    // Butonları güncelle
-    document.querySelectorAll('.payment-option-btn').forEach(btn => {
-        btn.classList.remove('selected');
+    const modals = document.querySelectorAll('[id*="modal"], [class*="modal"]');
+    modals.forEach(modal => {
+        modal.style.display = 'none';
+        modal.remove();
+        console.log('✅ Kapatılan modal:', modal);
     });
     
-    const selectedBtn = document.querySelector(`.${method}-option`);
-    if (selectedBtn) {
-        selectedBtn.classList.add('selected');
-    }
-    
-    // Başarı mesajı
-    displayMessage(`✅ ${money(usedBonus)} bonus + ${money(remainingAmount)} ${method === 'cash' ? 'nakit' : 'kart'} seçildi`);
-    speakToUser(`${money(remainingAmount)} ${method === 'cash' ? 'nakit' : 'kart'} ile ödenecek`);
-    
-    // 2 SANİYE SONRA TELEFON SORMAYA GEÇ
-    setTimeout(() => {
-        proceedToPhoneVerification();
-    }, 2000);
-}
-
-function confirmFullBonusPayment() {
-    console.log('✅ Tamamı bonus ile ödeme onaylandı');
-    
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    
-    // Seçimi kaydet
-    window.usedBonusAmount = totalAmount;
-    window.remainingPaymentMethod = null;
-    
-    displayMessage(`✅ Tamamı ${money(totalAmount)} bonus ile ödenecek`);
-    speakToUser(`Tamamı bonus ile ödenecek`);
-    
-    // 2 SANİYE SONRA TELEFON SORMAYA GEÇ
-    setTimeout(() => {
-        proceedToPhoneVerification();
-    }, 2000);
-}
-
+    resetPaymentState();
+    console.log('✅ Tüm modallar kapatıldı ve durum sıfırlandı');
+}        
 function proceedToPhoneVerification() {
     console.log('📞 Telefon doğrulamasına geçiliyor...');
     
@@ -15920,6 +15949,7 @@ async function processRegularPayment(orderId, customerId, totalAmount, paymentMe
     </script>
 </body>
 </html>
+
 
 
 
