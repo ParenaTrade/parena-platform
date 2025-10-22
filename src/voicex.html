@@ -4293,16 +4293,22 @@ function isSimilarMessage(newMessage, oldMessage) {
         // UI güncelleme
         updateMicrophoneUI(true);
         
-        // ✅✅✅ CRITICAL FIX - setTimeout KALDIR, HEMEN BAŞLAT:
-        console.log('🚀 Ses tanıma HEMEN başlatılıyor...');
-        initializeDynamicSpeechRecognition();
-        
-        // ✅ RECOGNITION'ı HEMEN BAŞLAT:
-        setTimeout(() => {
-            if (recognition && !isListening) {
-                startRecognition();
-            }
-        }, 100);
+// ✅✅✅ CRITICAL FIX - HEMEN BAŞLAT:
+console.log('🚀 Ses tanıma HEMEN başlatılıyor...');
+initializeDynamicSpeechRecognition();
+
+// ✅ RECOGNITION'ı HEMEN BAŞLAT (daha kısa timeout):
+setTimeout(() => {
+    if (recognition && !isListening) {
+        console.log('🎤 Recognition başlatılıyor...');
+        startRecognition();
+    } else {
+        console.log('❌ Recognition başlatılamadı:', {
+            recognition: !!recognition,
+            isListening: isListening
+        });
+    }
+}, 300); // ✅ 500 → 300 ms (daha hızlı)
         
         // Başarı mesajı
         displayMessage("Mikrofon açıldı. Hangi mağaza tipinden alışveriş yapmak istersiniz?");
@@ -4644,6 +4650,14 @@ function initializeDynamicSpeechRecognition() {
 }        
         
 function startRecognition() {
+
+     console.log('🔊 startRecognition ÇAĞRILDI!', {
+        recognition: !!recognition,
+        isMicrophoneEnabled: isMicrophoneEnabled,
+        isAssistantSpeaking: isAssistantSpeaking,
+        isListening: isListening
+    });
+    
     if (!recognition) {
         console.log('🔄 Recognition objesi yok, yeniden oluşturuluyor...');
         if (!initializeDynamicSpeechRecognition()) return;
@@ -12429,11 +12443,31 @@ function fixRecognition() {
     debugRecognition();
 }
 fixRecognition();
-     
+
+// Console'da test et:
+function testMicrophoneFlow() {
+    console.log('🧪 Mikrofon Flow Test:');
+    
+    // 1. Recognition oluştur
+    initializeDynamicSpeechRecognition();
+    
+    // 2. Hemen başlat
+    setTimeout(() => {
+        if (recognition) {
+            console.log('🎤 Recognition başlatılıyor...');
+            startRecognition();
+        } else {
+            console.log('❌ Recognition hala yok!');
+        }
+    }, 500);
+}
+testMicrophoneFlow();
+        
 
     </script>
 </body>
 </html>
+
 
 
 
