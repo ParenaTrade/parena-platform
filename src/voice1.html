@@ -2897,6 +2897,45 @@ const storeTypeFilterStyles = `
 
 .yes-btn { background: #4CAF50; }
 .no-btn { background: #F44336; }
+
+.bonus-control-section {
+    background: #E8F5E8;
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0;
+    border-left: 4px solid #4CAF50;
+}
+
+.bonus-toggle-btn {
+    background: #FFD600;
+    color: #333;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    margin: 5px 0;
+}
+
+.bonus-toggle-btn.active {
+    background: #4CAF50;
+    color: white;
+}
+
+.bonus-info-note {
+    background: #E3F2FD;
+    padding: 8px;
+    border-radius: 5px;
+    margin: 5px 0;
+}
+
+.payment-breakdown {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0;
+}
+        
 </style>
 </head>
 <body>
@@ -13648,23 +13687,8 @@ async function requestOrderConfirmation() {
         const totalAmount = calculateTotal();
         const deliveryAddress = formatDeliveryAddress();
         
-        // Müşteri bonus bakiyesini al
-        let bonusBalance = 0;
-        if (currentCustomer) {
-            bonusBalance = await getCustomerBonusBalance(currentCustomer.id);
-        }
-        
-        // Kullanılabilir bonus miktarını hesapla (toplam tutarı geçemez)
-        const availableBonus = Math.min(bonusBalance, totalAmount);
-        
-        // Kalan ödenecek tutarı hesapla
-        const remainingAmount = totalAmount - availableBonus;
-        
-        // Ödeme yöntemine göre kalan tutar nasıl ödenecek
-        const paymentDetails = getPaymentDetails(currentPaymentMethod, remainingAmount, availableBonus);
-        
-        // ÖDEME YÖNTEMİ İSMİ
-        const paymentMethodName = getPaymentMethodName(currentPaymentMethod);
+        // Ödeme dağılımını hesapla
+        const paymentDistribution = calculatePaymentDistribution(totalAmount, referralBonusBalance, currentPaymentMethod);
         
         modalBody.innerHTML = `
             <div class="payment-step active">
@@ -13685,32 +13709,45 @@ async function requestOrderConfirmation() {
                         <!-- Ödeme Bilgileri -->
                         <div class="payment-info-section">
                             <h5>💳 Ödeme Bilgileri</h5>
-                            <p><strong>Ödeme Yöntemi:</strong> <span class="payment-method-badge">${paymentMethodName}</span></p>
+                            <p><strong>Ödeme Yöntemi:</strong> <span class="payment-method-badge">${getPaymentMethodName(currentPaymentMethod)}</span></p>
                             
-                            <!-- Bonus Kullanımı -->
-                            <div class="bonus-section">
-                                <p><strong>💰 Bonus Bakiyeniz:</strong> <span class="bonus-amount">${money(bonusBalance)}</span></p>
-                                <p><strong>🎁 Kullanılacak Bonus:</strong> <span class="used-bonus">${money(availableBonus)}</span></p>
-                            </div>
+                            <!-- Bonus Kontrolü -->
+                            ${currentPaymentMethod === 'cash' && referralBonusBalance > 0 ? `
+                                <div class="bonus-control-section">
+                                    <p><strong>💰 Bonus Bakiyeniz:</strong> <span class="bonus-amount">${money(referralBonusBalance)}</span></p>
+                                    <button class="bonus-toggle-btn ${useBonus ? 'active' : ''}" onclick="toggleBonusUsage()">
+                                        ${useBonus ? '✅ Bonus Kullanılıyor' : '💡 Bonus Kullan'}
+                                    </button>
+                                    ${useBonus ? `<p><small>Kullanılacak bonus: ${money(bonusAmountToUse)}</small></p>` : ''}
+                                </div>
+                            ` : ''}
                             
-                            <!-- Toplam ve Kalan -->
-                            <div class="amount-section">
-                                <p><strong>🛒 Toplam Tutar:</strong> <span class="total-amount">${money(totalAmount)}</span></p>
-                                ${availableBonus > 0 ? `
-                                    <p><strong>✅ Bonus İndirimi:</strong> <span class="bonus-discount">-${money(availableBonus)}</span></p>
-                                    <p><strong>💵 Kalan Ödenecek:</strong> <span class="remaining-amount">${money(remainingAmount)}</span></p>
+                            ${(currentPaymentMethod === 'card' || currentPaymentMethod === 'meal') ? `
+                                <div class="bonus-info-note">
+                                    <p><small>ℹ️ Kart ödemelerinde bonus kullanılamaz</small></p>
+                                </div>
+                            ` : ''}
+                            
+                            <!-- Ödeme Dağılımı -->
+                            <div class="payment-breakdown">
+                                <h6>📊 Ödeme Dağılımı:</h6>
+                                <p><strong>🛒 Toplam Tutar:</strong> ${money(totalAmount)}</p>
+                                
+                                ${paymentDistribution.bonus_amount > 0 ? `
+                                    <p><strong>🎁 Bonus İndirimi:</strong> -${money(paymentDistribution.bonus_amount)}</p>
                                 ` : ''}
-                            </div>
-                            
-                            <!-- Ödeme Detayları -->
-                            <div class="payment-details">
-                                ${paymentDetails}
+                                
+                                ${paymentDistribution.cash_amount > 0 ? `
+                                    <p><strong>💵 Nakit Ödenecek:</strong> ${money(paymentDistribution.cash_amount)}</p>
+                                ` : ''}
+                                
+                                ${paymentDistribution.card_amount > 0 ? `
+                                    <p><strong>💳 Kartla Ödenecek:</strong> ${money(paymentDistribution.card_amount)}</p>
+                                ` : ''}
+                                
+                                <p><strong>✅ Net Ödenecek:</strong> ${money(paymentDistribution.cash_amount + paymentDistribution.card_amount)}</p>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="confirmation-note">
-                        <p>⚠️ <strong>Lütfen bilgileri kontrol edin:</strong> Sipariş onaylandıktan sonra değişiklik yapılamaz.</p>
                     </div>
                     
                     <div class="confirmation-buttons">
@@ -13742,10 +13779,17 @@ async function requestOrderConfirmation() {
         }
     }
     
-    displayMessage("✅ Sipariş ve ödeme bilgileriniz hazır! Bonus bakiyeniz değerlendirildi. Onaylıyor musunuz?");
-    speakToUser("Sipariş ve ödeme bilgileriniz hazır. Bonus bakiyeniz değerlendirildi. Siparişi onaylıyor musunuz evet veya hayır");
+    displayMessage("✅ Sipariş bilgileriniz hazır! Bonus seçeneklerini kontrol edip onaylayabilirsiniz.");
+    speakToUser("Sipariş bilgileriniz hazır. Bonus seçeneklerini kontrol edip onaylayabilirsiniz.");
 }
 
+// Sipariş özetini güncelle
+function updateOrderSummary() {
+    if (isWaitingForOrderConfirm) {
+        requestOrderConfirmation();
+    }
+}
+        
 // Ödeme detaylarını döndüren fonksiyon
 function getPaymentDetails(paymentMethod, remainingAmount, usedBonus) {
     switch(paymentMethod) {
@@ -13833,6 +13877,58 @@ async function processOrderConfirmation(response) {
 // YARDIMCI FONKSİYON
 // =============================================
 
+let useBonus = false; // Yeni global değişken
+let bonusAmountToUse = 0; // Kullanılacak bonus miktarı
+
+// Bonus kullanımını toggle eden fonksiyon
+function toggleBonusUsage() {
+    useBonus = !useBonus;
+    
+    if (useBonus) {
+        // Maksimum kullanılabilir bonusu hesapla
+        const totalAmount = calculateTotal();
+        const maxBonus = Math.min(referralBonusBalance, totalAmount);
+        bonusAmountToUse = maxBonus;
+        
+        displayMessage(`✅ Bonus kullanımı aktif: ${money(maxBonus)} bonus kullanılacak`);
+    } else {
+        bonusAmountToUse = 0;
+        displayMessage(`❌ Bonus kullanımı pasif`);
+    }
+    
+    // UI'ı güncelle
+    updateOrderSummary();
+}
+
+// Ödeme dağılımını hesapla (güncellendi)
+function calculatePaymentDistribution(totalAmount, bonusBalance, paymentMethod) {
+    let bonusAmount = 0;
+    let cashAmount = totalAmount;
+    let cardAmount = 0;
+    
+    // Sadece nakit ödemelerde ve bonus kullanım aktifse bonus kullan
+    if (paymentMethod === 'cash' && useBonus && bonusBalance > 0) {
+        bonusAmount = Math.min(bonusBalance, totalAmount);
+        cashAmount = totalAmount - bonusAmount;
+    }
+    
+    // Kart ve meal kartlarında bonus kullanma
+    if (paymentMethod === 'card' || paymentMethod === 'meal') {
+        useBonus = false;
+        bonusAmount = 0;
+        cashAmount = 0;
+        cardAmount = totalAmount;
+    }
+    
+    return {
+        total_amount: totalAmount,
+        bonus_amount: bonusAmount,
+        cash_amount: cashAmount,
+        card_amount: cardAmount,
+        payment_method: paymentMethod
+    };
+}
+        
 function calculatePaymentDistribution(totalAmount, bonusBalance, paymentMethod) {
     const distribution = {
         bonus_amount: 0,
@@ -13932,14 +14028,10 @@ async function saveOrder() {
         const totalAmount = calculateTotal();
         const deliveryAddress = formatDeliveryAddress();
         
-        // Müşteri bonus bakiyesini al
-        let bonusBalance = 0;
-        if (currentCustomer) {
-            bonusBalance = await getCustomerBonusBalance(currentCustomer.id);
-        }
-        
         // Ödeme dağılımını hesapla
-        const paymentDistribution = calculatePaymentDistribution(totalAmount, bonusBalance, currentPaymentMethod);
+        const paymentDistribution = calculatePaymentDistribution(totalAmount, referralBonusBalance, currentPaymentMethod);
+        
+        console.log('📊 Ödeme Dağılımı:', paymentDistribution);
         
         // Sipariş verilerini hazırla
         const orderData = {
@@ -13948,9 +14040,11 @@ async function saveOrder() {
             customer_phone: currentCustomer ? currentCustomer.phone : customerPhone,
             seller_id: selectedSellerId,
             total_amount: totalAmount,
+            paid_amount: paymentDistribution.cash_amount + paymentDistribution.card_amount,
+            bonus_used: paymentDistribution.bonus_amount,
             payment_method: currentPaymentMethod,
             delivery_address: deliveryAddress,
-            order_notes: `Teslimat adresi: ${deliveryAddress}. Ödeme: ${getPaymentMethodName(currentPaymentMethod)}`,
+            order_notes: `Teslimat: ${deliveryAddress}. Ödeme: ${getPaymentMethodName(currentPaymentMethod)} - Bonus: ${money(paymentDistribution.bonus_amount)}`,
             status: 'pending',
             created_at: new Date().toISOString()
         };
@@ -14008,33 +14102,38 @@ async function saveOrder() {
         }
         
         console.log('✅ Sipariş detayları kaydedildi');
-        // 3️⃣ BONUS HESAPLA - ESKİ FONKSİYONDAN EKLENDİ
+        
+        // 4️⃣ BONUS KULLANIMI VARSA GÜNCELLE
+        if (paymentDistribution.bonus_amount > 0 && currentCustomer) {
+            console.log('💰 Bonus bakiyesi güncelleniyor:', paymentDistribution.bonus_amount);
+            await updateCustomerBonusBalance(currentCustomer.id, paymentDistribution.bonus_amount);
+            
+            // Bonus bakiyesini yenile
+            referralBonusBalance = await getUserBonusBalance(currentCustomer.id);
+            updateBonusUI();
+        }
+        
+        // 5️⃣ BONUS KAZANÇ HESAPLA
         if (currentCustomer) {
             console.log('🎁 Sipariş bonusu hesaplanıyor...');
             try {
                 await calculateOrderBonus(order.id, currentCustomer.id, totalAmount);
-                
-                // Bonus bakiyesini yenile
-                referralBonusBalance = await getUserBonusBalance(currentCustomer.id);
-                updateBonusUI();
-                
                 console.log('✅ Sipariş bonusu hesaplandı');
             } catch (bonusError) {
                 console.warn('⚠️ Bonus hesaplama hatası (sipariş devam ediyor):', bonusError);
-                // Bonus hatası siparişi durdurmasın
             }
         }
         
-        // 4️⃣ BONUS KULLANIMI VARSA GÜNCELLE
-        if (paymentDistribution.bonus_amount > 0 && currentCustomer) {
-            await updateCustomerBonusBalance(currentCustomer.id, paymentDistribution.bonus_amount);
+        // 6️⃣ BAŞARILI MESAJ
+        const successMessage = `🎉 Siparişiniz başarıyla oluşturuldu! Sipariş #${order.id}`;
+        if (paymentDistribution.bonus_amount > 0) {
+            successMessage += ` - ${money(paymentDistribution.bonus_amount)} bonus kullanıldı`;
         }
         
-        // 5️⃣ BAŞARILI MESAJ
-        displayMessage("🎉 Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: " + order.id);
-        speakToUser("siparişiniz başarıyla oluşturuldu");
+        displayMessage(successMessage);
+        speakToUser("Siparişiniz başarıyla oluşturuldu");
         
-        // 6️⃣ TEMİZLİK
+        // 7️⃣ TEMİZLİK
         resetAfterSuccessfulOrder();
         
     } catch (error) {
@@ -14043,11 +14142,8 @@ async function saveOrder() {
         const errorMessage = `❌ Siparişiniz kaydedilemedi: ${error.message}`;
         displayMessage(errorMessage);
         speakToUser("Siparişiniz kaydedilemedi. Lütfen tekrar deneyin.");
-        
-        console.log('⚠️ Sepet korunuyor, kullanıcı tekrar deneyebilir');
     }
 }
-
         
 // Başarılı sipariş sonrası reset
 function resetAfterSuccessfulOrder() {
@@ -14421,6 +14517,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
