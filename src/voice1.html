@@ -2793,7 +2793,57 @@ const storeTypeFilterStyles = `
     background: #5a6268;
 }
 
-        
+  .payment-methods-selection {
+    text-align: center;
+    padding: 20px;
+}
+
+.payment-methods-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.payment-method-btn {
+    padding: 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.payment-method-btn:hover {
+    border-color: #007bff;
+    background: #f8f9fa;
+}
+
+.payment-method-btn.selected {
+    border-color: #007bff;
+    background: #007bff;
+    color: white;
+}
+
+.payment-method-btn i {
+    font-size: 24px;
+}
+
+.payment-method-btn span {
+    font-weight: bold;
+}
+
+.current-cart-summary {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}      
 </style>
 </head>
 <body>
@@ -6062,359 +6112,369 @@ async function safeVoiceMatchQuery(userInput) {
 }
         
 
-async function processVoiceCommand(transcript) {
-    const message = transcript.toLowerCase().trim();
-    console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
-
-    // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
-    if (transcript.trim() === lastSpokenMessage.trim()) {
-        console.log("⚠️ Kendi cevabımız tekrar algılandı, atlandı");
-        return;
-    }
-
-    // GEREKSİZ KELİMELERİ FİLTRELE
-    const filteredMessage = filterUnnecessaryWords(message);
-    if (!filteredMessage) {
-        console.log("🔇 Gereksiz mesaj filtrelendi");
-        return;
-    }
+    async function processVoiceCommand(transcript) {
+        const message = transcript.toLowerCase().trim();
+        console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
     
-    console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
-
-    try {
-        // =============================================
-        // 0. ÖZEL: EVET/HAYIR KONTROLÜ (EN ÖNCELİKLİ)
-        // =============================================
-        
-        // Adres onayı bekleniyorsa
-        if (isWaitingForAddressConfirm && (message === 'evet' || message === 'hayır')) {
-            console.log('🏠 Adres onayı için evet/hayır algılandı');
-            await processAddressConfirmation(message);
+        // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
+        if (transcript.trim() === lastSpokenMessage.trim()) {
+            console.log("⚠️ Kendi cevabımız tekrar algılandı, atlandı");
+            return;
+        }
+    
+        // GEREKSİZ KELİMELERİ FİLTRELE
+        const filteredMessage = filterUnnecessaryWords(message);
+        if (!filteredMessage) {
+            console.log("🔇 Gereksiz mesaj filtrelendi");
             return;
         }
         
-        // Sipariş onayı bekleniyorsa
-        if (isWaitingForOrderConfirm && (message === 'evet' || message === 'hayır')) {
-            console.log('✅ Sipariş onayı için evet/hayır algılandı');
-            await processOrderConfirmation(message);
-            return;
-        }
-
-        // =============================================
-        // 1. ÖNCELİK: ÖDEME SÜRECİ KONTROLLERİ
-        // =============================================
-        
-        // Telefon numarası bekleniyor
-        if (isWaitingForPhone && expectedInput === 'phone') {
-            await processPhoneNumber(message);
-            return;
-        }
-        
-        // Müşteri adı bekleniyor
-        if (isWaitingForName && expectedInput === 'name') {
-            await processCustomerName(message);
-            return;
-        }
-        
-        // Bina numarası bekleniyor
-        if (isWaitingForBuilding && expectedInput === 'building') {
-            await processBuildingInfo(message);
-            return;
-        }
-        
-        // Daire numarası bekleniyor
-        if (isWaitingForApartment && expectedInput === 'apartment') {
-            await processApartmentInfo(message);
-            return;
-        }
-        
-        // Yeni bina numarası bekleniyor
-        if (isWaitingForNewBuilding && expectedInput === 'new_building') {
-            await processNewBuildingInfo(message);
-            return;
-        }
-        
-        // Yeni daire numarası bekleniyor
-        if (isWaitingForNewApartment && expectedInput === 'new_apartment') {
-            await processNewApartmentInfo(message);
-            return;
-        }
-
-        // =============================================
-        // 2. ÖDEME KOMUTLARI
-        // =============================================
-        
-        if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş. Ödeme yapabilmek için sepete ürün ekleyin.");
-                speakToUser("Sepetiniz boş");
+        console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
+    
+        try {
+            // =============================================
+            // 0. ÖZEL: EVET/HAYIR KONTROLÜ (EN ÖNCELİKLİ)
+            // =============================================
+            
+            // Adres onayı bekleniyorsa
+            if (isWaitingForAddressConfirm && (message === 'evet' || message === 'hayır')) {
+                console.log('🏠 Adres onayı için evet/hayır algılandı');
+                await processAddressConfirmation(message);
                 return;
             }
             
-            showPaymentModal();
-            displayMessage("💳 Ödeme yöntemi seçin: Nakit, Kart veya Bonus");
-            speakToUser("Ödeme yöntemi seçin");
-            return;
-        }
-        
-        // Nakit ödeme
-        if (message.includes('nakit') || message.includes('para ile')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
-                speakToUser("Sepetiniz boş");
+            // Sipariş onayı bekleniyorsa
+            if (isWaitingForOrderConfirm && (message === 'evet' || message === 'hayır')) {
+                console.log('✅ Sipariş onayı için evet/hayır algılandı');
+                await processOrderConfirmation(message);
                 return;
             }
-            startPaymentProcess('cash');
-            return;
-        }
-        
-        // Kart ile ödeme
-        if (message.includes('kart') || message.includes('kredi kartı') || message.includes('bank kartı')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
-                speakToUser("Sepetiniz boş");
-                return;
-            }
-            startPaymentProcess('card');
-            return;
-        }
-        
-        // Bonus ile ödeme
-        if (message.includes('bonus') || message.includes('puan') || message.includes('puanla')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
-                speakToUser("Sepetiniz boş");
-                return;
-            }
-            startPaymentProcess('bonus');
-            return;
-        }
-
-        // =============================================
-        // 3. REFERRAL KOMUTLARI - YENİ SİSTEM İLE ENTEGRE
-        // =============================================
-        
-        // Yeni referral sistemi ile entegre
-        const referralHandled = await handleReferralVoiceCommand(message);
-        if (referralHandled) return;
-
-        // =============================================
-        // 4. SEPET YÖNETİMİ KOMUTLARI
-        // =============================================
-        
-        const clearCartCommands = [
-            'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
-            'clear cart', 'empty cart', 'reset cart', 'temizle',
-            'hepsini sil', 'ürünleri kaldır', 'sepetten kaldır', 'boşalt'
-        ];
-        
-        if (clearCartCommands.some(cmd => message.includes(cmd))) {
-            console.log('🛒 Sepeti boşaltma komutu algılandı');
-            clearCart();
-            return;
-        }
-        
-        // Sepet görüntüleme
-        if (message.includes('sepet') || message.includes('sepetim') || message.includes('sepeti göster')) {
-            if (cart.length === 0) {
-                displayMessage("🛒 Sepetiniz boş");
-                speakToUser("Sepetiniz boş");
-            } else {
-                openDynamicCart();
-                displayMessage(`🛒 Sepetinizde ${cart.length} ürün bulunuyor`);
-                speakToUser(`Sepetinizde ${cart.reduce((sum, item) => sum + item.quantity, 0)} adet ürün var`);
-            }
-            return;
-        }
-
-        // =============================================
-        // 5. TESLİMAT KONTROL KOMUTLARI
-        // =============================================
-        
-        if (message.includes('mesafe') || message.includes('uzaklık') || message.includes('kaç km')) {
-            if (selectedSellerId && userLocation.latitude) {
-                await showDeliveryDistanceInfo();
-                return;
-            } else {
-                displayMessage("❌ Mesafe bilgisi için önce satıcı seçin ve konumunuzu belirleyin.");
-                speakToUser("Önce satıcı seçin");
-                return;
-            }
-        }
-        
-        if (message.includes('teslimat ücreti') || message.includes('kargo ücreti')) {
-            if (selectedSellerId) {
-                await showDeliveryFeeInfo();
-                return;
-            } else {
-                displayMessage("❌ Teslimat ücreti için önce bir satıcı seçin.");
-                speakToUser("Önce satıcı seçin");
-                return;
-            }
-        }
-
-        // =============================================
-        // 6. AKILLI ÜRÜN FİLTRELEME SİSTEMİ (YENİ EKLENDİ)
-        // =============================================
-        
-        // Ürün filtreleme - sadece kategori/reyn seçiliyse ve numara içermiyorsa
-        if ((currentRoot === "5:0" || selectedCategoryId) && products.length > 0 && !message.includes('numara')) {
-            console.log('🔍 Akıllı filtreleme deneniyor:', message);
+    
+            // =============================================
+            // 1. ÖNCELİK: ÖDEME SÜRECİ KONTROLLERİ
+            // =============================================
             
-            const hasMatches = await findProductByNameForFilter(message);
+            // Telefon numarası bekleniyor
+            if (isWaitingForPhone && expectedInput === 'phone') {
+                await processPhoneNumber(message);
+                return;
+            }
             
-            if (hasMatches) {
-                // Veritabanından filtreli ürünleri getir
-                const filteredProducts = await smartFilterProducts(message);
+            // Müşteri adı bekleniyor
+            if (isWaitingForName && expectedInput === 'name') {
+                await processCustomerName(message);
+                return;
+            }
+            
+            // Bina numarası bekleniyor
+            if (isWaitingForBuilding && expectedInput === 'building') {
+                await processBuildingInfo(message);
+                return;
+            }
+            
+            // Daire numarası bekleniyor
+            if (isWaitingForApartment && expectedInput === 'apartment') {
+                await processApartmentInfo(message);
+                return;
+            }
+            
+            // Yeni bina numarası bekleniyor
+            if (isWaitingForNewBuilding && expectedInput === 'new_building') {
+                await processNewBuildingInfo(message);
+                return;
+            }
+            
+            // Yeni daire numarası bekleniyor
+            if (isWaitingForNewApartment && expectedInput === 'new_apartment') {
+                await processNewApartmentInfo(message);
+                return;
+            }
+    
+            // =============================================
+            // 2. ÖDEME KOMUTLARI
+            // =============================================
+            
+            if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
+                if (cart.length === 0) {
+                    displayMessage("❌ Sepetiniz boş. Ödeme yapabilmek için sepete ürün ekleyin.");
+                    speakToUser("Sepetiniz boş");
+                    return;
+                }
                 
-                if (filteredProducts.length > 0) {
-                    displayProducts(filteredProducts, message);
-                    displayMessage(`🔍 "${message}" için ${filteredProducts.length} ürün bulundu. Lütfen numara söyleyin.`);
-                    speakToUser(`${filteredProducts.length} ürün bulundu, numara söyleyin`);
+                showPaymentModal();
+                displayMessage("💳 Ödeme yöntemi seçin: Nakit, Kart, Bonus veya Yemek Kartı");
+                speakToUser("Ödeme yöntemi seçin");
+                return;
+            }
+            
+            // Nakit ödeme
+            if (message.includes('nakit') || message.includes('para ile')) {
+                if (cart.length === 0) {
+                    displayMessage("❌ Sepetiniz boş.");
+                    speakToUser("Sepetiniz boş");
+                    return;
+                }
+                startPaymentProcess('cash');
+                return;
+            }
+            
+            // Kart ile ödeme
+            if (message.includes('kart') || message.includes('kredi kartı') || message.includes('bank kartı')) {
+                if (cart.length === 0) {
+                    displayMessage("❌ Sepetiniz boş.");
+                    speakToUser("Sepetiniz boş");
+                    return;
+                }
+                startPaymentProcess('card');
+                return;
+            }
+            
+            // Bonus ile ödeme
+            if (message.includes('bonus') || message.includes('puan') || message.includes('puanla')) {
+                if (cart.length === 0) {
+                    displayMessage("❌ Sepetiniz boş.");
+                    speakToUser("Sepetiniz boş");
+                    return;
+                }
+                startPaymentProcess('bonus');
+                return;
+                }
+
+                if (message.includes('yemek kartı') || message.includes('yemek kart') || message.includes('yemek')) {
+                if (cart.length === 0) {
+                    displayMessage("❌ Sepetiniz boş.");
+                    speakToUser("Sepetiniz boş");
+                    return;
+                }
+                    selectPaymentMethod('meal_card');
+                    return;
+                }
+            
+            // =============================================
+            // 3. REFERRAL KOMUTLARI - YENİ SİSTEM İLE ENTEGRE
+            // =============================================
+            
+            // Yeni referral sistemi ile entegre
+            const referralHandled = await handleReferralVoiceCommand(message);
+            if (referralHandled) return;
+    
+            // =============================================
+            // 4. SEPET YÖNETİMİ KOMUTLARI
+            // =============================================
+            
+            const clearCartCommands = [
+                'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+                'clear cart', 'empty cart', 'reset cart', 'temizle',
+                'hepsini sil', 'ürünleri kaldır', 'sepetten kaldır', 'boşalt'
+            ];
+            
+            if (clearCartCommands.some(cmd => message.includes(cmd))) {
+                console.log('🛒 Sepeti boşaltma komutu algılandı');
+                clearCart();
+                return;
+            }
+            
+            // Sepet görüntüleme
+            if (message.includes('sepet') || message.includes('sepetim') || message.includes('sepeti göster')) {
+                if (cart.length === 0) {
+                    displayMessage("🛒 Sepetiniz boş");
+                    speakToUser("Sepetiniz boş");
+                } else {
+                    openDynamicCart();
+                    displayMessage(`🛒 Sepetinizde ${cart.length} ürün bulunuyor`);
+                    speakToUser(`Sepetinizde ${cart.reduce((sum, item) => sum + item.quantity, 0)} adet ürün var`);
+                }
+                return;
+            }
+    
+            // =============================================
+            // 5. TESLİMAT KONTROL KOMUTLARI
+            // =============================================
+            
+            if (message.includes('mesafe') || message.includes('uzaklık') || message.includes('kaç km')) {
+                if (selectedSellerId && userLocation.latitude) {
+                    await showDeliveryDistanceInfo();
+                    return;
+                } else {
+                    displayMessage("❌ Mesafe bilgisi için önce satıcı seçin ve konumunuzu belirleyin.");
+                    speakToUser("Önce satıcı seçin");
                     return;
                 }
             }
             
-            // Eşleşme yoksa kullanıcıyı bilgilendir ama işlemi durdurma
-            console.log(`❌ "${message}" için eşleşme bulunamadı, normal akışa devam`);
-        }
-
-        // =============================================
-        // 7. ALIŞVERİŞ AKIŞI KOMUTLARI
-        // =============================================
-
-        // MAĞAZA TİPİ SEÇİMİ - Kök 2:0 veya 2:1
-        if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
-            console.log('🏪 Mağaza seçim komutu algılandı');
-            const success = await handleVoiceStoreSelection(filteredMessage);
-            if (success) {
-                console.log('✅ Mağaza seçildi, kök sabit:', currentRoot);
-                return;
-            }
-        }
-        
-        // TÜM SATICILARI GÖSTER KOMUTU
-        if (message.includes('tüm satıcılar') || message.includes('tüm mağazalar') || message.includes('hepsini göster')) {
-            showAllSellers();
-            speakToUser("Tüm satıcılar gösteriliyor");
-            return;
-        }
-
-        // SATICI SEÇİMİ - Kök 2:0, 2:1 veya 3:0
-        if ((currentRoot === "2:0" || currentRoot === "2:1" || currentRoot === "3:0") && hasSellerKeywords(filteredMessage)) {
-            console.log('🏬 Satıcı seçim komutu algılandı');
-            const success = await handleVoiceSellerSelection(filteredMessage);
-            if (success) return;
-        }
-
-        // SATICI DURUMU KOMUTLARI
-        if (message.includes('açık mağaza') || message.includes('açık satıcı') || message.includes('hangi mağaza açık')) {
-            await showOpenSellers();
-            return;
-        }
-        
-        if (message.includes('mağaza durumu') || message.includes('satıcı durumu')) {
-            if (selectedSellerId) {
-                await showCurrentSellerStatus();
-            } else {
-                displayMessage("❌ Önce bir satıcı seçin.");
-                speakToUser("Önce satıcı seçin");
-            }
-            return;
-        }
-
-        // REYON SEÇİMİ - Kök 3:0, 4:0 veya satıcı seçili ama kategori seçilmemiş
-        if ((currentRoot === "3:0" || currentRoot === "4:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
-            console.log('📦 Reyon seçim komutu algılandı');
-            const success = await handleVoiceCategorySelection(filteredMessage);
-            if (success) return;
-        }
-
-        // ÜRÜN EKLEME - Kök 5:0 veya kategori seçili
-        if ((currentRoot === "5:0" || selectedCategoryId) && products.length > 0) {
-            console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
-            
-            // "evet" ve "hayır" ürün olarak algılanmasın
-            if (message === 'evet' || message === 'hayır') {
-                console.log('🚫 "evet/hayır" ürün olarak algılanmadı');
-                displayMessage("❌ Lütfen ürün ismi söyleyin");
-                speakToUser("Ürün ismi söyleyin");
-                return;
-            }
-            
-            const success = await handleVoiceProductAdd(filteredMessage);
-            if (success) {
-                console.log('✅ Ürün başarıyla eklendi');
-                return;
-            }
-        }
-
-        // =============================================
-        // 8. NAVİGASYON KOMUTLARI
-        // =============================================
-        
-        // Geri gitme
-        if (message.includes('geri') || message.includes('geri git') || message.includes('back')) {
-            await handleBackNavigation();
-            return;
-        }
-        
-        // Ana sayfa
-        if (message.includes('ana sayfa') || message.includes('başlangıç') || message.includes('home')) {
-            resetToHome();
-            return;
-        }
-        
-        // Yardım
-        if (message.includes('yardım') || message.includes('help') || message.includes('nasıl')) {
-            showHelp();
-            return;
-        }
-
-        // =============================================
-        // 9. SİSTEM KOMUTLARI
-        // =============================================
-        
-        // Mikrofon kontrolü
-        if (message.includes('mikrofon') || message.includes('ses')) {
-            if (message.includes('aç') || message.includes('başlat')) {
-                if (!isMicrophoneEnabled) {
-                    enableDynamicMicrophone();
+            if (message.includes('teslimat ücreti') || message.includes('kargo ücreti')) {
+                if (selectedSellerId) {
+                    await showDeliveryFeeInfo();
+                    return;
+                } else {
+                    displayMessage("❌ Teslimat ücreti için önce bir satıcı seçin.");
+                    speakToUser("Önce satıcı seçin");
+                    return;
                 }
+            }
+    
+            // =============================================
+            // 6. AKILLI ÜRÜN FİLTRELEME SİSTEMİ (YENİ EKLENDİ)
+            // =============================================
+            
+            // Ürün filtreleme - sadece kategori/reyn seçiliyse ve numara içermiyorsa
+            if ((currentRoot === "5:0" || selectedCategoryId) && products.length > 0 && !message.includes('numara')) {
+                console.log('🔍 Akıllı filtreleme deneniyor:', message);
+                
+                const hasMatches = await findProductByNameForFilter(message);
+                
+                if (hasMatches) {
+                    // Veritabanından filtreli ürünleri getir
+                    const filteredProducts = await smartFilterProducts(message);
+                    
+                    if (filteredProducts.length > 0) {
+                        displayProducts(filteredProducts, message);
+                        displayMessage(`🔍 "${message}" için ${filteredProducts.length} ürün bulundu. Lütfen numara söyleyin.`);
+                        speakToUser(`${filteredProducts.length} ürün bulundu, numara söyleyin`);
+                        return;
+                    }
+                }
+                
+                // Eşleşme yoksa kullanıcıyı bilgilendir ama işlemi durdurma
+                console.log(`❌ "${message}" için eşleşme bulunamadı, normal akışa devam`);
+            }
+    
+            // =============================================
+            // 7. ALIŞVERİŞ AKIŞI KOMUTLARI
+            // =============================================
+    
+            // MAĞAZA TİPİ SEÇİMİ - Kök 2:0 veya 2:1
+            if ((currentRoot === "2:0" || currentRoot === "2:1") && hasStoreTypeKeywords(filteredMessage)) {
+                console.log('🏪 Mağaza seçim komutu algılandı');
+                const success = await handleVoiceStoreSelection(filteredMessage);
+                if (success) {
+                    console.log('✅ Mağaza seçildi, kök sabit:', currentRoot);
+                    return;
+                }
+            }
+            
+            // TÜM SATICILARI GÖSTER KOMUTU
+            if (message.includes('tüm satıcılar') || message.includes('tüm mağazalar') || message.includes('hepsini göster')) {
+                showAllSellers();
+                speakToUser("Tüm satıcılar gösteriliyor");
                 return;
-            } else if (message.includes('kapat') || message.includes('durdur')) {
-                if (isMicrophoneEnabled) {
-                    disableDynamicMicrophone();
+            }
+    
+            // SATICI SEÇİMİ - Kök 2:0, 2:1 veya 3:0
+            if ((currentRoot === "2:0" || currentRoot === "2:1" || currentRoot === "3:0") && hasSellerKeywords(filteredMessage)) {
+                console.log('🏬 Satıcı seçim komutu algılandı');
+                const success = await handleVoiceSellerSelection(filteredMessage);
+                if (success) return;
+            }
+    
+            // SATICI DURUMU KOMUTLARI
+            if (message.includes('açık mağaza') || message.includes('açık satıcı') || message.includes('hangi mağaza açık')) {
+                await showOpenSellers();
+                return;
+            }
+            
+            if (message.includes('mağaza durumu') || message.includes('satıcı durumu')) {
+                if (selectedSellerId) {
+                    await showCurrentSellerStatus();
+                } else {
+                    displayMessage("❌ Önce bir satıcı seçin.");
+                    speakToUser("Önce satıcı seçin");
                 }
                 return;
             }
-        }
-        
-        // Konum değiştirme
-        if (message.includes('konum') || message.includes('yer') || message.includes('location')) {
-            showDynamicLocationModal();
-            return;
-        }
-
-        // =============================================
-        // 10. FALLBACK MESAJI (SON ÇARE)
-        // =============================================
-        
-        console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
-        const fallbackMessage = getSmartFallback();
-        if (fallbackMessage) {
-            displayMessage(fallbackMessage);
-            speakToUser(fallbackMessage);
-        }
-
-    } catch (error) {
-        console.error('❌ Komut işleme hatası:', error);
-        if (Date.now() - lastSpeakTime > SPEAK_COOLDOWN) {
-            displayMessage("❌ Bir hata oluştu, lütfen tekrar deneyin.");
-            speakToUser("Bir hata oluştu, tekrar deneyin.");
+    
+            // REYON SEÇİMİ - Kök 3:0, 4:0 veya satıcı seçili ama kategori seçilmemiş
+            if ((currentRoot === "3:0" || currentRoot === "4:0" || (selectedSellerId && !selectedCategoryId)) && hasCategoryKeywords(filteredMessage)) {
+                console.log('📦 Reyon seçim komutu algılandı');
+                const success = await handleVoiceCategorySelection(filteredMessage);
+                if (success) return;
+            }
+    
+            // ÜRÜN EKLEME - Kök 5:0 veya kategori seçili
+            if ((currentRoot === "5:0" || selectedCategoryId) && products.length > 0) {
+                console.log('🛒 Ürün ekleme komutu kontrol ediliyor...');
+                
+                // "evet" ve "hayır" ürün olarak algılanmasın
+                if (message === 'evet' || message === 'hayır') {
+                    console.log('🚫 "evet/hayır" ürün olarak algılanmadı');
+                    displayMessage("❌ Lütfen ürün ismi söyleyin");
+                    speakToUser("Ürün ismi söyleyin");
+                    return;
+                }
+                
+                const success = await handleVoiceProductAdd(filteredMessage);
+                if (success) {
+                    console.log('✅ Ürün başarıyla eklendi');
+                    return;
+                }
+            }
+    
+            // =============================================
+            // 8. NAVİGASYON KOMUTLARI
+            // =============================================
+            
+            // Geri gitme
+            if (message.includes('geri') || message.includes('geri git') || message.includes('back')) {
+                await handleBackNavigation();
+                return;
+            }
+            
+            // Ana sayfa
+            if (message.includes('ana sayfa') || message.includes('başlangıç') || message.includes('home')) {
+                resetToHome();
+                return;
+            }
+            
+            // Yardım
+            if (message.includes('yardım') || message.includes('help') || message.includes('nasıl')) {
+                showHelp();
+                return;
+            }
+    
+            // =============================================
+            // 9. SİSTEM KOMUTLARI
+            // =============================================
+            
+            // Mikrofon kontrolü
+            if (message.includes('mikrofon') || message.includes('ses')) {
+                if (message.includes('aç') || message.includes('başlat')) {
+                    if (!isMicrophoneEnabled) {
+                        enableDynamicMicrophone();
+                    }
+                    return;
+                } else if (message.includes('kapat') || message.includes('durdur')) {
+                    if (isMicrophoneEnabled) {
+                        disableDynamicMicrophone();
+                    }
+                    return;
+                }
+            }
+            
+            // Konum değiştirme
+            if (message.includes('konum') || message.includes('yer') || message.includes('location')) {
+                showDynamicLocationModal();
+                return;
+            }
+    
+            // =============================================
+            // 10. FALLBACK MESAJI (SON ÇARE)
+            // =============================================
+            
+            console.log('❌ Hiçbir komut işlenemedi, fallback kontrolü...');
+            const fallbackMessage = getSmartFallback();
+            if (fallbackMessage) {
+                displayMessage(fallbackMessage);
+                speakToUser(fallbackMessage);
+            }
+    
+        } catch (error) {
+            console.error('❌ Komut işleme hatası:', error);
+            if (Date.now() - lastSpeakTime > SPEAK_COOLDOWN) {
+                displayMessage("❌ Bir hata oluştu, lütfen tekrar deneyin.");
+                speakToUser("Bir hata oluştu, tekrar deneyin.");
+            }
         }
     }
-}
 
         
 
@@ -12388,14 +12448,7 @@ function setupPaymentButtons() {
 }
 
 // Ödeme yöntemi isimlerini getir
-function getPaymentMethodName(method) {
-    const names = {
-        'cash': 'Nakit',
-        'card': 'Kart', 
-        'bonus': 'Bonus'
-    };
-    return names[method] || 'Ödeme';
-}
+
 
 // EKSİK FONKSİYONU EKLEYELİM
 function formatPhoneNumber(phoneInput) {
@@ -12649,7 +12702,7 @@ function checkPaymentCommands(command) {
     return false;
 }
         
-    function startPaymentProcess(paymentMethod) {
+   function startPaymentProcess(paymentMethod) {
     console.log(`💰 Ödeme süreci başlatılıyor: ${paymentMethod}`);
     
     if (cart.length === 0) {
@@ -12660,187 +12713,100 @@ function checkPaymentCommands(command) {
     
     currentPaymentMethod = paymentMethod;
     
-    // Ödeme modalını göster
+    // Ödeme modalını göster ve telefon numarası iste
     showPaymentModal();
-    
-    // BONUS ÖDEME İSE ÖNCE BONUS SEÇİMİ, SONRA TELEFON
-    if (paymentMethod === 'bonus') {
-        showBonusPaymentSelection();
-    } else {
-        // NAKİT/KART İSE DOĞRUDAN TELEFON SOR
-        requestPhoneNumber();
-    }
+    requestPhoneNumber();
 }
-
-// YENİ FONKSİYON: BONUS ÖDEME SEÇİMİ
-function showBonusPaymentSelection() {
-    console.log('🎁 Bonus ödeme seçimi gösteriliyor...');
+        
+function showPaymentModal() {
+    // Ödeme modalını oluştur veya göster
+    let paymentModal = document.getElementById('paymentModal');
     
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    const remainingAfterBonus = Math.max(0, totalAmount - bonusBalance);
-    
-    const modalBody = document.getElementById('paymentModalBody');
-    if (modalBody) {
-        modalBody.innerHTML = `
-            <div class="bonus-payment-selection">
-                <h3>🎁 Bonus Ödeme Seçimi</h3>
-                
-                <div class="bonus-info-section">
-                    <div class="bonus-summary">
-                        <div class="summary-row">
-                            <span>Toplam Tutar:</span>
-                            <strong>${money(totalAmount)}</strong>
-                        </div>
-                        <div class="summary-row">
-                            <span>Bonus Bakiyeniz:</span>
-                            <strong class="bonus-balance">${money(bonusBalance)}</strong>
-                        </div>
-                        <div class="summary-row">
-                            <span>Kalan Bakiye:</span>
-                            <strong class="remaining-balance ${remainingAfterBonus > 0 ? 'negative' : 'positive'}">
-                                ${money(remainingAfterBonus)}
-                            </strong>
+    if (!paymentModal) {
+        paymentModal = document.createElement('div');
+        paymentModal.id = 'paymentModal';
+        paymentModal.className = 'payment-modal';
+        paymentModal.innerHTML = `
+            <div class="payment-modal-content">
+                <div class="payment-modal-header">
+                    <h3>Ödeme Yöntemi Seçin</h3>
+                    <span class="close-payment-modal">&times;</span>
+                </div>
+                <div class="payment-modal-body" id="paymentModalBody">
+                    <!-- ÖNCE ÖDEME YÖNTEMİ SEÇİMİ -->
+                    <div class="payment-methods-selection">
+                        <h4>Ödeme Yönteminizi Seçin</h4>
+                        <div class="payment-methods-grid">
+                            <button class="payment-method-btn" data-method="cash">
+                                <i class="fas fa-money-bill-wave"></i>
+                                <span>Nakit</span>
+                            </button>
+                            <button class="payment-method-btn" data-method="card">
+                                <i class="fas fa-credit-card"></i>
+                                <span>Kart</span>
+                            </button>
+                            <button class="payment-method-btn" data-method="bonus">
+                                <i class="fas fa-gift"></i>
+                                <span>Bonus</span>
+                            </button>
+                            <button class="payment-method-btn" data-method="meal_card">
+                                <i class="fas fa-utensils"></i>
+                                <span>Yemek Kartı</span>
+                            </button>
                         </div>
                     </div>
-                </div>
-                
-                ${remainingAfterBonus > 0 ? `
-                <div class="bonus-payment-options">
-                    <h4>${money(remainingAfterBonus)} nasıl ödemek istersiniz?</h4>
-                    <div class="payment-buttons-container">
-                        <button type="button" class="payment-option-btn cash-option" onclick="selectBonusRemainingPayment('cash')">
-                            💵 Nakit ile Öde
-                        </button>
-                        <button type="button" class="payment-option-btn card-option" onclick="selectBonusRemainingPayment('card')">
-                            💳 Kart ile Öde
-                        </button>
+                    <!-- SONRA ÖDEME DETAYLARI BURAYA GELECEK -->
+                    <div id="paymentDetailsSection" style="display: none;">
+                        <!-- Dinamik ödeme adımları buraya gelecek -->
                     </div>
                 </div>
-                ` : `
-                <div class="full-bonus-success">
-                    <div class="success-badge">✅ Tamamı bonus ile ödenebilir</div>
-                    <div class="bonus-action">
-                        <button type="button" class="confirm-full-bonus-btn" onclick="confirmFullBonusPayment()">
-                            ✅ Tamamı Bonus ile Öde
-                        </button>
-                    </div>
-                </div>
-                `}
-                
-                <!-- MANUEL DÜZENLEME -->
-                <div class="manual-edit-section" id="manualBonusEditSection" style="display: none;">
-                    <h4>✏️ Manuel Bonus Ayarları</h4>
-                    <div class="manual-edit-form">
-                        <div class="form-group">
-                            <label>Kullanılacak Bonus:</label>
-                            <input type="number" id="manualBonusInput" 
-                                   value="${Math.min(bonusBalance, totalAmount)}" 
-                                   min="0" max="${bonusBalance}" step="1" 
-                                   class="form-control">
-                            <small>Maksimum: ${money(bonusBalance)}</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Kalan Tutar Ödeme Yöntemi:</label>
-                            <select id="manualPaymentSelect" class="form-control">
-                                <option value="cash">💵 Nakit</option>
-                                <option value="card">💳 Kart</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-success btn-sm" onclick="applyManualBonusSettings()">
-                            ✅ Uygula
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="action-buttons">
-                    <button type="button" class="manual-edit-toggle-btn" onclick="toggleBonusManualEdit()">
+                <div class="payment-modal-footer">
+                    <button id="manualEditBtn" class="manual-edit-btn" style="display: none;">
                         <i class="fas fa-edit"></i> Manuel Düzenle
                     </button>
-                    <button type="button" class="btn btn-secondary" onclick="cancelBonusPayment()">
-                        ❌ İptal
+                    <button id="savePaymentInfoBtn" class="save-payment-btn" style="display: none;">
+                        <i class="fas fa-save"></i> Kaydet
                     </button>
                 </div>
             </div>
         `;
+        document.body.appendChild(paymentModal);
         
-        // SESLİ KOMUTLARI AYARLA
-        setupBonusPaymentVoiceCommands();
-    }
-    
-    // Sesli bildirim
-    if (remainingAfterBonus > 0) {
-        speakToUser(`Bonus bakiyeniz ${money(bonusBalance)}. ${money(remainingAfterBonus)} nakit veya kart ile ödenecek. Nasıl ödemek istersiniz?`);
-    } else {
-        speakToUser(`Tamamı bonus ile ödenebilir. Toplam tutar ${money(totalAmount)}, bonus bakiyeniz ${money(bonusBalance)}.`);
-    }
-}
+        // Ödeme yöntemi butonlarına event listener ekle
+        const paymentMethodBtns = paymentModal.querySelectorAll('.payment-method-btn');
+        paymentMethodBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const method = this.getAttribute('data-method');
+                selectPaymentMethod(method);
+            });
+        });
         
-
-function selectBonusRemainingPayment(method) {
-    console.log(`💰 Kalan ödeme seçildi: ${method}`);
-    
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    const usedBonus = Math.min(bonusBalance, totalAmount);
-    const remainingAmount = totalAmount - usedBonus;
-    
-    // Seçimi kaydet
-    window.usedBonusAmount = usedBonus;
-    window.remainingPaymentMethod = method;
-    
-    // Butonları güncelle
-    document.querySelectorAll('.payment-option-btn').forEach(btn => {
-        btn.classList.remove('selected');
-    });
-    
-    const selectedBtn = document.querySelector(`.${method}-option`);
-    if (selectedBtn) {
-        selectedBtn.classList.add('selected');
+        // Manuel düzenleme butonu
+        const manualEditBtn = document.getElementById('manualEditBtn');
+        if (manualEditBtn) {
+            manualEditBtn.addEventListener('click', showManualPaymentForm);
+        }
+        
+        // Kaydet butonu
+        const savePaymentInfoBtn = document.getElementById('savePaymentInfoBtn');
+        if (savePaymentInfoBtn) {
+            savePaymentInfoBtn.addEventListener('click', savePaymentInfoManually);
+        }
+        
+        // Kapatma butonu
+        const closeBtn = paymentModal.querySelector('.close-payment-modal');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closePaymentModal);
+        }
     }
     
-    // Başarı mesajı
-    displayMessage(`✅ ${money(usedBonus)} bonus + ${money(remainingAmount)} ${method === 'cash' ? 'nakit' : 'kart'} seçildi`);
-    speakToUser(`${money(remainingAmount)} ${method === 'cash' ? 'nakit' : 'kart'} ile ödenecek`);
+    paymentModal.style.display = 'flex';
     
-    // 2 SANİYE SONRA TELEFON SORMAYA GEÇ
-    setTimeout(() => {
-        proceedToPhoneVerification();
-    }, 2000);
+    // Her açılışta ödeme yöntemi seçim ekranını göster
+    showPaymentMethodSelection();
 }
 
-function confirmFullBonusPayment() {
-    console.log('✅ Tamamı bonus ile ödeme onaylandı');
-    
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    
-    // Seçimi kaydet
-    window.usedBonusAmount = totalAmount;
-    window.remainingPaymentMethod = null;
-    
-    displayMessage(`✅ Tamamı ${money(totalAmount)} bonus ile ödenecek`);
-    speakToUser(`Tamamı bonus ile ödenecek`);
-    
-    // 2 SANİYE SONRA TELEFON SORMAYA GEÇ
-    setTimeout(() => {
-        proceedToPhoneVerification();
-    }, 2000);
-}
-
-function proceedToPhoneVerification() {
-    console.log('📞 Telefon doğrulamasına geçiliyor...');
-    
-    // Sesli komutları temizle
-    if (typeof window.restoreBonusCommands === 'function') {
-        window.restoreBonusCommands();
-    }
-    
-    // Telefon sorma ekranına geç
-    requestPhoneNumber();
-}
-        
-function closePaymentModal() {
+   function closePaymentModal() {
     const paymentModal = document.getElementById('paymentModal');
     if (paymentModal) {
         paymentModal.style.display = 'none';
@@ -12848,7 +12814,7 @@ function closePaymentModal() {
     }
 }
 
-function resetPaymentState() {
+    function resetPaymentState() {
     isWaitingForPhone = false;
     isWaitingForName = false;
     isWaitingForBuilding = false;
@@ -12864,7 +12830,7 @@ function resetPaymentState() {
     apartmentNumber = null;
     useRegisteredAddress = false;
 }
-        
+
 function checkExpectedInput(command) {
     console.log('🔍 Beklenen input kontrolü:', { 
         command, 
@@ -12934,78 +12900,112 @@ function checkExpectedInput(command) {
     return false;
 }
 
-
-        // SESLİ VERİYİ INPUT'TA GÖSTERME FONKSİYONLARI
-function showVoiceInputInField(inputId, value, isSuccess = true) {
-    const input = document.getElementById(inputId);
-    if (input) {
-        input.value = value;
         
-        // Görsel feedback
-        input.classList.remove('voice-input-success', 'voice-input-error');
-        input.classList.add(isSuccess ? 'voice-input-success' : 'voice-input-error');
+function showPaymentMethodSelection() {
+    const modalBody = document.getElementById('paymentModalBody');
+    const paymentDetailsSection = document.getElementById('paymentDetailsSection');
+    
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="payment-methods-selection">
+                <h4>Ödeme Yönteminizi Seçin</h4>
+                <div class="payment-methods-grid">
+                    <button class="payment-method-btn" data-method="cash">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <span>Nakit</span>
+                    </button>
+                    <button class="payment-method-btn" data-method="card">
+                        <i class="fas fa-credit-card"></i>
+                        <span>Kart</span>
+                    </button>
+                    <button class="payment-method-btn" data-method="bonus">
+                        <i class="fas fa-gift"></i>
+                        <span>Bonus</span>
+                    </button>
+                    <button class="payment-method-btn" data-method="meal_card">
+                        <i class="fas fa-utensils"></i>
+                        <span>Yemek Kartı</span>
+                    </button>
+                </div>
+                <div class="current-cart-summary">
+                    <p><strong>Sepet Toplamı:</strong> ${money(calculateTotal())}</p>
+                </div>
+            </div>
+            <div id="paymentDetailsSection" style="display: none;"></div>
+        `;
         
-        // 3 saniye sonra normal haline dön
-        setTimeout(() => {
-            input.classList.remove('voice-input-success', 'voice-input-error');
-        }, 3000);
+        // Buton event listener'larını tekrar ekle
+        const paymentMethodBtns = modalBody.querySelectorAll('.payment-method-btn');
+        paymentMethodBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const method = this.getAttribute('data-method');
+                selectPaymentMethod(method);
+            });
+        });
     }
+    // Footer butonlarını gizle
+    const manualEditBtn = document.getElementById('manualEditBtn');
+    const savePaymentInfoBtn = document.getElementById('savePaymentInfoBtn');
+    if (manualEditBtn) manualEditBtn.style.display = 'none';
+    if (savePaymentInfoBtn) savePaymentInfoBtn.style.display = 'none';
+    
+    displayMessage("💳 Lütfen ödeme yöntemi seçin: Nakit, Kart, Bonus veya Yemek Kartı");
+    speakToUser("Ödeme yöntemi seçin. Nakit, kart, bonus veya yemek kartı");
 }
 
-function highlightVoiceField(inputId) {
-    // Önceki vurguları temizle
-    document.querySelectorAll('.voice-field-highlight').forEach(el => {
-        el.classList.remove('voice-field-highlight');
+
+function selectPaymentMethod(method) {
+    console.log(`✅ Ödeme yöntemi seçildi: ${method}`);
+    currentPaymentMethod = method;
+    
+    // Seçili butonu vurgula
+    const paymentMethodBtns = document.querySelectorAll('.payment-method-btn');
+    paymentMethodBtns.forEach(btn => {
+        btn.classList.remove('selected');
+        if (btn.getAttribute('data-method') === method) {
+            btn.classList.add('selected');
+        }
     });
     
-    // Yeni input'u vurgula
-    const input = document.getElementById(inputId);
-    if (input) {
-        input.classList.add('voice-field-highlight');
-        
-        // Input görünür alana getir
-        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // 5 saniye sonra vurguyu kaldır
-        setTimeout(() => {
-            input.classList.remove('voice-field-highlight');
-        }, 5000);
-    }
+    displayMessage(`✅ ${getPaymentMethodName(method)} seçildi. Telefon numaranızı söyleyin.`);
+    speakToUser(`${getPaymentMethodName(method)} seçildi. Telefon numaranızı söyleyin`);
+    
+    // Telefon numarası isteme adımına geç
+    requestPhoneNumber();
 }
 
-function showVoiceFeedback(message, isSuccess = true) {
-    // Mevcut feedback'i temizle
-    const existingFeedback = document.getElementById('voice-input-feedback');
-    if (existingFeedback) {
-        existingFeedback.remove();
+        
+function confirmFullBonusPayment() {
+    console.log('✅ Tamamı bonus ile ödeme onaylandı');
+    
+    const totalAmount = calculateTotal();
+    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
+    
+    // Seçimi kaydet
+    window.usedBonusAmount = totalAmount;
+    window.remainingPaymentMethod = null;
+    
+    displayMessage(`✅ Tamamı ${money(totalAmount)} bonus ile ödenecek`);
+    speakToUser(`Tamamı bonus ile ödenecek`);
+    
+    // 2 SANİYE SONRA TELEFON SORMAYA GEÇ
+    setTimeout(() => {
+        proceedToPhoneVerification();
+    }, 2000);
+}
+
+function proceedToPhoneVerification() {
+    console.log('📞 Telefon doğrulamasına geçiliyor...');
+    
+    // Sesli komutları temizle
+    if (typeof window.restoreBonusCommands === 'function') {
+        window.restoreBonusCommands();
     }
     
-    // Yeni feedback oluştur
-    const feedback = document.createElement('div');
-    feedback.id = 'voice-input-feedback';
-    feedback.textContent = message;
-    feedback.style.cssText = `
-        position: fixed;
-        top: 100px;
-        right: 20px;
-        background: ${isSuccess ? 'var(--success)' : 'var(--danger)'};
-        color: white;
-        padding: 10px 15px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-weight: 600;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    `;
-    
-    document.body.appendChild(feedback);
-    
-    // 3 saniye sonra kaldır
-    setTimeout(() => {
-        if (feedback.parentNode) {
-            feedback.parentNode.removeChild(feedback);
-        }
-    }, 3000);
+    // Telefon sorma ekranına geç
+    requestPhoneNumber();
 }
+        
 function requestPhoneNumber() {
     console.log('📞 Telefon numarası isteniyor...');
     
@@ -13554,631 +13554,166 @@ function formatDeliveryAddress() {
 // SİPARİŞ ONAY İSTEĞİ (TÜM SESLİ KOMUTLAR İLE)
 // =============================================
 
-function requestOrderConfirmation() {
-    console.log('📋 Sipariş onayı isteniyor...');
+async function requestOrderConfirmation() {
+    console.log('✅ Sipariş onayı isteniyor...');
     
-    const totalAmount = calculateTotal();
-    const deliveryAddress = formatDeliveryAddress();
-    
-    // Bonus bakiyesini al
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    const remainingAfterBonus = Math.max(0, totalAmount - bonusBalance);
+    isWaitingForOrderConfirm = true;
+    expectedInput = 'order_confirm';
     
     const modalBody = document.getElementById('paymentModalBody');
     if (modalBody) {
+        const totalAmount = calculateTotal();
+        const deliveryAddress = formatDeliveryAddress();
+        
+        // Müşteri bonus bakiyesini al
+        let bonusBalance = 0;
+        if (currentCustomer) {
+            bonusBalance = await getCustomerBonusBalance(currentCustomer.id);
+        }
+        
+        // Kullanılabilir bonus miktarını hesapla (toplam tutarı geçemez)
+        const availableBonus = Math.min(bonusBalance, totalAmount);
+        
         modalBody.innerHTML = `
-            <div class="order-summary-container">
-                <h3>📋 Sipariş Özeti</h3>
-                
-                <div class="summary-section">
-                    <div class="summary-row">
-                        <span>Müşteri:</span>
-                        <strong>${currentCustomer ? currentCustomer.name : customerName}</strong>
-                    </div>
-                    <div class="summary-row">
-                        <span>Telefon:</span>
-                        <strong>${currentCustomer ? currentCustomer.phone : customerPhone}</strong>
-                    </div>
-                    <div class="summary-row">
-                        <span>Teslimat Adresi:</span>
-                        <strong>${deliveryAddress}</strong>
-                    </div>
-                    <div class="summary-row">
-                        <span>Ödeme Yöntemi:</span>
-                        <strong class="payment-method-badge">${getPaymentMethodName(currentPaymentMethod)}</strong>
-                    </div>
+            <div class="payment-step active">
+                <div class="step-icon">
+                    <i class="fas fa-shopping-cart"></i>
                 </div>
-                
-                <div class="amount-section">
-                    <div class="total-amount">
-                        <span>Toplam Tutar:</span>
-                        <strong class="total-price">${money(totalAmount)}</strong>
+                <div class="step-content">
+                    <h4>Sipariş Özeti</h4>
+                    <div class="order-summary-details">
+                        <p><strong>Müşteri:</strong> ${currentCustomer ? currentCustomer.name : customerName}</p>
+                        <p><strong>Telefon:</strong> ${currentCustomer ? currentCustomer.phone : customerPhone}</p>
+                        <p><strong>Teslimat Adresi:</strong> ${deliveryAddress}</p>
+                        <p><strong>Ödeme Yöntemi:</strong> ${getPaymentMethodName(currentPaymentMethod)}</p>
+                        <p><strong>Bonus Bakiyeniz:</strong> ${money(bonusBalance)}</p>
+                        <p><strong>Kullanılabilir Bonus:</strong> ${money(availableBonus)}</p>
+                        <p><strong>Toplam Tutar:</strong> ${money(totalAmount)}</p>
                     </div>
-                    
-                    ${currentPaymentMethod === 'bonus' ? `
-                    <!-- BONUS ÖDEME DURUMU -->
-                    <div class="bonus-payment-section">
-                        <div class="bonus-info">
-                            <div class="bonus-row">
-                                <span>Bonus Bakiyeniz:</span>
-                                <strong class="bonus-balance">${money(bonusBalance)}</strong>
-                            </div>
-                            <div class="bonus-row">
-                                <span>Kalan Bakiye:</span>
-                                <strong class="remaining-balance ${remainingAfterBonus > 0 ? 'negative' : 'positive'}">
-                                    ${money(remainingAfterBonus)}
-                                </strong>
-                            </div>
-                        </div>
-                        
-                        ${remainingAfterBonus > 0 ? `
-                        <div class="remaining-payment-options">
-                            <p class="remaining-payment-title">${money(remainingAfterBonus)} nasıl ödemek istersiniz?</p>
-                            <div class="payment-buttons-remaining">
-                                <button type="button" class="payment-option-btn cash-option" onclick="handlePaymentSelection('cash')">
-                                    💵 Nakit ile Öde
-                                </button>
-                                <button type="button" class="payment-option-btn card-option" onclick="handlePaymentSelection('card')">
-                                    💳 Kart ile Öde
-                                </button>
-                            </div>
-                        </div>
-                        ` : `
-                        <div class="full-bonus-success">
-                            <div class="success-badge">✅ Tamamı bonus ile ödendi</div>
-                            <div class="new-balance-info">
-                                Yeni bonus bakiyeniz: <strong>${money(bonusBalance - totalAmount)}</strong>
-                            </div>
-                        </div>
-                        `}
-                    </div>
-                    ` : ''}
-                </div>
-                
-                <!-- MANUEL DÜZENLEME ALANI -->
-                <div class="manual-edit-section" id="manualEditSection" style="display: none;">
-                    <h4>✏️ Manuel Bonus Düzenleme</h4>
-                    <div class="manual-edit-form">
-                        <div class="form-group">
-                            <label>Kullanılacak Bonus:</label>
-                            <input type="number" id="manualBonusAmount" value="${Math.min(bonusBalance, totalAmount)}" 
-                                   min="0" max="${bonusBalance}" step="1" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label>Kalan Tutar Ödeme Yöntemi:</label>
-                            <select id="manualPaymentMethod" class="form-control">
-                                <option value="cash">💵 Nakit</option>
-                                <option value="card">💳 Kart</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-success btn-sm" onclick="handleManualPaymentApply()">
-                            ✅ Uygula
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- ONAY BUTONLARI -->
-                <div class="confirmation-section">
-                    <p class="confirmation-question">Siparişi onaylıyor musunuz?</p>
+                    <p>Siparişi onaylıyor musunuz?</p>
                     <div class="confirmation-buttons">
-                        <button class="confirm-btn yes-btn" onclick="handleOrderConfirmation('evet')">
-                            ✅ Evet, Onayla
-                        </button>
-                        <button class="confirm-btn no-btn" onclick="handleOrderConfirmation('hayır')">
-                            ❌ Hayır, İptal
-                        </button>
+                        <button class="confirm-btn yes-btn" data-response="evet">Evet, Onayla</button>
+                        <button class="confirm-btn no-btn" data-response="hayır">Hayır, İptal</button>
                     </div>
-                    
-                    <button type="button" id="manualEditBtn" class="manual-edit-btn" onclick="handleManualEditToggle()">
-                        <i class="fas fa-edit"></i> Manuel Düzenle
-                    </button>
                 </div>
             </div>
         `;
-    }
-    
-    // SESLİ KOMUTLARI AYARLA
-    setupVoiceCommandsForOrderConfirmation();
-    
-    // Sesli bildirim
-    if (currentPaymentMethod === 'bonus') {
-        if (remainingAfterBonus > 0) {
-            speakToUser(`Bonus bakiyeniz ${money(bonusBalance)}. ${money(remainingAfterBonus)} nakit veya kart ile ödenecek. "Nakit" veya "Kart" diyerek seçim yapabilirsiniz. Siparişi onaylamak için "Evet" iptal için "Hayır" diyebilirsiniz.`);
-        } else {
-            speakToUser(`Tamamı bonus ile ödendi. Yeni bakiyeniz ${money(bonusBalance - totalAmount)}. Siparişi onaylamak için "Evet" iptal için "Hayır" diyebilirsiniz.`);
-        }
-    } else {
-        speakToUser(`Sipariş özetiniz hazır. Toplam tutar ${money(totalAmount)}. Onaylamak için "Evet" iptal için "Hayır" diyebilirsiniz.`);
-    }
-    
-    isWaitingForOrderConfirm = true;
-}
-
-// =============================================
-// TÜM SESLİ KOMUTLAR TEK FONKSİYONDA
-// =============================================
-
-function setupBonusPaymentVoiceCommands() {
-    console.log('🎤 Bonus ödeme sesli komutları kuruluyor...');
-    
-    // Mevcut komutları yedekle
-    const currentCommands = [...voiceCommands];
-    voiceCommands.length = 0;
-    
-    // 1. ÖDEME YÖNTEMİ KOMUTLARI
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    const remainingAfterBonus = Math.max(0, totalAmount - bonusBalance);
-    
-    if (remainingAfterBonus > 0) {
-        voiceCommands.push({
-            command: ['nakit', 'nakit öde', 'nakit ile', 'cash', 'para'],
-            callback: () => {
-                console.log('🎤 Sesli komut: Nakit - Bonus ödeme');
-                selectBonusRemainingPayment('cash');
-                return true;
-            }
-        });
         
-        voiceCommands.push({
-            command: ['kart', 'kart ile', 'kartla', 'kredi kartı', 'bank kartı', 'card', 'credit'],
-            callback: () => {
-                console.log('🎤 Sesli komut: Kart - Bonus ödeme');
-                selectBonusRemainingPayment('card');
-                return true;
-            }
-        });
-    } else {
-        voiceCommands.push({
-            command: ['tamam', 'onayla', 'evet', 'öde', 'bonus ile öde'],
-            callback: () => {
-                console.log('🎤 Sesli komut: Tamamı bonus ile öde');
-                confirmFullBonusPayment();
-                return true;
-            }
-        });
-    }
-    
-    // 2. MANUEL DÜZENLEME KOMUTLARI
-    voiceCommands.push({
-        command: ['manuel', 'düzenle', 'edit', 'manuel düzenle', 'ayar'],
-        callback: () => {
-            console.log('🎤 Sesli komut: Manuel düzenleme');
-            toggleBonusManualEdit();
-            return true;
-        }
-    });
-    
-    voiceCommands.push({
-        command: ['uygula', 'kaydet', 'apply', 'save'],
-        callback: () => {
-            console.log('🎤 Sesli komut: Uygula');
-            const manualSection = document.getElementById('manualBonusEditSection');
-            if (manualSection && manualSection.style.display !== 'none') {
-                applyManualBonusSettings();
-                return true;
-            }
-            return false;
-        }
-    });
-    
-    // 3. BİLGİ KOMUTLARI
-    voiceCommands.push({
-        command: ['bakiyem', 'bonus', 'bonusum', 'bakiye'],
-        callback: () => {
-            speakToUser(`Bonus bakiyeniz ${money(bonusBalance)}`);
-            return true;
-        }
-    });
-    
-    voiceCommands.push({
-        command: ['toplam', 'tutar', 'ne kadar'],
-        callback: () => {
-            speakToUser(`Toplam tutar ${money(totalAmount)}`);
-            return true;
-        }
-    });
-    
-    // 4. İPTAL KOMUTU
-    voiceCommands.push({
-        command: ['iptal', 'vazgeç', 'geri', 'cancel'],
-        callback: () => {
-            console.log('🎤 Sesli komut: İptal');
-            cancelBonusPayment();
-            return true;
-        }
-    });
-    
-    // Geri yükleme fonksiyonu
-    window.restoreBonusCommands = function() {
-        voiceCommands.length = 0;
-        voiceCommands.push(...currentCommands);
-        delete window.restoreBonusCommands;
-    };
-    
-    console.log(`✅ ${voiceCommands.length} bonus ödeme komutu eklendi`);
-}
-
-function toggleBonusManualEdit() {
-    const manualSection = document.getElementById('manualBonusEditSection');
-    const toggleBtn = document.querySelector('.manual-edit-toggle-btn');
-    
-    if (manualSection.style.display === 'none') {
-        manualSection.style.display = 'block';
-        toggleBtn.innerHTML = '<i class="fas fa-times"></i> Manuel Düzenlemeyi Kapat';
-        speakToUser("Manuel bonus ayarları açıldı");
-    } else {
-        manualSection.style.display = 'none';
-        toggleBtn.innerHTML = '<i class="fas fa-edit"></i> Manuel Düzenle';
-    }
-}
-
-function applyManualBonusSettings() {
-    const manualBonusAmount = parseFloat(document.getElementById('manualBonusInput').value) || 0;
-    const manualPaymentMethod = document.getElementById('manualPaymentSelect').value;
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    
-    // Validasyon
-    if (manualBonusAmount > bonusBalance) {
-        displayMessage("❌ Girdiğiniz bonus miktarı bakiyenizden fazla!");
-        return;
-    }
-    
-    if (manualBonusAmount > totalAmount) {
-        displayMessage("❌ Girdiğiniz bonus miktarı sipariş tutarından fazla!");
-        return;
-    }
-    
-    const remainingAmount = totalAmount - manualBonusAmount;
-    
-    // Manuel seçimi kaydet
-    window.usedBonusAmount = manualBonusAmount;
-    window.remainingPaymentMethod = remainingAmount > 0 ? manualPaymentMethod : null;
-    
-    // Manuel bölümü kapat
-    document.getElementById('manualBonusEditSection').style.display = 'none';
-    document.querySelector('.manual-edit-toggle-btn').innerHTML = '<i class="fas fa-edit"></i> Manuel Düzenle';
-    
-    // Başarı mesajı
-    let successMessage = `✅ Manuel ayar: ${money(manualBonusAmount)} bonus`;
-    if (remainingAmount > 0) {
-        successMessage += ` + ${money(remainingAmount)} ${manualPaymentMethod === 'cash' ? 'nakit' : 'kart'}`;
-    }
-    
-    displayMessage(successMessage);
-    speakToUser("Manuel ayar uygulandı");
-    
-    // 2 SANİYE SONRA TELEFON SORMAYA GEÇ
-    setTimeout(() => {
-        proceedToPhoneVerification();
-    }, 2000);
-}
-
-function cancelBonusPayment() {
-    console.log('❌ Bonus ödeme iptal edildi');
-    
-    // Sesli komutları temizle
-    if (typeof window.restoreBonusCommands === 'function') {
-        window.restoreBonusCommands();
-    }
-    
-    // Modalı kapat
-    closePaymentModal();
-    resetPaymentState();
-}
+        // Manuel onay butonları
+        const yesBtn = modalBody.querySelector('.yes-btn');
+        const noBtn = modalBody.querySelector('.no-btn');
         
-function setupVoiceCommandsForOrderConfirmation() {
-    console.log('🎤 Sipariş onayı sesli komutları kuruluyor...');
-    
-    // voiceCommands'ın var olduğunu kontrol et
-    if (typeof voiceCommands === 'undefined') {
-        console.error('❌ voiceCommands tanımlı değil!');
-        return;
-    }
-    
-    console.log(`📊 Mevcut komut sayısı: ${voiceCommands.length}`);
-    
-    // Önce mevcut sesli komutları yedekle
-    const currentCommands = [...voiceCommands];
-    
-    // Komutları temizle
-    voiceCommands.length = 0;
-    console.log('🧹 Mevcut komutlar temizlendi');
-    
-    // 1. ONAY KOMUTLARI
-    voiceCommands.push({
-        command: ['evet', 'onayla', 'tamam', 'kabul', 'öde', 'confirm', 'yes'],
-        callback: () => {
-            console.log('🎤 Sesli komut: Evet - Sipariş onaylanıyor');
-            handleOrderConfirmation('evet');
-            return true;
-        }
-    });
-    
-    voiceCommands.push({
-        command: ['hayır', 'iptal', 'vazgeç', 'geri', 'durdur', 'cancel', 'no'],
-        callback: () => {
-            console.log('🎤 Sesli komut: Hayır - Sipariş iptal ediliyor');
-            handleOrderConfirmation('hayır');
-            return true;
-        }
-    });
-    
-    // 2. ÖDEME YÖNTEMİ KOMUTLARI (Sadece bonus ödemede aktif)
-    if (currentPaymentMethod === 'bonus') {
-        const totalAmount = calculateTotal();
-        const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-        const remainingAfterBonus = Math.max(0, totalAmount - bonusBalance);
-        
-        console.log(`💰 Bonus durumu: ${bonusBalance} TL, Kalan: ${remainingAfterBonus} TL`);
-        
-        if (remainingAfterBonus > 0) {
-            voiceCommands.push({
-                command: ['nakit', 'nakit öde', 'nakit ile', 'cash', 'para'],
-                callback: () => {
-                    console.log('🎤 Sesli komut: Nakit - Kalan ödeme seçiliyor');
-                    handlePaymentSelection('cash');
-                    return true;
-                }
+        if (yesBtn) {
+            yesBtn.addEventListener('click', function() {
+                processOrderConfirmation('evet');
             });
-            
-            voiceCommands.push({
-                command: ['kart', 'kart ile', 'kartla', 'kredi kartı', 'bank kartı', 'card', 'credit'],
-                callback: () => {
-                    console.log('🎤 Sesli komut: Kart - Kalan ödeme seçiliyor');
-                    handlePaymentSelection('card');
-                    return true;
-                }
+        }
+        
+        if (noBtn) {
+            noBtn.addEventListener('click', function() {
+                processOrderConfirmation('hayır');
             });
-            
-            console.log('✅ Nakit/Kart komutları eklendi');
         }
     }
     
-    // 3. MANUEL DÜZENLEME KOMUTLARI
-    voiceCommands.push({
-        command: ['manuel', 'düzenle', 'edit', 'manuel düzenle', 'ayar', 'adjust'],
-        callback: () => {
-            console.log('🎤 Sesli komut: Manuel Düzenleme');
-            handleManualEditToggle();
-            return true;
-        }
-    });
-    
-    voiceCommands.push({
-        command: ['uygula', 'kaydet', 'apply', 'save'],
-        callback: () => {
-            console.log('🎤 Sesli komut: Uygula');
-            const manualSection = document.getElementById('manualEditSection');
-            if (manualSection && manualSection.style.display !== 'none') {
-                handleManualPaymentApply();
-                return true;
-            }
-            return false;
-        }
-    });
-    
-    // 4. BİLGİ KOMUTLARI
-    voiceCommands.push({
-        command: ['bakiyem', 'bonus', 'bonusum', 'balance', 'bakiye'],
-        callback: () => {
-            const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-            const totalAmount = calculateTotal();
-            speakToUser(`Bonus bakiyeniz ${money(bonusBalance)}. Toplam tutar ${money(totalAmount)}`);
-            displayMessage(`💰 Bonus bakiyeniz: ${money(bonusBalance)} | Toplam: ${money(totalAmount)}`);
-            return true;
-        }
-    });
-    
-    voiceCommands.push({
-        command: ['toplam', 'tutar', 'ne kadar', 'amount', 'total'],
-        callback: () => {
-            const totalAmount = calculateTotal();
-            speakToUser(`Toplam tutar ${money(totalAmount)}`);
-            displayMessage(`💰 Toplam tutar: ${money(totalAmount)}`);
-            return true;
-        }
-    });
-    
-    // Geri yükleme fonksiyonu
-    window.restoreVoiceCommands = function() {
-        console.log('🔄 Sesli komutlar geri yükleniyor...');
-        voiceCommands.length = 0;
-        voiceCommands.push(...currentCommands);
-        console.log(`✅ ${currentCommands.length} komut geri yüklendi`);
-        
-        // Global fonksiyonu temizle
-        delete window.restoreVoiceCommands;
-    };
-    
-    console.log(`✅ ${voiceCommands.length} yeni komut eklendi`);
+    displayMessage("✅ Sipariş bilgileriniz hazır. Bonus bakiyeniz kontrol edildi. Siparişi onaylıyor musunuz?");
+    speakToUser("Sipariş bilgileriniz hazır. Bonus bakiyeniz kontrol edildi. Siparişi onaylıyor musunuz evet veya hayır");
 }
-
-// Yardımcı fonksiyon - Manuel düzenleme kapatıldığında komutları geri yükle
-function restoreDefaultVoiceCommands() {
-    if (typeof window.restoreVoiceCommands === 'function') {
-        window.restoreVoiceCommands();
-    }
-}
-// =============================================
-// TIKLAMA ve SESLİ KOMUT ORTAK FONKSİYONLARI
-// =============================================
-
-function handleOrderConfirmation(response) {
-    console.log('✅ Sipariş onayı işleniyor:', response);
-    
-    // Butonları devre dışı bırak (çift tıklamayı önle)
-    const yesBtn = document.querySelector('.yes-btn');
-    const noBtn = document.querySelector('.no-btn');
-    
-    if (yesBtn) yesBtn.disabled = true;
-    if (noBtn) noBtn.disabled = true;
-    
-    if (response === 'evet') {
-        displayMessage("⏳ Siparişiniz onaylanıyor...");
-        speakToUser("Sipariş onaylanıyor");
-        
-        // Bonus ödeme validasyonu
-        if (currentPaymentMethod === 'bonus') {
-            const totalAmount = calculateTotal();
-            const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-            const usedBonus = window.usedBonusAmount || Math.min(bonusBalance, totalAmount);
-            const remainingAmount = totalAmount - usedBonus;
-            
-            if (remainingAmount > 0 && !window.remainingPaymentMethod) {
-                displayMessage("❌ Lütfen kalan ödeme yöntemini seçin!");
-                speakToUser("Kalan ödeme yöntemi seçilmedi");
-                
-                // Butonları tekrar aktif et
-                if (yesBtn) yesBtn.disabled = false;
-                if (noBtn) noBtn.disabled = false;
-                return;
-            }
-        }
-        
-        // Sesli komutları temizle
-        if (typeof window.restoreVoiceCommands === 'function') {
-            window.restoreVoiceCommands();
-        }
-        
-        // Siparişi onayla
-        confirmOrder();
-        
-    } else {
-        displayMessage("❌ Sipariş iptal edildi.");
-        speakToUser("Sipariş iptal edildi");
-        
-        // Sesli komutları temizle
-        if (typeof window.restoreVoiceCommands === 'function') {
-            window.restoreVoiceCommands();
-        }
-        
-        // Modalı kapat ve temizle
-        setTimeout(() => {
-            closePaymentModal();
-            resetPaymentState();
-        }, 2000);
-    }
-    
-    isWaitingForOrderConfirm = false;
-}
-        
-function handlePaymentSelection(method) {
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    const usedBonus = window.usedBonusAmount || Math.min(bonusBalance, totalAmount);
-    const remainingAmount = totalAmount - usedBonus;
-    
-    console.log(`💰 Ödeme seçildi: ${method}, Tutar: ${remainingAmount}`);
-    
-    // Seçimi kaydet
-    window.remainingPaymentMethod = method;
-    
-    // UI güncelle
-    updatePaymentSummary(usedBonus, remainingAmount, method);
-    
-    // Sesli bildirim
-    speakToUser(`${money(remainingAmount)} ${method === 'cash' ? 'nakit' : 'kart'} ile ödenecek. Siparişi onaylamak için "Evet" diyebilirsiniz.`);
-    
-    // Butonları güncelle
-    document.querySelectorAll('.payment-option-btn').forEach(btn => {
-        btn.classList.remove('selected');
-    });
-    
-    const selectedBtn = document.querySelector(`.${method}-option`);
-    if (selectedBtn) {
-        selectedBtn.classList.add('selected');
-    }
-}
-
-function handleManualEditToggle() {
-    const manualSection = document.getElementById('manualEditSection');
-    const manualEditBtn = document.getElementById('manualEditBtn');
-    
-    if (manualSection.style.display === 'none') {
-        manualSection.style.display = 'block';
-        manualEditBtn.innerHTML = '<i class="fas fa-times"></i> Manuel Düzenlemeyi Kapat';
-        speakToUser("Manuel bonus düzenleme açıldı. Kullanılacak bonus miktarını ve ödeme yöntemini ayarlayabilirsiniz.");
-    } else {
-        manualSection.style.display = 'none';
-        manualEditBtn.innerHTML = '<i class="fas fa-edit"></i> Manuel Düzenle';
-        speakToUser("Manuel düzenleme kapatıldı");
-    }
-}
-
-function handleManualPaymentApply() {
-    const manualBonusAmount = parseFloat(document.getElementById('manualBonusAmount').value) || 0;
-    const manualPaymentMethod = document.getElementById('manualPaymentMethod').value;
-    const totalAmount = calculateTotal();
-    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-    
-    // Validasyon
-    if (manualBonusAmount > bonusBalance) {
-        displayMessage("❌ Girdiğiniz bonus miktarı bakiyenizden fazla!");
-        speakToUser("Bonus miktarı geçersiz");
-        return;
-    }
-    
-    if (manualBonusAmount > totalAmount) {
-        displayMessage("❌ Girdiğiniz bonus miktarı sipariş tutarından fazla!");
-        speakToUser("Bonus miktarı sipariş tutarından fazla");
-        return;
-    }
-    
-    const remainingAmount = totalAmount - manualBonusAmount;
-    
-    // Manuel seçimi uygula
-    window.usedBonusAmount = manualBonusAmount;
-    window.remainingPaymentMethod = manualPaymentMethod;
-    
-    // UI güncelle
-    updatePaymentSummary(manualBonusAmount, remainingAmount, manualPaymentMethod);
-    
-    // Manuel bölümü kapat
-    document.getElementById('manualEditSection').style.display = 'none';
-    document.getElementById('manualEditBtn').innerHTML = '<i class="fas fa-edit"></i> Manuel Düzenle';
-    
-    displayMessage(`✅ Manuel ayar uygulandı: ${money(manualBonusAmount)} bonus + ${money(remainingAmount)} ${manualPaymentMethod === 'cash' ? 'nakit' : 'kart'}`);
-    speakToUser(`Manuel ayar uygulandı. ${money(remainingAmount)} ${manualPaymentMethod === 'cash' ? 'nakit' : 'kart'} ile ödenecek.`);
-}
-
 // =============================================
 // YARDIMCI FONKSİYON
 // =============================================
 
-function updatePaymentSummary(usedBonus, remainingAmount, paymentMethod) {
-    const summaryElement = document.querySelector('.bonus-payment-section');
-    if (summaryElement) {
-        summaryElement.innerHTML = `
-            <div class="bonus-info">
-                <div class="bonus-row">
-                    <span>Kullanılan Bonus:</span>
-                    <strong>${money(usedBonus)}</strong>
-                </div>
-                <div class="bonus-row">
-                    <span>Kalan Ödeme:</span>
-                    <strong>${money(remainingAmount)} (${paymentMethod === 'cash' ? 'Nakit' : 'Kart'})</strong>
-                </div>
-                <div class="bonus-row">
-                    <span>Yeni Bonus Bakiyeniz:</span>
-                    <strong>${money((currentCustomer?.bonus_balance || 0) - usedBonus)}</strong>
-                </div>
-            </div>
-            <div class="payment-confirmed-badge">
-                ✅ Ödeme planı onaylandı
-            </div>
-        `;
+function calculatePaymentDistribution(totalAmount, bonusBalance, paymentMethod) {
+    const distribution = {
+        bonus_amount: 0,
+        cash_amount: 0,
+        card_amount: 0,
+        meal_card: 0,
+        remaining_amount: totalAmount
+    };
+    
+    // Bonus kullanımını hesapla
+    if (bonusBalance > 0) {
+        distribution.bonus_amount = Math.min(bonusBalance, totalAmount);
+        distribution.remaining_amount = totalAmount - distribution.bonus_amount;
+    }
+    
+    // Kalan tutarı ödeme yöntemine göre dağıt
+    if (distribution.remaining_amount > 0) {
+        switch (paymentMethod) {
+            case 'cash':
+                distribution.cash_amount = distribution.remaining_amount;
+                break;
+            case 'card':
+                distribution.card_amount = distribution.remaining_amount;
+                break;
+            case 'bonus':
+                // Sadece bonus kullanılıyorsa ve yetersizse hata ver
+                if (distribution.remaining_amount > 0) {
+                    throw new Error('Bonus bakiyeniz yetersiz. Lütfen farklı ödeme yöntemi seçin.');
+                }
+                break;
+            // Diğer ödeme yöntemleri buraya eklenebilir
+        }
+    }
+    
+    distribution.remaining_amount = 0; // Tüm tutar dağıtıldı
+    return distribution;
+}
+
+async function savePaymentRecord(orderId, paymentDistribution) {
+    try {
+        const paymentData = {
+            order_id: orderId,
+            customer_id: currentCustomer ? currentCustomer.id : null,
+            payment_method: currentPaymentMethod,
+            amount: calculateTotal(),
+            payment_type: 'order_payment',
+            bonus_amount: paymentDistribution.bonus_amount,
+            cash_amount: paymentDistribution.cash_amount,
+            card_amount: paymentDistribution.card_amount,
+            meal_card: paymentDistribution.meal_card,
+            status: 'completed',
+            payment_date: new Date().toISOString()
+        };
+        
+        const { error } = await supabase
+            .from('customer_payments')
+            .insert([paymentData]);
+            
+        if (error) throw error;
+        
+        console.log('✅ Ödeme kaydı oluşturuldu:', paymentData);
+    } catch (error) {
+        console.error('❌ Ödeme kaydı hatası:', error);
+        throw error;
+    }
+}
+
+async function updateCustomerBonusBalance(customerId, usedBonus) {
+    try {
+        const { error } = await supabase
+            .from('customers')
+            .update({ 
+                bonus_balance: supabase.raw(`bonus_balance - ${usedBonus}`),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', customerId);
+            
+        if (error) throw error;
+        
+        console.log(`✅ Bonus bakiyesi güncellendi: ${usedBonus} TL kullanıldı`);
+    } catch (error) {
+        console.error('❌ Bonus bakiye güncelleme hatası:', error);
+        throw error;
     }
 }
 
 
-
-        
-
 // =============================================
 // SİPARİŞ KAYDETME
 // =============================================
+
 
 async function saveOrder() {
     console.log('💾 Sipariş kaydediliyor...');
@@ -14187,38 +13722,14 @@ async function saveOrder() {
         const totalAmount = calculateTotal();
         const deliveryAddress = formatDeliveryAddress();
         
-        // Ödeme detaylarını hazırla
-        let paymentNotes = `Teslimat adresi: ${deliveryAddress}. Ödeme: ${getPaymentMethodName(currentPaymentMethod)}`;
-        let usedBonus = 0;
-        let remainingPaymentMethod = null;
-        let remainingAmount = 0;
-        
-        // Manuel ödeme verilerini kontrol et
-        if (window.manualPaymentData) {
-            usedBonus = window.manualPaymentData.bonus;
-            remainingAmount = window.manualPaymentData.cash + window.manualPaymentData.card;
-            remainingPaymentMethod = window.manualPaymentData.cash > 0 ? 'cash' : 'card';
-        } else if (currentPaymentMethod === 'bonus') {
-            const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
-            usedBonus = window.usedBonusAmount || Math.min(bonusBalance, totalAmount);
-            remainingAmount = totalAmount - usedBonus;
-            remainingPaymentMethod = window.remainingPaymentMethod;
+        // Müşteri bonus bakiyesini al
+        let bonusBalance = 0;
+        if (currentCustomer) {
+            bonusBalance = await getCustomerBonusBalance(currentCustomer.id);
         }
         
-        // Orders tablosu için ödeme yöntemi metnini hazırla
-        let paymentMethodText = getPaymentMethodName(currentPaymentMethod);
-        if (usedBonus > 0 && remainingAmount > 0) {
-            paymentMethodText = `(bonus): ${money(usedBonus)} Ödendi, (${remainingPaymentMethod}): ${money(remainingAmount)} Ödenecek`;
-        } else if (usedBonus > 0) {
-            paymentMethodText = `(bonus): ${money(usedBonus)} Ödendi`;
-        }
-        
-        if (usedBonus > 0) {
-            paymentNotes += `, Kullanılan Bonus: ${money(usedBonus)}`;
-        }
-        if (remainingPaymentMethod) {
-            paymentNotes += `, Kalan Ödeme: ${money(remainingAmount)} ${remainingPaymentMethod === 'cash' ? 'Nakit' : 'Kart'}`;
-        }
+        // Ödeme dağılımını hesapla
+        const paymentDistribution = calculatePaymentDistribution(totalAmount, bonusBalance, currentPaymentMethod);
         
         // Sipariş verilerini hazırla
         const orderData = {
@@ -14227,9 +13738,9 @@ async function saveOrder() {
             customer_phone: currentCustomer ? currentCustomer.phone : customerPhone,
             seller_id: selectedSellerId,
             total_amount: totalAmount,
-            payment_method: paymentMethodText,
+            payment_method: currentPaymentMethod,
             delivery_address: deliveryAddress,
-            order_notes: paymentNotes,
+            order_notes: `Teslimat adresi: ${deliveryAddress}. Ödeme: ${getPaymentMethodName(currentPaymentMethod)}`,
             status: 'pending',
             created_at: new Date().toISOString()
         };
@@ -14250,16 +13761,16 @@ async function saveOrder() {
         
         console.log('✅ Sipariş kaydedildi:', order);
         
-        // 2️⃣ SİPARİŞ DETAYLARINI KAYDET
+        // 2️⃣ ÖDEME KAYDINI OLUŞTUR
+        await savePaymentRecord(order.id, paymentDistribution);
+        
+        // 3️⃣ SİPARİŞ DETAYLARINI KAYDET
         if (cart.length === 0) {
             console.error('❌ Sepet boş, sipariş detayı kaydedilemedi');
             throw new Error('Sepet boş, sipariş detayı kaydedilemedi');
         }
 
-        console.log('📦 Sipariş detayları hazırlanıyor:', cart);
-
         const orderDetails = cart.map(item => {
-            // Eksik alanları kontrol et
             if (!item.id || !item.name || !item.price) {
                 console.error('❌ Geçersiz sepet öğesi:', item);
                 throw new Error(`Geçersiz sepet öğesi: ${item.name}`);
@@ -14277,7 +13788,6 @@ async function saveOrder() {
             };
         });
 
-        console.log('✅ Sipariş detayları hazır:', orderDetails);        
         const { error: detailsError } = await supabase
             .from('order_details')
             .insert(orderDetails);
@@ -14288,7 +13798,6 @@ async function saveOrder() {
         }
         
         console.log('✅ Sipariş detayları kaydedildi');
-        
         // 3️⃣ BONUS HESAPLA - ESKİ FONKSİYONDAN EKLENDİ
         if (currentCustomer) {
             console.log('🎁 Sipariş bonusu hesaplanıyor...');
@@ -14306,67 +13815,29 @@ async function saveOrder() {
             }
         }
         
-        // 4️⃣ ÖDEME KAYITLARINI OLUŞTUR - YENİ EKLENEN
-        if (currentPaymentMethod === 'bonus' && usedBonus > 0) {
-            await processBonusPayment(order.id, currentCustomer.id, totalAmount, usedBonus, remainingPaymentMethod);
-        } else {
-            await processRegularPayment(order.id, currentCustomer.id, totalAmount, currentPaymentMethod);
+        // 4️⃣ BONUS KULLANIMI VARSA GÜNCELLE
+        if (paymentDistribution.bonus_amount > 0 && currentCustomer) {
+            await updateCustomerBonusBalance(currentCustomer.id, paymentDistribution.bonus_amount);
         }
         
-        // 5️⃣ REFERRAL KAZANÇLARINI İŞLE - YENİ EKLENEN
-        if (currentCustomer) {
-            await processReferralPayouts(currentCustomer.id);
-        }
+        // 5️⃣ BAŞARILI MESAJ
+        displayMessage("🎉 Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: " + order.id);
+        speakToUser("siparişiniz başarıyla oluşturuldu");
         
-        // 6️⃣ BAŞARILI MESAJ
-        const bonusMessage = currentCustomer ? 
-            ` Bonus bakiyeniz güncellendi: ${money(referralBonusBalance)}` : 
-            '';
-            
-        // Ödeme detayı mesajı - YENİ EKLENEN
-        let paymentDetailMessage = '';
-        if (currentPaymentMethod === 'bonus' && usedBonus > 0) {
-            paymentDetailMessage = ` ${money(usedBonus)} bonus kullanıldı.`;
-            if (remainingAmount > 0) {
-                paymentDetailMessage += ` Kalan ${money(remainingAmount)} ${remainingPaymentMethod === 'cash' ? 'nakit' : 'kart'} ile ödendi.`;
-            }
-        }
-            
-        displayMessage(`🎉 Siparişiniz başarıyla oluşturuldu! Sipariş numaranız: ${order.id}${paymentDetailMessage}${bonusMessage}`);
-        speakToUser("siparişiniz başarıyla oluşturuldu" + (bonusMessage ? " bonusunuz eklendi" : ""));
-        
-        // 7️⃣ TEMİZLİK
+        // 6️⃣ TEMİZLİK
         resetAfterSuccessfulOrder();
-        
-        return order;
         
     } catch (error) {
         console.error('❌ SİPARİŞ KAYDETME HATASI:', error);
         
-        // NET HATA MESAJI - ESKİ FONKSİYONDAN EKLENDİ
-        const errorMessage = `
-❌ SİPARİŞ HATASI
-
-Siparişiniz kaydedilemedi:
-${error.message}
-
-Lütfen:
-• İnternet bağlantınızı kontrol edin
-• Bilgilerinizi kontrol edin  
-• Tekrar deneyin
-
-Teknik Detay: ${error.code || 'Bilinmeyen hata'}
-        `;
-        
+        const errorMessage = `❌ Siparişiniz kaydedilemedi: ${error.message}`;
         displayMessage(errorMessage);
         speakToUser("Siparişiniz kaydedilemedi. Lütfen tekrar deneyin.");
         
-        // Sepeti koru, kullanıcı tekrar denesin - ESKİ FONKSİYONDAN EKLENDİ
         console.log('⚠️ Sepet korunuyor, kullanıcı tekrar deneyebilir');
-        
-        throw error;
     }
 }
+
         
 // Başarılı sipariş sonrası reset
 function resetAfterSuccessfulOrder() {
@@ -14996,14 +14467,18 @@ async function updateCustomerBonusBalance(customerId) {
 // Yardımcı fonksiyon
 async function getCustomerBonusBalance(customerId) {
     try {
-        const { data: customer, error } = await supabase
+        const { data, error } = await supabase
             .from('customers')
             .select('bonus_balance')
             .eq('id', customerId)
             .single();
             
-        if (error) throw error;
-        return customer?.bonus_balance || 0;
+        if (error) {
+            console.error('❌ Bonus bakiye sorgulama hatası:', error);
+            return 0;
+        }
+        
+        return data.bonus_balance || 0;
     } catch (error) {
         console.error('❌ Bonus bakiye alma hatası:', error);
         return 0;
@@ -15698,6 +15173,7 @@ async function processRegularPayment(orderId, customerId, totalAmount, paymentMe
     </script>
 </body>
 </html>
+
 
 
 
