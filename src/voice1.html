@@ -13985,10 +13985,9 @@ async function savePaymentRecord(orderId, paymentDistribution) {
     try {
         console.log('💳 Ödeme kaydı oluşturuluyor:', { orderId, paymentDistribution });
         
-        // Tablodaki GEÇERLİ payment_type değerlerini kullan
-        let paymentType = 'full'; // Varsayılan - tam ödeme
+        // Payment type belirle
+        let paymentType = 'full'; // Varsayılan
         
-        // Ödeme dağılımına göre payment_type belirle
         if (paymentDistribution.bonus_amount > 0) {
             if (paymentDistribution.bonus_amount === paymentDistribution.total_amount) {
                 paymentType = 'bonus_only'; // Sadece bonus
@@ -13996,27 +13995,23 @@ async function savePaymentRecord(orderId, paymentDistribution) {
                 paymentType = 'partial'; // Kısmi ödeme (bonus + nakit/kart)
             }
         }
-        // bonus_amount = 0 ise zaten 'full' kalır
         
         console.log('🎯 Payment Type Seçildi:', paymentType);
         
+        // 💰 AMOUNT = SİPARİŞ TOPLAM TUTARI (bonus dahil)
         const paymentData = {
             order_id: orderId,
             customer_id: currentCustomer ? currentCustomer.id : null,
             payment_method: paymentDistribution.payment_method,
-            amount: paymentDistribution.cash_amount + paymentDistribution.card_amount,
-            payment_type: paymentType, // 'full', 'partial', veya 'bonus_only'
-            bonus_used: paymentDistribution.bonus_amount, // Tabloda bonus_used alanı var
+            amount: paymentDistribution.total_amount, // ✅ SİPARİŞ TOPLAMI
+            payment_type: paymentType,
+            bonus_used: paymentDistribution.bonus_amount,
             cash_amount: paymentDistribution.cash_amount,
             card_amount: paymentDistribution.card_amount,
             status: 'completed',
             payment_date: new Date().toISOString(),
             created_at: new Date().toISOString()
         };
-        
-        // meal_card ve bonus_amount alanları null bırakılabilir
-        // paymentData.meal_card = null;
-        // paymentData.bonus_amount = null;
         
         console.log('📦 Ödeme verisi:', paymentData);
         
@@ -14037,7 +14032,7 @@ async function savePaymentRecord(orderId, paymentDistribution) {
         throw error;
     }
 }
-
+        
 // referral_payouts tablosunda RLS (Row Level Security) aktif
 async function saveBonusUsage(customerId, orderId, bonusAmount) {
     try {
@@ -14681,6 +14676,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
