@@ -13985,29 +13985,38 @@ async function savePaymentRecord(orderId, paymentDistribution) {
     try {
         console.log('💳 Ödeme kaydı oluşturuluyor:', { orderId, paymentDistribution });
         
-        // payment_type için geçerli değerleri kontrol et
-        let paymentType = 'order_payment';
+        // Tablodaki GEÇERLİ payment_type değerlerini kullan
+        let paymentType = 'full'; // Varsayılan - tam ödeme
         
-        // Constraint'e uygun payment_type değerleri
-        const validPaymentTypes = ['order_payment', 'refund', 'bonus_earning', 'bonus_usage'];
-        
-        // Bonus kullanımı varsa payment_type'ı güncelle
+        // Ödeme dağılımına göre payment_type belirle
         if (paymentDistribution.bonus_amount > 0) {
-            paymentType = 'bonus_usage';
+            if (paymentDistribution.bonus_amount === paymentDistribution.total_amount) {
+                paymentType = 'bonus_only'; // Sadece bonus
+            } else {
+                paymentType = 'partial'; // Kısmi ödeme (bonus + nakit/kart)
+            }
         }
+        // bonus_amount = 0 ise zaten 'full' kalır
+        
+        console.log('🎯 Payment Type Seçildi:', paymentType);
         
         const paymentData = {
             order_id: orderId,
             customer_id: currentCustomer ? currentCustomer.id : null,
             payment_method: paymentDistribution.payment_method,
             amount: paymentDistribution.cash_amount + paymentDistribution.card_amount,
-            payment_type: paymentType, // Constraint'e uygun değer
-            bonus_amount: paymentDistribution.bonus_amount,
+            payment_type: paymentType, // 'full', 'partial', veya 'bonus_only'
+            bonus_used: paymentDistribution.bonus_amount, // Tabloda bonus_used alanı var
             cash_amount: paymentDistribution.cash_amount,
             card_amount: paymentDistribution.card_amount,
             status: 'completed',
+            payment_date: new Date().toISOString(),
             created_at: new Date().toISOString()
         };
+        
+        // meal_card ve bonus_amount alanları null bırakılabilir
+        // paymentData.meal_card = null;
+        // paymentData.bonus_amount = null;
         
         console.log('📦 Ödeme verisi:', paymentData);
         
@@ -14042,7 +14051,7 @@ async function saveBonusUsage(customerId, orderId, bonusAmount) {
             customer_id: customerId,
             order_id: orderId,
             amount: -bonusAmount, // Eksi değer - kullanım olduğu için
-            payout_type: 'bonus_usage',
+            payout_type: 'bonus_usage', // referral_payouts tablosunda bu farklı
             status: 'completed',
             description: `Sipariş #${orderId} için bonus kullanımı`,
             created_at: new Date().toISOString()
@@ -14066,8 +14075,7 @@ async function saveBonusUsage(customerId, orderId, bonusAmount) {
         console.error('❌ Bonus kullanım kaydı hatası:', error);
         return null;
     }
-}
-        
+}        
    async function updateCustomerBonusBalance(customerId, bonusAmountUsed) {
     try {
         console.log('💰 Bonus bakiyesi güncelleniyor:', { customerId, bonusAmountUsed });
@@ -14668,6 +14676,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
