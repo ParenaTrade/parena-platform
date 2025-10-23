@@ -13981,30 +13981,18 @@ function calculatePaymentDistribution(totalAmount, bonusBalance, paymentMethod) 
 }
         
 
+// payments.js modülünde
 async function savePaymentRecord(orderId, paymentDistribution) {
     try {
         console.log('💳 Ödeme kaydı oluşturuluyor:', { orderId, paymentDistribution });
         
-        // Payment type belirle
-        let paymentType = 'full'; // Varsayılan
-        
-        if (paymentDistribution.bonus_amount > 0) {
-            if (paymentDistribution.bonus_amount === paymentDistribution.total_amount) {
-                paymentType = 'bonus_only'; // Sadece bonus
-            } else {
-                paymentType = 'partial'; // Kısmi ödeme (bonus + nakit/kart)
-            }
-        }
-        
-        console.log('🎯 Payment Type Seçildi:', paymentType);
-        
-        // 💰 AMOUNT = SİPARİŞ TOPLAM TUTARI (bonus dahil)
+        // 💰 CRITICAL FIX: AMOUNT = SİPARİŞ TOPLAM TUTARI
         const paymentData = {
             order_id: orderId,
             customer_id: currentCustomer ? currentCustomer.id : null,
             payment_method: paymentDistribution.payment_method,
             amount: paymentDistribution.total_amount, // ✅ SİPARİŞ TOPLAMI
-            payment_type: paymentType,
+            payment_type: calculatePaymentType(paymentDistribution),
             bonus_used: paymentDistribution.bonus_amount,
             cash_amount: paymentDistribution.cash_amount,
             card_amount: paymentDistribution.card_amount,
@@ -14019,19 +14007,29 @@ async function savePaymentRecord(orderId, paymentDistribution) {
             .from('customer_payments')
             .insert([paymentData]);
             
-        if (error) {
-            console.error('❌ Ödeme kaydı hatası:', error);
-            throw new Error(`Ödeme kaydı oluşturulamadı: ${error.message}`);
-        }
+        if (error) throw error;
         
         console.log('✅ Ödeme kaydı oluşturuldu');
         return data;
         
     } catch (error) {
-        console.error('❌ Ödeme kaydı oluşturma hatası:', error);
+        console.error('❌ Ödeme kaydı hatası:', error);
         throw error;
     }
 }
+
+// Payment type hesaplama
+function calculatePaymentType(paymentDistribution) {
+    if (paymentDistribution.bonus_amount > 0) {
+        if (paymentDistribution.bonus_amount === paymentDistribution.total_amount) {
+            return 'bonus_only';
+        } else {
+            return 'partial';
+        }
+    }
+    return 'full';
+}
+
         
 // referral_payouts tablosunda RLS (Row Level Security) aktif
 async function saveBonusUsage(customerId, orderId, bonusAmount) {
