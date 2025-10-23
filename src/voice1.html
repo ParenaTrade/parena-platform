@@ -12547,20 +12547,15 @@ function getPaymentMethodName(method) {
 }
 
         
-// AKILLI TELEFON FORMATLAMA - İkisini de dener
+// EKSİK FONKSİYONU EKLEYELİM
 function formatPhoneNumber(phoneInput) {
     console.log('📞 formatPhoneNumber çağrıldı:', phoneInput);
     
-    // Önce 10 haneli deneyelim
-    let cleanedNumber = cleanPhoneNumber10Digits(phoneInput);
-    
-    // 10 haneli olmazsa 11 haneli dene
-    if (!cleanedNumber) {
-        cleanedNumber = cleanPhoneNumber11Digits(phoneInput);
-    }
+    // Mevcut cleanPhoneNumber fonksiyonunu kullan
+    const cleanedNumber = cleanPhoneNumber(phoneInput);
     
     if (!cleanedNumber) {
-        console.log('❌ Hiçbir format uymadı');
+        console.log('❌ cleanPhoneNumber geçersiz numara döndü');
         return {
             success: false,
             formatted: phoneInput,
@@ -12579,56 +12574,36 @@ function formatPhoneNumber(phoneInput) {
         formatted: formatted,
         raw: cleanedNumber
     };
-} 
-
-// 10 BASAMAKLI (5XXXXXXXXX) için
-function cleanPhoneNumber10Digits(phone) {
-    console.log('🧹 10 haneli numara temizleniyor:', phone);
-    
-    // Rakamları al
-    let cleaned = phone.replace(/\D/g, '');
-    
-    // Ödeme kelimelerini filtrele
-    const paymentWords = ['nakit', 'kart', 'bonus', 'ödeme', 'öde', 'toplam', 'tutar'];
-    if (paymentWords.some(word => phone.toLowerCase().includes(word))) {
-        console.log('❌ Ödeme kelimesi içeriyor, geçersiz');
-        return null;
-    }
-    
-    // 10 haneli (5416337291) - 5 ile başlamalı
-    if (cleaned.length === 10 && cleaned.startsWith('5')) {
-        console.log('✅ 10 haneli numara kabul edildi:', cleaned);
-        return cleaned;
-    }
-    
-    console.log('❌ Geçersiz 10 haneli format');
-    return null;
 }
 
-// 11 BASAMAKLI (05XXXXXXXXX) için  
-function cleanPhoneNumber11Digits(phone) {
-    console.log('🧹 11 haneli numara temizleniyor:', phone);
+
+    // EĞER cleanPhoneNumber YOKSA BUNU EKLEYİN
+function cleanPhoneNumber(phone) {
+    console.log('🧹 cleanPhoneNumber çağrıldı:', phone);
     
     // Rakamları al
     let cleaned = phone.replace(/\D/g, '');
     
-    // Ödeme kelimelerini filtrele
+    // "nakit", "kart" gibi ödeme kelimelerini filtrele
     const paymentWords = ['nakit', 'kart', 'bonus', 'ödeme', 'öde', 'toplam', 'tutar'];
     if (paymentWords.some(word => phone.toLowerCase().includes(word))) {
         console.log('❌ Ödeme kelimesi içeriyor, geçersiz');
         return null;
+    }
+    
+    // 10 haneli (5416337291)
+    if (cleaned.length === 10 && cleaned.startsWith('5')) {
+        return cleaned;
     }
     
     // 11 haneli (05416337291) - baştaki 0'ı kaldır
     if (cleaned.length === 11 && cleaned.startsWith('05')) {
-        const result = cleaned.substring(1); // 0'ı kaldır
-        console.log('✅ 11 haneli numara dönüştürüldü:', result);
-        return result;
+        return cleaned.substring(1);
     }
     
-    console.log('❌ Geçersiz 11 haneli format');
+    console.log('❌ Geçersiz telefon formatı');
     return null;
-}
+}    
         
         
 async function checkCustomerByPhone(phone) {
@@ -14558,6 +14533,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
