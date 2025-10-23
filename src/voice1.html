@@ -14162,10 +14162,84 @@ function showManualPaymentForm() {
 }
 
 
+// Yardımcı fonksiyon
+async function getCustomerBonusBalance(customerId) {
+    try {
+        const { data: customer, error } = await supabase
+            .from('customers')
+            .select('bonus_balance')
+            .eq('id', customerId)
+            .single();
+            
+        if (error) throw error;
+        return customer?.bonus_balance || 0;
+    } catch (error) {
+        console.error('❌ Bonus bakiye alma hatası:', error);
+        return 0;
+    }
+}
+
+function savePaymentInfoManually() {
+    console.log('💾 Manuel ödeme bilgileri kaydediliyor...');
+    
+    try {
+        // Temel bilgileri al
+        const manualPhone = document.getElementById('manualPhone').value;
+        const manualName = document.getElementById('manualName').value;
+        const manualAddress = document.getElementById('manualAddress').value;
+        const manualBuilding = document.getElementById('manualBuilding').value;
+        const manualApartment = document.getElementById('manualApartment').value;
+        const paymentMethod = document.querySelector('input[name="manualPayment"]:checked').value;
+        
+        // Validasyon
+        if (!manualPhone || !manualName || !manualAddress) {
+            displayMessage("❌ Lütfen zorunlu alanları doldurun!");
+            speakToUser("Lütfen telefon, ad ve adres bilgilerinizi girin");
+            return;
+        }
+        
+        // Telefon formatını kontrol et
+        const phoneResult = formatPhoneNumber(manualPhone);
+        if (!phoneResult.success) {
+            displayMessage("❌ Geçersiz telefon numarası formatı!");
+            speakToUser("Geçersiz telefon numarası");
+            return;
+        }
+        
+        // Bilgileri kaydet
+        customerPhone = phoneResult.raw;
+        customerName = manualName;
+        buildingNumber = manualBuilding;
+        apartmentNumber = manualApartment;
+        currentPaymentMethod = paymentMethod;
+        
+        // Bonus ödeme detaylarını işle
+        if (paymentMethod === 'bonus') {
+            handleManualBonusPayment();
+        } else {
+            // Diğer ödeme yöntemleri için bonus bilgilerini temizle
+            window.usedBonusAmount = null;
+            window.remainingPaymentMethod = null;
+        }
+        
+        // Başarı mesajı ve yönlendirme
+        showSaveSuccessMessage(paymentMethod);
+        
+    } catch (error) {
+        console.error('❌ Manuel ödeme kaydetme hatası:', error);
+        displayMessage("❌ Bilgiler kaydedilemedi!");
+        speakToUser("Kayıt sırasında hata oluştu");
+    }
+}
+
+
+
+        
         
     </script>
 </body>
 </html>
+
 
 
 
