@@ -6320,7 +6320,28 @@ async function safeVoiceMatchQuery(userInput) {
                 startPaymentProcess('card');
                 return;
             }
-                        
+            
+            // Bonus ile ödeme
+            if (message.includes('bonus') || message.includes('puan') || message.includes('puanla')) {
+                if (cart.length === 0) {
+                    displayMessage("❌ Sepetiniz boş.");
+                    speakToUser("Sepetiniz boş");
+                    return;
+                }
+                startPaymentProcess('bonus');
+                return;
+                }
+
+                if (message.includes('yemek kartı') || message.includes('yemek kart') || message.includes('yemek')) {
+                if (cart.length === 0) {
+                    displayMessage("❌ Sepetiniz boş.");
+                    speakToUser("Sepetiniz boş");
+                    return;
+                }
+                    selectPaymentMethod('meal_card');
+                    return;
+                }
+            
             // =============================================
             // 3. REFERRAL KOMUTLARI - YENİ SİSTEM İLE ENTEGRE
             // =============================================
@@ -11228,7 +11249,7 @@ async function handleDynamicCartManagement(data) {
     }
 }
 
-// Ödeme seçimi
+        // Ödeme seçimi
 async function handleDynamicPaymentSelection(data) {
     const paymentMethod = data.extractedData?.payment || data.message.toLowerCase();
     
@@ -11236,8 +11257,10 @@ async function handleDynamicPaymentSelection(data) {
         await finalizeDynamicOrder('nakit');
     } else if (paymentMethod.includes('kart') || paymentMethod.includes('kredi')) {
         await finalizeDynamicOrder('kart');
+    } else if (paymentMethod.includes('bonus')) {
+        await finalizeDynamicOrder('bonus');
     } else {
-        speakToUser("Lütfen ödeme yöntemi seçin: nakit, kart");
+        speakToUser("Lütfen ödeme yöntemi seçin: nakit, kart veya bonus.");
     }
 }
 
@@ -12484,6 +12507,7 @@ function setupPaymentButtons() {
     
     const payCashBtn = document.getElementById('payCash');
     const payCardBtn = document.getElementById('payCard');
+    const payBonusBtn = document.getElementById('payBonus');
     
     if (payCashBtn) {
         payCashBtn.addEventListener('click', () => {
@@ -12495,6 +12519,12 @@ function setupPaymentButtons() {
         payCardBtn.addEventListener('click', () => {
             console.log('💳 Kart ödeme butonuna tıklandı');
             startPaymentProcess('card');
+        });
+    }
+    if (payBonusBtn) {
+        payBonusBtn.addEventListener('click', () => {
+            console.log('💳 Bonus ödeme butonuna tıklandı');
+            startPaymentProcess('bonus');
         });
     }
     
@@ -12510,6 +12540,8 @@ function getPaymentMethodName(method) {
     const names = {
         'cash': 'Nakit',
         'card': 'Kart', 
+        'bonus': 'Bonus',
+        'meal': 'Meal'
     };
     return names[method] || 'Ödeme';
 }
@@ -12570,7 +12602,7 @@ function cleanPhoneNumber(phone) {
     }
     
     // Ödeme kelimelerini filtrele
-    const paymentWords = ['nakit', 'kart', 'ödeme', 'öde', 'toplam', 'tutar'];
+    const paymentWords = ['nakit', 'kart', 'bonus', 'ödeme', 'öde', 'toplam', 'tutar'];
     const lowerPhone = phone.toLowerCase();
     if (paymentWords.some(word => lowerPhone.includes(word))) {
         console.log('❌ Ödeme kelimesi içeriyor, geçersiz');
@@ -12803,6 +12835,7 @@ function checkPaymentCommands(command) {
     const paymentKeywords = {
         'nakit': 'cash',
         'kart': 'card', 
+        'bonus': 'bonus',
         'ödeme': 'cash',
         'öde': 'cash'
     };
@@ -12867,6 +12900,14 @@ function showPaymentModal() {
                             <button class="payment-method-btn" data-method="card">
                                 <i class="fas fa-credit-card"></i>
                                 <span>Kart</span>
+                            </button>
+                            <button class="payment-method-btn" data-method="bonus">
+                                <i class="fas fa-gift"></i>
+                                <span>Bonus</span>
+                            </button>
+                            <button class="payment-method-btn" data-method="meal_card">
+                                <i class="fas fa-utensils"></i>
+                                <span>Yemek Kartı</span>
                             </button>
                         </div>
                     </div>
@@ -13033,6 +13074,14 @@ function showPaymentMethodSelection() {
                         <i class="fas fa-credit-card"></i>
                         <span>Kart</span>
                     </button>
+                    <button class="payment-method-btn" data-method="bonus">
+                        <i class="fas fa-gift"></i>
+                        <span>Bonus</span>
+                    </button>
+                    <button class="payment-method-btn" data-method="meal_card">
+                        <i class="fas fa-utensils"></i>
+                        <span>Yemek Kartı</span>
+                    </button>
                 </div>
                 <div class="current-cart-summary">
                     <p><strong>Sepet Toplamı:</strong> ${money(calculateTotal())}</p>
@@ -13056,8 +13105,8 @@ function showPaymentMethodSelection() {
     if (manualEditBtn) manualEditBtn.style.display = 'none';
     if (savePaymentInfoBtn) savePaymentInfoBtn.style.display = 'none';
     
-    displayMessage("💳 Lütfen ödeme yöntemi seçin: Nakit, Kart");
-    speakToUser("Ödeme yöntemi seçin. Nakit, kart");
+    displayMessage("💳 Lütfen ödeme yöntemi seçin: Nakit, Kart, Bonus veya Yemek Kartı");
+    speakToUser("Ödeme yöntemi seçin. Nakit, kart, bonus veya yemek kartı");
 }
 
 
@@ -14673,48 +14722,8 @@ function savePaymentInfoManually() {
     }
 }
 
-
-
-        
+  
         
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
