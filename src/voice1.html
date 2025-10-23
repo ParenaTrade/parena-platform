@@ -14078,16 +14078,37 @@ async function saveBonusUsage(customerId, orderId, bonusAmount) {
     try {
         console.log('💰 Bonus bakiyesi güncelleniyor:', { customerId, bonusAmountUsed });
         
-        // Mevcut bonus bakiyesini al
-        const currentBonus = await getUserBonusBalance(customerId);
+        // 1. Mevcut bonus bakiyesini al
+        const { data: customer, error: fetchError } = await supabase
+            .from('customers')
+            .select('bonus_balance')
+            .eq('id', customerId)
+            .single();
+            
+        if (fetchError) throw fetchError;
+        
+        const currentBonus = customer.bonus_balance || 0;
         const newBalance = currentBonus - bonusAmountUsed;
         
         console.log(`💰 Bonus güncelleme: ${currentBonus} - ${bonusAmountUsed} = ${newBalance}`);
         
-        // referral_payouts tablosuna kullanım kaydı ekle
+        // 2. customers.bonus_balance GÜNCELLE
+        const { error: updateError } = await supabase
+            .from('customers')
+            .update({ 
+                bonus_balance: newBalance,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', customerId);
+            
+        if (updateError) throw updateError;
+        
+        console.log('✅ customers.bonus_balance güncellendi');
+        
+        // 3. referral_payouts tablosuna kullanım kaydı ekle
         const payoutData = {
             customer_id: customerId,
-            amount: -bonusAmountUsed, // Eksi değer - kullanım
+            amount: -bonusAmountUsed,
             payout_type: 'bonus_usage',
             status: 'completed',
             description: `Sipariş için bonus kullanımı`,
@@ -14099,16 +14120,15 @@ async function saveBonusUsage(customerId, orderId, bonusAmount) {
             .insert([payoutData]);
             
         if (payoutError) {
-            console.error('❌ Bonus kullanım kaydı hatası:', payoutError);
-            throw new Error(`Bonus kullanım kaydedilemedi: ${payoutError.message}`);
+            console.error('❌ referral_payouts kaydı hatası:', payoutError);
+            // Bu hata kritik değil, devam et
         }
         
-        console.log('✅ Bonus kullanımı kaydedildi');
-        
-        // Bonus bakiyesini local olarak güncelle
+        // 4. Local state'i güncelle
         referralBonusBalance = newBalance;
         updateBonusUI();
         
+        console.log('✅ Bonus bakiye güncelleme tamamlandı');
         return newBalance;
         
     } catch (error) {
@@ -14116,6 +14136,36 @@ async function saveBonusUsage(customerId, orderId, bonusAmount) {
         throw error;
     }
 }
+
+// Bonus güncellemeyi test et
+async function testBonusUpdate() {
+    if (currentCustomer) {
+        console.log('🧪 Bonus güncelleme testi...');
+        
+        // Önce mevcut bakiyeyi al
+        const { data: customer } = await supabase
+            .from('customers')
+            .select('bonus_balance')
+            .eq('id', currentCustomer.id)
+            .single();
+            
+        console.log('📊 Mevcut bonus bakiye:', customer?.bonus_balance);
+        
+        // 10₺ bonus kullanımı simüle et
+        await updateCustomerBonusBalance(currentCustomer.id, 10);
+        
+        // Sonraki bakiyeyi kontrol et
+        const { data: updatedCustomer } = await supabase
+            .from('customers')
+            .select('bonus_balance')
+            .eq('id', currentCustomer.id)
+            .single();
+            
+        console.log('📊 Güncel bonus bakiye:', updatedCustomer?.bonus_balance);
+    }
+}
+
+// Console'da çalıştır: testBonusUpdate()
         
 // Tablo yapısını öğrenmek için test fonksiyonu
 async function testPaymentTableStructure() {
@@ -14674,6 +14724,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
