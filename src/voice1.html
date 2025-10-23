@@ -12551,7 +12551,7 @@ function getPaymentMethodName(method) {
 function formatPhoneNumber(phoneInput) {
     console.log('📞 formatPhoneNumber çağrıldı:', phoneInput);
     
-    // Mevcut cleanPhoneNumber fonksiyonunu kullan
+    // Mevcut cleanPhoneNumber fonksiyonunu kullan (0'ı kaldırmayan versiyon)
     const cleanedNumber = cleanPhoneNumber(phoneInput);
     
     if (!cleanedNumber) {
@@ -12566,13 +12566,20 @@ function formatPhoneNumber(phoneInput) {
     console.log('🔧 Temizlenmiş numara:', cleanedNumber);
     
     // Formatlı numara oluştur
-    const formatted = `+90 ${cleanedNumber.substring(0, 3)} ${cleanedNumber.substring(3, 6)} ${cleanedNumber.substring(6, 8)} ${cleanedNumber.substring(8, 10)}`;
+    let formatted;
+    if (cleanedNumber.length === 11) {
+        // 11 haneli: 0541 633 72 50
+        formatted = `+90 ${cleanedNumber.substring(1, 4)} ${cleanedNumber.substring(4, 7)} ${cleanedNumber.substring(7, 9)} ${cleanedNumber.substring(9, 11)}`;
+    } else {
+        // 10 haneli: 541 633 72 50  
+        formatted = `+90 ${cleanedNumber.substring(0, 3)} ${cleanedNumber.substring(3, 6)} ${cleanedNumber.substring(6, 8)} ${cleanedNumber.substring(8, 10)}`;
+    }
     
     console.log('✅ Formatlanmış numara:', formatted);
     return {
         success: true,
         formatted: formatted,
-        raw: cleanedNumber
+        raw: cleanedNumber  // Artık 05416337250 formatında
     };
 }
 
@@ -12581,27 +12588,40 @@ function formatPhoneNumber(phoneInput) {
 function cleanPhoneNumber(phone) {
     console.log('🧹 cleanPhoneNumber çağrıldı:', phone);
     
+    if (!phone || typeof phone !== 'string') {
+        console.log('❌ Geçersiz phone parametresi');
+        return null;
+    }
+    
     // Rakamları al
     let cleaned = phone.replace(/\D/g, '');
     
-    // "nakit", "kart" gibi ödeme kelimelerini filtrele
+    if (cleaned.length === 0) {
+        console.log('❌ Rakam içermiyor');
+        return null;
+    }
+    
+    // Ödeme kelimelerini filtrele
     const paymentWords = ['nakit', 'kart', 'bonus', 'ödeme', 'öde', 'toplam', 'tutar'];
-    if (paymentWords.some(word => phone.toLowerCase().includes(word))) {
+    const lowerPhone = phone.toLowerCase();
+    if (paymentWords.some(word => lowerPhone.includes(word))) {
         console.log('❌ Ödeme kelimesi içeriyor, geçersiz');
         return null;
     }
     
-    // 10 haneli (5416337291)
+    // 10 haneli (5416337291) - 5 ile başlamalı
     if (cleaned.length === 10 && cleaned.startsWith('5')) {
+        console.log('✅ 10 haneli numara kabul edildi:', cleaned);
         return cleaned;
     }
     
-    // 11 haneli (05416337291) - baştaki 0'ı kaldır
+    // 11 haneli (05416337291) - OLDUĞU GİBİ DÖN (0'ı kaldırma!)
     if (cleaned.length === 11 && cleaned.startsWith('05')) {
-        return cleaned.substring(1);
+        console.log('✅ 11 haneli numara kabul edildi:', cleaned);
+        return cleaned; // 0'ı kaldırmadan dön
     }
     
-    console.log('❌ Geçersiz telefon formatı');
+    console.log('❌ Geçersiz telefon formatı:', cleaned);
     return null;
 }    
         
@@ -14533,6 +14553,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
