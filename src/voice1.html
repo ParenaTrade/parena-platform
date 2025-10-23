@@ -2843,7 +2843,60 @@ const storeTypeFilterStyles = `
     background: #f8f9fa;
     border-radius: 8px;
     border-left: 4px solid #007bff;
-}      
+}    
+
+        .payment-info-section {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+    margin: 10px 0;
+}
+
+.bonus-section, .amount-section {
+    border-left: 4px solid #4CAF50;
+    padding-left: 10px;
+    margin: 10px 0;
+}
+
+.payment-method-badge {
+    background: #1E88E5;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 15px;
+    font-size: 12px;
+}
+
+.payment-method-detail {
+    background: #E3F2FD;
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0;
+    border-left: 4px solid #FFD600;
+}
+
+.bonus-amount { color: #4CAF50; font-weight: bold; }
+.used-bonus { color: #FF9800; font-weight: bold; }
+.total-amount { color: #1E88E5; font-weight: bold; }
+.bonus-discount { color: #F44336; font-weight: bold; }
+.remaining-amount { color: #9C27B0; font-weight: bold; }
+
+.confirmation-note {
+    background: #FFF3CD;
+    border: 1px solid #FFEAA7;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 15px 0;
+    font-size: 14px;
+}
+
+.confirmation-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.yes-btn { background: #4CAF50; }
+.no-btn { background: #F44336; }
 </style>
 </head>
 <body>
@@ -6475,14 +6528,6 @@ async function safeVoiceMatchQuery(userInput) {
             }
         }
     }
-
-        
-
-
-        
-        
-
-        
 
 // =============================================
 // YENİ REFERRAL VE BONUS SİSTEMİ
@@ -12451,6 +12496,7 @@ function setupPaymentButtons() {
 
 
 // Ödeme yöntemi isimlerini getir
+// 2. ÖDEME YÖNTEMİ İSMİ ALMA FONKSİYONU (orijinal kalsın)
 function getPaymentMethodName(method) {
     const names = {
         'cash': 'Nakit',
@@ -12460,9 +12506,6 @@ function getPaymentMethodName(method) {
     };
     return names[method] || 'Ödeme';
 }
-
-
-
 
         
 // EKSİK FONKSİYONU EKLEYELİM
@@ -12752,6 +12795,9 @@ function checkPaymentCommands(command) {
     showPaymentModal();
     requestPhoneNumber();
 }
+
+
+
         
 function showPaymentModal() {
     // Ödeme modalını oluştur veya göster
@@ -13584,11 +13630,13 @@ function formatDeliveryAddress() {
     
     return fullAddress;
 }
-  
+
+        
 // =============================================
 // SİPARİŞ ONAY İSTEĞİ (TÜM SESLİ KOMUTLAR İLE)
 // =============================================
 
+// 4. DÜZELTİLMİŞ requestOrderConfirmation
 async function requestOrderConfirmation() {
     console.log('✅ Sipariş onayı isteniyor...');
     
@@ -13609,32 +13657,75 @@ async function requestOrderConfirmation() {
         // Kullanılabilir bonus miktarını hesapla (toplam tutarı geçemez)
         const availableBonus = Math.min(bonusBalance, totalAmount);
         
+        // Kalan ödenecek tutarı hesapla
+        const remainingAmount = totalAmount - availableBonus;
+        
+        // Ödeme yöntemine göre kalan tutar nasıl ödenecek
+        const paymentDetails = getPaymentDetails(currentPaymentMethod, remainingAmount, availableBonus);
+        
+        // ÖDEME YÖNTEMİ İSMİ
+        const paymentMethodName = getPaymentMethodName(currentPaymentMethod);
+        
         modalBody.innerHTML = `
             <div class="payment-step active">
                 <div class="step-icon">
                     <i class="fas fa-shopping-cart"></i>
                 </div>
                 <div class="step-content">
-                    <h4>Sipariş Özeti</h4>
+                    <h4>🎯 Sipariş & Ödeme Özeti</h4>
                     <div class="order-summary-details">
-                        <p><strong>Müşteri:</strong> ${currentCustomer ? currentCustomer.name : customerName}</p>
-                        <p><strong>Telefon:</strong> ${currentCustomer ? currentCustomer.phone : customerPhone}</p>
-                        <p><strong>Teslimat Adresi:</strong> ${deliveryAddress}</p>
-                        <p><strong>Ödeme Yöntemi:</strong> ${getPaymentMethodName(currentPaymentMethod)}</p>
-                        <p><strong>Bonus Bakiyeniz:</strong> ${money(bonusBalance)}</p>
-                        <p><strong>Kullanılabilir Bonus:</strong> ${money(availableBonus)}</p>
-                        <p><strong>Toplam Tutar:</strong> ${money(totalAmount)}</p>
+                        <!-- Müşteri Bilgileri -->
+                        <div class="customer-info-section">
+                            <h5>👤 Müşteri Bilgileri</h5>
+                            <p><strong>Ad:</strong> ${currentCustomer ? currentCustomer.name : customerName}</p>
+                            <p><strong>Telefon:</strong> ${currentCustomer ? currentCustomer.phone : customerPhone}</p>
+                            <p><strong>Adres:</strong> ${deliveryAddress}</p>
+                        </div>
+                        
+                        <!-- Ödeme Bilgileri -->
+                        <div class="payment-info-section">
+                            <h5>💳 Ödeme Bilgileri</h5>
+                            <p><strong>Ödeme Yöntemi:</strong> <span class="payment-method-badge">${paymentMethodName}</span></p>
+                            
+                            <!-- Bonus Kullanımı -->
+                            <div class="bonus-section">
+                                <p><strong>💰 Bonus Bakiyeniz:</strong> <span class="bonus-amount">${money(bonusBalance)}</span></p>
+                                <p><strong>🎁 Kullanılacak Bonus:</strong> <span class="used-bonus">${money(availableBonus)}</span></p>
+                            </div>
+                            
+                            <!-- Toplam ve Kalan -->
+                            <div class="amount-section">
+                                <p><strong>🛒 Toplam Tutar:</strong> <span class="total-amount">${money(totalAmount)}</span></p>
+                                ${availableBonus > 0 ? `
+                                    <p><strong>✅ Bonus İndirimi:</strong> <span class="bonus-discount">-${money(availableBonus)}</span></p>
+                                    <p><strong>💵 Kalan Ödenecek:</strong> <span class="remaining-amount">${money(remainingAmount)}</span></p>
+                                ` : ''}
+                            </div>
+                            
+                            <!-- Ödeme Detayları -->
+                            <div class="payment-details">
+                                ${paymentDetails}
+                            </div>
+                        </div>
                     </div>
-                    <p>Siparişi onaylıyor musunuz?</p>
+                    
+                    <div class="confirmation-note">
+                        <p>⚠️ <strong>Lütfen bilgileri kontrol edin:</strong> Sipariş onaylandıktan sonra değişiklik yapılamaz.</p>
+                    </div>
+                    
                     <div class="confirmation-buttons">
-                        <button class="confirm-btn yes-btn" data-response="evet">Evet, Onayla</button>
-                        <button class="confirm-btn no-btn" data-response="hayır">Hayır, İptal</button>
+                        <button class="confirm-btn yes-btn" data-response="evet">
+                            <i class="fas fa-check-circle"></i> Evet, Onayla
+                        </button>
+                        <button class="confirm-btn no-btn" data-response="hayır">
+                            <i class="fas fa-times-circle"></i> Hayır, İptal
+                        </button>
                     </div>
                 </div>
             </div>
         `;
         
-        // Manuel onay butonları
+        // Buton event listener'ları
         const yesBtn = modalBody.querySelector('.yes-btn');
         const noBtn = modalBody.querySelector('.no-btn');
         
@@ -13651,8 +13742,92 @@ async function requestOrderConfirmation() {
         }
     }
     
-    displayMessage("✅ Sipariş bilgileriniz hazır. Bonus bakiyeniz kontrol edildi. Siparişi onaylıyor musunuz?");
-    speakToUser("Sipariş bilgileriniz hazır. Bonus bakiyeniz kontrol edildi. Siparişi onaylıyor musunuz evet veya hayır");
+    displayMessage("✅ Sipariş ve ödeme bilgileriniz hazır! Bonus bakiyeniz değerlendirildi. Onaylıyor musunuz?");
+    speakToUser("Sipariş ve ödeme bilgileriniz hazır. Bonus bakiyeniz değerlendirildi. Siparişi onaylıyor musunuz evet veya hayır");
+}
+
+// Ödeme detaylarını döndüren fonksiyon
+function getPaymentDetails(paymentMethod, remainingAmount, usedBonus) {
+    switch(paymentMethod) {
+        case 'bonus':
+            if (remainingAmount === 0) {
+                return `
+                    <div class="payment-method-detail bonus-full">
+                        <p><strong>🎉 Tamamı Bonus ile Ödendi!</strong></p>
+                        <p>Kalan bonus bakiyeniz: ${money(usedBonus)}</p>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="payment-method-detail bonus-partial">
+                        <p><strong>📊 Ödeme Dağılımı:</strong></p>
+                        <p>• Bonus: ${money(usedBonus)}</p>
+                        <p>• Nakit/Kart: ${money(remainingAmount)} (Teslimatta)</p>
+                    </div>
+                `;
+            }
+            
+        case 'cash':
+            return `
+                <div class="payment-method-detail cash">
+                    <p><strong>💵 Nakit Ödeme:</strong></p>
+                    <p>Teslimatta ${usedBonus > 0 ? money(remainingAmount) + ' nakit ödeme yapılacak (' + money(usedBonus) + ' bonus kullanıldı)' : money(remainingAmount) + ' nakit ödeme yapılacak'}</p>
+                </div>
+            `;
+            
+        case 'card':
+            return `
+                <div class="payment-method-detail card">
+                    <p><strong>💳 Kart ile Ödeme:</strong></p>
+                    <p>Teslimatta ${usedBonus > 0 ? money(remainingAmount) + ' kart ile ödenecek (' + money(usedBonus) + ' bonus kullanıldı)' : money(remainingAmount) + ' kart ile ödenecek'}</p>
+                </div>
+            `;
+            
+        case 'meal':
+            return `
+                <div class="payment-method-detail meal">
+                    <p><strong>🍱 Meal Kart ile Ödeme:</strong></p>
+                    <p>Teslimatta ${usedBonus > 0 ? money(remainingAmount) + ' meal kart ile ödenecek (' + money(usedBonus) + ' bonus kullanıldı)' : money(remainingAmount) + ' meal kart ile ödenecek'}</p>
+                </div>
+            `;
+            
+        default:
+            return `<p><strong>Ödeme:</strong> ${money(remainingAmount)}</p>`;
+    }
+}
+        // 5. Eksik fonksiyonlar (varsa ekle)
+function completeOrder() {
+    console.log('✅ Sipariş tamamlanıyor...');
+    // Sipariş tamamlama işlemleri
+    displayMessage("✅ Siparişiniz onaylandı! Hazırlanıyor...");
+    speakToUser("Siparişiniz onaylandı ve hazırlanmaya başlandı.");
+}
+
+function cancelOrder() {
+    console.log('❌ Sipariş iptal ediliyor...');
+    // Sipariş iptal işlemleri
+    resetOrderState();
+}
+
+        // 3. SİPARİŞ ONAY İŞLEMİ FONKSİYONU (eksik olan)
+async function processOrderConfirmation(response) {
+    console.log('🔄 Sipariş onayı işleniyor:', response);
+    
+    isWaitingForOrderConfirm = false;
+    expectedInput = null;
+    
+    if (response === 'evet' || response === 'onayla' || response === 'evet onayla') {
+        // Siparişi tamamla
+        await completeOrder();
+    } else {
+        // Siparişi iptal et
+        cancelOrder();
+        displayMessage("❌ Sipariş iptal edildi.");
+        speakToUser("Siparişiniz iptal edildi. Başka bir işlem yapabilirsiniz.");
+    }
+    
+    // Modal'ı kapat
+    closePaymentModal();
 }
 // =============================================
 // YARDIMCI FONKSİYON
@@ -14012,10 +14187,11 @@ function cancelOrder() {
 // YARDIMCI FONKSİYONLAR
 // =============================================
 
-async function getPaymentMethodName(method) {
+// 1. MÜŞTERİ BİLGİSİ ALMA FONKSİYONU (isim değişti)
+async function getCustomerByPhone(phone) {
     try {
         const { data, error } = await supabase
-            .from('customers')
+            .from('customers')               
             .select('*')
             .eq('phone', phone)
             .single();
@@ -14245,6 +14421,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
