@@ -12547,15 +12547,20 @@ function getPaymentMethodName(method) {
 }
 
         
-// EKSİK FONKSİYONU EKLEYELİM
+// AKILLI TELEFON FORMATLAMA - İkisini de dener
 function formatPhoneNumber(phoneInput) {
     console.log('📞 formatPhoneNumber çağrıldı:', phoneInput);
     
-    // Mevcut cleanPhoneNumber fonksiyonunu kullan
-    const cleanedNumber = cleanPhoneNumber(phoneInput);
+    // Önce 10 haneli deneyelim
+    let cleanedNumber = cleanPhoneNumber10Digits(phoneInput);
+    
+    // 10 haneli olmazsa 11 haneli dene
+    if (!cleanedNumber) {
+        cleanedNumber = cleanPhoneNumber11Digits(phoneInput);
+    }
     
     if (!cleanedNumber) {
-        console.log('❌ cleanPhoneNumber geçersiz numara döndü');
+        console.log('❌ Hiçbir format uymadı');
         return {
             success: false,
             formatted: phoneInput,
@@ -12574,52 +12579,38 @@ function formatPhoneNumber(phoneInput) {
         formatted: formatted,
         raw: cleanedNumber
     };
-}
-
-
-    // EĞER cleanPhoneNumber YOKSA BUNU EKLEYİN
-function cleanPhoneNumber(phone) {
-    console.log('🧹 cleanPhoneNumber çağrıldı:', phone);
-    
-    // Rakamları al
-    let cleaned = phone.replace(/\D/g, '');
-    
-    // "nakit", "kart" gibi ödeme kelimelerini filtrele
-    const paymentWords = ['nakit', 'kart', 'bonus', 'ödeme', 'öde', 'toplam', 'tutar'];
-    if (paymentWords.some(word => phone.toLowerCase().includes(word))) {
-        console.log('❌ Ödeme kelimesi içeriyor, geçersiz');
-        return null;
-    }
-    
-    // 10 haneli (5416337291)
-    if (cleaned.length === 10 && cleaned.startsWith('5')) {
-        return cleaned;
-    }
-    
-    // 11 haneli (05416337291) - baştaki 0'ı kaldır
-    if (cleaned.length === 11 && cleaned.startsWith('05')) {
-        return cleaned.substring(1);
-    }
-    
-    console.log('❌ Geçersiz telefon formatı');
-    return null;
-}    
+} 
 
 async function checkCustomerByPhone(phone) {
     try {
+        console.log('🔍 Müşteri sorgulanıyor:', phone);
+        
+        // Akıllı formatlama kullan
+        const phoneResult = formatPhoneNumber(phone);
+        
+        if (!phoneResult.success) {
+            console.log('❌ Geçersiz telefon numarası');
+            return null;
+        }
+
+        const cleanedPhone = phoneResult.raw;
+
+        // Supabase sorgusu
         const { data, error } = await supabase
             .from('customers')
             .select('*')
-            .eq('phone', phone)
-            .single();
-            
-        if (error && error.code !== '406') {
-            console.error('Müşteri sorgulama hatası:', error);
+            .eq('phone', cleanedPhone);
+
+        if (error) {
+            console.error('❌ Müşteri sorgulama hatası:', error);
+            return null;
         }
+
+        console.log('✅ Müşteri sorgulama sonucu:', data && data.length > 0 ? 'Kayıtlı müşteri' : 'Yeni müşteri');
+        return data && data.length > 0 ? data[0] : null;
         
-        return data || null;
     } catch (error) {
-        console.error('Müşteri kontrol hatası:', error);
+        console.error('❌ Müşteri kontrol hatası:', error);
         return null;
     }
 }
@@ -14517,6 +14508,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
