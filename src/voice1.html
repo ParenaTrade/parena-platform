@@ -14026,9 +14026,147 @@ async function getPaymentMethodName(method) {
 }
 
 
+
+// =============================================
+// MANUEL ÖDEME FORMÜ
+// =============================================
+
+function showManualPaymentForm() {
+    console.log('📝 Manuel ödeme formu gösteriliyor...');
+    
+    const modalBody = document.getElementById('paymentModalBody');
+    if (!modalBody) return;
+    
+    const totalAmount = calculateTotal();
+    const currentAddress = currentCustomer ? currentCustomer.address : '';
+    const bonusBalance = currentCustomer ? (currentCustomer.bonus_balance || 0) : 0;
+    
+    modalBody.innerHTML = `
+        <div class="manual-payment-form">
+            <h4>Ödeme Bilgileri</h4>
+            
+            <div class="form-group">
+                <label for="manualPhone">Telefon Numarası</label>
+                <input type="tel" id="manualPhone" value="${customerPhone || ''}" 
+                       placeholder="05XX XXX XX XX">
+            </div>
+            
+            <div class="form-group">
+                <label for="manualName">Ad Soyad</label>
+                <input type="text" id="manualName" value="${currentCustomer ? currentCustomer.name : customerName || ''}" 
+                       placeholder="Adınız ve soyadınız">
+            </div>
+            
+            <div class="form-group">
+                <label for="manualAddress">Teslimat Adresi</label>
+                <textarea id="manualAddress" rows="3" placeholder="Teslimat adresiniz">${currentAddress}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="manualBuilding">Bina No</label>
+                <input type="text" id="manualBuilding" value="${buildingNumber || ''}" 
+                       placeholder="Bina numarası">
+            </div>
+            
+            <div class="form-group">
+                <label for="manualApartment">Daire No</label>
+                <input type="text" id="manualApartment" value="${apartmentNumber || ''}" 
+                       placeholder="Daire numarası">
+            </div>
+            
+            <div class="form-group">
+                <label>Ödeme Yöntemi</label>
+                <div class="payment-methods">
+                    <label class="payment-method">
+                        <input type="radio" name="manualPayment" value="cash" ${currentPaymentMethod === 'cash' ? 'checked' : ''}>
+                        <span>Nakit</span>
+                    </label>
+                    <label class="payment-method">
+                        <input type="radio" name="manualPayment" value="card" ${currentPaymentMethod === 'card' ? 'checked' : ''}>
+                        <span>Kart</span>
+                    </label>
+                    <label class="payment-method">
+                        <input type="radio" name="manualPayment" value="bonus" ${currentPaymentMethod === 'bonus' ? 'checked' : ''}>
+                        <span>Bonus</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- YENİ EKLENEN BONUS ÖDEME DETAYLARI -->
+            <div id="bonusPaymentDetails" style="display: ${currentPaymentMethod === 'bonus' ? 'block' : 'none'};">
+                <div class="bonus-payment-section">
+                    <h5>🎁 Bonus Ödeme Detayları</h5>
+                    
+                    <div class="bonus-info">
+                        <div class="bonus-row">
+                            <span>Bonus Bakiyeniz:</span>
+                            <strong class="bonus-balance">${money(bonusBalance)}</strong>
+                        </div>
+                        <div class="bonus-row">
+                            <span>Toplam Tutar:</span>
+                            <strong>${money(totalAmount)}</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="manualBonusAmount">Kullanılacak Bonus Miktarı:</label>
+                        <input type="number" id="manualBonusAmount" 
+                               value="${Math.min(bonusBalance, totalAmount)}" 
+                               min="0" max="${bonusBalance}" step="1" 
+                               class="form-control">
+                        <small>Maksimum kullanabileceğiniz: ${money(bonusBalance)}</small>
+                    </div>
+                    
+                    <div class="form-group" id="remainingPaymentSection">
+                        <label>Kalan Tutar Ödeme Yöntemi:</label>
+                        <div class="payment-options">
+                            <label class="payment-option">
+                                <input type="radio" name="remainingPayment" value="cash" checked>
+                                <span>💵 Nakit</span>
+                            </label>
+                            <label class="payment-option">
+                                <input type="radio" name="remainingPayment" value="card">
+                                <span>💳 Kart</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="payment-summary" id="bonusPaymentSummary">
+                        <div class="summary-row">
+                            <span>Kullanılacak Bonus:</span>
+                            <strong id="usedBonusDisplay">${money(Math.min(bonusBalance, totalAmount))}</strong>
+                        </div>
+                        <div class="summary-row">
+                            <span>Kalan Ödeme:</span>
+                            <strong id="remainingAmountDisplay">${money(Math.max(0, totalAmount - Math.min(bonusBalance, totalAmount)))}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="order-summary">
+                <h5>Sipariş Özeti</h5>
+                <p>Toplam Tutar: <strong>${money(totalAmount)}</strong></p>
+            </div>
+        </div>
+    `;
+    
+    // Ödeme yöntemi değişikliklerini dinle
+    setupManualPaymentListeners();
+    
+    // Kaydet butonunu göster
+    const saveBtn = document.getElementById('savePaymentInfoBtn');
+    if (saveBtn) {
+        saveBtn.style.display = 'block';
+    }
+}
+
+
+        
     </script>
 </body>
 </html>
+
 
 
 
