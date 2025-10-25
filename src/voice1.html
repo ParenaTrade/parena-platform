@@ -4600,7 +4600,6 @@ function updateProductCartCounts() {
 }
 
     
-        
 // BAĞIMSIZ SLIDER - PRODUCTS HEADER DIŞINDA
 function initCommandSlider() {
     console.log('🔄 Bağımsız slider başlatılıyor...');
@@ -4774,15 +4773,6 @@ function moveSliderOutside() {
     }
 }
 
-// DOM yüklendiğinde çalıştır
-document.addEventListener('DOMContentLoaded', function() {
-    moveSliderOutside();
-    initCommandSlider();
-});
-
-
-        
-        
 // REYON BANNER GÜNCELLEME
 async function updateReyonBanner(categoryName, categoryId) {
     console.log(`🎨 Reyon banner güncelleniyor: ${categoryName} (ID: ${categoryId})`);
@@ -4823,33 +4813,7 @@ async function updateReyonBanner(categoryName, categoryId) {
     }
 }
 
-// PRODUCTS SECTION FONKSİYONLARI - SLIDER'A DOKUNMA
-function showProductsSection() {
-    const productsSection = document.getElementById('productsSection');
-    if (productsSection) {
-        productsSection.style.display = 'block';
-    }
-    // Slider bağımsız - gizleme/gösterme yok
-}
-
-function hideProductsSection() {
-    const productsSection = document.getElementById('productsSection');
-    if (productsSection) {
-        productsSection.style.display = 'none';
-    }
-    // Slider bağımsız - gizleme/gösterme yok
-}
-
-// HEMEN ÇALIŞTIR
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM yüklendi, bağımsız slider başlatılıyor...');
-    initCommandSlider();
-});
-        
-// =============================================
 // VARSayılan BANNER GÖRSELLERİ
-// =============================================
-
 function getDefaultBannerImage(categoryName) {
     const defaultImages = {
         'Meyve & Sebze': '/images/banners/fruits-vegetables.jpg',
@@ -4875,28 +4839,64 @@ function getDefaultBannerImage(categoryName) {
     return '/images/banners/default-reyon.jpg';
 }
 
-
-// Slider kontrollerini başlatan fonksiyon
-function initSliderControls() {
-    console.log('🎛️ Slider kontrolleri başlatılıyor...');
+// PRODUCTS SECTION FONKSİYONLARI - PRODUCTS'İ GÖSTER
+function showProductsSection() {
+    const productsSection = document.getElementById('productsSection');
+    if (productsSection) {
+        productsSection.style.display = 'block';
+        console.log('✅ Products section gösterildi');
+    }
 }
 
-// HEMEN ÇALIŞTIR - DOM yüklenir yüklenmez
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM yüklendi, entegre slider başlatılıyor...');
-    initCommandSlider();
-});
-
-// Sayfa tamamen yüklendiğinde de kontrol et
-window.addEventListener('load', function() {
-    console.log('📄 Sayfa tamamen yüklendi');
-    const slider = document.getElementById('commandSlider');
-    if (!slider || slider.style.display === 'none') {
-        console.log('⚠️ Slider görünmüyor, yeniden başlatılıyor...');
-        initCommandSlider();
+function hideProductsSection() {
+    const productsSection = document.getElementById('productsSection');
+    if (productsSection) {
+        productsSection.style.display = 'none';
+        console.log('✅ Products section gizlendi');
     }
-});
+}
 
+// ⭐ KATEGORİ SEÇİLDİĞİNDE PRODUCTS'İ GÖSTER
+async function selectDynamicCategory(category) {
+    const categoryCard = document.querySelector(`[data-category-id="${category.id}"]`);
+    if (categoryCard) {
+        document.querySelectorAll('.category-card').forEach(c => {
+            c.classList.remove('selected');
+        });
+        
+        categoryCard.classList.add('selected');
+        selectedCategoryId = category.id;
+        
+        // KÖKÜ GÜNCELLE - KATEGORİ SEÇİLDİ
+        currentRoot = "5:0";
+        debugLog(`🔄 Kök güncellendi: 4:0 -> 5:0 (Kategori seçildi: ${category.name})`);
+        
+        // REYON BANNER'INI GÜNCELLE
+        await updateReyonBanner(category.name, category.id);
+        
+        // ⭐ PRODUCTS SECTION'ı GÖSTER
+        showProductsSection();
+        
+        await loadProductsByCategory(category.id);
+        
+        debugLog(`🛒 Kategori seçildi: ${category.name}`);
+        speakToUser(`${category.name} kategorisi seçildi. Ürünler listeleniyor. Sesli olarak ürün siparişi verebilirsiniz.`);
+    }
+}
+
+// ⭐ TEK BİR DOM YÜKLEME OLAYI
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM yüklendi, slider başlatılıyor...');
+    
+    // Önce mevcut slider'ı dışarı taşı
+    moveSliderOutside();
+    
+    // Sonra yeni slider'ı başlat
+    initCommandSlider();
+    
+    // Products section'ı başlangıçta gizle
+    hideProductsSection();
+});
     
         
         // =============================================
@@ -15597,6 +15597,7 @@ function updateBonusUI() {
     </script>
 </body>
 </html>
+
 
 
 
