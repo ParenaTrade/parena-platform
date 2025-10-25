@@ -3344,28 +3344,11 @@ const storeTypeFilterStyles = `
                 </button>
             </div>
         </section>
-
-        <!-- Products Grid -->
-        <section class="products-section" id="productsSection" style="display: none;">
-            <div class="products-header">
-                <h2 class="section-title" style="margin-bottom: 0;">
-                    <i class="fas fa-box-open"></i>
-                    Ürünler
-                </h2>
-                <div id="selectedSellerInfo">Satıcı seçilmedi</div>
-            </div>
-            <div class="scroll-container">
-                <button class="scroll-btn left" id="scrollProductsLeft">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <div class="scroll-content" id="productsGrid"></div>
-                <button class="scroll-btn right" id="scrollProductsRight">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        </section>
-    </div>
-
+        <!-- SLIDER BAĞIMSIZ -->
+<div class="command-voice-slider" id="commandVoiceSlider">
+    <!-- slider içeriği -->
+</div>
+ <section class="products-section" id="productsSection">
     <!-- Location Modal -->
     <div id="locationModal" class="modal" style="display: none;">
         <div class="modal-content">
@@ -4618,7 +4601,7 @@ function updateProductCartCounts() {
 
     
         
-// BAĞIMSIZ SLIDER KODU - HEADER ALTINDA
+// BAĞIMSIZ SLIDER - PRODUCTS HEADER DIŞINDA
 function initCommandSlider() {
     console.log('🔄 Bağımsız slider başlatılıyor...');
     
@@ -4636,9 +4619,13 @@ function initCommandSlider() {
         { text: "1 numara 1,5 porsiyon", icon: "fas fa-utensil-spoon" }
     ];
     
-    // ⭐ DOĞRUDAN BODY'YE EKLE - PRODUCTS SECTION DIŞINDA
-    const mainContainer = document.body;
-    
+    // ⭐ PRODUCTS SECTION'DAN ÖNCE EKLE
+    const productsSection = document.getElementById('productsSection');
+    if (!productsSection) {
+        console.error('❌ Products section bulunamadı!');
+        return;
+    }
+
     const exampleGroups = [];
     for (let i = 0; i < examples.length; i += 3) {
         exampleGroups.push(examples.slice(i, i + 3));
@@ -4705,16 +4692,10 @@ function initCommandSlider() {
         </div>
     `;
 
-    // ⭐ HEADER'DAN SONRA EKLE
-    const header = document.querySelector('header');
-    if (header) {
-        header.parentNode.insertBefore(sliderContainer, header.nextSibling);
-    } else {
-        // Header yoksa body başına ekle
-        document.body.insertBefore(sliderContainer, document.body.firstChild);
-    }
+    // ⭐ PRODUCTS SECTION'DAN ÖNCE EKLE
+    productsSection.parentNode.insertBefore(sliderContainer, productsSection);
     
-    console.log('✅ Bağımsız slider header altına eklendi');
+    console.log('✅ Slider products section öncesine eklendi (bağımsız)');
     
     // Slider fonksiyonları
     let currentGroupIndex = 0;
@@ -4775,6 +4756,12 @@ function initCommandSlider() {
     console.log('✅ Bağımsız slider başlatıldı');
 }
 
+// HEMEN ÇALIŞTIR
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM yüklendi, bağımsız slider başlatılıyor...');
+    initCommandSlider();
+});
+        
 // REYON BANNER GÜNCELLEME
 async function updateReyonBanner(categoryName, categoryId) {
     console.log(`🎨 Reyon banner güncelleniyor: ${categoryName} (ID: ${categoryId})`);
@@ -4839,248 +4826,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
         
 // =============================================
-// REYON BANNER GÜNCELLEME - YENİ ID'LER
-// =============================================
-
-async function updateReyonBanner(categoryName, categoryId) {
-    console.log(`🎨 Reyon banner güncelleniyor: ${categoryName} (ID: ${categoryId})`);
-    
-    const sliderTitle = document.getElementById('voiceReyonTitle');
-    const bannerText = document.querySelector('.voice-banner-text');
-    
-    // ⭐ REYON İSMİNİ KESİN GÜNCELLE
-    if (sliderTitle) {
-        sliderTitle.textContent = categoryName;
-        console.log(`✅ Slider title güncellendi: ${categoryName}`);
-    }
-    
-    if (bannerText) {
-        bannerText.textContent = categoryName;
-        console.log(`✅ Banner text güncellendi: ${categoryName}`);
-    }
-    
-    // Görsel güncelleme
-    const bannerImage = document.getElementById('voiceBannerImage');
-    if (bannerImage) {
-        try {
-            const { data: reyonData, error } = await supabase
-                .from('reyon')
-                .select('image_url')
-                .eq('id', categoryId)
-                .single();
-            
-            let bannerImageUrl = reyonData?.image_url || getDefaultBannerImage(categoryName);
-            bannerImage.src = bannerImageUrl;
-            
-            bannerImage.onload = function() {
-                document.getElementById('voiceBannerAnimation')?.classList.add('voice-banner-animate');
-            };
-            
-        } catch (error) {
-            console.error('Banner görsel hatası:', error);
-            bannerImage.src = getDefaultBannerImage(categoryName);
-        }
-    }
-}
-// ENTEGRE SLİDER FONKSİYONU - YENİ TASARIM
-function initCommandSlider() {
-    console.log('🔄 Entegre slider başlatılıyor...');
-    
-    if (document.querySelector('.command-voice-slider')) return;
-    
-    const examples = [
-        { text: "1 numara 5 kilo", icon: "fas fa-weight" },
-        { text: "1 numara 2,5 kilo", icon: "fas fa-balance-scale" },
-        { text: "1 numara 500 gram", icon: "fas fa-weight-hanging" },
-        { text: "1 numara Yarım kilo", icon: "fas fa-adjust" },
-        { text: "1 numara 5 adet", icon: "fas fa-cube" },
-        { text: "1 numara 5 paket", icon: "fas fa-box" },
-        { text: "1 numara 3 litre", icon: "fas fa-wine-bottle" },
-        { text: "1 numara 1 porsiyon", icon: "fas fa-utensils" },
-        { text: "1 numara 1,5 porsiyon", icon: "fas fa-utensil-spoon" }
-    ];
-    
-    const productsSection = document.getElementById('productsSection');
-    if (!productsSection) return;
-
-    const productsHeader = productsSection.querySelector('.products-header');
-    if (!productsHeader) return;
-    
-    const exampleGroups = [];
-    for (let i = 0; i < examples.length; i += 3) {
-        exampleGroups.push(examples.slice(i, i + 3));
-    }
-
-    // ⭐ YENİ CLASS İSİMLERİ - ÇAKIŞMA YOK
-    const sliderContainer = document.createElement('div');
-    sliderContainer.className = 'command-voice-slider';
-    sliderContainer.id = 'commandVoiceSlider';
-    
-    sliderContainer.innerHTML = `
-        <!-- ÜST: REYON BAŞLIĞI -->
-        <div class="voice-reyon-header">
-            <i class="fas fa-microphone-alt voice-header-icon"></i>
-            <span class="voice-reyon-title" id="voiceReyonTitle">Reyon Seçin</span>
-        </div>
-        
-        <!-- ORTA: KOMUT SLIDER -->
-        <div class="voice-commands-section">
-            <div class="voice-examples-container">
-                ${exampleGroups.map((group, groupIndex) => `
-                    <div class="voice-example-group ${groupIndex === 0 ? 'active' : ''}" data-group="${groupIndex}">
-                        ${group.map((example, exampleIndex) => `
-                            <div class="voice-command-example ${exampleIndex === 0 ? 'active-cmd' : ''}" 
-                                 data-group="${groupIndex}" 
-                                 data-example="${exampleIndex}">
-                                <i class="${example.icon}"></i>
-                                <span>${example.text}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                `).join('')}
-            </div>
-            <div class="voice-slider-controls">
-                <button class="voice-slider-btn voice-prev-btn" title="Önceki">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <button class="voice-slider-btn voice-next-btn" title="Sonraki">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        </div>
-        
-        <!-- BANNER: YEŞİL ANİMASYON -->
-        <div class="voice-reyon-banner" id="voiceReyonBanner">
-            <div class="voice-banner-content">
-                <div class="voice-banner-animation" id="voiceBannerAnimation">
-                    <div class="voice-banner-image">
-                        <img src="" alt="Reyon Banner" class="voice-banner-img" id="voiceBannerImage">
-                        <div class="voice-banner-overlay">
-                            <i class="fas fa-store voice-banner-icon"></i>
-                            <span class="voice-banner-text">Reyon seçin</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- BİLDİRİM: KOMPAKT -->
-        <div class="voice-hint-container" id="voiceHintContainer">
-            <div class="voice-hint-content">
-                <i class="fas fa-microphone voice-hint-icon"></i>
-                <span class="voice-hint-text">"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz</span>
-            </div>
-        </div>
-    `;
-
-    productsHeader.appendChild(sliderContainer);
-    
-    console.log('✅ Yeni tasarım slider eklendi');
-    
-    // Slider fonksiyonları
-    let currentGroupIndex = 0;
-    let autoSlideInterval;
-
-    function showGroup(groupIndex) {
-        const groups = sliderContainer.querySelectorAll('.voice-example-group');
-        const examples = sliderContainer.querySelectorAll('.voice-command-example');
-        
-        groups.forEach(group => group.classList.remove('active'));
-        examples.forEach(example => example.classList.remove('active-cmd'));
-        
-        if (groups[groupIndex]) {
-            groups[groupIndex].classList.add('active');
-            
-            const groupExamples = sliderContainer.querySelectorAll(`.voice-command-example[data-group="${groupIndex}"]`);
-            if (groupExamples[0]) {
-                groupExamples[0].classList.add('active-cmd');
-            }
-        }
-        
-        currentGroupIndex = groupIndex;
-    }
-
-    function startAutoSlide() {
-        autoSlideInterval = setInterval(() => {
-            const nextGroupIndex = (currentGroupIndex + 1) % exampleGroups.length;
-            showGroup(nextGroupIndex);
-        }, 4000);
-    }
-
-    function nextGroup() {
-        const nextIndex = (currentGroupIndex + 1) % exampleGroups.length;
-        showGroup(nextIndex);
-        resetAutoSlide();
-    }
-
-    function prevGroup() {
-        const prevIndex = (currentGroupIndex - 1 + exampleGroups.length) % exampleGroups.length;
-        showGroup(prevIndex);
-        resetAutoSlide();
-    }
-
-    function resetAutoSlide() {
-        clearInterval(autoSlideInterval);
-        startAutoSlide();
-    }
-
-    const nextBtn = sliderContainer.querySelector('.voice-next-btn');
-    const prevBtn = sliderContainer.querySelector('.voice-prev-btn');
-    
-    if (nextBtn) nextBtn.addEventListener('click', nextGroup);
-    if (prevBtn) prevBtn.addEventListener('click', prevGroup);
-
-    showGroup(0);
-    startAutoSlide();
-
-    console.log('✅ Slider başlatıldı');
-}
-
-// =============================================
-// REYON BANNER GÜNCELLEME - YENİ ID'LER
-// =============================================
-
-async function updateReyonBanner(categoryName, categoryId) {
-    console.log(`🎨 Reyon banner güncelleniyor: ${categoryName} (ID: ${categoryId})`);
-    
-    const sliderTitle = document.getElementById('voiceReyonTitle');
-    const bannerText = document.querySelector('.voice-banner-text');
-    
-    // ⭐ REYON İSMİNİ KESİN GÜNCELLE
-    if (sliderTitle) {
-        sliderTitle.textContent = categoryName;
-        console.log(`✅ Slider title güncellendi: ${categoryName}`);
-    }
-    
-    if (bannerText) {
-        bannerText.textContent = categoryName;
-        console.log(`✅ Banner text güncellendi: ${categoryName}`);
-    }
-    
-    // Görsel güncelleme
-    const bannerImage = document.getElementById('voiceBannerImage');
-    if (bannerImage) {
-        try {
-            const { data: reyonData, error } = await supabase
-                .from('reyon')
-                .select('image_url')
-                .eq('id', categoryId)
-                .single();
-            
-            let bannerImageUrl = reyonData?.image_url || getDefaultBannerImage(categoryName);
-            bannerImage.src = bannerImageUrl;
-            
-            bannerImage.onload = function() {
-                document.getElementById('voiceBannerAnimation')?.classList.add('voice-banner-animate');
-            };
-            
-        } catch (error) {
-            console.error('Banner görsel hatası:', error);
-            bannerImage.src = getDefaultBannerImage(categoryName);
-        }
-    }
-}
-        // =============================================
 // VARSayılan BANNER GÖRSELLERİ
 // =============================================
 
@@ -15831,6 +15576,7 @@ function updateBonusUI() {
     </script>
 </body>
 </html>
+
 
 
 
