@@ -3015,17 +3015,22 @@ const storeTypeFilterStyles = `
 }
 
 
-/* ENTEGRE SLİDER STİLLERİ - SARI TEMA */
-/*/* YENİ SLIDER TASARIMI - ÇAKIŞMA YOK */
+/* YENİ SLIDER TASARIMI - HEADER ALTINDA SABİT */
 .command-voice-slider {
     background: #f8f9fa;
     border-radius: 12px;
     padding: 12px;
-    margin: 10px 0;
+    margin: 10px 15px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     gap: 8px;
+    position: relative;
+    z-index: 1000;
+    width: calc(100% - 30px);
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* ÜST: REYON BAŞLIĞI - AÇIK GRI */
@@ -3245,9 +3250,7 @@ const storeTypeFilterStyles = `
 
 .voice-hint-text {
     white-space: nowrap;
-}      
-
-        
+}        
 </style>
 </head>
 <body>
@@ -4632,7 +4635,7 @@ function updateProductCartCounts() {
     }
 }
         
-// ENTEGRE SLİDER FONKSİYONU - YENİ TASARIM
+// ENTEGRE SLİDER FONKSİYONU - HEADER ALTINDA SABİT
 function initCommandSlider() {
     console.log('🔄 Entegre slider başlatılıyor...');
     
@@ -4650,18 +4653,33 @@ function initCommandSlider() {
         { text: "1 numara 1,5 porsiyon", icon: "fas fa-utensil-spoon" }
     ];
     
-    const productsSection = document.getElementById('productsSection');
-    if (!productsSection) return;
-
-    const productsHeader = productsSection.querySelector('.products-header');
-    if (!productsHeader) return;
+    // ⭐ PRODUCTS SECTION DEĞİL, ANA CONTAINER'A EKLE
+    const mainContainer = document.querySelector('.main-container') || 
+                         document.querySelector('#app') || 
+                         document.body;
     
+    if (!mainContainer) {
+        console.error('❌ Ana container bulunamadı!');
+        return;
+    }
+
+    // ⭐ HEADER'DAN SONRA EKLE
+    const header = document.querySelector('header') || 
+                   document.querySelector('.header') ||
+                   document.querySelector('.main-header');
+    
+    let insertAfterElement = header;
+    
+    // Header yoksa body'nin başına ekle
+    if (!insertAfterElement) {
+        insertAfterElement = document.body;
+    }
+
     const exampleGroups = [];
     for (let i = 0; i < examples.length; i += 3) {
         exampleGroups.push(examples.slice(i, i + 3));
     }
 
-    // ⭐ YENİ CLASS İSİMLERİ - ÇAKIŞMA YOK
     const sliderContainer = document.createElement('div');
     sliderContainer.className = 'command-voice-slider';
     sliderContainer.id = 'commandVoiceSlider';
@@ -4723,9 +4741,14 @@ function initCommandSlider() {
         </div>
     `;
 
-    productsHeader.appendChild(sliderContainer);
+    // ⭐ HEADER'DAN SONRA EKLE
+    if (insertAfterElement === document.body) {
+        document.body.insertBefore(sliderContainer, document.body.firstChild);
+    } else {
+        insertAfterElement.parentNode.insertBefore(sliderContainer, insertAfterElement.nextSibling);
+    }
     
-    console.log('✅ Yeni tasarım slider eklendi');
+    console.log('✅ Slider header altına eklendi');
     
     // Slider fonksiyonları
     let currentGroupIndex = 0;
@@ -4785,7 +4808,6 @@ function initCommandSlider() {
 
     console.log('✅ Slider başlatıldı');
 }
-
 // =============================================
 // REYON BANNER GÜNCELLEME - YENİ ID'LER
 // =============================================
@@ -15779,6 +15801,7 @@ function updateBonusUI() {
     </script>
 </body>
 </html>
+
 
 
 
