@@ -4606,15 +4606,12 @@ function updateProductCartCounts() {
 
 
 
-// BAĞIMSIZ SLIDER - BENZERSİZ CLASS İSİMLERİ
+// DÜZELTİLMİŞ SLAYT FONKSİYONU - PRODUCTS SECTION'DAN BAĞIMSIZ
 function initCommandSlider() {
     console.log('🔄 Slider başlatılıyor...');
     
     // Eğer slider zaten varsa çık
-    if (document.querySelector('.voice-command-slider')) {
-        console.log('✅ Slider zaten mevcut');
-        return;
-    }
+    if (document.querySelector('.command-slider-header')) return;
     
     const examples = [
         { text: "1 numara 5 kilo", icon: "fas fa-weight" },
@@ -4630,135 +4627,108 @@ function initCommandSlider() {
     
     // Products section'ı bul
     const productsSection = document.getElementById('productsSection');
-    if (!productsSection) {
-        console.log('❌ Products section bulunamadı');
-        return;
-    }
+    if (!productsSection) return;
 
-    // Örnek gruplarını oluştur
+    // Products header'ı bul
+    const productsHeader = productsSection.querySelector('.products-header');
+    if (!productsHeader) return;
+    
+    // Örnekleri 3'lü gruplara ayır
     const exampleGroups = [];
     for (let i = 0; i < examples.length; i += 3) {
         exampleGroups.push(examples.slice(i, i + 3));
     }
 
-    // ⭐ YENİ VE BENZERSİZ SLIDER CONTAINER
+    // ⭐ SADECE SLIDER'I EKLE (BİLDİRİMSİZ)
     const sliderContainer = document.createElement('div');
-    sliderContainer.className = 'voice-command-slider';
-    sliderContainer.id = 'voiceCommandSlider';
+    sliderContainer.className = 'command-slider-header';
+    sliderContainer.id = 'commandSlider';
     
     sliderContainer.innerHTML = `
-        <!-- ÜRÜN EKLEME KURALLARI -->
-        <div class="voice-rules-section">
-            <div class="voice-rules-container">
-                <div class="voice-examples-wrapper">
-                    ${exampleGroups.map((group, groupIndex) => `
-                        <div class="voice-example-group ${groupIndex === 0 ? 'voice-active' : ''}" data-voice-group="${groupIndex}">
-                            ${group.map((example, exampleIndex) => `
-                                <div class="voice-example-item ${exampleIndex === 0 ? 'voice-item-active' : ''}" 
-                                     data-voice-group="${groupIndex}" 
-                                     data-voice-example="${exampleIndex}">
-                                    <i class="${example.icon}"></i>
-                                    <span>${example.text}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `).join('')}
-                </div>
-                <div class="voice-controls-box">
-                    <button class="voice-nav-btn voice-prev-btn" title="Önceki">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <button class="voice-nav-btn voice-next-btn" title="Sonraki">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- REYON SEÇİN BAŞLIĞI -->
-        <div class="voice-reyon-header">
-            <h2 class="voice-reyon-title">
-                <i class="fas fa-store"></i>
-                Reyon Seçin
-            </h2>
-        </div>
-
-        <!-- BANNER - PRODUCT GENİŞLİĞİNDE -->
-        <div class="voice-banner-section" id="voiceReyonBanner">
-            <div class="voice-banner-container">
-                <div class="voice-banner-animation" id="voiceBannerAnimation">
-                    <img src="" alt="Reyon Banner" class="voice-banner-img" id="voiceBannerImage">
-                    <div class="voice-banner-content">
-                        <i class="fas fa-shopping-cart voice-banner-icon"></i>
-                        <span class="voice-banner-text">Reyonunuzu Seçin</span>
+        <div class="slider-content">
+            <i class="fas fa-microphone-alt slider-icon"></i>
+            <span class="slider-title">Sesli Komut Örnekleri:</span>
+            <div class="slider-examples-container">
+                ${exampleGroups.map((group, groupIndex) => `
+                    <div class="slider-example-group ${groupIndex === 0 ? 'active' : ''}" data-group="${groupIndex}">
+                        ${group.map((example, exampleIndex) => `
+                            <div class="slider-example ${exampleIndex === 0 ? 'active-example' : ''}" 
+                                 data-group="${groupIndex}" 
+                                 data-example="${exampleIndex}">
+                                <i class="${example.icon}"></i>
+                                <span>${example.text}</span>
+                            </div>
+                        `).join('')}
                     </div>
-                </div>
+                `).join('')}
             </div>
-        </div>
-
-        <!-- BUTONLAR -->
-        <div class="voice-actions-panel">
-            <div class="voice-buttons-grid">
-                <button class="voice-action-button voice-store-btn" id="voiceStoreBtn">
-                    <i class="fas fa-store"></i>
-                    <span>Mağaza Seç</span>
+            <div class="slider-controls">
+                <button class="slider-btn prev-btn" title="Önceki">
+                    <i class="fas fa-chevron-left"></i>
                 </button>
-                <button class="voice-action-button voice-cart-btn" id="voiceCartBtn">
-                    <i class="fas fa-trash"></i>
-                    <span>Sepeti Sil</span>
-                </button>
-                <button class="voice-action-button voice-payment-btn" id="voicePaymentBtn">
-                    <i class="fas fa-credit-card"></i>
-                    <span>Ödeme Yap</span>
+                <button class="slider-btn next-btn" title="Sonraki">
+                    <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
         </div>
     `;
 
-    // ⭐ PRODUCTS SECTION'DAN ÖNCE EKLE
-    productsSection.parentNode.insertBefore(sliderContainer, productsSection);
+    // ⭐ BİLDİRİMİ AYRI BİR ELEMENT OLARAK EKLE
+    const notificationContainer = document.createElement('div');
+    notificationContainer.className = 'voice-notification-container';
+    notificationContainer.id = 'voiceCommandNotification';
+    notificationContainer.innerHTML = `
+        <div class="voice-notification-content">
+            <i class="fas fa-microphone"></i>
+            <span class="voice-notification-text">"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz</span>
+        </div>
+    `;
+
+    // ⭐ ÖNCE SLIDER'I EKLE, SONRA BİLDİRİMİ
+    productsHeader.appendChild(sliderContainer);
+    productsHeader.appendChild(notificationContainer); // ⭐ BURASI ÖNEMLİ
     
-    console.log('✅ Slider products section öncesine eklendi');
+    console.log('✅ Slider ve bildirim ayrı elementler olarak eklendi');
     
-    // ⭐ BAŞLANGIÇTA GİZLİ
-    sliderContainer.style.display = 'none';
+    // Slider fonksiyonlarını başlat
+    initSliderControls();
     
-    // Buton event'leri - YENİ ID'ler
-    document.getElementById('voiceStoreBtn')?.addEventListener('click', function() {
-        showStoreSelection();
-        hideProductsSection();
-        hideVoiceSlider();
-    });
-    
-    document.getElementById('voiceCartBtn')?.addEventListener('click', clearCart);
-    document.getElementById('voicePaymentBtn')?.addEventListener('click', showPaymentMethodSelection);
-    
-    // Slider fonksiyonları
+    // Slider state
     let currentGroupIndex = 0;
     let autoSlideInterval;
 
+    // Grup değiştirme fonksiyonu
     function showGroup(groupIndex) {
-        const groups = sliderContainer.querySelectorAll('.voice-example-group');
-        const examples = sliderContainer.querySelectorAll('.voice-example-item');
+        const groups = sliderContainer.querySelectorAll('.slider-example-group');
+        const examples = sliderContainer.querySelectorAll('.slider-example');
         
-        groups.forEach(group => group.classList.remove('voice-active'));
-        examples.forEach(example => example.classList.remove('voice-item-active'));
+        // Tüm grupları ve örnekleri gizle
+        groups.forEach(group => group.classList.remove('active'));
+        examples.forEach(example => example.classList.remove('active-example'));
         
+        // Yeni grubu göster
         if (groups[groupIndex]) {
-            groups[groupIndex].classList.add('voice-active');
-            groups[groupIndex].querySelector('.voice-example-item')?.classList.add('voice-item-active');
+            groups[groupIndex].classList.add('active');
+            
+            // Grubun ilk örneğini aktif et
+            const groupExamples = sliderContainer.querySelectorAll(`.slider-example[data-group="${groupIndex}"]`);
+            if (groupExamples[0]) {
+                groupExamples[0].classList.add('active-example');
+            }
         }
         
         currentGroupIndex = groupIndex;
     }
 
+    // Otomatik slayt fonksiyonu
     function startAutoSlide() {
         autoSlideInterval = setInterval(() => {
             const nextGroupIndex = (currentGroupIndex + 1) % exampleGroups.length;
             showGroup(nextGroupIndex);
-        }, 4000);
+        }, 4000); // 4 saniyede bir değişim
     }
 
+    // Manuel kontrol fonksiyonları
     function nextGroup() {
         const nextIndex = (currentGroupIndex + 1) % exampleGroups.length;
         showGroup(nextIndex);
@@ -4775,34 +4745,6 @@ function initCommandSlider() {
         clearInterval(autoSlideInterval);
         startAutoSlide();
     }
-
-    // Kontrol butonları
-    sliderContainer.querySelector('.voice-next-btn')?.addEventListener('click', nextGroup);
-    sliderContainer.querySelector('.voice-prev-btn')?.addEventListener('click', prevGroup);
-
-    // Başlat
-    showGroup(0);
-    startAutoSlide();
-
-    console.log('✅ Slider başlatıldı (gizli)');
-}
-
-// GÖSTER/GİZLE FONKSİYONLARINI GÜNCELLE - YENİ İSİMLER
-function showVoiceSlider() {
-    const slider = document.getElementById('voiceCommandSlider');
-    if (slider) {
-        slider.style.display = 'block';
-        console.log('✅ Voice Slider gösterildi');
-    }
-}
-
-function hideVoiceSlider() {
-    const slider = document.getElementById('voiceCommandSlider');
-    if (slider) {
-        slider.style.display = 'none';
-        console.log('✅ Voice Slider gizlendi');
-    }
-}
 
 // SEPET SİLME FONKSİYONU
 function clearCart() {
@@ -4827,8 +4769,8 @@ function showStoreSelection() {
     if (banner) {
         banner.style.display = 'block';
     }
-    
-    // Store type section'ı göster - DOĞRU SELECTOR
+
+        // Store type section'ı göster - DOĞRU SELECTOR
     const storeTypeSection = document.querySelector('body > div.main-container > section:nth-child(1)');
     const sellersSection = document.getElementById('sellersSection');
     
@@ -4848,6 +4790,47 @@ function showStoreSelection() {
     // Slider'ı gizle
     hideVoiceSlider();
 }
+
+    // Event listener'ları ekle
+    const nextBtn = sliderContainer.querySelector('.next-btn');
+    const prevBtn = sliderContainer.querySelector('.prev-btn');
+    
+    if (nextBtn) nextBtn.addEventListener('click', nextGroup);
+    if (prevBtn) prevBtn.addEventListener('click', prevGroup);
+
+    // İlk grubu göster ve otomatik slaytı başlat
+    showGroup(0);
+    startAutoSlide();
+
+    console.log('✅ 3\'lü grup komut slider başlatıldı');
+}
+
+// Slider kontrollerini başlatan fonksiyon
+function initSliderControls() {
+    console.log('🎛️ Slider kontrolleri başlatılıyor...');
+    // Bu fonksiyon artık ana fonksiyonun içinde, burada boş bırakabiliriz
+    // veya gerekiyorsa ek kontroller ekleyebiliriz
+}
+
+// HEMEN ÇALIŞTIR - DOM yüklenir yüklenmez
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM yüklendi, slider başlatılıyor...');
+    initCommandSlider();
+});
+
+// Sayfa tamamen yüklendiğinde de kontrol et
+window.addEventListener('load', function() {
+    console.log('📄 Sayfa tamamen yüklendi');
+    // Slider'ın görünür olup olmadığını kontrol et
+    const slider = document.getElementById('commandSlider');
+    if (!slider || slider.style.display === 'none') {
+        console.log('⚠️ Slider görünmüyor, yeniden başlatılıyor...');
+        initCommandSlider();
+    }
+});
+
+
+    
 
 // SECTION YÖNETİM FONKSİYONLARI
 function showProductsSection() {
@@ -4919,26 +4902,6 @@ async function selectDynamicCategory(category) {
     }
 }
 
-// ⭐ SATICI SEÇİLDİĞİNDE SLİDER GİZLE - GÜNCELLENMİŞ
-async function selectDynamicSeller(seller) {
-    console.log(`🏪 Satıcı seçildi: ${seller.business_name}`);
-    
-    // Slider'ı gizle
-    // hideVoiceSlider();
-    
-    // Products section'ı göster (currentRoot ile zaten yükleniyor)
-    // showProductsSection(); // GEREK YOK - currentRoot ile yükleniyor
-    
-    // Mağaza seçim alanlarını gizle
-    hideStoreSelection();
-    
-    console.log('✅ Satıcı seçildi, slider gizlendi, mağaza alanları gizlendi');
-}
-
-// ⭐ SAYFA YÜKLENDİĞİNDE
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM yüklendi...');
-    
     // Slider'ı başlat (gizli olarak)
     // initCommandSlider();
     
@@ -15625,6 +15588,7 @@ function updateBonusUI() {
     </script>
 </body>
 </html>
+
 
 
 
