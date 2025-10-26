@@ -4605,6 +4605,10 @@ function updateProductCartCounts() {
 }
 
     
+// GEREKLİ DEĞİŞKENLERİ TANIMLA
+let selectedCategoryId = null;
+let currentRoot = "4:0";
+
 // BAĞIMSIZ SLIDER - BENZERSİZ CLASS İSİMLERİ
 function initCommandSlider() {
     console.log('🔄 Slider başlatılıyor...');
@@ -4803,46 +4807,6 @@ function hideVoiceSlider() {
     }
 }
 
-// REYON BANNER GÜNCELLEME FONKSİYONUNU GÜNCELLE
-async function updateReyonBanner(categoryName, categoryId) {
-    console.log(`🎨 Reyon banner güncelleniyor: ${categoryName} (ID: ${categoryId})`);
-    
-    const sliderTitle = document.querySelector('.voice-reyon-title');
-    const bannerText = document.querySelector('.voice-banner-text');
-    
-    if (sliderTitle) {
-        sliderTitle.innerHTML = `<i class="fas fa-store"></i>${categoryName}`;
-        console.log(`✅ Slider title güncellendi: ${categoryName}`);
-    }
-    
-    if (bannerText) {
-        bannerText.textContent = categoryName;
-        console.log(`✅ Banner text güncellendi: ${categoryName}`);
-    }
-    
-    const bannerImage = document.getElementById('voiceBannerImage');
-    if (bannerImage) {
-        try {
-            const { data: reyonData, error } = await supabase
-                .from('reyon')
-                .select('image_url')
-                .eq('id', categoryId)
-                .single();
-            
-            let bannerImageUrl = reyonData?.image_url || getDefaultBannerImage(categoryName);
-            bannerImage.src = bannerImageUrl;
-            
-            bannerImage.onload = function() {
-                document.getElementById('voiceBannerAnimation')?.classList.add('voice-banner-animate');
-            };
-            
-        } catch (error) {
-            console.error('Banner görsel hatası:', error);
-            bannerImage.src = getDefaultBannerImage(categoryName);
-        }
-    }
-}
-
 // EKSİK FONKSİYONLARI TANIMLA
 function speakToUser(message) {
     console.log(`🗣️ Sesli mesaj: ${message}`);
@@ -4948,6 +4912,52 @@ function hideStoreSelection() {
 async function loadProductsByCategory(categoryId) {
     console.log(`📦 Ürünler yükleniyor, kategori ID: ${categoryId}`);
     // Bu fonksiyon gerçek ürün yükleme işlemini yapacak
+    return Promise.resolve(); // Basit bir promise döndür
+}
+
+// REYON BANNER GÜNCELLEME FONKSİYONU
+async function updateReyonBanner(categoryName, categoryId) {
+    console.log(`🎨 Reyon banner güncelleniyor: ${categoryName} (ID: ${categoryId})`);
+    
+    const sliderTitle = document.querySelector('.voice-reyon-title');
+    const bannerText = document.querySelector('.voice-banner-text');
+    
+    if (sliderTitle) {
+        sliderTitle.innerHTML = `<i class="fas fa-store"></i>${categoryName}`;
+        console.log(`✅ Slider title güncellendi: ${categoryName}`);
+    }
+    
+    if (bannerText) {
+        bannerText.textContent = categoryName;
+        console.log(`✅ Banner text güncellendi: ${categoryName}`);
+    }
+    
+    const bannerImage = document.getElementById('voiceBannerImage');
+    if (bannerImage) {
+        try {
+            // Supabase çağrısı - eğer supabase tanımlı değilse hata vermemesi için
+            if (typeof supabase !== 'undefined') {
+                const { data: reyonData, error } = await supabase
+                    .from('reyon')
+                    .select('image_url')
+                    .eq('id', categoryId)
+                    .single();
+                
+                let bannerImageUrl = reyonData?.image_url || getDefaultBannerImage(categoryName);
+                bannerImage.src = bannerImageUrl;
+            } else {
+                bannerImage.src = getDefaultBannerImage(categoryName);
+            }
+            
+            bannerImage.onload = function() {
+                document.getElementById('voiceBannerAnimation')?.classList.add('voice-banner-animate');
+            };
+            
+        } catch (error) {
+            console.error('Banner görsel hatası:', error);
+            bannerImage.src = getDefaultBannerImage(categoryName);
+        }
+    }
 }
 
 // ⭐ KATEGORİ SEÇİLDİĞİNDE PRODUCTS VE SLİDER GÖSTER
@@ -4986,14 +4996,14 @@ async function selectDynamicCategory(category) {
 async function selectDynamicSeller(seller) {
     console.log(`🏪 Satıcı seçildi: ${seller.business_name}`);
     
-    // Slider'ı göster
-   // hideVoiceSlider();
+    // Slider'ı gizle
+    hideVoiceSlider();
     
     // Products section'ı göster
- //   hideProductsSection();
+    showProductsSection();
     
     // Mağaza seçim alanlarını gizle
- //   hideStoreSelection();
+    hideStoreSelection();
     
     // Diğer satıcı seçim işlemleri...
 }
@@ -5003,13 +5013,13 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOM yüklendi...');
     
     // Slider'ı başlat (gizli olarak)
-    // initCommandSlider();
+    initCommandSlider();
     
     // Başlangıçta products section'ı gizle
     hideProductsSection();
     
     // Başlangıçta slider'ı gizle
-   // hideVoiceSlider();
+    hideVoiceSlider();
     
     // Başlangıçta mağaza seçim alanlarını göster
     showStoreSelection();
@@ -15692,6 +15702,7 @@ function updateBonusUI() {
     </script>
 </body>
 </html>
+
 
 
 
