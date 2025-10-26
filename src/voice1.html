@@ -4604,9 +4604,6 @@ function updateProductCartCounts() {
     });
 }
 
-    
-// GEREKLİ DEĞİŞKENLERİ TANIMLA
-
 
 
 // BAĞIMSIZ SLIDER - BENZERSİZ CLASS İSİMLERİ
@@ -4807,16 +4804,6 @@ function hideVoiceSlider() {
     }
 }
 
-// EKSİK FONKSİYONLARI TANIMLA
-function speakToUser(message) {
-    console.log(`🗣️ Sesli mesaj: ${message}`);
-    // Sesli okuma fonksiyonu buraya gelecek
-}
-
-function debugLog(message) {
-    console.log(`🔍 ${message}`);
-}
-
 // SEPET SİLME FONKSİYONU
 function clearCart() {
     if (confirm('Sepetinizdeki tüm ürünleri silmek istediğinizden emin misiniz?')) {
@@ -4831,7 +4818,7 @@ function showPaymentMethodSelection() {
     speakToUser('Ödeme yöntemi seçin');
 }
 
-// MAĞAZA SEÇİMİNİ GÖSTER
+// MAĞAZA SEÇİMİNİ GÖSTER - GÜNCELLENMİŞ
 function showStoreSelection() {
     console.log('🏪 Mağaza seçimi gösteriliyor...');
     
@@ -4841,39 +4828,25 @@ function showStoreSelection() {
         banner.style.display = 'block';
     }
     
-    // Store type ve sellers section'ı göster
-    const storeTypeSection = document.querySelector('.scroll-container');
+    // Store type section'ı göster - DOĞRU SELECTOR
+    const storeTypeSection = document.querySelector('body > div.main-container > section:nth-child(1)');
     const sellersSection = document.getElementById('sellersSection');
     
-    if (storeTypeSection) storeTypeSection.style.display = 'flex';
-    if (sellersSection) sellersSection.style.display = 'block';
+    if (storeTypeSection) {
+        storeTypeSection.style.display = 'block';
+        console.log('✅ Store type section gösterildi');
+    }
+    
+    if (sellersSection) {
+        sellersSection.style.display = 'block';
+        console.log('✅ Sellers section gösterildi');
+    }
     
     // Products section'ı gizle
     hideProductsSection();
     
     // Slider'ı gizle
     hideVoiceSlider();
-}
-
-// VARSayılan BANNER GÖRSELLERİ
-function getDefaultBannerImage(categoryName) {
-    const defaultImages = {
-        'Meyve & Sebze': '/images/banners/fruits-vegetables.jpg',
-        'Et & Tavuk': '/images/banners/meat-poultry.jpg',
-        'Süt Ürünleri': '/images/banners/dairy.jpg',
-        'Temel Gıda': '/images/banners/groceries.jpg',
-        'İçecekler': '/images/banners/beverages.jpg',
-        'Atıştırmalık': '/images/banners/snacks.jpg',
-        'Dondurulmuş Gıda': '/images/banners/frozen.jpg'
-    };
-    
-    for (const [key, value] of Object.entries(defaultImages)) {
-        if (categoryName.toLowerCase().includes(key.toLowerCase())) {
-            return value;
-        }
-    }
-    
-    return '/images/banners/default-reyon.jpg';
 }
 
 // SECTION YÖNETİM FONKSİYONLARI
@@ -4893,74 +4866,33 @@ function hideProductsSection() {
     }
 }
 
+// MAĞAZA SEÇİM ALANLARINI GİZLE - GÜNCELLENMİŞ
 function hideStoreSelection() {
+    console.log('🏪 Mağaza seçim alanları gizleniyor...');
+    
     // Video Banner'ı gizle
     const banner = document.querySelector('.banner');
     if (banner) {
         banner.style.display = 'none';
+        console.log('✅ Banner gizlendi');
     }
     
-    // Store type ve sellers section'ı gizle
-    const storeTypeSection = document.querySelector('.scroll-container');
+    // Store type section'ı gizle - DOĞRU SELECTOR
+    const storeTypeSection = document.querySelector('body > div.main-container > section:nth-child(1)');
     const sellersSection = document.getElementById('sellersSection');
     
-    if (storeTypeSection) storeTypeSection.style.display = 'none';
-    if (sellersSection) sellersSection.style.display = 'none';
-}
-
-// PRODUCT YÜKLEME FONKSİYONU (BASİT VERSİYON)
-async function loadProductsByCategory(categoryId) {
-    console.log(`📦 Ürünler yükleniyor, kategori ID: ${categoryId}`);
-    // Bu fonksiyon gerçek ürün yükleme işlemini yapacak
-    return Promise.resolve(); // Basit bir promise döndür
-}
-
-// REYON BANNER GÜNCELLEME FONKSİYONU
-async function updateReyonBanner(categoryName, categoryId) {
-    console.log(`🎨 Reyon banner güncelleniyor: ${categoryName} (ID: ${categoryId})`);
-    
-    const sliderTitle = document.querySelector('.voice-reyon-title');
-    const bannerText = document.querySelector('.voice-banner-text');
-    
-    if (sliderTitle) {
-        sliderTitle.innerHTML = `<i class="fas fa-store"></i>${categoryName}`;
-        console.log(`✅ Slider title güncellendi: ${categoryName}`);
+    if (storeTypeSection) {
+        storeTypeSection.style.display = 'none';
+        console.log('✅ Store type section gizlendi');
     }
     
-    if (bannerText) {
-        bannerText.textContent = categoryName;
-        console.log(`✅ Banner text güncellendi: ${categoryName}`);
-    }
-    
-    const bannerImage = document.getElementById('voiceBannerImage');
-    if (bannerImage) {
-        try {
-            // Supabase çağrısı - eğer supabase tanımlı değilse hata vermemesi için
-            if (typeof supabase !== 'undefined') {
-                const { data: reyonData, error } = await supabase
-                    .from('reyon')
-                    .select('image_url')
-                    .eq('id', categoryId)
-                    .single();
-                
-                let bannerImageUrl = reyonData?.image_url || getDefaultBannerImage(categoryName);
-                bannerImage.src = bannerImageUrl;
-            } else {
-                bannerImage.src = getDefaultBannerImage(categoryName);
-            }
-            
-            bannerImage.onload = function() {
-                document.getElementById('voiceBannerAnimation')?.classList.add('voice-banner-animate');
-            };
-            
-        } catch (error) {
-            console.error('Banner görsel hatası:', error);
-            bannerImage.src = getDefaultBannerImage(categoryName);
-        }
+    if (sellersSection) {
+        sellersSection.style.display = 'none';
+        console.log('✅ Sellers section gizlendi');
     }
 }
 
-// ⭐ KATEGORİ SEÇİLDİĞİNDE PRODUCTS VE SLİDER GÖSTER
+// ⭐ KATEGORİ SEÇİLDİĞİNDE SLİDER GÖSTER - GÜNCELLENMİŞ
 async function selectDynamicCategory(category) {
     console.log(`🛒 Kategori seçildi: ${category.name}`);
     
@@ -4973,39 +4905,36 @@ async function selectDynamicCategory(category) {
         categoryCard.classList.add('selected');
         selectedCategoryId = category.id;
         
-        currentRoot = "5:0";
-        debugLog(`🔄 Kök güncellendi: 4:0 -> 5:0 (Kategori seçildi: ${category.name})`);
-        
         // REYON BANNER'INI GÜNCELLE
         await updateReyonBanner(category.name, category.id);
         
-        // ⭐ SLİDER VE PRODUCTS SECTION'ı GÖSTER
+        // ⭐ SADECE SLİDER GÖSTER - products section currentRoot ile yükleniyor
         showVoiceSlider();
-        showProductsSection();
         
         // ⭐ MAĞAZA SEÇİM ALANLARINI GİZLE
         hideStoreSelection();
         
-        await loadProductsByCategory(category.id);
+        // currentRoot "5:0" olarak güncellenecek - bu sistem tarafından yapılıyor
+        console.log('✅ Kategori seçildi, slider gösterildi, mağaza alanları gizlendi');
         
         speakToUser(`${category.name} kategorisi seçildi. Ürünler listeleniyor. Sesli olarak ürün siparişi verebilirsiniz.`);
     }
 }
 
-// ⭐ SATICI SEÇİLDİĞİNDE SLİDER GİZLE, PRODUCTS GÖSTER
+// ⭐ SATICI SEÇİLDİĞİNDE SLİDER GİZLE - GÜNCELLENMİŞ
 async function selectDynamicSeller(seller) {
     console.log(`🏪 Satıcı seçildi: ${seller.business_name}`);
     
     // Slider'ı gizle
     hideVoiceSlider();
     
-    // Products section'ı göster
-    showProductsSection();
+    // Products section'ı göster (currentRoot ile zaten yükleniyor)
+    // showProductsSection(); // GEREK YOK - currentRoot ile yükleniyor
     
     // Mağaza seçim alanlarını gizle
     hideStoreSelection();
     
-    // Diğer satıcı seçim işlemleri...
+    console.log('✅ Satıcı seçildi, slider gizlendi, mağaza alanları gizlendi');
 }
 
 // ⭐ SAYFA YÜKLENDİĞİNDE
@@ -15702,6 +15631,7 @@ function updateBonusUI() {
     </script>
 </body>
 </html>
+
 
 
 
