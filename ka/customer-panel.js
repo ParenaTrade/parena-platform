@@ -258,10 +258,8 @@ class CustomerPanel {
         }
     }
 
-    // Diğer metodları da aynı şekilde güncelleyin...
-    // loadCustomerOrders, loadCustomerProfile, vb. tüm metodlarda this.supabase kullanın
-
     async loadCustomerOrders() {
+        // Siparişler bölümünü yükle
         const section = document.getElementById('customerOrdersSection');
         if (!section) return;
 
@@ -286,15 +284,6 @@ class CustomerPanel {
 
     async loadAllCustomerOrders() {
         try {
-            console.log('📋 Tüm siparişler yükleniyor...');
-            
-            if (!this.supabase) {
-                console.error('❌ Supabase client yok!');
-                const container = document.getElementById('customerOrdersList');
-                container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
-                return;
-            }
-
             const { data: orders, error } = await this.supabase
                 .from('orders')
                 .select(`
@@ -306,17 +295,11 @@ class CustomerPanel {
                 .eq('customer_id', this.customerData.id)
                 .order('created_at', { ascending: false });
 
-            if (error) {
-                console.error('❌ Siparişler sorgu hatası:', error);
-                throw error;
-            }
-
             this.orders = orders || [];
             this.renderCustomerOrders(this.orders);
-            console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
 
         } catch (error) {
-            console.error('❌ Siparişler yükleme hatası:', error);
+            console.error('Siparişler yükleme hatası:', error);
             const container = document.getElementById('customerOrdersList');
             container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
         }
