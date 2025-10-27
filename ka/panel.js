@@ -1,50 +1,79 @@
 class PanelSystem {
     constructor() {
-        this.currentSection = 'dashboard';
         this.currentPanel = null;
-        this.userProfile = null;
     }
 
     initializePanel(userProfile) {
-        this.userProfile = userProfile;
-        this.updateUI();
-        this.setupEventListeners();
-        this.initializeRoleSpecificPanel();
-    }
-
-    updateUI() {
-        // Null check ekleyelim
-        if (!this.userProfile) {
-            console.error('User profile is null');
+        console.log('🎯 Panel başlatılıyor:', userProfile);
+        
+        // Auth kontrolünü kaldır - sadece session'a güven
+        if (!userProfile || !userProfile.role) {
+            console.error('❌ Geçersiz kullanıcı profili');
             return;
         }
 
-        // Kullanıcı bilgilerini UI'da göster
-        const userName = this.userProfile.full_name || 
-                        this.userProfile.name || 
-                        this.userProfile.email || 
-                        'Kullanıcı';
-        
-        document.getElementById('userName').textContent = userName;
-        
-        // Rol bilgisini düzgün göster
-        const roleText = this.getRoleText(this.userProfile.role);
-        document.getElementById('userRole').textContent = roleText;
-        
-        document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
+        this.initializeRoleSpecificPanel(userProfile);
+        this.setupNavigation();
+    }
 
-        // Update role badge
-        const roleBadge = document.getElementById('userRole');
-        roleBadge.className = `role-badge role-${this.userProfile.role || 'customer'}`;
+    initializeRoleSpecificPanel(userProfile) {
+        // Mevcut paneli temizle
+        this.currentPanel = null;
+
+        switch(userProfile.role) {
+            case 'customer':
+                if (typeof CustomerPanel !== 'undefined') {
+                    this.currentPanel = new CustomerPanel(userProfile);
+                    this.showSection('customerDashboard');
+                }
+                break;
+            case 'seller':
+                if (typeof SellerPanel !== 'undefined') {
+                    this.currentPanel = new SellerPanel(userProfile);
+                    this.showSection('sellerDashboard');
+                }
+                break;
+            case 'courier':
+                if (typeof CourierPanel !== 'undefined') {
+                    this.currentPanel = new CourierPanel(userProfile);
+                    this.showSection('courierDashboard');
+                }
+                break;
+            default:
+                console.error('❌ Tanımlanmamış kullanıcı rolü:', userProfile.role);
+        }
+
+        // Kullanıcı bilgilerini göster
+        this.updateUserInfo(userProfile);
+    }
+
+    updateUserInfo(userProfile) {
+        const userInfoElement = document.getElementById('userInfo');
+        if (userInfoElement) {
+            userInfoElement.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight: 500;">${userProfile.name}</div>
+                        <div style="font-size: 12px; color: #666;">
+                            ${this.getRoleText(userProfile.role)} • ${userProfile.phone}
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="window.authSystem.logout()">
+                    <i class="fas fa-sign-out-alt"></i> Çıkış
+                </button>
+            `;
+        }
     }
 
     getRoleText(role) {
         const roleMap = {
-            'seller': 'Satıcı',
-            'courier': 'Kurye',
-            'admin': 'Admin',
-            'üye': 'Müşteri',
-            'customer': 'Müşteri'
+            'customer': 'Müşteri',
+            'seller': 'Satıcı', 
+            'courier': 'Kurye'
         };
         return roleMap[role] || role;
     }
