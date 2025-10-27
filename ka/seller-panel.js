@@ -939,11 +939,7 @@ async loadSellerOrders() {
         return statusMap[status] || status;
     }
 }
-      
-    // Global instance - CLASS DIŞINDA
-    if (typeof window.sellerPanel === 'undefined') {
-        window.sellerPanel = null;
-    }
+   
 
 // YENİ METODLAR - seller-panel.js sonuna ekle
 
@@ -1142,9 +1138,16 @@ async showCourierAssignmentModal(orderId) {
             window.panelSystem.showAlert('Sipariş durumu güncellenemedi!', 'error');
         }
     }
-    
+
+
     async isAutoAssignmentEnabled() {
         // Sistem ayarlarından otomatik atama durumunu kontrol et
         // Varsayılan olarak true döndür
         return true;
+    }
+ }
+   
+    // Global instance - CLASS DIŞINDA
+    if (typeof window.sellerPanel === 'undefined') {
+        window.sellerPanel = null;
     }
