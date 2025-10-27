@@ -235,177 +235,192 @@ class CustomerPanel {
     }
 
     async loadCustomerStats() {
-        try {
-            console.log('📊 Müşteri istatistikleri yükleniyor...');
-            
-            // Güvenlik kontrolleri
-            if (!this.supabase) {
-                console.error('❌ Supabase client yok!');
-                return;
-            }
-
-            if (!this.customerData || !this.customerData.id) {
-                console.error('❌ Müşteri ID yok!');
-                return;
-            }
-
-            console.log(`🔍 Siparişler aranıyor, Müşteri ID: ${this.customerData.id}`);
-
-            // Sipariş istatistiklerini yükle
-            const { data: orders, error } = await this.supabase
-                .from('orders')
-                .select('id, status')
-                .eq('customer_id', this.customerData.id);
-
-            if (error) {
-                console.error('❌ İstatistik sorgu hatası:', error);
-                return;
-            }
-
-            // UI güncelleme
-            if (orders) {
-                const totalOrders = orders.length;
-                const pendingOrders = orders.filter(order => 
-                    ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(order.status)
-                ).length;
-
-                document.getElementById('totalOrders').textContent = totalOrders;
-                document.getElementById('pendingOrders').textContent = pendingOrders;
-                
-                console.log('✅ İstatistikler yüklendi:', { total: totalOrders, pending: pendingOrders });
-            } else {
-                console.log('ℹ️ Hiç sipariş bulunamadı');
-                document.getElementById('totalOrders').textContent = '0';
-                document.getElementById('pendingOrders').textContent = '0';
-            }
-
-        } catch (error) {
-            console.error('❌ Müşteri istatistik yükleme hatası:', error);
-            // Hata durumunda sıfırları göster
-            document.getElementById('totalOrders').textContent = '0';
-            document.getElementById('pendingOrders').textContent = '0';
+    try {
+        console.log('📊 Müşteri istatistikleri yükleniyor...');
+        
+        if (!this.supabase || !this.customerData || !this.customerData.id) {
+            console.error('❌ Eksik veri:', {
+                supabase: !!this.supabase,
+                customerData: !!this.customerData,
+                customerId: this.customerData?.id
+            });
+            this.showDemoStats();
+            return;
         }
-    }
 
+        console.log(`🔍 Siparişler aranıyor, Müşteri ID: ${this.customerData.id}`);
 
-    async loadRecentCustomerOrders() {
-        try {
-            console.log('📦 Son siparişler yükleniyor...');
-            
-            if (!this.supabase) {
-                console.error('❌ Supabase client yok!');
-                const container = document.getElementById('recentCustomerOrders');
-                container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
-                return;
-            }
+        // Orders tablosundan sipariş istatistiklerini yükle
+        const { data: orders, error } = await this.supabase
+            .from('orders')
+            .select('id, status, total_amount')
+            .eq('customer_id', this.customerData.id);
 
-            const { data: orders, error } = await this.supabase
-                .from('orders')
-                .select(`
-                    id,
-                    total_amount,
-                    status,
-                    created_at,
-                    delivery_address,
-                    seller:seller_profiles(business_name)
-                `)
-                .eq('customer_id', this.customerData.id)
-                .order('created_at', { ascending: false })
-                .limit(5);
-
-            const container = document.getElementById('recentCustomerOrders');
-            
-            if (error) {
-                console.error('❌ Sipariş sorgu hatası:', error);
-                container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
-                return;
-            }
-
-            if (!orders || orders.length === 0) {
-                container.innerHTML = '<p class="text-muted">Henüz siparişiniz bulunmuyor.</p>';
-                return;
-            }
-
-            container.innerHTML = orders.map(order => `
-                <div class="order-item" style="border-bottom: 1px solid #eee; padding: 15px 0;">
-                    <div class="order-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <div>
-                            <strong>Sipariş #${order.id.slice(-8)}</strong>
-                            <div style="color: #666; font-size: 12px; margin-top: 2px;">
-                                ${order.seller?.business_name || 'Satıcı'}
-                            </div>
-                        </div>
-                        <span class="status-badge status-${order.status}">
-                            ${this.getStatusText(order.status)}
-                        </span>
-                    </div>
-                    <div class="order-footer" style="display: flex; justify-content: space-between; margin-top: 8px;">
-                        <span style="font-weight: bold; color: var(--primary);">
-                            ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
-                        </span>
-                        <small style="color: #999;">
-                            ${new Date(order.created_at).toLocaleDateString('tr-TR')}
-                        </small>
-                    </div>
-                </div>
-            `).join('');
-
-            console.log('✅ Son siparişler yüklendi:', orders.length);
-
-        } catch (error) {
-            console.error('❌ Son siparişler yükleme hatası:', error);
-            const container = document.getElementById('recentCustomerOrders');
-            container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+        if (error) {
+            console.error('❌ İstatistik sorgu hatası:', error);
+            this.showDemoStats();
+            return;
         }
+
+        // UI güncelleme
+        if (orders && orders.length > 0) {
+            const totalOrders = orders.length;
+            const pendingOrders = orders.filter(order => 
+                ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(order.status)
+            ).length;
+            
+            const totalSpent = orders.reduce((sum, order) => 
+                sum + parseFloat(order.total_amount || 0), 0
+            );
+
+            document.getElementById('totalOrders').textContent = totalOrders;
+            document.getElementById('pendingOrders').textContent = pendingOrders;
+            
+            console.log('✅ İstatistikler yüklendi:', { 
+                total: totalOrders, 
+                pending: pendingOrders,
+                spent: totalSpent 
+            });
+        } else {
+            console.log('ℹ️ Hiç sipariş bulunamadı');
+            this.showDemoStats();
+        }
+
+    } catch (error) {
+        console.error('❌ Müşteri istatistik yükleme hatası:', error);
+        this.showDemoStats();
     }
+}
 
-    async loadCustomerOrders() {
-        // Siparişler bölümünü yükle
-        const section = document.getElementById('customerOrdersSection');
-        if (!section) return;
+async loadRecentCustomerOrders() {
+    try {
+        console.log('📦 Son siparişler yükleniyor...');
+        
+        if (!this.supabase || !this.customerData || !this.customerData.id) {
+            this.showNoOrdersMessage('Sistem hazır değil.');
+            return;
+        }
 
-        section.innerHTML = `
-            <div class="section-header">
-                <h2>Siparişlerim</h2>
-            </div>
-            <div class="card">
-                <div class="card-body">
-                    <div id="customerOrdersList">
-                        <div class="loading-spinner">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <p>Siparişler yükleniyor...</p>
+        // Orders tablosundan son siparişleri getir
+        const { data: orders, error } = await this.supabase
+            .from('orders')
+            .select(`
+                id,
+                total_amount,
+                status,
+                created_at,
+                delivery_address,
+                customer_name,
+                customer_phone,
+                seller_id
+            `)
+            .eq('customer_id', this.customerData.id)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+        const container = document.getElementById('recentCustomerOrders');
+        
+        if (error) {
+            console.error('❌ Sipariş sorgu hatası:', error);
+            this.showNoOrdersMessage('Siparişler yüklenirken hata oluştu.');
+            return;
+        }
+
+        if (!orders || orders.length === 0) {
+            this.showNoOrdersMessage('Henüz siparişiniz bulunmuyor.');
+            return;
+        }
+
+        // Seller isimlerini almak için ayrı sorgu
+        const sellerIds = orders.map(order => order.seller_id).filter(id => id);
+        let sellers = {};
+        
+        if (sellerIds.length > 0) {
+            const { data: sellersData } = await this.supabase
+                .from('seller_profiles')
+                .select('id, business_name')
+                .in('id', sellerIds);
+            
+            if (sellersData) {
+                sellersData.forEach(seller => {
+                    sellers[seller.id] = seller.business_name;
+                });
+            }
+        }
+
+        container.innerHTML = orders.map(order => `
+            <div class="order-item" style="border-bottom: 1px solid #eee; padding: 15px 0;">
+                <div class="order-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <strong>Sipariş #${order.id.slice(-8)}</strong>
+                        <div style="color: #666; font-size: 12px; margin-top: 2px;">
+                            ${sellers[order.seller_id] || order.customer_name || 'Müşteri'}
                         </div>
                     </div>
+                    <span class="status-badge status-${order.status}">
+                        ${this.getStatusText(order.status)}
+                    </span>
+                </div>
+                ${order.delivery_address ? `
+                    <div style="color: #666; font-size: 12px; margin: 5px 0;">
+                        <i class="fas fa-map-marker-alt"></i> ${order.delivery_address}
+                    </div>
+                ` : ''}
+                <div class="order-footer" style="display: flex; justify-content: space-between; margin-top: 8px;">
+                    <span style="font-weight: bold; color: var(--primary);">
+                        ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
+                    </span>
+                    <small style="color: #999;">
+                        ${new Date(order.created_at).toLocaleDateString('tr-TR')}
+                    </small>
                 </div>
             </div>
-        `;
+        `).join('');
 
-        await this.loadAllCustomerOrders();
+        console.log('✅ Son siparişler yüklendi:', orders.length);
+
+    } catch (error) {
+        console.error('❌ Son siparişler yükleme hatası:', error);
+        this.showNoOrdersMessage('Siparişler yüklenirken hata oluştu.');
     }
+}
 
-    async loadAllCustomerOrders() {
-        try {
-            const { data: orders, error } = await this.supabase
-                .from('orders')
-                .select(`
-                    *,
-                    order_details(*),
-                    seller:seller_profiles(business_name, phone),
-                    courier:couriers(full_name, phone)
-                `)
-                .eq('customer_id', this.customerData.id)
-                .order('created_at', { ascending: false });
-
-            this.orders = orders || [];
-            this.renderCustomerOrders(this.orders);
-
-        } catch (error) {
-            console.error('Siparişler yükleme hatası:', error);
+async loadAllCustomerOrders() {
+    try {
+        console.log('📋 Tüm siparişler yükleniyor...');
+        
+        if (!this.supabase || !this.customerData || !this.customerData.id) {
             const container = document.getElementById('customerOrdersList');
-            container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+            container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
+            return;
         }
-    }
 
+        // Orders tablosundan tüm siparişleri getir
+        const { data: orders, error } = await this.supabase
+            .from('orders')
+            .select(`
+                *,
+                seller:seller_profiles(business_name, phone),
+                courier:couriers(full_name, phone)
+            `)
+            .eq('customer_id', this.customerData.id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('❌ Siparişler sorgu hatası:', error);
+            throw error;
+        }
+
+        this.orders = orders || [];
+        this.renderCustomerOrders(this.orders);
+        console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
+
+    } catch (error) {
+        console.error('❌ Siparişler yükleme hatası:', error);
+        const container = document.getElementById('customerOrdersList');
+        container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+    }
+}
     renderCustomerOrders(orders) {
         const container = document.getElementById('customerOrdersList');
         
