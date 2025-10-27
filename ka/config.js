@@ -1,9 +1,9 @@
-// Configuration File - Tüm sistem ayarları burada
+// Configuration File - Vercel Environment Variables ile
 const CONFIG = {
-    // Supabase configuration
+    // Supabase configuration - Vercel env variables
     SUPABASE: {
-        url: "https://xliutvspwodhoaxvysks.supabase.co",
-        key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w"
+        url: process.env.SUPABASE_URL || "https://xliutvspwodhoaxvysks.supabase.co",
+        key: process.env.SUPABASE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzM1ODI5OSwiZXhwIjoyMDcyOTM0Mjk5fQ.WQ8gtJD1hRUGL0L7uQ9ApfKFEyhDUZjQ8Vs0A7g6udo"
     },
     
     // System constants
@@ -45,55 +45,58 @@ const CONFIG = {
     }
 };
 
-// Supabase client initialization - DOM hazır olduğunda
+// Vercel environment detection
+function getVercelEnvironment() {
+    return process.env.NODE_ENV || 'development';
+}
+
+// Supabase client initialization for Vercel
 function initializeSupabase() {
     try {
-        // Supabase SDK'nın yüklü olduğundan emin ol
-        if (typeof window.supabase !== 'undefined') {
-            const client = window.supabase.createClient(CONFIG.SUPABASE.url, CONFIG.SUPABASE.key, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true
-                },
-                global: {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'apikey': CONFIG.SUPABASE.key
-                    }
-                }
-            });
-            
-            window.SUPABASE_CLIENT = client;
-            window.CONFIG = CONFIG;
-            
-            console.log('✅ Supabase client başarıyla başlatıldı');
-            return client;
-        } else {
-            console.error('❌ Supabase SDK bulunamadı! CDN yüklü mü?');
+        const environment = getVercelEnvironment();
+        console.log(`🚀 ${environment} ortamında başlatılıyor...`);
+        
+        // Supabase SDK kontrolü
+        if (typeof window.supabase === 'undefined') {
+            console.error('❌ Supabase SDK bulunamadı!');
             return null;
         }
+
+        const client = window.supabase.createClient(CONFIG.SUPABASE.url, CONFIG.SUPABASE.key, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: true
+            },
+            global: {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'apikey': CONFIG.SUPABASE.key
+                }
+            }
+        });
+
+        console.log('✅ Supabase client başarıyla başlatıldı');
+        console.log('📍 URL:', CONFIG.SUPABASE.url);
+        console.log('🔐 Ortam:', environment);
+        
+        return client;
+        
     } catch (error) {
         console.error('❌ Supabase client başlatma hatası:', error);
         return null;
     }
 }
 
-// Sayfa yüklendiğinde otomatik başlat
-document.addEventListener('DOMContentLoaded', function() {
-    const client = initializeSupabase();
-    
-    if (!client) {
-        // 2. deneme - kısa bir gecikmeyle
-        setTimeout(() => {
-            const retryClient = initializeSupabase();
-            if (!retryClient) {
-                console.error('❌ Supabase client başlatılamadı!');
-            }
-        }, 500);
-    }
-});
-
-// Hemen çalıştır (DOMContentLoaded beklemek istemiyorsanız)
-window.SUPABASE_CLIENT = initializeSupabase();
+// Global değişkenleri ayarla
 window.CONFIG = CONFIG;
+window.SUPABASE_CLIENT = initializeSupabase();
+
+// Hata durumu için fallback
+if (!window.SUPABASE_CLIENT) {
+    console.warn('⚠️ İlk başlatma başarısız, 2. deneme yapılıyor...');
+    setTimeout(() => {
+        window.SUPABASE_CLIENT = initializeSupabase();
+    }, 1000);
+}
