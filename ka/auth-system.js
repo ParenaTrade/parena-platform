@@ -1,12 +1,90 @@
 // WhatsApp Doğrulamalı Auth System - Tüm kullanıcılar için
+class PasswordManager {
+    constructor() {
+        this.SALT_LENGTH = 16;
+    }
+
+    // Rastgele salt oluştur
+    generateSalt() {
+        const array = new Uint8Array(this.SALT_LENGTH);
+        crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Şifreyi hash'le (async - tarayıcıda çalışır)
+    async hashPassword(password, salt = null) {
+        const actualSalt = salt || this.generateSalt();
+        
+        // TextEncoder ile password'u encode et
+        const encoder = new TextEncoder();
+        const passwordBuffer = encoder.encode(password);
+        
+        // Salt'ı Uint8Array'e çevir
+        const saltBuffer = encoder.encode(actualSalt);
+        
+        // Password + salt birleştir
+        const combinedBuffer = new Uint8Array(passwordBuffer.length + saltBuffer.length);
+        combinedBuffer.set(passwordBuffer);
+        combinedBuffer.set(saltBuffer, passwordBuffer.length);
+        
+        // SHA-256 hash
+        const hashBuffer = await crypto.subtle.digest('SHA-256', combinedBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        return {
+            hash: hashHex,
+            salt: actualSalt
+        };
+    }
+
+    // Şifreyi doğrula
+    async verifyPassword(password, storedHash, storedSalt) {
+        try {
+            const { hash } = await this.hashPassword(password, storedSalt);
+            return hash === storedHash;
+        } catch (error) {
+            console.error('Şifre doğrulama hatası:', error);
+            return false;
+        }
+    }
+
+    // Şifre güçlülüğünü kontrol et
+    validatePasswordStrength(password) {
+        const minLength = 6;
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumbers = /\d/.test(password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+        if (password.length < minLength) {
+            return { isValid: false, message: 'Şifre en az 6 karakter olmalıdır' };
+        }
+
+        // Güçlü şifre için öneriler (opsiyonel)
+        const strengthScore = [hasUpperCase, hasLowerCase, hasNumbers, hasSpecialChar]
+            .filter(Boolean).length;
+
+        if (strengthScore >= 3) {
+            return { isValid: true, message: 'Güçlü şifre' };
+        } else {
+            return { 
+                isValid: true, 
+                message: 'Şifrenizi güçlendirmek için büyük/küçük harf, rakam ve özel karakter kullanın' 
+            };
+        }
+    }
+}
+
 class AuthSystem {
     constructor() {
         this.currentUser = null;
         this.userProfile = null;
-        this.userType = 'customer'; // customer, seller, courier
-        this.authMethod = 'password'; // password, whatsapp
+        this.userType = 'customer';
+        this.authMethod = 'password';
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
+        this.passwordManager = new PasswordManager();
         this.verificationData = null;
         this.countdownInterval = null;
         this.resendTimer = null;
@@ -331,19 +409,29 @@ class AuthSystem {
             return;
         }
 
+        // Şifre güçlülük kontrolü
+        const strengthCheck = this.passwordManager.validatePasswordStrength(password);
+        if (!strengthCheck.isValid) {
+            this.showAlert(strengthCheck.message, 'error');
+            return;
+        }
+
         try {
             console.log(`📝 ${this.userType} kaydı:`, { name, phone });
-            
+
+            // Şifreyi hash'le
+            const { hash, salt } = await this.passwordManager.hashPassword(password);
+
             let userData;
             switch(this.userType) {
                 case 'customer':
-                    userData = await this.registerCustomer(name, phone, password);
+                    userData = await this.registerCustomer(name, phone, hash, salt);
                     break;
                 case 'seller':
-                    userData = await this.registerSeller(name, phone, password);
+                    userData = await this.registerSeller(name, phone, hash, salt);
                     break;
                 case 'courier':
-                    userData = await this.registerCourier(name, phone, password);
+                    userData = await this.registerCourier(name, phone, hash, salt);
                     break;
             }
 
@@ -593,25 +681,6 @@ class AuthSystem {
         // Simüle edilmiş API çağrısı
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Entegrasyon hazır olduğunda bu kodu açabilirsiniz:
-        /*
-        const response = await fetch('/api/send-whatsapp-otp', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                phone: phone,
-                code: code,
-                userType: this.userType
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('WhatsApp mesajı gönderilemedi');
-        }
-        */
-        
         // Geliştirme modunda kodu konsola yazdır
         if (this.config.environment === 'development') {
             console.log(`🔐 GELİŞTİRME MODU - OTP Kodu: ${code}`);
@@ -619,17 +688,7 @@ class AuthSystem {
         }
     }
 
-    // Diğer yardımcı fonksiyonlar...
-    redirectToIndex() {
-        // index.html sayfasına yönlendir
-        window.location.href = 'index.html';
-    }
-
-    // Mevcut veritabanı fonksiyonlarınız burada kalacak...
-    // verifyCustomerPassword, registerCustomer, handleCustomerLogin vb.
-    // ... (Önceki kodunuzdaki bu fonksiyonlar buraya gelecek)
-
-    // Örnek fonksiyonlar:
+    // Veritabanı İşlemleri - Hash + Salt ile
     async verifyCustomerPassword(phone, password) {
         const { data: customer, error } = await this.supabase
             .from('customers')
@@ -637,30 +696,101 @@ class AuthSystem {
             .eq('phone', phone)
             .single();
 
-        if (error) throw new Error('Müşteri bulunamadı');
-        if (!customer.password || customer.password !== this.hashPassword(password)) {
+        if (error) {
+            throw new Error('Müşteri bulunamadı');
+        }
+
+        // Demo kayıt kontrolü - demo şifresiyle girişe izin ver
+        if (customer.password_hash === 'demo_hash_123' && password === 'demo123') {
+            console.log('✅ Demo kayıt ile giriş yapıldı');
+            return customer;
+        }
+
+        // Normal şifre doğrulama
+        const isValid = await this.passwordManager.verifyPassword(
+            password, 
+            customer.password_hash, 
+            customer.password_salt
+        );
+
+        if (!isValid) {
             throw new Error('Şifre hatalı');
         }
+
         return customer;
     }
 
-    async registerCustomer(name, phone, password) {
+    async verifySellerPassword(phone, password) {
+        const { data: seller, error } = await this.supabase
+            .from('seller_profiles')
+            .select('*')
+            .eq('phone', phone)
+            .single();
+
+        if (error) throw new Error('Satıcı bulunamadı');
+
+        // Demo kayıt kontrolü
+        if (seller.password_hash === 'demo_hash_123' && password === 'demo123') {
+            console.log('✅ Demo satıcı ile giriş yapıldı');
+            return seller;
+        }
+
+        const isValid = await this.passwordManager.verifyPassword(
+            password, 
+            seller.password_hash, 
+            seller.password_salt
+        );
+
+        if (!isValid) throw new Error('Şifre hatalı');
+        return seller;
+    }
+
+    async verifyCourierPassword(phone, password) {
+        const { data: courier, error } = await this.supabase
+            .from('couriers')
+            .select('*')
+            .eq('phone', phone)
+            .single();
+
+        if (error) throw new Error('Kurye bulunamadı');
+
+        // Demo kayıt kontrolü
+        if (courier.password_hash === 'demo_hash_123' && password === 'demo123') {
+            console.log('✅ Demo kurye ile giriş yapıldı');
+            return courier;
+        }
+
+        const isValid = await this.passwordManager.verifyPassword(
+            password, 
+            courier.password_hash, 
+            courier.password_salt
+        );
+
+        if (!isValid) throw new Error('Şifre hatalı');
+        return courier;
+    }
+
+    async registerCustomer(name, phone, passwordHash, passwordSalt) {
         const { data: existingCustomer } = await this.supabase
             .from('customers')
             .select('id')
             .eq('phone', phone)
             .single();
 
-        if (existingCustomer) throw new Error('Bu telefon numarası zaten kayıtlı');
+        if (existingCustomer) {
+            throw new Error('Bu telefon numarası zaten kayıtlı');
+        }
 
         const newCustomer = {
             name: name,
             phone: phone,
-            password: this.hashPassword(password),
+            password_hash: passwordHash,
+            password_salt: passwordSalt,
             role: 'üye',
             customer_type: 'Market Müşterisi',
             status: 'active',
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
 
         const { data: customer, error } = await this.supabase
@@ -671,6 +801,67 @@ class AuthSystem {
 
         if (error) throw error;
         return customer;
+    }
+
+    async registerSeller(name, phone, passwordHash, passwordSalt) {
+        const { data: existingSeller } = await this.supabase
+            .from('seller_profiles')
+            .select('id')
+            .eq('phone', phone)
+            .single();
+
+        if (existingSeller) {
+            throw new Error('Bu telefon numarası zaten kayıtlı');
+        }
+
+        const newSeller = {
+            business_name: name,
+            phone: phone,
+            password_hash: passwordHash,
+            password_salt: passwordSalt,
+            status: false,
+            created_at: new Date().toISOString()
+        };
+
+        const { data: seller, error } = await this.supabase
+            .from('seller_profiles')
+            .insert([newSeller])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return seller;
+    }
+
+    async registerCourier(name, phone, passwordHash, passwordSalt) {
+        const { data: existingCourier } = await this.supabase
+            .from('couriers')
+            .select('id')
+            .eq('phone', phone)
+            .single();
+
+        if (existingCourier) {
+            throw new Error('Bu telefon numarası zaten kayıtlı');
+        }
+
+        const newCourier = {
+            full_name: name,
+            phone: phone,
+            password_hash: passwordHash,
+            password_salt: passwordSalt,
+            status: 'inactive',
+            vehicle_type: 'motorcycle',
+            created_at: new Date().toISOString()
+        };
+
+        const { data: courier, error } = await this.supabase
+            .from('couriers')
+            .insert([newCourier])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return courier;
     }
 
     async completeUserLogin(phone, name, userType) {
@@ -716,6 +907,8 @@ class AuthSystem {
             const newCustomer = {
                 name: name || 'Müşteri',
                 phone: phone,
+                password_hash: 'temp_hash', // WhatsApp login'de şifre gerekmez
+                password_salt: 'temp_salt',
                 role: 'üye',
                 customer_type: 'Market Müşterisi',
                 status: 'active',
@@ -736,9 +929,7 @@ class AuthSystem {
         return customer;
     }
 
-    // Diğer handle fonksiyonları...
     async handleSellerLogin(phone, name) {
-        // Satıcı login/kayıt işlemleri
         let { data: seller, error } = await this.supabase
             .from('seller_profiles')
             .select('*')
@@ -753,6 +944,8 @@ class AuthSystem {
             const newSeller = {
                 business_name: name ? `${name} İşletmesi` : 'Yeni İşletme',
                 phone: phone,
+                password_hash: 'temp_hash',
+                password_salt: 'temp_salt',
                 status: false,
                 created_at: new Date().toISOString()
             };
@@ -771,7 +964,6 @@ class AuthSystem {
     }
 
     async handleCourierLogin(phone, name) {
-        // Kurye login/kayıt işlemleri
         let { data: courier, error } = await this.supabase
             .from('couriers')
             .select('*')
@@ -786,6 +978,8 @@ class AuthSystem {
             const newCourier = {
                 full_name: name || 'Kurye',
                 phone: phone,
+                password_hash: 'temp_hash',
+                password_salt: 'temp_salt',
                 status: 'inactive',
                 vehicle_type: 'motorcycle',
                 created_at: new Date().toISOString()
@@ -804,10 +998,7 @@ class AuthSystem {
         return courier;
     }
 
-    hashPassword(password) {
-        return btoa(unescape(encodeURIComponent(password)));
-    }
-
+    // Yardımcı Fonksiyonlar
     cleanPhoneNumber(phone) {
         return phone.replace(/\D/g, '');
     }
@@ -836,6 +1027,10 @@ class AuthSystem {
         };
 
         console.log(`✅ ${userType} oturumu oluşturuldu:`, sessionData);
+    }
+
+    redirectToIndex() {
+        window.location.href = 'index.html';
     }
 
     async checkExistingSession() {
