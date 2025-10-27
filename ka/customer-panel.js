@@ -4,18 +4,17 @@ class CustomerPanel {
         this.customerData = null;
         this.orders = [];
         this.currentSection = '';
+        this.isDataLoaded = false; // Yeni: veri yüklendi mi?
         
         // Supabase client'ını config'den al
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
         
         console.log('👤 CustomerPanel başlatılıyor...');
-        console.log('Supabase:', this.supabase ? '✅ Var' : '❌ Yok');
-        console.log('Config:', this.config ? '✅ Var' : '❌ Yok');
+        console.log('User Profile:', this.userProfile);
         
         if (!this.supabase) {
             console.error('❌ Supabase client bulunamadı!');
-            // Fallback: global supabase kullan
             this.supabase = window.supabase;
         }
         
@@ -24,6 +23,8 @@ class CustomerPanel {
 
     async init() {
         await this.loadCustomerData();
+        this.isDataLoaded = true;
+        console.log('✅ CustomerPanel başlatma tamamlandı');
     }
 
     async loadCustomerData() {
@@ -36,6 +37,17 @@ class CustomerPanel {
                 return;
             }
 
+            // Önce userProfile'dan temel bilgileri al
+            this.customerData = {
+                id: this.userProfile.id,
+                name: this.userProfile.full_name || this.userProfile.name || 'Müşteri',
+                phone: this.userProfile.phone,
+                email: this.userProfile.email,
+                bonus_balance: this.userProfile.bonus_balance || 0
+            };
+
+            console.log('🔍 Customers tablosu aranıyor...');
+
             // Customers tablosundan müşteri bilgilerini yükle
             const { data, error } = await this.supabase
                 .from('customers')
@@ -44,16 +56,36 @@ class CustomerPanel {
                 .single();
 
             if (error) {
-                console.warn('⚠️ Müşteri profili yüklenemedi:', error);
+                if (error.code === 'PGRST116') {
+                    console.warn('⚠️ Müşteri kaydı bulunamadı, user profile kullanılıyor');
+                } else {
+                    console.warn('⚠️ Müşteri sorgu hatası:', error);
+                }
                 // Fallback: userProfile'ı kullan
-                this.customerData = this.userProfile;
-            } else {
-                this.customerData = data;
-                console.log('✅ Müşteri verisi yüklendi:', data.name);
+                return;
             }
+
+            if (data) {
+                // Customers tablosundan gelen verilerle birleştir
+                this.customerData = {
+                    ...this.customerData,
+                    ...data,
+                    name: data.name || this.customerData.name,
+                    bonus_balance: data.bonus_balance || this.customerData.bonus_balance
+                };
+                console.log('✅ Müşteri verisi yüklendi:', this.customerData.name);
+            }
+
         } catch (error) {
             console.error('❌ Müşteri verisi yükleme hatası:', error);
-            this.customerData = this.userProfile;
+            // Fallback: en azından userProfile ile devam et
+            this.customerData = {
+                id: this.userProfile.id,
+                name: this.userProfile.full_name || this.userProfile.name || 'Müşteri',
+                phone: this.userProfile.phone,
+                email: this.userProfile.email,
+                bonus_balance: this.userProfile.bonus_balance || 0
+            };
         }
     }
 
@@ -62,11 +94,27 @@ class CustomerPanel {
         
         console.log(`📂 Section yükleniyor: ${sectionName}`);
         
+        // Veri yüklenene kadar bekle
+        if (!this.isDataLoaded) {
+            console.log('⏳ Veri yükleniyor, bekleniyor...');
+            await this.waitForData();
+        }
+        
         // Supabase kontrolü
         if (!this.supabase) {
             console.error('❌ Supabase client yok, section yüklenemiyor');
+            this.showError(sectionName, 'Sistem hazır değil');
             return;
         }
+        
+        // customerData kontrolü
+        if (!this.customerData || !this.customerData.id) {
+            console.error('❌ Müşteri verisi yok, section yüklenemiyor');
+            this.showError(sectionName, 'Müşteri bilgileri yüklenemedi');
+            return;
+        }
+        
+        console.log(`✅ Section yükleniyor: ${sectionName}, Müşteri ID: ${this.customerData.id}`);
         
         switch (sectionName) {
             case 'customerDashboard':
@@ -87,87 +135,34 @@ class CustomerPanel {
         }
     }
 
-    // EKSİK METODU EKLE
-    async loadCustomerProfile() {
-        const section = document.getElementById('customerProfileSection');
-        if (!section) return;
-
-        section.innerHTML = `
-            <div class="section-header">
-                <h2>Profil Bilgilerim</h2>
-            </div>
-            <div class="card">
-                <div class="card-body">
-                    <form id="customerProfileForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerName">Ad Soyad</label>
-                                <input type="text" id="customerName" class="form-control" 
-                                       value="${this.customerData?.full_name || this.customerData?.name || ''}">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerPhone">Telefon</label>
-                                <input type="text" id="customerPhone" class="form-control" 
-                                       value="${this.customerData?.phone || ''}">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerEmail">E-posta</label>
-                                <input type="email" id="customerEmail" class="form-control" 
-                                       value="${this.customerData?.email || ''}">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerBonus">Bonus Bakiyesi</label>
-                                <input type="text" id="customerBonus" class="form-control" 
-                                       value="${this.customerData?.bonus_balance || 0} ₺" readonly>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Bilgileri Güncelle
-                        </button>
-                    </form>
-                </div>
-            </div>
-        `;
-
-        // Form submit eventini ekle
-        const form = document.getElementById('customerProfileForm');
-        if (form) {
-            form.addEventListener('submit', (e) => this.updateCustomerProfile(e));
+    // Veri yüklenene kadar bekleyen yardımcı metod
+    async waitForData() {
+        const maxWaitTime = 5000; // 5 saniye
+        const startTime = Date.now();
+        
+        while (!this.isDataLoaded && (Date.now() - startTime) < maxWaitTime) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        if (!this.isDataLoaded) {
+            console.warn('⚠️ Veri yüklenme zaman aşımına uğradı');
         }
     }
 
-    async updateCustomerProfile(e) {
-        e.preventDefault();
-        
-        const name = document.getElementById('customerName').value;
-        const phone = document.getElementById('customerPhone').value;
-        const email = document.getElementById('customerEmail').value;
-
-        try {
-            const { error } = await supabase
-                .from('customers')
-                .update({
-                    name: name,
-                    phone: phone,
-                    email: email,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', this.customerData.id);
-
-            if (error) throw error;
-
-            window.panelSystem.showAlert('Profil bilgileriniz güncellendi!', 'success');
-            
-            // Yerel veriyi güncelle
-            this.customerData.name = name;
-            this.customerData.phone = phone;
-            this.customerData.email = email;
-
-        } catch (error) {
-            console.error('Profil güncelleme hatası:', error);
-            window.panelSystem.showAlert('Profil güncellenemedi!', 'error');
+    // Hata durumunda gösterilecek mesaj
+    showError(sectionName, message) {
+        const section = document.getElementById(`${sectionName}Section`);
+        if (section) {
+            section.innerHTML = `
+                <div class="error-message" style="text-align: center; padding: 40px; color: #666;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #ffc107; margin-bottom: 20px;"></i>
+                    <h3>${message}</h3>
+                    <p>Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.</p>
+                    <button class="btn btn-primary" onclick="location.reload()">
+                        <i class="fas fa-redo"></i> Sayfayı Yenile
+                    </button>
+                </div>
+            `;
         }
     }
 
@@ -178,8 +173,11 @@ class CustomerPanel {
             return;
         }
 
+        // Müşteri adını güvenli şekilde al
+        const customerName = this.customerData?.name || this.customerData?.full_name || 'Müşteri';
+
         section.innerHTML = `
-            <h1>Hoş Geldiniz, ${this.customerData?.full_name || this.customerData?.name || 'Müşteri'}!</h1>
+            <h1>Hoş Geldiniz, ${customerName}!</h1>
             <p class="subtitle">Hesap özetiniz ve son işlemleriniz</p>
             
             <div class="stats-grid">
@@ -240,10 +238,18 @@ class CustomerPanel {
         try {
             console.log('📊 Müşteri istatistikleri yükleniyor...');
             
+            // Güvenlik kontrolleri
             if (!this.supabase) {
                 console.error('❌ Supabase client yok!');
                 return;
             }
+
+            if (!this.customerData || !this.customerData.id) {
+                console.error('❌ Müşteri ID yok!');
+                return;
+            }
+
+            console.log(`🔍 Siparişler aranıyor, Müşteri ID: ${this.customerData.id}`);
 
             // Sipariş istatistiklerini yükle
             const { data: orders, error } = await this.supabase
@@ -256,20 +262,31 @@ class CustomerPanel {
                 return;
             }
 
+            // UI güncelleme
             if (orders) {
-                document.getElementById('totalOrders').textContent = orders.length;
-                
+                const totalOrders = orders.length;
                 const pendingOrders = orders.filter(order => 
                     ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(order.status)
                 ).length;
+
+                document.getElementById('totalOrders').textContent = totalOrders;
                 document.getElementById('pendingOrders').textContent = pendingOrders;
                 
-                console.log('✅ İstatistikler yüklendi:', { total: orders.length, pending: pendingOrders });
+                console.log('✅ İstatistikler yüklendi:', { total: totalOrders, pending: pendingOrders });
+            } else {
+                console.log('ℹ️ Hiç sipariş bulunamadı');
+                document.getElementById('totalOrders').textContent = '0';
+                document.getElementById('pendingOrders').textContent = '0';
             }
+
         } catch (error) {
             console.error('❌ Müşteri istatistik yükleme hatası:', error);
+            // Hata durumunda sıfırları göster
+            document.getElementById('totalOrders').textContent = '0';
+            document.getElementById('pendingOrders').textContent = '0';
         }
     }
+
 
     async loadRecentCustomerOrders() {
         try {
