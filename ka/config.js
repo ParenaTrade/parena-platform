@@ -1,23 +1,23 @@
-// Configuration File - Vercel Environment Variables ile
+// Configuration File - Vercel Environment Variables için optimize
 const CONFIG = {
     // Supabase configuration - Vercel env variables
     SUPABASE: {
-        url: process.env.SUPABASE_URL || "https://xliutvspwodhoaxvysks.supabase.co",
-        key: process.env.SUPABASE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzM1ODI5OSwiZXhwIjoyMDcyOTM0Mjk5fQ.WQ8gtJD1hRUGL0L7uQ9ApfKFEyhDUZjQ8Vs0A7g6udo"
+        // Vercel'de process.env, browser'da ise fallback değerler kullanılacak
+        url: typeof process !== 'undefined' && process.env ? process.env.SUPABASE_URL : "https://xliutvspwodhoaxvysks.supabase.co",
+        key: typeof process !== 'undefined' && process.env ? process.env.SUPABASE_KEY : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzM1ODI5OSwiZXhwIjoyMDcyOTM0Mjk5fQ.WQ8gtJD1hRUGL0L7uQ9ApfKFEyhDUZjQ8Vs0A7g6udo"
     },
     
     // System constants
     SYSTEM: {
-        ORDER_TIMEOUT: 10 * 60 * 1000, // 10 minutes
-        MAX_DELIVERY_DISTANCE: 10, // km
-        COMMISSION_RATE: 0.15, // 15%
+        ORDER_TIMEOUT: 10 * 60 * 1000,
+        MAX_DELIVERY_DISTANCE: 10,
+        COMMISSION_RATE: 0.15,
         COURIER_BASE_FEE: 15.00,
         CURRENCY: 'TRY',
         AUTO_ASSIGN_COURIER: true,
         NOTIFICATION_SOUND: true
     },
     
-    // Order status constants
     ORDER_STATUS: {
         PENDING: 'pending',
         CONFIRMED: 'confirmed',
@@ -28,7 +28,6 @@ const CONFIG = {
         CANCELLED: 'cancelled'
     },
     
-    // User roles
     ROLES: {
         ADMIN: 'admin',
         SELLER: 'seller',
@@ -37,7 +36,6 @@ const CONFIG = {
         MEMBER: 'üye'
     },
     
-    // Payment methods
     PAYMENT_METHODS: {
         CASH: 'cash',
         CREDIT_CARD: 'credit_card',
@@ -45,16 +43,28 @@ const CONFIG = {
     }
 };
 
-// Vercel environment detection
-function getVercelEnvironment() {
-    return process.env.NODE_ENV || 'development';
+// Browser ortamı kontrolü
+function isBrowser() {
+    return typeof window !== 'undefined';
 }
 
-// Supabase client initialization for Vercel
+// Vercel environment detection
+function getEnvironment() {
+    if (isBrowser()) {
+        // Browser'da URL'den kontrol
+        const hostname = window.location.hostname;
+        if (hostname.includes('vercel.app') || hostname.includes('localhost')) {
+            return hostname.includes('localhost') ? 'development' : 'production';
+        }
+    }
+    return 'production';
+}
+
+// Supabase client initialization
 function initializeSupabase() {
     try {
-        const environment = getVercelEnvironment();
-        console.log(`🚀 ${environment} ortamında başlatılıyor...`);
+        const environment = getEnvironment();
+        console.log(`🌍 Ortam: ${environment}`);
         
         // Supabase SDK kontrolü
         if (typeof window.supabase === 'undefined') {
@@ -62,7 +72,19 @@ function initializeSupabase() {
             return null;
         }
 
-        const client = window.supabase.createClient(CONFIG.SUPABASE.url, CONFIG.SUPABASE.key, {
+        // URL ve key'leri al
+        const supabaseUrl = CONFIG.SUPABASE.url;
+        const supabaseKey = CONFIG.SUPABASE.key;
+        
+        console.log(`🔗 Supabase URL: ${supabaseUrl ? '✅' : '❌'}`);
+        console.log(`🔑 Supabase Key: ${supabaseKey ? '✅' : '❌'}`);
+
+        if (!supabaseUrl || !supabaseKey) {
+            console.error('❌ Supabase URL veya Key bulunamadı!');
+            return null;
+        }
+
+        const client = window.supabase.createClient(supabaseUrl, supabaseKey, {
             auth: {
                 persistSession: true,
                 autoRefreshToken: true,
@@ -72,14 +94,15 @@ function initializeSupabase() {
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                    'apikey': CONFIG.SUPABASE.key
+                    'apikey': supabaseKey
                 }
             }
         });
 
         console.log('✅ Supabase client başarıyla başlatıldı');
-        console.log('📍 URL:', CONFIG.SUPABASE.url);
-        console.log('🔐 Ortam:', environment);
+        
+        // Test connection
+        testConnection(client);
         
         return client;
         
@@ -89,14 +112,44 @@ function initializeSupabase() {
     }
 }
 
-// Global değişkenleri ayarla
-window.CONFIG = CONFIG;
-window.SUPABASE_CLIENT = initializeSupabase();
+// Bağlantı testi
+async function testConnection(client) {
+    try {
+        const { data, error } = await client.from('profiles').select('count').limit(1);
+        if (error) {
+            console.warn('⚠️ Bağlantı testi hatası:', error.message);
+        } else {
+            console.log('🔌 Bağlantı testi başarılı');
+        }
+    } catch (testError) {
+        console.warn('⚠️ Bağlantı testi başarısız:', testError.message);
+    }
+}
 
-// Hata durumu için fallback
-if (!window.SUPABASE_CLIENT) {
-    console.warn('⚠️ İlk başlatma başarısız, 2. deneme yapılıyor...');
-    setTimeout(() => {
+// Sayfa yüklendiğinde başlat
+if (isBrowser()) {
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 DOM hazır, Supabase başlatılıyor...');
+        window.CONFIG = CONFIG;
         window.SUPABASE_CLIENT = initializeSupabase();
-    }, 1000);
+        
+        // Global değişkenleri kontrol et
+        if (!window.SUPABASE_CLIENT) {
+            console.warn('⚠️ İlk başlatma başarısız, 2. deneme yapılıyor...');
+            setTimeout(() => {
+                window.SUPABASE_CLIENT = initializeSupabase();
+                if (window.SUPABASE_CLIENT) {
+                    console.log('✅ 2. deneme başarılı');
+                } else {
+                    console.error('❌ Supabase başlatılamadı!');
+                }
+            }, 2000);
+        }
+    });
+} else {
+    // Node.js ortamı (Vercel build sırasında)
+    console.log('🔨 Build ortamı - Config export ediliyor');
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = { CONFIG };
+    }
 }
