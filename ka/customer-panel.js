@@ -4,6 +4,21 @@ class CustomerPanel {
         this.customerData = null;
         this.orders = [];
         this.currentSection = '';
+        
+        // Supabase client'ını config'den al
+        this.supabase = window.SUPABASE_CLIENT;
+        this.config = window.CONFIG;
+        
+        console.log('👤 CustomerPanel başlatılıyor...');
+        console.log('Supabase:', this.supabase ? '✅ Var' : '❌ Yok');
+        console.log('Config:', this.config ? '✅ Var' : '❌ Yok');
+        
+        if (!this.supabase) {
+            console.error('❌ Supabase client bulunamadı!');
+            // Fallback: global supabase kullan
+            this.supabase = window.supabase;
+        }
+        
         this.init();
     }
 
@@ -13,22 +28,31 @@ class CustomerPanel {
 
     async loadCustomerData() {
         try {
+            console.log('📥 Müşteri verisi yükleniyor...');
+            
+            if (!this.supabase) {
+                console.error('❌ Supabase client yok!');
+                this.customerData = this.userProfile;
+                return;
+            }
+
             // Customers tablosundan müşteri bilgilerini yükle
-            const { data, error } = await supabase
+            const { data, error } = await this.supabase
                 .from('customers')
                 .select('*')
                 .eq('id', this.userProfile.id)
                 .single();
 
             if (error) {
-                console.warn('Müşteri profili yüklenemedi:', error);
+                console.warn('⚠️ Müşteri profili yüklenemedi:', error);
                 // Fallback: userProfile'ı kullan
                 this.customerData = this.userProfile;
             } else {
                 this.customerData = data;
+                console.log('✅ Müşteri verisi yüklendi:', data.name);
             }
         } catch (error) {
-            console.error('Müşteri verisi yükleme hatası:', error);
+            console.error('❌ Müşteri verisi yükleme hatası:', error);
             this.customerData = this.userProfile;
         }
     }
@@ -36,12 +60,20 @@ class CustomerPanel {
     async loadSectionData(sectionName) {
         this.currentSection = sectionName;
         
+        console.log(`📂 Section yükleniyor: ${sectionName}`);
+        
+        // Supabase kontrolü
+        if (!this.supabase) {
+            console.error('❌ Supabase client yok, section yüklenemiyor');
+            return;
+        }
+        
         switch (sectionName) {
             case 'customerDashboard':
                 await this.loadCustomerDashboard();
                 break;
             case 'customerProfile':
-                await this.loadCustomerProfile(); // BU METOD EKSİK
+                await this.loadCustomerProfile();
                 break;
             case 'customerOrders':
                 await this.loadCustomerOrders();
@@ -55,93 +87,12 @@ class CustomerPanel {
         }
     }
 
-    // EKSİK METODU EKLE
-    async loadCustomerProfile() {
-        const section = document.getElementById('customerProfileSection');
-        if (!section) return;
-
-        section.innerHTML = `
-            <div class="section-header">
-                <h2>Profil Bilgilerim</h2>
-            </div>
-            <div class="card">
-                <div class="card-body">
-                    <form id="customerProfileForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerName">Ad Soyad</label>
-                                <input type="text" id="customerName" class="form-control" 
-                                       value="${this.customerData?.full_name || this.customerData?.name || ''}">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerPhone">Telefon</label>
-                                <input type="text" id="customerPhone" class="form-control" 
-                                       value="${this.customerData?.phone || ''}">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerEmail">E-posta</label>
-                                <input type="email" id="customerEmail" class="form-control" 
-                                       value="${this.customerData?.email || ''}">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerBonus">Bonus Bakiyesi</label>
-                                <input type="text" id="customerBonus" class="form-control" 
-                                       value="${this.customerData?.bonus_balance || 0} ₺" readonly>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Bilgileri Güncelle
-                        </button>
-                    </form>
-                </div>
-            </div>
-        `;
-
-        // Form submit eventini ekle
-        const form = document.getElementById('customerProfileForm');
-        if (form) {
-            form.addEventListener('submit', (e) => this.updateCustomerProfile(e));
-        }
-    }
-
-    async updateCustomerProfile(e) {
-        e.preventDefault();
-        
-        const name = document.getElementById('customerName').value;
-        const phone = document.getElementById('customerPhone').value;
-        const email = document.getElementById('customerEmail').value;
-
-        try {
-            const { error } = await supabase
-                .from('customers')
-                .update({
-                    name: name,
-                    phone: phone,
-                    email: email,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', this.customerData.id);
-
-            if (error) throw error;
-
-            window.panelSystem.showAlert('Profil bilgileriniz güncellendi!', 'success');
-            
-            // Yerel veriyi güncelle
-            this.customerData.name = name;
-            this.customerData.phone = phone;
-            this.customerData.email = email;
-
-        } catch (error) {
-            console.error('Profil güncelleme hatası:', error);
-            window.panelSystem.showAlert('Profil güncellenemedi!', 'error');
-        }
-    }
-
     async loadCustomerDashboard() {
         const section = document.getElementById('customerDashboardSection');
-        if (!section) return;
+        if (!section) {
+            console.error('❌ customerDashboardSection bulunamadı!');
+            return;
+        }
 
         section.innerHTML = `
             <h1>Hoş Geldiniz, ${this.customerData?.full_name || this.customerData?.name || 'Müşteri'}!</h1>
@@ -203,28 +154,51 @@ class CustomerPanel {
 
     async loadCustomerStats() {
         try {
+            console.log('📊 Müşteri istatistikleri yükleniyor...');
+            
+            if (!this.supabase) {
+                console.error('❌ Supabase client yok!');
+                return;
+            }
+
             // Sipariş istatistiklerini yükle
-            const { data: orders, error } = await supabase
+            const { data: orders, error } = await this.supabase
                 .from('orders')
                 .select('id, status')
                 .eq('customer_id', this.customerData.id);
 
-            if (!error && orders) {
+            if (error) {
+                console.error('❌ İstatistik sorgu hatası:', error);
+                return;
+            }
+
+            if (orders) {
                 document.getElementById('totalOrders').textContent = orders.length;
                 
                 const pendingOrders = orders.filter(order => 
                     ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(order.status)
                 ).length;
                 document.getElementById('pendingOrders').textContent = pendingOrders;
+                
+                console.log('✅ İstatistikler yüklendi:', { total: orders.length, pending: pendingOrders });
             }
         } catch (error) {
-            console.error('Müşteri istatistik yükleme hatası:', error);
+            console.error('❌ Müşteri istatistik yükleme hatası:', error);
         }
     }
 
     async loadRecentCustomerOrders() {
         try {
-            const { data: orders, error } = await supabase
+            console.log('📦 Son siparişler yükleniyor...');
+            
+            if (!this.supabase) {
+                console.error('❌ Supabase client yok!');
+                const container = document.getElementById('recentCustomerOrders');
+                container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
+                return;
+            }
+
+            const { data: orders, error } = await this.supabase
                 .from('orders')
                 .select(`
                     id,
@@ -240,14 +214,20 @@ class CustomerPanel {
 
             const container = document.getElementById('recentCustomerOrders');
             
-            if (error || !orders || orders.length === 0) {
+            if (error) {
+                console.error('❌ Sipariş sorgu hatası:', error);
+                container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+                return;
+            }
+
+            if (!orders || orders.length === 0) {
                 container.innerHTML = '<p class="text-muted">Henüz siparişiniz bulunmuyor.</p>';
                 return;
             }
 
             container.innerHTML = orders.map(order => `
                 <div class="order-item" style="border-bottom: 1px solid #eee; padding: 15px 0;">
-                    <div class="order-header" style="display: flex; justify-content: between; align-items: center; margin-bottom: 8px;">
+                    <div class="order-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <div>
                             <strong>Sipariş #${order.id.slice(-8)}</strong>
                             <div style="color: #666; font-size: 12px; margin-top: 2px;">
@@ -269,15 +249,19 @@ class CustomerPanel {
                 </div>
             `).join('');
 
+            console.log('✅ Son siparişler yüklendi:', orders.length);
+
         } catch (error) {
-            console.error('Son siparişler yükleme hatası:', error);
+            console.error('❌ Son siparişler yükleme hatası:', error);
             const container = document.getElementById('recentCustomerOrders');
             container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
         }
     }
 
+    // Diğer metodları da aynı şekilde güncelleyin...
+    // loadCustomerOrders, loadCustomerProfile, vb. tüm metodlarda this.supabase kullanın
+
     async loadCustomerOrders() {
-        // Siparişler bölümünü yükle
         const section = document.getElementById('customerOrdersSection');
         if (!section) return;
 
@@ -302,7 +286,16 @@ class CustomerPanel {
 
     async loadAllCustomerOrders() {
         try {
-            const { data: orders, error } = await supabase
+            console.log('📋 Tüm siparişler yükleniyor...');
+            
+            if (!this.supabase) {
+                console.error('❌ Supabase client yok!');
+                const container = document.getElementById('customerOrdersList');
+                container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
+                return;
+            }
+
+            const { data: orders, error } = await this.supabase
                 .from('orders')
                 .select(`
                     *,
@@ -313,11 +306,17 @@ class CustomerPanel {
                 .eq('customer_id', this.customerData.id)
                 .order('created_at', { ascending: false });
 
+            if (error) {
+                console.error('❌ Siparişler sorgu hatası:', error);
+                throw error;
+            }
+
             this.orders = orders || [];
             this.renderCustomerOrders(this.orders);
+            console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
 
         } catch (error) {
-            console.error('Siparişler yükleme hatası:', error);
+            console.error('❌ Siparişler yükleme hatası:', error);
             const container = document.getElementById('customerOrdersList');
             container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
         }
