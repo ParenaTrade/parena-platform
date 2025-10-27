@@ -759,6 +759,7 @@ if (order.status === 'ready' && !order.courier_id) {
 
     return actions.join('');
 }
+      // Mevcut updateOrderStatus fonksiyonunu güncelle (opsiyonel - otomatik atama için)
     async updateOrderStatus(orderId, newStatus) {
         try {
             const { error } = await supabase
@@ -768,14 +769,24 @@ if (order.status === 'ready' && !order.courier_id) {
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', orderId);
-
+    
             if (error) throw error;
-
+    
+            // YENİ: Eğer sipariş hazır durumuna geçiyorsa ve otomatik atama aktifse
+            if (newStatus === 'ready') {
+                const autoAssignEnabled = await this.isAutoAssignmentEnabled();
+                if (autoAssignEnabled) {
+                    setTimeout(() => {
+                        this.assignCourierAutomatically(orderId);
+                    }, 2000); // 2 saniye sonra otomatik ata
+                }
+            }
+    
             window.panelSystem.showAlert(`Sipariş durumu güncellendi: ${this.getStatusText(newStatus)}`, 'success');
             
             // Reload orders
             await this.loadAllSellerOrders();
-
+    
         } catch (error) {
             console.error('Sipariş durumu güncelleme hatası:', error);
             window.panelSystem.showAlert('Sipariş durumu güncellenemedi!', 'error');
@@ -937,26 +948,22 @@ if (order.status === 'ready' && !order.courier_id) {
             'cancelled': 'İptal Edildi'
         };
         return statusMap[status] || status;
+        }
     }
-}
-   
-
-// YENİ METODLAR - seller-panel.js sonuna ekle
-
-async showCourierAssignmentModal(orderId) {
-    // Müsait kuryeleri getir
-    const availableCouriers = await this.getAvailableCouriers();
-    
-    const modalHtml = `
-        <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
-            <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto;">
-                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0;">Kurye Atama</h3>
-                    <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                
+       
+    async showCourierAssignmentModal(orderId) {
+        // Müsait kuryeleri getir
+        const availableCouriers = await this.getAvailableCouriers();
+        const modalHtml = `
+            <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
+                <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto;">
+                    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0;">Kurye Atama</h3>
+                        <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
                 <div class="assignment-options" style="margin-bottom: 20px;">
                     <div class="form-group">
                         <label>Atama Türü</label>
@@ -1105,40 +1112,6 @@ async showCourierAssignmentModal(orderId) {
         }
     }
     
-    // Mevcut updateOrderStatus fonksiyonunu güncelle (opsiyonel - otomatik atama için)
-    async updateOrderStatus(orderId, newStatus) {
-        try {
-            const { error } = await supabase
-                .from('orders')
-                .update({ 
-                    status: newStatus,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', orderId);
-    
-            if (error) throw error;
-    
-            // YENİ: Eğer sipariş hazır durumuna geçiyorsa ve otomatik atama aktifse
-            if (newStatus === 'ready') {
-                const autoAssignEnabled = await this.isAutoAssignmentEnabled();
-                if (autoAssignEnabled) {
-                    setTimeout(() => {
-                        this.assignCourierAutomatically(orderId);
-                    }, 2000); // 2 saniye sonra otomatik ata
-                }
-            }
-    
-            window.panelSystem.showAlert(`Sipariş durumu güncellendi: ${this.getStatusText(newStatus)}`, 'success');
-            
-            // Reload orders
-            await this.loadAllSellerOrders();
-    
-        } catch (error) {
-            console.error('Sipariş durumu güncelleme hatası:', error);
-            window.panelSystem.showAlert('Sipariş durumu güncellenemedi!', 'error');
-        }
-    }
-
 
     async isAutoAssignmentEnabled() {
         // Sistem ayarlarından otomatik atama durumunu kontrol et
