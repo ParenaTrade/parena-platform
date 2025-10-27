@@ -13,48 +13,76 @@ class AuthSystem {
     }
 
     setupEventListeners() {
-        // Giriş türü seçimi
-        document.querySelectorAll('.login-type-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.selectLoginType(btn.dataset.type);
+        // Tüm elementleri null kontrolü ile seç
+        const elements = {
+            staffLoginForm: document.getElementById('staffLoginForm'),
+            customerLoginForm: document.getElementById('customerLoginForm'),
+            showStaffRegister: document.getElementById('showStaffRegister'),
+            staffRegisterForm: document.getElementById('staffRegisterForm'),
+            loginTypeBtns: document.querySelectorAll('.login-type-btn'),
+            roleOptions: document.querySelectorAll('.role-option')
+        };
+
+        // Giriş türü seçimi - sadece varsa
+        if (elements.loginTypeBtns.length > 0) {
+            elements.loginTypeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    this.selectLoginType(btn.dataset.type);
+                });
             });
-        });
+        }
 
-        // Form submissions
-        document.getElementById('staffLoginForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.staffLogin();
-        });
-
-        document.getElementById('customerLoginForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.customerLogin();
-        });
-
-        // Personel kayıt modalı
-        document.getElementById('showStaffRegister').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.showStaffRegister();
-        });
-
-        document.getElementById('staffRegisterForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.staffRegister();
-        });
-
-        // Role selection
-        document.querySelectorAll('.role-option').forEach(option => {
-            option.addEventListener('click', () => {
-                this.selectRole(option.dataset.role);
+        // Form submissions - sadece varsa
+        if (elements.staffLoginForm) {
+            elements.staffLoginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.staffLogin();
             });
-        });
+        }
+
+        if (elements.customerLoginForm) {
+            elements.customerLoginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.customerLogin();
+            });
+        }
+
+        // Personel kayıt modalı - sadece varsa
+        if (elements.showStaffRegister) {
+            elements.showStaffRegister.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showStaffRegister();
+            });
+        }
+
+        if (elements.staffRegisterForm) {
+            elements.staffRegisterForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.staffRegister();
+            });
+        }
+
+        // Role selection - sadece varsa
+        if (elements.roleOptions.length > 0) {
+            elements.roleOptions.forEach(option => {
+                option.addEventListener('click', () => {
+                    this.selectRole(option.dataset.role);
+                });
+            });
+        }
+
+        console.log('Auth event listeners başarıyla kuruldu');
     }
 
     async checkExistingAuth() {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            await this.loadUserProfile(user);
-            this.showPanel();
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await this.loadUserProfile(user);
+                this.showPanel();
+            }
+        } catch (error) {
+            console.error('Mevcut auth kontrol hatası:', error);
         }
     }
 
@@ -65,27 +93,51 @@ class AuthSystem {
         document.querySelectorAll('.login-type-btn').forEach(btn => {
             btn.classList.remove('selected');
         });
-        document.querySelector(`[data-type="${type}"]`).classList.add('selected');
+        
+        const selectedBtn = document.querySelector(`[data-type="${type}"]`);
+        if (selectedBtn) {
+            selectedBtn.classList.add('selected');
+        }
         
         // Formları göster/gizle
         document.querySelectorAll('.login-form').forEach(form => {
             form.classList.remove('active');
         });
-        document.getElementById(`${type}LoginForm`).classList.add('active');
+        
+        const targetForm = document.getElementById(`${type}LoginForm`);
+        if (targetForm) {
+            targetForm.classList.add('active');
+        }
     }
 
     selectRole(role) {
         document.querySelectorAll('.role-option').forEach(opt => {
             opt.classList.remove('selected');
         });
-        document.querySelector(`[data-role="${role}"]`).classList.add('selected');
-        document.getElementById('selectedRole').value = role;
+        
+        const selectedOption = document.querySelector(`[data-role="${role}"]`);
+        if (selectedOption) {
+            selectedOption.classList.add('selected');
+        }
+        
+        const roleInput = document.getElementById('selectedRole');
+        if (roleInput) {
+            roleInput.value = role;
+        }
     }
 
     // Personel Girişi (Satıcı/Kurye)
     async staffLogin() {
-        const email = document.getElementById('staffEmail').value;
-        const password = document.getElementById('staffPassword').value;
+        const emailInput = document.getElementById('staffEmail');
+        const passwordInput = document.getElementById('staffPassword');
+        
+        if (!emailInput || !passwordInput) {
+            this.showAlert('Form elementleri bulunamadı.', 'error');
+            return;
+        }
+
+        const email = emailInput.value;
+        const password = passwordInput.value;
 
         if (!email || !password) {
             this.showAlert('Lütfen tüm alanları doldurun.', 'error');
@@ -121,8 +173,16 @@ class AuthSystem {
 
     // Müşteri Girişi (Telefon ile)
     async customerLogin() {
-        const phone = document.getElementById('customerPhone').value;
-        const name = document.getElementById('customerName').value;
+        const phoneInput = document.getElementById('customerPhone');
+        const nameInput = document.getElementById('customerName');
+        
+        if (!phoneInput) {
+            this.showAlert('Telefon alanı bulunamadı.', 'error');
+            return;
+        }
+
+        const phone = phoneInput.value;
+        const name = nameInput ? nameInput.value : '';
 
         if (!phone) {
             this.showAlert('Lütfen telefon numaranızı girin.', 'error');
@@ -145,7 +205,7 @@ class AuthSystem {
             }
 
             if (!customer) {
-                // Yeni müşteri oluştur - MEVCUT TABLO YAPISINA GÖRE
+                // Yeni müşteri oluştur
                 const { data: newCustomer, error: createError } = await supabase
                     .from('customers')
                     .insert([{
@@ -183,7 +243,7 @@ class AuthSystem {
                 full_name: customer.name,
                 role: customer.role,
                 phone: customer.phone,
-                bonus_balance: customer.bonus_balance,
+                bonus_balance: customer.bonus_balance || 0,
                 address: customer.address,
                 city: customer.city,
                 district: customer.district,
@@ -200,11 +260,22 @@ class AuthSystem {
 
     // Personel Kaydı (Satıcı/Kurye)
     async staffRegister() {
-        const fullName = document.getElementById('regFullName').value;
-        const email = document.getElementById('regEmail').value;
-        const phone = document.getElementById('regPhone').value;
-        const password = document.getElementById('regPassword').value;
-        const role = document.getElementById('selectedRole').value;
+        const fullNameInput = document.getElementById('regFullName');
+        const emailInput = document.getElementById('regEmail');
+        const phoneInput = document.getElementById('regPhone');
+        const passwordInput = document.getElementById('regPassword');
+        const roleInput = document.getElementById('selectedRole');
+
+        if (!fullNameInput || !emailInput || !phoneInput || !passwordInput || !roleInput) {
+            this.showAlert('Form elementleri bulunamadı.', 'error');
+            return;
+        }
+
+        const fullName = fullNameInput.value;
+        const email = emailInput.value;
+        const phone = phoneInput.value;
+        const password = passwordInput.value;
+        const role = roleInput.value;
 
         if (!fullName || !email || !phone || !password || !role) {
             this.showAlert('Lütfen tüm alanları doldurun.', 'error');
@@ -217,7 +288,7 @@ class AuthSystem {
         }
 
         try {
-            this.showAlert('Personel kaydı oluşturuluyor...', 'success');
+            this.showAlert('Personel kaydı oluşturuluyor...', 'info');
 
             // 1. Auth kaydı
             const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -235,7 +306,7 @@ class AuthSystem {
             if (authError) throw authError;
 
             if (authData.user) {
-                // 2. Role-specific kayıt (mevcut tablolara göre)
+                // 2. Role-specific kayıt
                 await this.handleStaffRegistration(authData.user, role, {
                     fullName,
                     email,
@@ -340,28 +411,50 @@ class AuthSystem {
     }
 
     showStaffRegister() {
-        document.getElementById('staffRegisterModal').style.display = 'flex';
+        const modal = document.getElementById('staffRegisterModal');
+        if (modal) {
+            modal.style.display = 'flex';
+        }
     }
 
     closeStaffRegister() {
-        document.getElementById('staffRegisterModal').style.display = 'none';
-        document.getElementById('staffRegisterForm').reset();
+        const modal = document.getElementById('staffRegisterModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        
+        const form = document.getElementById('staffRegisterForm');
+        if (form) {
+            form.reset();
+        }
     }
 
     async loadUserProfile(user) {
         this.currentUser = user;
         
-        // Profiles tablosundan kullanıcı bilgilerini yükle
-        const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
+        try {
+            // Profiles tablosundan kullanıcı bilgilerini yükle
+            const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
 
-        if (profile) {
-            this.userProfile = profile;
-        } else {
-            // Fallback: user metadata'dan oluştur
+            if (profile && !error) {
+                this.userProfile = profile;
+            } else {
+                // Fallback: user metadata'dan oluştur
+                this.userProfile = {
+                    id: user.id,
+                    full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Kullanıcı',
+                    role: user.user_metadata?.role || 'customer',
+                    phone: user.user_metadata?.phone,
+                    created_at: new Date().toISOString()
+                };
+            }
+        } catch (error) {
+            console.error('Profil yükleme hatası:', error);
+            // Fallback kullan
             this.userProfile = {
                 id: user.id,
                 full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Kullanıcı',
@@ -373,7 +466,10 @@ class AuthSystem {
     }
 
     showPanel() {
-        document.querySelector('.auth-container').style.display = 'none';
+        const authContainer = document.querySelector('.auth-container');
+        if (authContainer) {
+            authContainer.style.display = 'none';
+        }
         
         // Panel container'ı göster (eğer mevcutsa)
         const panelContainer = document.getElementById('panelContainer');
@@ -385,6 +481,7 @@ class AuthSystem {
         if (typeof window.panelSystem !== 'undefined') {
             window.panelSystem.initializePanel(this.userProfile);
         } else {
+            console.log('Panel sistemi bulunamadı, ana sayfaya yönlendiriliyor...');
             // Panel sistemi yoksa ana sayfaya yönlendir
             window.location.href = 'index.html';
         }
@@ -392,6 +489,11 @@ class AuthSystem {
 
     showAlert(message, type) {
         const alert = document.getElementById('authAlert');
+        if (!alert) {
+            console.log(`${type}: ${message}`);
+            return;
+        }
+        
         alert.textContent = message;
         alert.className = `alert alert-${type}`;
         alert.style.display = 'block';
@@ -402,7 +504,7 @@ class AuthSystem {
     }
 
     async logout() {
-        if (this.userProfile.role === 'üye' || this.userProfile.role === 'customer') {
+        if (this.userProfile && (this.userProfile.role === 'üye' || this.userProfile.role === 'customer')) {
             // Müşteri oturumu - sadece sayfayı yenile
             location.reload();
         } else {
@@ -415,7 +517,9 @@ class AuthSystem {
 
 // Modal kapatma fonksiyonları
 function closeStaffRegister() {
-    window.authSystem.closeStaffRegister();
+    if (window.authSystem) {
+        window.authSystem.closeStaffRegister();
+    }
 }
 
 // Uygulamayı başlat
