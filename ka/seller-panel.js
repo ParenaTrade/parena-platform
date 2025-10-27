@@ -6,6 +6,19 @@ class SellerPanel {
         this.orders = [];
         this.allSellerOrders = [];
         this.currentSection = '';
+        
+        // Supabase client'ını config'den al
+        this.supabase = window.SUPABASE_CLIENT;
+        this.config = window.CONFIG;
+        
+        console.log('🏪 SellerPanel başlatılıyor...');
+        console.log('Supabase:', this.supabase ? '✅ Var' : '❌ Yok');
+        
+        if (!this.supabase) {
+            console.error('❌ Supabase client bulunamadı!');
+            this.supabase = window.supabase; // Fallback
+        }
+        
         this.init();
     }
 
@@ -15,7 +28,7 @@ class SellerPanel {
     }
 
     async loadSellerData() {
-        const { data, error } = await supabase
+        const { data, error } = await this.supabase
             .from('seller_profiles')
             .select('*')
             .eq('seller_id', this.userProfile.id)
@@ -29,7 +42,7 @@ class SellerPanel {
     setupRealTimeListeners() {
         // Real-time order listeners
         if (this.sellerData?.id) {
-            const ordersSubscription = supabase
+            const ordersSubscription = this.supabase
                 .channel('orders')
                 .on('postgres_changes', 
                     { 
@@ -192,7 +205,7 @@ class SellerPanel {
     async loadSellerStats() {
         const today = new Date().toISOString().split('T')[0];
         
-        const { data: orders, error } = await supabase
+        const { data: orders, error } = await this.supabase
             .from('orders')
             .select('id, total_amount, status, created_at')
             .eq('seller_id', this.sellerData?.id)
@@ -214,7 +227,7 @@ class SellerPanel {
         }
 
         // Calculate average rating from orders
-        const { data: ratedOrders } = await supabase
+        const { data: ratedOrders } = await this.supabase
             .from('orders')
             .select('performance_rating')
             .eq('seller_id', this.sellerData?.id)
@@ -228,7 +241,7 @@ class SellerPanel {
     }
 
     async loadRecentSellerOrders() {
-        const { data: orders, error } = await supabase
+        const { data: orders, error } = await this.supabase
             .from('orders')
             .select(`
                 id,
@@ -279,7 +292,7 @@ class SellerPanel {
     }
 
     async loadStockAlerts() {
-        const { data: products, error } = await supabase
+        const { data: products, error } = await this.supabase
             .from('products')
             .select('name, stock')
             .eq('seller_id', this.sellerData?.id)
@@ -368,7 +381,7 @@ class SellerPanel {
     }
 
     async loadProductsData() {
-        const { data: products, error } = await supabase
+        const { data: products, error } = await this.supabase
             .from('products')
             .select('*')
             .eq('seller_id', this.sellerData?.id)
@@ -502,7 +515,7 @@ class SellerPanel {
         };
 
         try {
-            const { data, error } = await supabase
+            const { data, error } = await this.supabase
                 .from('products')
                 .insert([productData])
                 .select()
@@ -511,7 +524,7 @@ class SellerPanel {
             if (error) throw error;
 
             // Also add to product_prices table
-            await supabase
+            await this.supabase
                 .from('product_prices')
                 .insert([{
                     product_id: data.id,
@@ -553,7 +566,7 @@ class SellerPanel {
     async deleteProduct(productId) {
         if (confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
             try {
-                const { error } = await supabase
+                const { error } = await this.supabase
                     .from('products')
                     .delete()
                     .eq('id', productId);
@@ -615,7 +628,7 @@ async loadSellerOrders() {
     });
 }
     async loadAllSellerOrders() {
-        const { data: orders, error } = await supabase
+        const { data: orders, error } = await this.supabase
             .from('orders')
             .select(`
                 *,
@@ -762,7 +775,7 @@ if (order.status === 'ready' && !order.courier_id) {
       // Mevcut updateOrderStatus fonksiyonunu güncelle (opsiyonel - otomatik atama için)
     async updateOrderStatus(orderId, newStatus) {
         try {
-            const { error } = await supabase
+            const { error } = await this.supabase
                 .from('orders')
                 .update({ 
                     status: newStatus,
@@ -798,7 +811,7 @@ if (order.status === 'ready' && !order.courier_id) {
         if (!reason) return;
 
         try {
-            const { error } = await supabase
+            const { error } = await this.supabase
                 .from('orders')
                 .update({ 
                     status: 'cancelled',
@@ -823,7 +836,7 @@ if (order.status === 'ready' && !order.courier_id) {
         if (!note) return;
 
         try {
-            const { error } = await supabase
+            const { error } = await this.supabase
                 .from('orders')
                 .update({ 
                     seller_notes: note,
@@ -1021,7 +1034,7 @@ if (order.status === 'ready' && !order.courier_id) {
     }
     
     async getAvailableCouriers() {
-        const { data: couriers, error } = await supabase
+        const { data: couriers, error } = await this.supabase
             .from('couriers')
             .select('*')
             .eq('is_online', true)
@@ -1038,7 +1051,7 @@ if (order.status === 'ready' && !order.courier_id) {
             const sellerLocation = await this.getSellerLocation();
             
             // Otomatik kurye ata
-            const assignedCourier = await window.courierAssignmentSystem.assignBestCourier(orderId, sellerLocation);
+            const assignedCourier = await this.window.courierAssignmentSystem.assignBestCourier(orderId, sellerLocation);
             
             if (assignedCourier) {
                 window.panelSystem.showAlert(`Otomatik kurye atandı: ${assignedCourier.full_name}`, 'success');
@@ -1064,7 +1077,7 @@ if (order.status === 'ready' && !order.courier_id) {
         }
     
         try {
-            const success = await window.courierAssignmentSystem.assignCourierManually(orderId, courierId);
+            const success = await this.window.courierAssignmentSystem.assignCourierManually(orderId, courierId);
             
             if (success) {
                 window.panelSystem.showAlert('Kurye başarıyla atandı!', 'success');
@@ -1092,7 +1105,7 @@ if (order.status === 'ready' && !order.courier_id) {
     }
     
     async showCourierInfo(orderId) {
-        const { data: order } = await supabase
+        const { data: order } = await this.supabase
             .from('orders')
             .select(`
                 courier:couriers(full_name, phone, vehicle_type, rating)
