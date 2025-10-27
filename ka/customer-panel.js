@@ -87,6 +87,90 @@ class CustomerPanel {
         }
     }
 
+    // EKSİK METODU EKLE
+    async loadCustomerProfile() {
+        const section = document.getElementById('customerProfileSection');
+        if (!section) return;
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Profil Bilgilerim</h2>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <form id="customerProfileForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerName">Ad Soyad</label>
+                                <input type="text" id="customerName" class="form-control" 
+                                       value="${this.customerData?.full_name || this.customerData?.name || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerPhone">Telefon</label>
+                                <input type="text" id="customerPhone" class="form-control" 
+                                       value="${this.customerData?.phone || ''}">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerEmail">E-posta</label>
+                                <input type="email" id="customerEmail" class="form-control" 
+                                       value="${this.customerData?.email || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerBonus">Bonus Bakiyesi</label>
+                                <input type="text" id="customerBonus" class="form-control" 
+                                       value="${this.customerData?.bonus_balance || 0} ₺" readonly>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Bilgileri Güncelle
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        // Form submit eventini ekle
+        const form = document.getElementById('customerProfileForm');
+        if (form) {
+            form.addEventListener('submit', (e) => this.updateCustomerProfile(e));
+        }
+    }
+
+    async updateCustomerProfile(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('customerName').value;
+        const phone = document.getElementById('customerPhone').value;
+        const email = document.getElementById('customerEmail').value;
+
+        try {
+            const { error } = await supabase
+                .from('customers')
+                .update({
+                    name: name,
+                    phone: phone,
+                    email: email,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', this.customerData.id);
+
+            if (error) throw error;
+
+            window.panelSystem.showAlert('Profil bilgileriniz güncellendi!', 'success');
+            
+            // Yerel veriyi güncelle
+            this.customerData.name = name;
+            this.customerData.phone = phone;
+            this.customerData.email = email;
+
+        } catch (error) {
+            console.error('Profil güncelleme hatası:', error);
+            window.panelSystem.showAlert('Profil güncellenemedi!', 'error');
+        }
+    }
+
     async loadCustomerDashboard() {
         const section = document.getElementById('customerDashboardSection');
         if (!section) {
