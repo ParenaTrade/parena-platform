@@ -949,7 +949,7 @@ if (order.status === 'ready' && !order.courier_id) {
         };
         return statusMap[status] || status;
         }
-    }
+    
        
     async showCourierAssignmentModal(orderId) {
         // Müsait kuryeleri getir
