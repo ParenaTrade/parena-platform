@@ -9,7 +9,19 @@ const SYSTEM_CONSTANTS = {
     ORDER_TIMEOUT: 10 * 60 * 1000, // 10 minutes
     MAX_DELIVERY_DISTANCE: 10, // km
     COMMISSION_RATE: 0.15, // 15%
-    COURIER_BASE_FEE: 15.00
+    COURIER_BASE_FEE: 15.00,
+    CURRENCY: 'TRY'
+};
+
+// Order status constants
+const ORDER_STATUS = {
+    PENDING: 'pending',
+    CONFIRMED: 'confirmed',
+    PREPARING: 'preparing',
+    READY: 'ready',
+    ON_THE_WAY: 'on_the_way',
+    DELIVERED: 'delivered',
+    CANCELLED: 'cancelled'
 };
 
 // Initialize Supabase client

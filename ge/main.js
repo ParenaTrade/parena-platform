@@ -12,11 +12,5 @@ document.addEventListener('DOMContentLoaded', function() {
     window.authSystem = new AuthSystem();
     window.panelSystem = new PanelSystem();
     
-    // Make panels globally available
-    window.customerPanel = customerPanel;
-    window.sellerPanel = sellerPanel;
-    window.courierPanel = courierPanel;
-    window.adminPanel = adminPanel;
-    
     console.log('Multivendor Sipariş Sistemi başlatıldı');
 });
