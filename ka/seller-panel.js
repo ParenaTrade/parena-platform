@@ -703,15 +703,15 @@ async loadSellerOrders() {
         `).join('');
     }
 
-    getOrderActions(order) {
+   getOrderActions(order) {
     const actions = [];
     
     if (order.status === 'pending') {
         actions.push(`
-            <button class="btn btn-success btn-sm" onclick="sellerPanel.updateOrderStatus('${order.id}', 'confirmed')">
+            <button class="btn btn-success btn-sm" onclick="window.sellerPanel.updateOrderStatus('${order.id}', 'confirmed')">
                 <i class="fas fa-check"></i> Onayla
             </button>
-            <button class="btn btn-danger btn-sm" onclick="sellerPanel.cancelOrder('${order.id}')">
+            <button class="btn btn-danger btn-sm" onclick="window.sellerPanel.cancelOrder('${order.id}')">
                 <i class="fas fa-times"></i> Reddet
             </button>
         `);
@@ -734,9 +734,9 @@ async loadSellerOrders() {
     }
 
     // YENİ: Kurye atama butonları eklendi
-    if (order.status === 'ready' && !order.courier_id) {
+if (order.status === 'ready' && !order.courier_id) {
         actions.push(`
-            <button class="btn btn-primary btn-sm" onclick="sellerPanel.showCourierAssignmentModal('${order.id}')">
+            <button class="btn btn-primary btn-sm" onclick="window.sellerPanel.showCourierAssignmentModal('${order.id}')">
                 <i class="fas fa-motorcycle"></i> Kurye Ata
             </button>
         `);
