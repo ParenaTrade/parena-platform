@@ -939,6 +939,11 @@ async loadSellerOrders() {
         return statusMap[status] || status;
     }
 }
+      
+    // Global instance - CLASS DIŞINDA
+    if (typeof window.sellerPanel === 'undefined') {
+        window.sellerPanel = null;
+    }
 
 // YENİ METODLAR - seller-panel.js sonuna ekle
 
@@ -997,155 +1002,149 @@ async showCourierAssignmentModal(orderId) {
                 </div>
             </div>
         </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    // Event listeners
-    document.getElementById('autoAssignBtn').addEventListener('click', async () => {
-        await this.assignCourierAutomatically(orderId);
-    });
-
-    document.getElementById('manualAssignBtn').addEventListener('click', () => {
-        document.getElementById('manualAssignmentSection').style.display = 'block';
-        document.getElementById('autoAssignmentResult').style.display = 'none';
-    });
-}
-
-async getAvailableCouriers() {
-    const { data: couriers, error } = await supabase
-        .from('couriers')
-        .select('*')
-        .eq('is_online', true)
-        .eq('status', 'active')
-        .lt('current_deliveries', 5)
-        .order('current_deliveries', { ascending: true });
-
-    return couriers || [];
-}
-
-async assignCourierAutomatically(orderId) {
-    try {
-        // Satıcı konumunu al
-        const sellerLocation = await this.getSellerLocation();
-        
-        // Otomatik kurye ata
-        const assignedCourier = await window.courierAssignmentSystem.assignBestCourier(orderId, sellerLocation);
-        
-        if (assignedCourier) {
-            window.panelSystem.showAlert(`Otomatik kurye atandı: ${assignedCourier.full_name}`, 'success');
-            document.querySelector('.modal-overlay').remove();
-            await this.loadAllSellerOrders();
-        } else {
-            window.panelSystem.showAlert('Müsait kurye bulunamadı!', 'error');
-        }
-
-    } catch (error) {
-        console.error('Otomatik kurye atama hatası:', error);
-        window.panelSystem.showAlert('Kurye atanamadı!', 'error');
+        `;
+    
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+        // Event listeners
+        document.getElementById('autoAssignBtn').addEventListener('click', async () => {
+            await this.assignCourierAutomatically(orderId);
+        });
+    
+        document.getElementById('manualAssignBtn').addEventListener('click', () => {
+            document.getElementById('manualAssignmentSection').style.display = 'block';
+            document.getElementById('autoAssignmentResult').style.display = 'none';
+        });
     }
-}
-
-async assignCourierManually(orderId) {
-    const courierSelect = document.getElementById('courierSelect');
-    const courierId = courierSelect.value;
-
-    if (!courierId) {
-        window.panelSystem.showAlert('Lütfen bir kurye seçin!', 'error');
-        return;
+    
+    async getAvailableCouriers() {
+        const { data: couriers, error } = await supabase
+            .from('couriers')
+            .select('*')
+            .eq('is_online', true)
+            .eq('status', 'active')
+            .lt('current_deliveries', 5)
+            .order('current_deliveries', { ascending: true });
+    
+        return couriers || [];
     }
-
-    try {
-        const success = await window.courierAssignmentSystem.assignCourierManually(orderId, courierId);
-        
-        if (success) {
-            window.panelSystem.showAlert('Kurye başarıyla atandı!', 'success');
-            document.querySelector('.modal-overlay').remove();
-            await this.loadAllSellerOrders();
-        } else {
+    
+    async assignCourierAutomatically(orderId) {
+        try {
+            // Satıcı konumunu al
+            const sellerLocation = await this.getSellerLocation();
+            
+            // Otomatik kurye ata
+            const assignedCourier = await window.courierAssignmentSystem.assignBestCourier(orderId, sellerLocation);
+            
+            if (assignedCourier) {
+                window.panelSystem.showAlert(`Otomatik kurye atandı: ${assignedCourier.full_name}`, 'success');
+                document.querySelector('.modal-overlay').remove();
+                await this.loadAllSellerOrders();
+            } else {
+                window.panelSystem.showAlert('Müsait kurye bulunamadı!', 'error');
+            }
+    
+        } catch (error) {
+            console.error('Otomatik kurye atama hatası:', error);
             window.panelSystem.showAlert('Kurye atanamadı!', 'error');
         }
-
-    } catch (error) {
-        console.error('Manuel kurye atama hatası:', error);
-        window.panelSystem.showAlert('Kurye atanamadı!', 'error');
     }
-}
-
-async getSellerLocation() {
-    // Satıcı konumunu getir (seller_profiles tablosundan)
-    if (this.sellerData?.latitude && this.sellerData?.longitude) {
-        return {
-            latitude: this.sellerData.latitude,
-            longitude: this.sellerData.longitude
-        };
-    }
-    return null;
-}
-
-async showCourierInfo(orderId) {
-    const { data: order } = await supabase
-        .from('orders')
-        .select(`
-            courier:couriers(full_name, phone, vehicle_type, rating)
-        `)
-        .eq('id', orderId)
-        .single();
-
-    if (order && order.courier) {
-        const courier = order.courier;
-        alert(`
-            Kurye Bilgileri:
-            Ad: ${courier.full_name}
-            Telefon: ${courier.phone}
-            Araç: ${courier.vehicle_type}
-            Puan: ${courier.rating}/5
-        `);
-    }
-}
-
-// Mevcut updateOrderStatus fonksiyonunu güncelle (opsiyonel - otomatik atama için)
-async updateOrderStatus(orderId, newStatus) {
-    try {
-        const { error } = await supabase
-            .from('orders')
-            .update({ 
-                status: newStatus,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', orderId);
-
-        if (error) throw error;
-
-        // YENİ: Eğer sipariş hazır durumuna geçiyorsa ve otomatik atama aktifse
-        if (newStatus === 'ready') {
-            const autoAssignEnabled = await this.isAutoAssignmentEnabled();
-            if (autoAssignEnabled) {
-                setTimeout(() => {
-                    this.assignCourierAutomatically(orderId);
-                }, 2000); // 2 saniye sonra otomatik ata
-            }
+    
+    async assignCourierManually(orderId) {
+        const courierSelect = document.getElementById('courierSelect');
+        const courierId = courierSelect.value;
+    
+        if (!courierId) {
+            window.panelSystem.showAlert('Lütfen bir kurye seçin!', 'error');
+            return;
         }
-
-        window.panelSystem.showAlert(`Sipariş durumu güncellendi: ${this.getStatusText(newStatus)}`, 'success');
-        
-        // Reload orders
-        await this.loadAllSellerOrders();
-
-    } catch (error) {
-        console.error('Sipariş durumu güncelleme hatası:', error);
-        window.panelSystem.showAlert('Sipariş durumu güncellenemedi!', 'error');
+    
+        try {
+            const success = await window.courierAssignmentSystem.assignCourierManually(orderId, courierId);
+            
+            if (success) {
+                window.panelSystem.showAlert('Kurye başarıyla atandı!', 'success');
+                document.querySelector('.modal-overlay').remove();
+                await this.loadAllSellerOrders();
+            } else {
+                window.panelSystem.showAlert('Kurye atanamadı!', 'error');
+            }
+    
+        } catch (error) {
+            console.error('Manuel kurye atama hatası:', error);
+            window.panelSystem.showAlert('Kurye atanamadı!', 'error');
+        }
     }
-}
-
-async isAutoAssignmentEnabled() {
-    // Sistem ayarlarından otomatik atama durumunu kontrol et
-    // Varsayılan olarak true döndür
-    return true;
-}
-
-
-// Global instance - CLASS DIŞINDA
-if (typeof window.sellerPanel === 'undefined') {
-    window.sellerPanel = null;
-}
+    
+    async getSellerLocation() {
+        // Satıcı konumunu getir (seller_profiles tablosundan)
+        if (this.sellerData?.latitude && this.sellerData?.longitude) {
+            return {
+                latitude: this.sellerData.latitude,
+                longitude: this.sellerData.longitude
+            };
+        }
+        return null;
+    }
+    
+    async showCourierInfo(orderId) {
+        const { data: order } = await supabase
+            .from('orders')
+            .select(`
+                courier:couriers(full_name, phone, vehicle_type, rating)
+            `)
+            .eq('id', orderId)
+            .single();
+    
+        if (order && order.courier) {
+            const courier = order.courier;
+            alert(`
+                Kurye Bilgileri:
+                Ad: ${courier.full_name}
+                Telefon: ${courier.phone}
+                Araç: ${courier.vehicle_type}
+                Puan: ${courier.rating}/5
+            `);
+        }
+    }
+    
+    // Mevcut updateOrderStatus fonksiyonunu güncelle (opsiyonel - otomatik atama için)
+    async updateOrderStatus(orderId, newStatus) {
+        try {
+            const { error } = await supabase
+                .from('orders')
+                .update({ 
+                    status: newStatus,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', orderId);
+    
+            if (error) throw error;
+    
+            // YENİ: Eğer sipariş hazır durumuna geçiyorsa ve otomatik atama aktifse
+            if (newStatus === 'ready') {
+                const autoAssignEnabled = await this.isAutoAssignmentEnabled();
+                if (autoAssignEnabled) {
+                    setTimeout(() => {
+                        this.assignCourierAutomatically(orderId);
+                    }, 2000); // 2 saniye sonra otomatik ata
+                }
+            }
+    
+            window.panelSystem.showAlert(`Sipariş durumu güncellendi: ${this.getStatusText(newStatus)}`, 'success');
+            
+            // Reload orders
+            await this.loadAllSellerOrders();
+    
+        } catch (error) {
+            console.error('Sipariş durumu güncelleme hatası:', error);
+            window.panelSystem.showAlert('Sipariş durumu güncellenemedi!', 'error');
+        }
+    }
+    
+    async isAutoAssignmentEnabled() {
+        // Sistem ayarlarından otomatik atama durumunu kontrol et
+        // Varsayılan olarak true döndür
+        return true;
+    }
