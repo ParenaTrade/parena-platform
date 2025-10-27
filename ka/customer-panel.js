@@ -2,7 +2,8 @@ class CustomerPanel {
     constructor(userProfile) {
         this.userProfile = userProfile;
         this.customerData = null;
-        this.allOrders = [];
+        this.orders = [];
+        this.currentSection = '';
         this.init();
     }
 
@@ -11,60 +12,145 @@ class CustomerPanel {
     }
 
     async loadCustomerData() {
-        // Mevcut customers tablosundan verileri yükle
-        const { data, error } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('id', this.userProfile.id)
-            .single();
+        try {
+            // Customers tablosundan müşteri bilgilerini yükle
+            const { data, error } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('id', this.userProfile.id)
+                .single();
 
-        if (data) {
-            this.customerData = data;
-        } else {
-            // Fallback: userProfile'ı kullan
+            if (error) {
+                console.warn('Müşteri profili yüklenemedi:', error);
+                // Fallback: userProfile'ı kullan
+                this.customerData = this.userProfile;
+            } else {
+                this.customerData = data;
+            }
+        } catch (error) {
+            console.error('Müşteri verisi yükleme hatası:', error);
             this.customerData = this.userProfile;
         }
     }
 
     async loadSectionData(sectionName) {
+        this.currentSection = sectionName;
+        
         switch (sectionName) {
             case 'customerDashboard':
                 await this.loadCustomerDashboard();
                 break;
             case 'customerProfile':
-                await this.loadCustomerProfile();
+                await this.loadCustomerProfile(); // BU METOD EKSİK
                 break;
             case 'customerOrders':
                 await this.loadCustomerOrders();
                 break;
-            case 'customerPayments':
-                await this.loadCustomerPayments();
+            case 'customerAddresses':
+                await this.loadCustomerAddresses();
                 break;
-            case 'referral':
-                await this.loadReferralSection();
+            case 'customerSupport':
+                await this.loadCustomerSupport();
                 break;
+        }
+    }
+
+    // EKSİK METODU EKLE
+    async loadCustomerProfile() {
+        const section = document.getElementById('customerProfileSection');
+        if (!section) return;
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Profil Bilgilerim</h2>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <form id="customerProfileForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerName">Ad Soyad</label>
+                                <input type="text" id="customerName" class="form-control" 
+                                       value="${this.customerData?.full_name || this.customerData?.name || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerPhone">Telefon</label>
+                                <input type="text" id="customerPhone" class="form-control" 
+                                       value="${this.customerData?.phone || ''}">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerEmail">E-posta</label>
+                                <input type="email" id="customerEmail" class="form-control" 
+                                       value="${this.customerData?.email || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerBonus">Bonus Bakiyesi</label>
+                                <input type="text" id="customerBonus" class="form-control" 
+                                       value="${this.customerData?.bonus_balance || 0} ₺" readonly>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Bilgileri Güncelle
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        // Form submit eventini ekle
+        const form = document.getElementById('customerProfileForm');
+        if (form) {
+            form.addEventListener('submit', (e) => this.updateCustomerProfile(e));
+        }
+    }
+
+    async updateCustomerProfile(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('customerName').value;
+        const phone = document.getElementById('customerPhone').value;
+        const email = document.getElementById('customerEmail').value;
+
+        try {
+            const { error } = await supabase
+                .from('customers')
+                .update({
+                    name: name,
+                    phone: phone,
+                    email: email,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', this.customerData.id);
+
+            if (error) throw error;
+
+            window.panelSystem.showAlert('Profil bilgileriniz güncellendi!', 'success');
+            
+            // Yerel veriyi güncelle
+            this.customerData.name = name;
+            this.customerData.phone = phone;
+            this.customerData.email = email;
+
+        } catch (error) {
+            console.error('Profil güncelleme hatası:', error);
+            window.panelSystem.showAlert('Profil güncellenemedi!', 'error');
         }
     }
 
     async loadCustomerDashboard() {
         const section = document.getElementById('customerDashboardSection');
+        if (!section) return;
+
         section.innerHTML = `
-            <h1>Hoş Geldiniz, ${this.customerData?.name || this.customerData?.full_name || ''}!</h1>
-            <p class="subtitle">Sipariş geçmişiniz ve bonus durumunuz</p>
+            <h1>Hoş Geldiniz, ${this.customerData?.full_name || this.customerData?.name || 'Müşteri'}!</h1>
+            <p class="subtitle">Hesap özetiniz ve son işlemleriniz</p>
             
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon primary">
-                        <i class="fas fa-coins"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="bonusBalance">${this.customerData?.bonus_balance || 0}</h3>
-                        <p>Bonus Puanım</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon success">
-                        <i class="fas fa-shopping-cart"></i>
+                        <i class="fas fa-shopping-bag"></i>
                     </div>
                     <div class="stat-info">
                         <h3 id="totalOrders">0</h3>
@@ -72,37 +158,24 @@ class CustomerPanel {
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon warning">
-                        <i class="fas fa-money-bill-wave"></i>
+                    <div class="stat-icon success">
+                        <i class="fas fa-clock"></i>
                     </div>
                     <div class="stat-info">
-                        <h3 id="totalSpent">0 ₺</h3>
-                        <p>Toplam Harcama</p>
+                        <h3 id="pendingOrders">0</h3>
+                        <p>Bekleyen Sipariş</p>
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon danger">
-                        <i class="fas fa-users"></i>
+                    <div class="stat-icon warning">
+                        <i class="fas fa-star"></i>
                     </div>
                     <div class="stat-info">
-                        <h3 id="referralCount">0</h3>
-                        <p>Davet Edilen</p>
+                        <h3 id="customerBonus">${this.customerData?.bonus_balance || 0} ₺</h3>
+                        <p>Bonus Bakiyesi</p>
                     </div>
                 </div>
             </div>
-
-            ${this.customerData?.group_code ? `
-                <div class="referral-section">
-                    <h3><i class="fas fa-user-plus"></i> Arkadaşını Davet Et, Bonus Kazan!</h3>
-                    <p>Arkadaşlarını davet ederek her biri için <strong>50 bonus puan</strong> kazan!</p>
-                    <div class="referral-code">
-                        <span id="referralLink">Grup Kodu: ${this.customerData.group_code}</span>
-                        <button class="btn btn-primary" onclick="customerPanel.copyReferralLink()">
-                            <i class="fas fa-copy"></i> Kopyala
-                        </button>
-                    </div>
-                </div>
-            ` : ''}
 
             <div class="content-row">
                 <div class="content-col">
@@ -112,7 +185,7 @@ class CustomerPanel {
                             <a href="#" class="view-all" onclick="window.panelSystem.showSection('customerOrders')">Tümünü Gör</a>
                         </div>
                         <div class="card-body">
-                            <div id="recentOrdersList">
+                            <div id="recentCustomerOrders">
                                 <div class="loading-spinner">
                                     <i class="fas fa-spinner fa-spin"></i>
                                     <p>Siparişler yükleniyor...</p>
@@ -121,116 +194,96 @@ class CustomerPanel {
                         </div>
                     </div>
                 </div>
-                <div class="content-col">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>Adres Bilgilerim</h3>
-                        </div>
-                        <div class="card-body">
-                            <div id="customerAddress">
-                                ${this.customerData?.address ? `
-                                    <p><strong>Adres:</strong> ${this.customerData.address}</p>
-                                    <p><strong>İlçe:</strong> ${this.customerData.district || ''}</p>
-                                    <p><strong>Şehir:</strong> ${this.customerData.city || ''}</p>
-                                    ${this.customerData.location ? `<p><strong>Konum:</strong> ${this.customerData.location}</p>` : ''}
-                                ` : '<p class="text-muted">Henüz adres bilginiz bulunmuyor.</p>'}
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         `;
 
-        await this.loadDashboardStats();
-        await this.loadRecentOrders();
+        await this.loadCustomerStats();
+        await this.loadRecentCustomerOrders();
     }
 
-    async loadDashboardStats() {
-        // Sipariş istatistikleri - mevcut orders tablosuna göre
-        const { data: orders, error } = await supabase
-            .from('orders')
-            .select('id, total_amount, status')
-            .eq('customer_id', this.userProfile.id);
+    async loadCustomerStats() {
+        try {
+            // Sipariş istatistiklerini yükle
+            const { data: orders, error } = await supabase
+                .from('orders')
+                .select('id, status')
+                .eq('customer_id', this.customerData.id);
 
-        if (!error && orders) {
-            document.getElementById('totalOrders').textContent = orders.length;
-            
-            const totalSpent = orders
-                .filter(order => order.status !== 'cancelled')
-                .reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
-            document.getElementById('totalSpent').textContent = 
-                totalSpent.toFixed(2) + ' ₺';
-        }
-
-        // Referans sayısı - mevcut referral_tracking tablosuna göre
-        if (this.customerData?.group_code) {
-            const { data: referrals, error: refError } = await supabase
-                .from('referral_tracking')
-                .select('id')
-                .eq('group_code', this.customerData.group_code);
-
-            if (!refError) {
-                document.getElementById('referralCount').textContent = referrals.length;
+            if (!error && orders) {
+                document.getElementById('totalOrders').textContent = orders.length;
+                
+                const pendingOrders = orders.filter(order => 
+                    ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(order.status)
+                ).length;
+                document.getElementById('pendingOrders').textContent = pendingOrders;
             }
+        } catch (error) {
+            console.error('Müşteri istatistik yükleme hatası:', error);
         }
     }
 
-    async loadRecentOrders() {
-        const { data: orders, error } = await supabase
-            .from('orders')
-            .select(`
-                id,
-                total_amount,
-                status,
-                created_at,
-                delivery_address,
-                seller:seller_profiles(business_name)
-            `)
-            .eq('customer_id', this.userProfile.id)
-            .order('created_at', { ascending: false })
-            .limit(5);
+    async loadRecentCustomerOrders() {
+        try {
+            const { data: orders, error } = await supabase
+                .from('orders')
+                .select(`
+                    id,
+                    total_amount,
+                    status,
+                    created_at,
+                    delivery_address,
+                    seller:seller_profiles(business_name)
+                `)
+                .eq('customer_id', this.customerData.id)
+                .order('created_at', { ascending: false })
+                .limit(5);
 
-        const container = document.getElementById('recentOrdersList');
-        
-        if (error || !orders.length) {
-            container.innerHTML = '<p class="text-muted">Henüz siparişiniz bulunmuyor.</p>';
-            return;
+            const container = document.getElementById('recentCustomerOrders');
+            
+            if (error || !orders || orders.length === 0) {
+                container.innerHTML = '<p class="text-muted">Henüz siparişiniz bulunmuyor.</p>';
+                return;
+            }
+
+            container.innerHTML = orders.map(order => `
+                <div class="order-item" style="border-bottom: 1px solid #eee; padding: 15px 0;">
+                    <div class="order-header" style="display: flex; justify-content: between; align-items: center; margin-bottom: 8px;">
+                        <div>
+                            <strong>Sipariş #${order.id.slice(-8)}</strong>
+                            <div style="color: #666; font-size: 12px; margin-top: 2px;">
+                                ${order.seller?.business_name || 'Satıcı'}
+                            </div>
+                        </div>
+                        <span class="status-badge status-${order.status}">
+                            ${this.getStatusText(order.status)}
+                        </span>
+                    </div>
+                    <div class="order-footer" style="display: flex; justify-content: space-between; margin-top: 8px;">
+                        <span style="font-weight: bold; color: var(--primary);">
+                            ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
+                        </span>
+                        <small style="color: #999;">
+                            ${new Date(order.created_at).toLocaleDateString('tr-TR')}
+                        </small>
+                    </div>
+                </div>
+            `).join('');
+
+        } catch (error) {
+            console.error('Son siparişler yükleme hatası:', error);
+            const container = document.getElementById('recentCustomerOrders');
+            container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
         }
-
-        container.innerHTML = orders.map(order => `
-            <div class="order-item" style="border-bottom: 1px solid #eee; padding: 15px 0;">
-                <div class="order-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <strong>Sipariş #${order.id.slice(-8)}</strong>
-                    <span class="status-badge status-${order.status}">${this.getStatusText(order.status)}</span>
-                </div>
-                <div class="order-details" style="display: flex; justify-content: space-between; color: #666; font-size: 14px;">
-                    <span>${order.seller?.business_name || 'Satıcı'}</span>
-                    <span>${parseFloat(order.total_amount).toFixed(2)} ₺</span>
-                </div>
-                <div class="order-date" style="color: #999; font-size: 12px; margin-top: 5px;">
-                    ${new Date(order.created_at).toLocaleDateString('tr-TR')} - ${order.delivery_address || 'Adres belirtilmemiş'}
-                </div>
-            </div>
-        `).join('');
     }
 
     async loadCustomerOrders() {
+        // Siparişler bölümünü yükle
         const section = document.getElementById('customerOrdersSection');
+        if (!section) return;
+
         section.innerHTML = `
             <div class="section-header">
                 <h2>Siparişlerim</h2>
-                <div class="header-actions">
-                    <select id="orderStatusFilter" class="form-control">
-                        <option value="">Tüm Siparişler</option>
-                        <option value="pending">Bekleyen</option>
-                        <option value="confirmed">Onaylanan</option>
-                        <option value="preparing">Hazırlanan</option>
-                        <option value="ready">Hazır</option>
-                        <option value="on_the_way">Yolda</option>
-                        <option value="delivered">Teslim Edilen</option>
-                        <option value="cancelled">İptal Edilen</option>
-                    </select>
-                </div>
             </div>
             <div class="card">
                 <div class="card-body">
@@ -245,27 +298,29 @@ class CustomerPanel {
         `;
 
         await this.loadAllCustomerOrders();
-        
-        // Setup filter
-        document.getElementById('orderStatusFilter').addEventListener('change', (e) => {
-            this.filterCustomerOrders(e.target.value);
-        });
     }
 
     async loadAllCustomerOrders() {
-        const { data: orders, error } = await supabase
-            .from('orders')
-            .select(`
-                *,
-                seller:seller_profiles(business_name, phone),
-                order_details(*),
-                courier:couriers(full_name, phone)
-            `)
-            .eq('customer_id', this.userProfile.id)
-            .order('created_at', { ascending: false });
+        try {
+            const { data: orders, error } = await supabase
+                .from('orders')
+                .select(`
+                    *,
+                    order_details(*),
+                    seller:seller_profiles(business_name, phone),
+                    courier:couriers(full_name, phone)
+                `)
+                .eq('customer_id', this.customerData.id)
+                .order('created_at', { ascending: false });
 
-        this.allOrders = orders || [];
-        this.renderCustomerOrders(this.allOrders);
+            this.orders = orders || [];
+            this.renderCustomerOrders(this.orders);
+
+        } catch (error) {
+            console.error('Siparişler yükleme hatası:', error);
+            const container = document.getElementById('customerOrdersList');
+            container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+        }
     }
 
     renderCustomerOrders(orders) {
@@ -282,55 +337,78 @@ class CustomerPanel {
                     <div>
                         <strong style="font-size: 16px;">Sipariş #${order.id.slice(-8)}</strong>
                         <div style="color: #666; font-size: 14px; margin-top: 5px;">
-                            ${order.seller?.business_name} • ${order.customer_phone || this.customerData?.phone}
+                            ${order.seller?.business_name || 'Satıcı'}
                         </div>
                     </div>
-                    <span class="status-badge status-${order.status}" style="padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-                        ${this.getStatusText(order.status)}
-                    </span>
+                    <div style="text-align: right;">
+                        <span class="status-badge status-${order.status}">
+                            ${this.getStatusText(order.status)}
+                        </span>
+                        <div style="margin-top: 5px; font-size: 14px; font-weight: bold; color: var(--primary);">
+                            ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="order-details" style="margin-bottom: 15px;">
-                    ${order.order_details.map(item => `
-                        <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f8f9fa;">
-                            <span>${item.product_name} x ${item.quantity}</span>
-                            <span>${parseFloat(item.total_price).toFixed(2)} ₺</span>
+                <div class="order-items" style="margin-bottom: 15px;">
+                    ${(order.order_details || []).map(item => `
+                        <div style="display: flex; justify-content: space-between; padding: 8px; background: #f8f9fa; border-radius: 4px; margin-bottom: 5px;">
+                            <div>
+                                <span style="font-weight: 500;">${item.product_name}</span>
+                                <div style="font-size: 12px; color: #666;">
+                                    ${item.quantity} adet × ${parseFloat(item.unit_price || 0).toFixed(2)} ₺
+                                </div>
+                            </div>
+                            <div style="font-weight: bold;">
+                                ${parseFloat(item.total_price || 0).toFixed(2)} ₺
+                            </div>
                         </div>
                     `).join('')}
                 </div>
                 
                 <div class="order-footer" style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid #e1e5e9;">
                     <div style="color: #666; font-size: 14px;">
-                        <div>${new Date(order.created_at).toLocaleDateString('tr-TR')}</div>
+                        <div>${new Date(order.created_at).toLocaleString('tr-TR')}</div>
                         ${order.courier ? `<div>Kurye: ${order.courier.full_name}</div>` : ''}
                     </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 18px; font-weight: bold; color: var(--primary);">
-                            ${parseFloat(order.total_amount).toFixed(2)} ₺
-                        </div>
-                        <div style="font-size: 12px; color: #666;">
-                            ${order.payment_method || 'Ödeme yöntemi belirtilmemiş'}
-                        </div>
-                    </div>
                 </div>
-                
-                ${order.customer_notes ? `
-                    <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 14px;">
-                        <strong>Notunuz:</strong> ${order.customer_notes}
-                    </div>
-                ` : ''}
             </div>
         `).join('');
     }
 
-    filterCustomerOrders(status) {
-        if (!status) {
-            this.renderCustomerOrders(this.allOrders);
-            return;
-        }
-        
-        const filteredOrders = this.allOrders.filter(order => order.status === status);
-        this.renderCustomerOrders(filteredOrders);
+    async loadCustomerAddresses() {
+        const section = document.getElementById('customerAddressesSection');
+        if (!section) return;
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Adreslerim</h2>
+                <button class="btn btn-primary" id="addAddressBtn">
+                    <i class="fas fa-plus"></i> Yeni Adres Ekle
+                </button>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted">Adres yönetimi yakında eklenecek.</p>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadCustomerSupport() {
+        const section = document.getElementById('customerSupportSection');
+        if (!section) return;
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Müşteri Desteği</h2>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted">Müşteri destek sistemi yakında eklenecek.</p>
+                </div>
+            </div>
+        `;
     }
 
     getStatusText(status) {
@@ -344,17 +422,6 @@ class CustomerPanel {
             'cancelled': 'İptal Edildi'
         };
         return statusMap[status] || status;
-    }
-
-    async copyReferralLink() {
-        const link = document.getElementById('referralLink').textContent;
-        try {
-            await navigator.clipboard.writeText(link);
-            window.panelSystem.showAlert('Grup kodu panoya kopyalandı!', 'success');
-        } catch (err) {
-            console.error('Kopyalama hatası:', err);
-            window.panelSystem.showAlert('Kopyalama başarısız!', 'error');
-        }
     }
 }
 
