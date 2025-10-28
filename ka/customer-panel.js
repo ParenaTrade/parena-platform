@@ -560,183 +560,12 @@ class CustomerPanel {
         container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
     }
 }
-    // CSS Animasyonlarını Ekleme Fonksiyonu
-    addDeliveryAnimationsCSS() {
-    if (document.getElementById('delivery-animations-css')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'delivery-animations-css';
-    style.textContent = `
-        /* Kurye Animasyonları - DÜZELTİLMİŞ */
-        @keyframes moveToStore {
-            0% { 
-                transform: translateX(-20px) translateY(0);
-                opacity: 0; 
-            }
-            20% { 
-                opacity: 1; 
-            }
-            50% { 
-                transform: translateX(10px) translateY(-2px);
-            }
-            80% { 
-                transform: translateX(15px) translateY(0);
-            }
-            100% { 
-                transform: translateX(20px) translateY(0);
-            }
-        }
-        
-        @keyframes moveToAddress {
-            0% { 
-                transform: translateX(0px) translateY(0);
-            }
-            25% { 
-                transform: translateX(15px) translateY(-1px);
-            }
-            50% { 
-                transform: translateX(30px) translateY(0);
-            }
-            75% { 
-                transform: translateX(45px) translateY(-1px);
-            }
-            100% { 
-                transform: translateX(60px) translateY(0);
-            }
-        }
-        
-        @keyframes bounceMoto {
-            0%, 100% { 
-                transform: translateY(0); 
-            }
-            50% { 
-                transform: translateY(-3px); 
-            }
-        }
-        
-        @keyframes pulseStore {
-            0%, 100% { 
-                transform: scale(1); 
-                color: #28a745;
-            }
-            50% { 
-                transform: scale(1.2); 
-                color: #20c997;
-            }
-        }
-        
-        @keyframes pulseAddress {
-            0%, 100% { 
-                transform: scale(1); 
-                color: #dc3545;
-            }
-            50% { 
-                transform: scale(1.1); 
-                color: #e35d6a;
-            }
-        }
-        
-        @keyframes spinClock {
-            0% { 
-                transform: rotate(0deg); 
-            }
-            100% { 
-                transform: rotate(360deg); 
-            }
-        }
-        
-        @keyframes checkmark {
-            0% { 
-                transform: scale(0); 
-                opacity: 0;
-            }
-            50% { 
-                transform: scale(1.2); 
-            }
-            100% { 
-                transform: scale(1); 
-                opacity: 1;
-            }
-        }
-        
-        /* Animasyon Classları - DÜZELTİLMİŞ */
-        .moto-moving {
-            animation: moveToStore 3s ease-in-out infinite, bounceMoto 0.6s ease-in-out infinite !important;
-            color: #007bff !important;
-        }
-        
-        .moto-delivering {
-            animation: moveToAddress 4s linear infinite, bounceMoto 0.6s ease-in-out infinite !important;
-            color: #007bff !important;
-        }
-        
-        .store-pulsing {
-            animation: pulseStore 2s ease-in-out infinite !important;
-        }
-        
-        .address-pulsing {
-            animation: pulseAddress 2s ease-in-out infinite !important;
-        }
-        
-        .fa-spin-slow {
-            animation: spinClock 2s linear infinite !important;
-        }
-        
-        .checkmark-animation {
-            animation: checkmark 0.6s ease-out !important;
-            color: #28a745 !important;
-        }
-        
-        /* Kurye Container Stilleri */
-        .moto-container {
-            position: relative;
-            width: 80px;
-            height: 25px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .moto-container .fa-store {
-            position: absolute;
-            left: 0;
-            font-size: 14px;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-        }
-        
-        .moto-container .fa-motorcycle {
-            position: absolute;
-            font-size: 16px;
-            z-index: 2;
-        }
-        
-        .moto-container .fa-map-marker-alt {
-            position: absolute;
-            right: 0;
-            font-size: 14px;
-        }
-        
-        /* Kurye Yol Çizgisi */
-        .delivery-road {
-            position: absolute;
-            bottom: 8px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);
-            z-index: 1;
-        }
-    `;
-    
-    document.head.appendChild(style);
-    console.log('✅ CSS animasyonları yüklendi!');
-}
     renderDeliveryTracker(order) {
     const status = order.status;
     
-    // Sipariş detaylarındakiyle AYNI kurye kontrolü
+    // Sadece courier_id ve courier_name kullan
     const hasCourier = order.courier_id || order.courier_name;
-    const courierName = order.courier_name || 'Atandı';
+    const courierName = order.courier_name || 'Kurye';
     
     let trackerHTML = '';
     
@@ -745,7 +574,6 @@ class CustomerPanel {
         case 'confirmed':
         case 'preparing':
             if (hasCourier) {
-                // Kurye atanmış ama sipariş henüz hazır değil
                 trackerHTML = `
                     <div style="display: flex; align-items: center; gap: 10px; color: #0c5460;">
                         <i class="fas fa-user-check" style="font-size: 16px;"></i>
@@ -756,10 +584,9 @@ class CustomerPanel {
                     </div>
                 `;
             } else {
-                // Kurye atanmamış
                 trackerHTML = `
                     <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
-                        <i class="fas fa-clock fa-spin-slow" style="font-size: 16px;"></i>
+                        <i class="fas fa-clock" style="font-size: 16px;"></i>
                         <div>
                             <div style="font-size: 13px; font-weight: 600;">Kurye aranıyor</div>
                             <div style="font-size: 11px; color: #666;">Siparişiniz hazırlanıyor</div>
@@ -772,17 +599,15 @@ class CustomerPanel {
         case 'ready':
             if (hasCourier) {
                 trackerHTML = `
-                    <div class="delivery-animation" data-order-id="${order.id}" data-status="ready">
-                        <div style="display: flex; align-items: center; gap: 12px; color: #155724;">
-                            <div class="moto-container">
-                                <i class="fas fa-store store-pulsing"></i>
-                                <i class="fas fa-motorcycle moto-moving"></i>
-                                <div class="delivery-road"></div>
-                            </div>
-                            <div>
-                                <div style="font-size: 13px; font-weight: 600;">Kurye mağazaya geliyor</div>
-                                <div style="font-size: 11px; color: #666;">${courierName} yola çıktı</div>
-                            </div>
+                    <div style="display: flex; align-items: center; gap: 12px; color: #155724;">
+                        <div class="moto-container" style="position: relative; width: 80px; height: 25px; display: flex; align-items: center;">
+                            <i class="fas fa-store" style="position: absolute; left: 0; font-size: 14px; color: #28a745;"></i>
+                            <i class="fas fa-motorcycle" style="position: absolute; left: 40px; font-size: 16px; color: #007bff;"></i>
+                            <div style="position: absolute; bottom: 8px; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);"></div>
+                        </div>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600;">Kurye mağazada</div>
+                            <div style="font-size: 11px; color: #666;">${courierName} paketi aldı</div>
                         </div>
                     </div>
                 `;
@@ -801,17 +626,15 @@ class CustomerPanel {
             
         case 'on_the_way':
             trackerHTML = `
-                <div class="delivery-animation" data-order-id="${order.id}" data-status="on_the_way">
-                    <div style="display: flex; align-items: center; gap: 12px; color: #004085;">
-                        <div class="moto-container">
-                            <i class="fas fa-map-marker-alt address-pulsing"></i>
-                            <i class="fas fa-motorcycle moto-delivering"></i>
-                            <div class="delivery-road"></div>
-                        </div>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 600;">Kurye yolda</div>
-                            <div style="font-size: 11px; color: #666;">${courierName} adresinize geliyor</div>
-                        </div>
+                <div style="display: flex; align-items: center; gap: 12px; color: #004085;">
+                    <div class="moto-container" style="position: relative; width: 80px; height: 25px; display: flex; align-items: center;">
+                        <i class="fas fa-map-marker-alt" style="position: absolute; right: 0; font-size: 14px; color: #dc3545;"></i>
+                        <i class="fas fa-motorcycle" style="position: absolute; left: 20px; font-size: 16px; color: #007bff;"></i>
+                        <div style="position: absolute; bottom: 8px; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);"></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600;">Kurye yolda</div>
+                        <div style="font-size: 11px; color: #666;">${courierName} adresinize geliyor</div>
                     </div>
                 </div>
             `;
@@ -819,15 +642,17 @@ class CustomerPanel {
             
         case 'delivered':
             const deliveryTime = order.delivered_at ? 
-                `${new Date(order.delivered_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})} • Teslimat tamamlandı` : 
-                'Teslimat tamamlandı';
+                `${new Date(order.delivered_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}` : 
+                '';
                 
             trackerHTML = `
                 <div style="display: flex; align-items: center; gap: 10px; color: #155724;">
-                    <i class="fas fa-check-circle checkmark-animation" style="font-size: 16px;"></i>
+                    <i class="fas fa-check-circle" style="font-size: 16px;"></i>
                     <div>
                         <div style="font-size: 13px; font-weight: 600;">Teslim edildi</div>
-                        <div style="font-size: 11px; color: #666;">${deliveryTime}</div>
+                        <div style="font-size: 11px; color: #666;">
+                            ${deliveryTime ? `${deliveryTime} • ${courierName}` : `${courierName} teslim etti`}
+                        </div>
                     </div>
                 </div>
             `;
@@ -847,85 +672,10 @@ class CustomerPanel {
     
     return trackerHTML;
 }
-    
-    
-// CSS yerine JavaScript ile animasyon
-startJavaScriptAnimation() {
-    console.log('⭐ JavaScript animasyonu başlatılıyor...');
-    
-    const animations = document.querySelectorAll('.delivery-animation');
-    
-    animations.forEach(animation => {
-        const orderId = animation.getAttribute('data-order-id');
-        const status = animation.getAttribute('data-status');
-        const moto = animation.querySelector('.fa-motorcycle');
-        
-        if (!moto) return;
-        
-        // CSS animasyonunu kaldır, JS animasyonu ekle
-        moto.style.animation = 'none';
-        moto.classList.add('js-animated');
-        
-        if (status === 'ready') {
-            this.animateMotoToStore(moto);
-        } else if (status === 'on_the_way') {
-            this.animateMotoToAddress(moto);
-        }
-    });
-}
 
-animateMotoToStore(moto) {
-    let position = 0;
-    const animate = () => {
-        position += 1;
-        if (position > 60) position = 0;
-        
-        const bounce = Math.sin(position * 0.2) * 2;
-        moto.style.transform = `translateX(${position}px) translateY(${bounce}px)`;
-        
-        requestAnimationFrame(animate);
-    };
-    animate();
-}
 
     
-
-animateMotoToAddress(moto) {
-    let position = 0;
-    const animate = () => {
-        position += 1.5; // Daha hızlı
-        if (position > 60) position = 0;
-        
-        const bounce = Math.cos(position * 0.3) * 3;
-        moto.style.transform = `translateX(${position}px) translateY(${bounce}px)`;
-        
-        requestAnimationFrame(animate);
-    };
-    animate();
-}
     
-// CustomerPanel class'ına bu fonksiyonları ekleyin:
-startDeliveryAnimations() {
-    console.log('🎬 Animasyonlar başlatılıyor...');
-    
-    // Tüm animasyonlu elementleri bul
-    const readyAnimations = document.querySelectorAll('[data-status="ready"]');
-    const onTheWayAnimations = document.querySelectorAll('[data-status="on_the_way"]');
-    
-    console.log(`🔍 ${readyAnimations.length} ready, ${onTheWayAnimations.length} on_the_way animasyonu`);
-    
-    // Ready durumu için animasyon
-    readyAnimations.forEach((element, index) => {
-        const orderId = element.getAttribute('data-order-id');
-        this.startSimpleMotoAnimation(orderId, 'ready');
-    });
-    
-    // On_the_way durumu için animasyon
-    onTheWayAnimations.forEach((element, index) => {
-        const orderId = element.getAttribute('data-order-id');
-        this.startSimpleMotoAnimation(orderId, 'on_the_way');
-    });
-}
 
 startSimpleMotoAnimation(orderId, status) {
     console.log(`🏍️ Basit animasyon başlatılıyor: ${orderId} - ${status}`);
