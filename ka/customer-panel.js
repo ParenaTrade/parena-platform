@@ -524,41 +524,42 @@ class CustomerPanel {
     }
 
     async loadAllCustomerOrders() {
-        try {
-            console.log('📋 Tüm siparişler yükleniyor...');
-            
-            if (!this.supabase || !this.customerData || !this.customerData.id) {
-                const container = document.getElementById('customerOrdersList');
-                container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
-                return;
-            }
-
-            const { data: orders, error } = await this.supabase
-                .from('orders')
-                .select(`
-                    *,
-                    order_details(*),
-                    seller:seller_profiles(business_name, phone)
-                `)
-                .eq('customer_id', this.customerData.id)
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('❌ Siparişler sorgu hatası:', error);
-                throw error;
-            }
-
-            this.orders = orders || [];
-            this.renderCustomerOrders(this.orders);
-            console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
-
-        } catch (error) {
-            console.error('❌ Siparişler yükleme hatası:', error);
+    try {
+        console.log('📋 Tüm siparişler yükleniyor...');
+        
+        if (!this.supabase || !this.customerData || !this.customerData.id) {
             const container = document.getElementById('customerOrdersList');
-            container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+            container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
+            return;
         }
-    }
 
+        // Kurye bilgilerini de içeren sorgu
+        const { data: orders, error } = await this.supabase
+            .from('orders')
+            .select(`
+                *,
+                order_details(*),
+                seller:seller_profiles(business_name, phone),
+                courier:couriers(name, phone)
+            `)
+            .eq('customer_id', this.customerData.id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('❌ Siparişler sorgu hatası:', error);
+            throw error;
+        }
+
+        this.orders = orders || [];
+        this.renderCustomerOrders(this.orders);
+        console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
+
+    } catch (error) {
+        console.error('❌ Siparişler yükleme hatası:', error);
+        const container = document.getElementById('customerOrdersList');
+        container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+    }
+}
     // CSS Animasyonlarını Ekleme Fonksiyonu
     addDeliveryAnimationsCSS() {
         if (document.getElementById('delivery-animations-css')) return;
@@ -817,109 +818,115 @@ class CustomerPanel {
         document.head.appendChild(style);
     }
 
-    // Kurye Takip Sistemi Render Fonksiyonu
     renderDeliveryTracker(order) {
-        const status = order.status;
-        const hasCourier = order.courier_id;
-        
-        let trackerHTML = '';
-        
-        switch(status) {
-            case 'pending':
-            case 'confirmed':
-            case 'preparing':
-                trackerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
-                        <i class="fas fa-clock fa-spin-slow" style="font-size: 16px;"></i>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 600;">Kurye aranıyor</div>
-                            <div style="font-size: 11px; color: #666;">Siparişiniz hazırlanıyor</div>
-                        </div>
+    const status = order.status;
+    // Kurye kontrolünü güncelle - hem courier_id hem de courier relation kontrolü
+    const hasCourier = order.courier_id || (order.courier && order.courier.name);
+    const courierName = order.courier ? order.courier.name : order.courier_name;
+    
+    console.log(`🔍 Sipariş ${order.id} - Durum: ${status}, Kurye:`, { 
+        courier_id: order.courier_id,
+        courier: order.courier,
+        courier_name: order.courier_name
+    });
+    
+    let trackerHTML = '';
+    
+    switch(status) {
+        case 'pending':
+        case 'confirmed':
+        case 'preparing':
+            trackerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
+                    <i class="fas fa-clock fa-spin-slow" style="font-size: 16px;"></i>
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600;">Kurye aranıyor</div>
+                        <div style="font-size: 11px; color: #666;">Siparişiniz hazırlanıyor</div>
                     </div>
-                `;
-                break;
-                
-            case 'ready':
-                if (hasCourier) {
-                    const courierName = order.courier_name || 'Kurye';
-                    trackerHTML = `
-                        <div class="delivery-animation" data-order-id="${order.id}" data-status="ready">
-                            <div style="display: flex; align-items: center; gap: 12px; color: #155724;">
-                                <div class="moto-container">
-                                    <i class="fas fa-store store-pulsing"></i>
-                                    <i class="fas fa-motorcycle moto-moving"></i>
-                                    <div class="delivery-road"></div>
-                                </div>
-                                <div>
-                                    <div style="font-size: 13px; font-weight: 600;">Kurye mağazaya geliyor</div>
-                                    <div style="font-size: 11px; color: #666;">${courierName} yola çıktı</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    trackerHTML = `
-                        <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
-                            <i class="fas fa-clock" style="font-size: 16px;"></i>
-                            <div>
-                                <div style="font-size: 13px; font-weight: 600;">Kurye bekleniyor</div>
-                                <div style="font-size: 11px; color: #666;">Siparişiniz hazır</div>
-                            </div>
-                        </div>
-                    `;
-                }
-                break;
-                
-            case 'on_the_way':
-                const courierNameOnWay = order.courier_name || 'Kurye';
+                </div>
+            `;
+            break;
+            
+        case 'ready':
+            if (hasCourier) {
+                const displayCourierName = courierName || 'Kurye';
                 trackerHTML = `
-                    <div class="delivery-animation" data-order-id="${order.id}" data-status="on_the_way">
-                        <div style="display: flex; align-items: center; gap: 12px; color: #004085;">
+                    <div class="delivery-animation" data-order-id="${order.id}" data-status="ready">
+                        <div style="display: flex; align-items: center; gap: 12px; color: #155724;">
                             <div class="moto-container">
-                                <i class="fas fa-map-marker-alt address-pulsing"></i>
-                                <i class="fas fa-motorcycle moto-delivering"></i>
+                                <i class="fas fa-store store-pulsing"></i>
+                                <i class="fas fa-motorcycle moto-moving"></i>
                                 <div class="delivery-road"></div>
                             </div>
                             <div>
-                                <div style="font-size: 13px; font-weight: 600;">Kurye yolda</div>
-                                <div style="font-size: 11px; color: #666;">${courierNameOnWay} adresinize geliyor</div>
+                                <div style="font-size: 13px; font-weight: 600;">Kurye mağazaya geliyor</div>
+                                <div style="font-size: 11px; color: #666;">${displayCourierName} yola çıktı</div>
                             </div>
                         </div>
                     </div>
                 `;
-                break;
-                
-            case 'delivered':
-                const deliveryTime = order.delivered_at ? 
-                    `${new Date(order.delivered_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})} • Teslimat tamamlandı` : 
-                    'Teslimat tamamlandı';
-                    
+            } else {
                 trackerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; color: #155724;">
-                        <i class="fas fa-check-circle checkmark-animation" style="font-size: 16px;"></i>
+                    <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
+                        <i class="fas fa-clock" style="font-size: 16px;"></i>
                         <div>
-                            <div style="font-size: 13px; font-weight: 600;">Teslim edildi</div>
-                            <div style="font-size: 11px; color: #666;">${deliveryTime}</div>
+                            <div style="font-size: 13px; font-weight: 600;">Kurye bekleniyor</div>
+                            <div style="font-size: 11px; color: #666;">Siparişiniz hazır</div>
                         </div>
                     </div>
                 `;
-                break;
-                
-            default:
-                trackerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; color: #6c757d;">
-                        <i class="fas fa-info-circle" style="font-size: 16px;"></i>
+            }
+            break;
+            
+        case 'on_the_way':
+            const displayCourierNameOnWay = courierName || 'Kurye';
+            trackerHTML = `
+                <div class="delivery-animation" data-order-id="${order.id}" data-status="on_the_way">
+                    <div style="display: flex; align-items: center; gap: 12px; color: #004085;">
+                        <div class="moto-container">
+                            <i class="fas fa-map-marker-alt address-pulsing"></i>
+                            <i class="fas fa-motorcycle moto-delivering"></i>
+                            <div class="delivery-road"></div>
+                        </div>
                         <div>
-                            <div style="font-size: 13px; font-weight: 600;">${this.getStatusText(status)}</div>
-                            <div style="font-size: 11px; color: #666;">Sipariş durumu</div>
+                            <div style="font-size: 13px; font-weight: 600;">Kurye yolda</div>
+                            <div style="font-size: 11px; color: #666;">${displayCourierNameOnWay} adresinize geliyor</div>
                         </div>
                     </div>
-                `;
-        }
-        
-        return trackerHTML;
+                </div>
+            `;
+            break;
+            
+        case 'delivered':
+            const deliveryTime = order.delivered_at ? 
+                `${new Date(order.delivered_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})} • Teslimat tamamlandı` : 
+                'Teslimat tamamlandı';
+                
+            trackerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px; color: #155724;">
+                    <i class="fas fa-check-circle checkmark-animation" style="font-size: 16px;"></i>
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600;">Teslim edildi</div>
+                        <div style="font-size: 11px; color: #666;">${deliveryTime}</div>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        default:
+            trackerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px; color: #6c757d;">
+                    <i class="fas fa-info-circle" style="font-size: 16px;"></i>
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600;">${this.getStatusText(status)}</div>
+                        <div style="font-size: 11px; color: #666;">Sipariş durumu</div>
+                    </div>
+                </div>
+            `;
     }
-
+    
+    return trackerHTML;
+}
     // Animasyonları Başlatma Fonksiyonu
     startDeliveryAnimations() {
         const animatedElements = document.querySelectorAll('.delivery-animation');
@@ -1099,33 +1106,33 @@ class CustomerPanel {
                             </div>
                         </div>
                         
-                        <div>
-                            <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
-                                <i class="fas fa-shipping-fast" style="margin-right: 8px;"></i>
-                                Teslimat Bilgileri
-                            </h4>
-                            <div style="font-size: 13px; color: #666;">
-                                ${order.courier_id ? `
-                                    <div style="color: var(--success); margin-bottom: 4px;">
-                                        <i class="fas fa-motorcycle"></i> 
-                                        <strong>Kurye:</strong> ${order.courier_name || 'Atandı'}
-                                    </div>
-                                ` : `
-                                    <div style="color: var(--warning); margin-bottom: 4px;">
-                                        <i class="fas fa-clock"></i> 
-                                        <strong>Kurye:</strong> Atanıyor
-                                    </div>
-                                `}
-                                
-                                ${order.delivery_address ? `
-                                    <div style="margin-bottom: 4px;">
-                                        <strong>Adres:</strong> ${order.delivery_address}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    
+                        // Sipariş detayları içindeki kurye bilgisi kısmı
+<div>
+    <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
+        <i class="fas fa-shipping-fast" style="margin-right: 8px;"></i>
+        Teslimat Bilgileri
+    </h4>
+    <div style="font-size: 13px; color: #666;">
+        ${order.courier_id || (order.courier && order.courier.name) ? `
+            <div style="color: var(--success); margin-bottom: 4px;">
+                <i class="fas fa-motorcycle"></i> 
+                <strong>Kurye:</strong> ${order.courier ? order.courier.name : order.courier_name || 'Atandı'}
+            </div>
+        ` : `
+            <div style="color: var(--warning); margin-bottom: 4px;">
+                <i class="fas fa-clock"></i> 
+                <strong>Kurye:</strong> Atanıyor
+            </div>
+        `}
+        
+        ${order.delivery_address ? `
+            <div style="margin-bottom: 4px;">
+                <strong>Adres:</strong> ${order.delivery_address}
+            </div>
+        ` : ''}
+    </div>
+    </div>
+   </div>
                     <!-- İptal Durumu -->
                     ${order.cancellation_requested ? `
                         <div style="margin: 15px 0; padding: 12px; background: #fff3cd; border-radius: 6px;">
