@@ -1110,12 +1110,11 @@ async checkExistingSession() {
             phone: session.phone
         };
 
-        // SADECE login sayfasındaysak index'e yönlendir
+        // YENİ (düzeltilmiş):
         if (isLoginPage) {
-            console.log('🔄 Login sayfasındayız, index sayfasına yönlendiriliyor...');
-            setTimeout(() => {
-                this.redirectToIndex();
-            }, 1000);
+        console.log('🔐 Login sayfasındayız, oturum kontrolü atlanıyor...');
+        return; // ❌ Yönlendirme YOK!
+    }
         } else if (isIndexPage) {
             console.log('✅ Index sayfasındayız ve oturum geçerli');
             
