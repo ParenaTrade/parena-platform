@@ -546,41 +546,23 @@ class CustomerPanel {
             return;
         }
 
-        // DÜZELTİLMİŞ SORGU - courier ilişkisi opsiyonel
+        // İLİŞKİSİZ SORGU - courier tamamen kaldırıldı
         const { data: orders, error } = await this.supabase
             .from('orders')
             .select(`
                 *,
                 order_details(*),
-                seller:seller_profiles(business_name, phone),
-                courier:couriers(full_name, phone)
+                seller:seller_profiles(business_name, phone)
             `)
             .eq('customer_id', this.customerData.id)
             .order('created_at', { ascending: false });
 
         if (error) {
             console.error('❌ Siparişler sorgu hatası:', error);
-            
-            // Eğer hala ilişki hatası veriyorsa, alternatif sorgu
-            const { data: ordersAlt, error: errorAlt } = await this.supabase
-                .from('orders')
-                .select(`
-                    *,
-                    order_details(*),
-                    seller:seller_profiles(business_name, phone)
-                `)
-                .eq('customer_id', this.customerData.id)
-                .order('created_at', { ascending: false });
-                
-            if (errorAlt) {
-                throw errorAlt;
-            }
-            
-            this.orders = ordersAlt || [];
-        } else {
-            this.orders = orders || [];
+            throw error;
         }
 
+        this.orders = orders || [];
         this.renderCustomerOrders(this.orders);
         console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
 
@@ -650,19 +632,18 @@ class CustomerPanel {
             <div class="order-footer" style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid #e1e5e9;">
                 <div style="color: #666; font-size: 14px;">
                     <div>${new Date(order.created_at).toLocaleString('tr-TR')}</div>
-                    ${order.courier ? `
-                        <div>
-                            <i class="fas fa-motorcycle"></i> Kurye: ${order.courier.full_name}
-                        </div>
-                    ` : order.courier_name ? `
-                        <div>
-                            <i class="fas fa-motorcycle"></i> Kurye: ${order.courier_name}
+                    
+                    <!-- KURYE DURUMU -->
+                    ${order.courier_id ? `
+                        <div style="color: var(--success);">
+                            <i class="fas fa-motorcycle"></i> Kurye: ${order.courier_name || 'Atandı'}
                         </div>
                     ` : `
-                        <div>
-                            <i class="fas fa-clock"></i> Kurye atanacak
+                        <div style="color: var(--warning);">
+                            <i class="fas fa-clock"></i> Kurye atanıyor
                         </div>
                     `}
+                    
                     ${order.payment_method ? `
                         <div>Ödeme: ${this.getPaymentMethodText(order.payment_method)}</div>
                     ` : ''}
