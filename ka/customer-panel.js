@@ -559,7 +559,7 @@ class CustomerPanel {
         }
     }
 
-    renderCustomerOrders(orders) {
+renderCustomerOrders(orders) {
     const container = document.getElementById('customerOrdersList');
     
     if (!orders.length) {
@@ -576,7 +576,13 @@ class CustomerPanel {
     // CSS animasyonlarını ekle
     this.addDeliveryAnimationsCSS();
 
-    container.innerHTML = orders.map((order, index) => `
+    container.innerHTML = orders.map((order, index) => {
+        // Optional chaining'leri değişkenlere al
+        const sellerName = order.seller && order.seller.business_name ? order.seller.business_name : 'Satıcı';
+        const deliveryAddress = order.delivery_address || '';
+        const orderDetails = order.order_details || [];
+        
+        return `
         <div class="order-card" style="border: 1px solid #e1e5e9; border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
             <!-- Sipariş Özeti - Her Zaman Görünür -->
             <div class="order-summary" 
@@ -593,13 +599,13 @@ class CustomerPanel {
                         
                         <div style="color: #666; font-size: 14px; margin-bottom: 5px;">
                             <i class="fas fa-store" style="margin-right: 5px;"></i>
-                            ${order.seller?.business_name || 'Satıcı'}
+                            ${sellerName}
                         </div>
                         
-                        ${order.delivery_address ? `
+                        ${deliveryAddress ? `
                             <div style="color: #666; font-size: 12px;">
                                 <i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i> 
-                                ${order.delivery_address}
+                                ${deliveryAddress}
                             </div>
                         ` : ''}
 
@@ -627,10 +633,138 @@ class CustomerPanel {
             <!-- Sipariş Detayları - Açılır/Kapanır -->
             <div class="order-details" id="details-${order.id}" 
                  style="display: none; padding: 0 20px 20px 20px; background: white;">
-                <!-- ... önceki detay içeriği aynı ... -->
+                
+                <!-- Ürünler -->
+                ${orderDetails.length > 0 ? `
+                    <div style="margin: 15px 0;">
+                        <h4 style="margin-bottom: 10px; color: #333; font-size: 14px;">
+                            <i class="fas fa-list" style="margin-right: 8px;"></i>
+                            Sipariş İçeriği
+                        </h4>
+                        <div class="order-items">
+                            ${orderDetails.map(item => {
+                                const unitPrice = parseFloat(item.unit_price || 0).toFixed(2);
+                                const discount = parseFloat(item.discount || 0).toFixed(2);
+                                const totalPrice = parseFloat(item.total_price || 0).toFixed(2);
+                                const quantity = item.quantity || 0;
+                                
+                                return `
+                                <div style="display: flex; justify-content: space-between; padding: 10px; 
+                                         background: #f8f9fa; border-radius: 6px; margin-bottom: 8px;">
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 500; margin-bottom: 4px;">${item.product_name || 'Ürün'}</div>
+                                        <div style="font-size: 12px; color: #666;">
+                                            ${quantity} adet × ${unitPrice} ₺
+                                            ${item.discount > 0 ? 
+                                                `<span style="color: var(--success); margin-left: 8px;">
+                                                    -${discount} ₺ indirim
+                                                </span>` : ''}
+                                        </div>
+                                    </div>
+                                    <div style="font-weight: bold; color: var(--primary);">
+                                        ${totalPrice} ₺
+                                    </div>
+                                </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Sipariş Bilgileri -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0;">
+                    <div>
+                        <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
+                            <i class="fas fa-info-circle" style="margin-right: 8px;"></i>
+                            Sipariş Bilgileri
+                        </h4>
+                        <div style="font-size: 13px; color: #666;">
+                            <div style="margin-bottom: 4px;">
+                                <strong>Sipariş Tarihi:</strong> 
+                                ${new Date(order.created_at).toLocaleString('tr-TR')}
+                            </div>
+                            <div style="margin-bottom: 4px;">
+                                <strong>Ödeme Yöntemi:</strong> 
+                                ${order.payment_method ? this.getPaymentMethodText(order.payment_method) : 'Belirtilmemiş'}
+                            </div>
+                            ${order.customer_notes ? `
+                                <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 4px;">
+                                    <strong>Notunuz:</strong> ${order.customer_notes}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
+                            <i class="fas fa-shipping-fast" style="margin-right: 8px;"></i>
+                            Teslimat Bilgileri
+                        </h4>
+                        <div style="font-size: 13px; color: #666;">
+                            ${order.courier_id ? `
+                                <div style="color: var(--success); margin-bottom: 4px;">
+                                    <i class="fas fa-motorcycle"></i> 
+                                    <strong>Kurye:</strong> ${order.courier_name || 'Atandı'}
+                                </div>
+                            ` : `
+                                <div style="color: var(--warning); margin-bottom: 4px;">
+                                    <i class="fas fa-clock"></i> 
+                                    <strong>Kurye:</strong> Atanıyor
+                                </div>
+                            `}
+                            
+                            ${order.delivery_address ? `
+                                <div style="margin-bottom: 4px;">
+                                    <strong>Adres:</strong> ${order.delivery_address}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- İptal Durumu -->
+                ${order.cancellation_requested ? `
+                    <div style="margin: 15px 0; padding: 12px; background: #fff3cd; border-radius: 6px;">
+                        <div style="display: flex; align-items: center; gap: 8px; color: var(--warning);">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>İptal Talebiniz İnceleniyor</strong>
+                        </div>
+                        ${order.cancellation_reason ? `
+                            <div style="margin-top: 8px; font-size: 13px;">
+                                <strong>İptal Nedeni:</strong> ${order.cancellation_reason}
+                            </div>
+                        ` : ''}
+                    </div>
+                ` : ''}
+                
+                <!-- Aksiyon Butonları -->
+                <div class="order-actions" style="display: flex; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e1e5e9;">
+                    ${order.status === 'delivered' ? `
+                        <button class="btn btn-sm btn-success" data-action="rate" data-order-id="${order.id}">
+                            <i class="fas fa-star"></i> Değerlendir
+                        </button>
+                    ` : ''}
+                    
+                    ${order.status === 'pending' ? `
+                        ${order.cancellation_requested ? `
+                            <button class="btn btn-sm btn-secondary" data-action="view-cancellation" data-order-id="${order.id}">
+                                <i class="fas fa-info-circle"></i> İptal Durumu
+                            </button>
+                        ` : `
+                            <button class="btn btn-sm btn-warning" data-action="cancel" data-order-id="${order.id}">
+                                <i class="fas fa-times"></i> İptal Talebi
+                            </button>
+                        `}
+                    ` : ''}
+                    
+                    <button class="btn btn-sm btn-outline-primary" data-action="close" data-order-id="${order.id}">
+                        <i class="fas fa-times"></i> Kapat
+                    </button>
+                </div>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     // Event listener'ları ekle
     this.attachOrderEventListeners();
@@ -638,449 +772,7 @@ class CustomerPanel {
     // Animasyonları başlat
     this.startDeliveryAnimations();
 }
-
-addDeliveryAnimationsCSS() {
-    if (document.getElementById('delivery-animations-css')) return;
     
-    const style = document.createElement('style');
-    style.id = 'delivery-animations-css';
-    style.textContent = `
-        /* Kurye Animasyonları */
-        @keyframes moveToStore {
-            0% { 
-                transform: translateX(-20px) translateY(0);
-                opacity: 0; 
-            }
-            20% { 
-                opacity: 1; 
-            }
-            50% { 
-                transform: translateX(10px) translateY(-2px);
-            }
-            80% { 
-                transform: translateX(15px) translateY(0);
-            }
-            100% { 
-                transform: translateX(20px) translateY(0);
-            }
-        }
-        
-        @keyframes moveToAddress {
-            0% { 
-                transform: translateX(0px) translateY(0);
-            }
-            25% { 
-                transform: translateX(15px) translateY(-1px);
-            }
-            50% { 
-                transform: translateX(30px) translateY(0);
-            }
-            75% { 
-                transform: translateX(45px) translateY(-1px);
-            }
-            100% { 
-                transform: translateX(60px) translateY(0);
-            }
-        }
-        
-        @keyframes bounceMoto {
-            0%, 100% { 
-                transform: translateY(0); 
-            }
-            50% { 
-                transform: translateY(-3px); 
-            }
-        }
-        
-        @keyframes pulseStore {
-            0%, 100% { 
-                transform: scale(1); 
-                color: #28a745;
-            }
-            50% { 
-                transform: scale(1.2); 
-                color: #20c997;
-            }
-        }
-        
-        @keyframes pulseAddress {
-            0%, 100% { 
-                transform: scale(1); 
-                color: #dc3545;
-            }
-            50% { 
-                transform: scale(1.1); 
-                color: #e35d6a;
-            }
-        }
-        
-        @keyframes spinClock {
-            0% { 
-                transform: rotate(0deg); 
-            }
-            100% { 
-                transform: rotate(360deg); 
-            }
-        }
-        
-        @keyframes checkmark {
-            0% { 
-                transform: scale(0); 
-                opacity: 0;
-            }
-            50% { 
-                transform: scale(1.2); 
-            }
-            100% { 
-                transform: scale(1); 
-                opacity: 1;
-            }
-        }
-        
-        /* Animasyon Classları */
-        .moto-moving {
-            animation: moveToStore 3s ease-in-out infinite, bounceMoto 0.6s ease-in-out infinite;
-            color: #007bff !important;
-        }
-        
-        .moto-delivering {
-            animation: moveToAddress 4s linear infinite, bounceMoto 0.6s ease-in-out infinite;
-            color: #007bff !important;
-        }
-        
-        .store-pulsing {
-            animation: pulseStore 2s ease-in-out infinite;
-        }
-        
-        .address-pulsing {
-            animation: pulseAddress 2s ease-in-out infinite;
-        }
-        
-        .fa-spin-slow {
-            animation: spinClock 2s linear infinite;
-        }
-        
-        .checkmark-animation {
-            animation: checkmark 0.6s ease-out;
-            color: #28a745 !important;
-        }
-        
-        /* Kurye Container Stilleri */
-        .moto-container {
-            position: relative;
-            width: 80px;
-            height: 25px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .moto-container .fa-store {
-            position: absolute;
-            left: 0;
-            font-size: 14px;
-        }
-        
-        .moto-container .fa-motorcycle {
-            position: absolute;
-            font-size: 16px;
-            z-index: 2;
-        }
-        
-        .moto-container .fa-map-marker-alt {
-            position: absolute;
-            right: 0;
-            font-size: 14px;
-        }
-        
-        /* Durum Badge Stilleri */
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .status-pending { 
-            background: linear-gradient(135deg, #fff3cd, #ffeaa7); 
-            color: #856404; 
-            border: 1px solid #ffeaa7;
-        }
-        
-        .status-confirmed { 
-            background: linear-gradient(135deg, #d1ecf1, #a6e1ec); 
-            color: #0c5460; 
-            border: 1px solid #a6e1ec;
-        }
-        
-        .status-preparing { 
-            background: linear-gradient(135deg, #d1ecf1, #a6e1ec); 
-            color: #0c5460; 
-            border: 1px solid #a6e1ec;
-        }
-        
-        .status-ready { 
-            background: linear-gradient(135deg, #d4edda, #c3e6cb); 
-            color: #155724; 
-            border: 1px solid #c3e6cb;
-        }
-        
-        .status-on_the_way { 
-            background: linear-gradient(135deg, #cce7ff, #b3d9ff); 
-            color: #004085; 
-            border: 1px solid #b3d9ff;
-        }
-        
-        .status-delivered { 
-            background: linear-gradient(135deg, #d4edda, #c3e6cb); 
-            color: #155724; 
-            border: 1px solid #c3e6cb;
-        }
-        
-        .status-cancelled { 
-            background: linear-gradient(135deg, #f8d7da, #f5c6cb); 
-            color: #721c24; 
-            border: 1px solid #f5c6cb;
-        }
-        
-        /* Delivery Tracker Stilleri */
-        .delivery-tracker {
-            margin-top: 12px;
-            padding: 8px 12px;
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 8px;
-            border: 1px solid #e9ecef;
-        }
-        
-        .delivery-tracker .fa-clock {
-            color: #ffc107;
-        }
-        
-        .delivery-tracker .fa-check-circle {
-            color: #28a745;
-        }
-        
-        .delivery-tracker .fa-info-circle {
-            color: #6c757d;
-        }
-        
-        /* Responsive Tasarım */
-        @media (max-width: 768px) {
-            .moto-container {
-                width: 60px;
-            }
-            
-            .status-badge {
-                font-size: 10px;
-                padding: 3px 8px;
-            }
-            
-            .delivery-tracker {
-                font-size: 11px;
-                padding: 6px 8px;
-            }
-        }
-        
-        /* Kurye Yol Çizgisi (Opsiyonel) */
-        .delivery-road {
-            position: absolute;
-            bottom: 8px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);
-            z-index: 1;
-        }
-    `;
-    
-    document.head.appendChild(style);
-}
-
-renderDeliveryTracker(order) {
-    const status = order.status;
-    const hasCourier = order.courier_id;
-    
-    let trackerHTML = '';
-    
-    switch(status) {
-        case 'pending':
-        case 'confirmed':
-        case 'preparing':
-            trackerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
-                    <i class="fas fa-clock fa-spin-slow" style="font-size: 16px;"></i>
-                    <div>
-                        <div style="font-size: 13px; font-weight: 600;">Kurye aranıyor</div>
-                        <div style="font-size: 11px; color: #666;">Siparişiniz hazırlanıyor</div>
-                    </div>
-                </div>
-            `;
-            break;
-            
-        case 'ready':
-            if (hasCourier) {
-                trackerHTML = `
-                    <div class="delivery-animation" data-order-id="${order.id}" data-status="ready">
-                        <div style="display: flex; align-items: center; gap: 12px; color: #155724;">
-                            <div class="moto-container">
-                                <i class="fas fa-store store-pulsing"></i>
-                                <i class="fas fa-motorcycle moto-moving"></i>
-                                <div class="delivery-road"></div>
-                            </div>
-                            <div>
-                                <div style="font-size: 13px; font-weight: 600;">Kurye mağazaya geliyor</div>
-                                <div style="font-size: 11px; color: #666;">${order.courier_name || 'Kurye'} yola çıktı</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else {
-                trackerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
-                        <i class="fas fa-clock" style="font-size: 16px;"></i>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 600;">Kurye bekleniyor</div>
-                            <div style="font-size: 11px; color: #666;">Siparişiniz hazır</div>
-                        </div>
-                    </div>
-                `;
-            }
-            break;
-            
-        case 'on_the_way':
-            trackerHTML = `
-                <div class="delivery-animation" data-order-id="${order.id}" data-status="on_the_way">
-                    <div style="display: flex; align-items: center; gap: 12px; color: #004085;">
-                        <div class="moto-container">
-                            <i class="fas fa-map-marker-alt address-pulsing"></i>
-                            <i class="fas fa-motorcycle moto-delivering"></i>
-                            <div class="delivery-road"></div>
-                        </div>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 600;">Kurye yolda</div>
-                            <div style="font-size: 11px; color: #666;">${order.courier_name || 'Kurye'} adresinize geliyor</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            break;
-            
-        case 'delivered':
-            trackerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; color: #155724;">
-                    <i class="fas fa-check-circle checkmark-animation" style="font-size: 16px;"></i>
-                    <div>
-                        <div style="font-size: 13px; font-weight: 600;">Teslim edildi</div>
-                        <div style="font-size: 11px; color: #666;">
-                            ${order.delivered_at ? 
-                                `${new Date(order.delivered_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})} • Teslimat tamamlandı` : 
-                                'Teslimat tamamlandı'}
-                        </div>
-                    </div>
-                </div>
-            `;
-            break;
-            
-        default:
-            trackerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; color: #6c757d;">
-                    <i class="fas fa-info-circle" style="font-size: 16px;"></i>
-                    <div>
-                        <div style="font-size: 13px; font-weight: 600;">${this.getStatusText(status)}</div>
-                        <div style="font-size: 11px; color: #666;">Sipariş durumu</div>
-                    </div>
-                </div>
-            `;
-    }
-    
-    return trackerHTML;
-}
-
-startDeliveryAnimations() {
-    // Animasyonlu elementleri bul ve başlat
-    const animatedElements = document.querySelectorAll('.delivery-animation');
-    
-    animatedElements.forEach(element => {
-        const orderId = element.getAttribute('data-order-id');
-        const status = element.getAttribute('data-status');
-        
-        switch(status) {
-            case 'ready':
-                this.startMotoToStoreAnimation(orderId);
-                break;
-            case 'on_the_way':
-                this.startMotoToAddressAnimation(orderId);
-                break;
-        }
-    });
-}
-
-startMotoToStoreAnimation(orderId) {
-    const element = document.querySelector(`[data-order-id="${orderId}"] .moto-moving`);
-    if (!element) return;
-    
-    // 5 saniye sonra mağaza ikonu görünsün (simülasyon)
-    setTimeout(() => {
-        const storeIcon = document.querySelector(`[data-order-id="${orderId}"] .fa-store`);
-        if (storeIcon) {
-            storeIcon.style.opacity = '1';
-        }
-    }, 5000);
-}
-
-startMotoToAddressAnimation(orderId) {
-    // Teslim edildi durumunda animasyonu durdur
-    const orderCard = document.querySelector(`[data-order-id="${orderId}"]`).closest('.order-card');
-    const statusBadge = orderCard?.querySelector('.status-badge');
-    
-    if (statusBadge && statusBadge.classList.contains('status-delivered')) {
-        const motoElement = document.querySelector(`[data-order-id="${orderId}"] .moto-delivering`);
-        if (motoElement) {
-            motoElement.style.animation = 'none';
-        }
-    }
-}
-    // Aksiyon butonları
-    actionButtons.forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation(); // Üst elementlere yayılmayı engelle
-            const action = e.currentTarget.getAttribute('data-action');
-            const orderId = e.currentTarget.getAttribute('data-order-id');
-            
-            switch(action) {
-                case 'rate':
-                    this.rateOrder(orderId);
-                    break;
-                case 'view-cancellation':
-                    this.viewCancellationStatus(orderId);
-                    break;
-                case 'cancel':
-                    this.cancelOrder(orderId);
-                    break;
-                case 'close':
-                    this.toggleOrderDetails(orderId);
-                    break;
-            }
-        });
-    });
-}
-
-// Açılır-kapanır fonksiyonu
-toggleOrderDetails(orderId) {
-    const detailsElement = document.getElementById(`details-${orderId}`);
-    const chevronElement = document.getElementById(`chevron-${orderId}`);
-    
-    if (detailsElement && chevronElement) {
-        if (detailsElement.style.display === 'none' || !detailsElement.style.display) {
-            detailsElement.style.display = 'block';
-            chevronElement.style.transform = 'rotate(180deg)';
-        } else {
-            detailsElement.style.display = 'none';
-            chevronElement.style.transform = 'rotate(0deg)';
-        }
-    }
-}
     filterOrders(status) {
         if (!status) {
             this.renderCustomerOrders(this.orders);
