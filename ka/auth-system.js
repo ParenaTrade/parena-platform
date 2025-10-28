@@ -770,100 +770,100 @@ class AuthSystem {
         return courier;
     }
 
-    async registerCustomer(name, phone, passwordHash, passwordSalt) {
-        const { data: existingCustomer } = await this.supabase
-            .from('customers')
-            .select('id')
-            .eq('phone', phone)
-            .single();
+    // Kayıt fonksiyonlarını güncelle - HASH + SALT ile kayıt yapacak
+async registerCustomer(name, phone, passwordHash, passwordSalt) {
+    const { data: existingCustomer } = await this.supabase
+        .from('customers')
+        .select('id')
+        .eq('phone', phone)
+        .single();
 
-        if (existingCustomer) {
-            throw new Error('Bu telefon numarası zaten kayıtlı');
-        }
-
-        const newCustomer = {
-            name: name,
-            phone: phone,
-            password_hash: passwordHash,
-            password_salt: passwordSalt,
-            role: 'üye',
-            customer_type: 'Market Müşterisi',
-            status: 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
-
-        const { data: customer, error } = await this.supabase
-            .from('customers')
-            .insert([newCustomer])
-            .select()
-            .single();
-
-        if (error) throw error;
-        return customer;
+    if (existingCustomer) {
+        throw new Error('Bu telefon numarası zaten kayıtlı');
     }
 
-    async registerSeller(name, phone, passwordHash, passwordSalt) {
-        const { data: existingSeller } = await this.supabase
-            .from('seller_profiles')
-            .select('id')
-            .eq('phone', phone)
-            .single();
+    const newCustomer = {
+        name: name,
+        phone: phone,
+        password_hash: passwordHash,  // Hash'lenmiş şifre
+        password_salt: passwordSalt,  // Salt değeri
+        role: 'üye',
+        customer_type: 'Market Müşterisi',
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+    };
 
-        if (existingSeller) {
-            throw new Error('Bu telefon numarası zaten kayıtlı');
-        }
+    const { data: customer, error } = await this.supabase
+        .from('customers')
+        .insert([newCustomer])
+        .select()
+        .single();
 
-        const newSeller = {
-            business_name: name,
-            phone: phone,
-            password_hash: passwordHash,
-            password_salt: passwordSalt,
-            status: false,
-            created_at: new Date().toISOString()
-        };
+    if (error) throw error;
+    return customer;
+}
 
-        const { data: seller, error } = await this.supabase
-            .from('seller_profiles')
-            .insert([newSeller])
-            .select()
-            .single();
+async registerSeller(name, phone, passwordHash, passwordSalt) {
+    const { data: existingSeller } = await this.supabase
+        .from('seller_profiles')
+        .select('id')
+        .eq('phone', phone)
+        .single();
 
-        if (error) throw error;
-        return seller;
+    if (existingSeller) {
+        throw new Error('Bu telefon numarası zaten kayıtlı');
     }
 
-    async registerCourier(name, phone, passwordHash, passwordSalt) {
-        const { data: existingCourier } = await this.supabase
-            .from('couriers')
-            .select('id')
-            .eq('phone', phone)
-            .single();
+    const newSeller = {
+        business_name: name,
+        phone: phone,
+        password_hash: passwordHash,  // Hash'lenmiş şifre
+        password_salt: passwordSalt,  // Salt değeri
+        status: false,
+        created_at: new Date().toISOString()
+    };
 
-        if (existingCourier) {
-            throw new Error('Bu telefon numarası zaten kayıtlı');
-        }
+    const { data: seller, error } = await this.supabase
+        .from('seller_profiles')
+        .insert([newSeller])
+        .select()
+        .single();
 
-        const newCourier = {
-            full_name: name,
-            phone: phone,
-            password_hash: passwordHash,
-            password_salt: passwordSalt,
-            status: 'inactive',
-            vehicle_type: 'motorcycle',
-            created_at: new Date().toISOString()
-        };
+    if (error) throw error;
+    return seller;
+}
 
-        const { data: courier, error } = await this.supabase
-            .from('couriers')
-            .insert([newCourier])
-            .select()
-            .single();
+async registerCourier(name, phone, passwordHash, passwordSalt) {
+    const { data: existingCourier } = await this.supabase
+        .from('couriers')
+        .select('id')
+        .eq('phone', phone)
+        .single();
 
-        if (error) throw error;
-        return courier;
+    if (existingCourier) {
+        throw new Error('Bu telefon numarası zaten kayıtlı');
     }
 
+    const newCourier = {
+        full_name: name,
+        phone: phone,
+        password_hash: passwordHash,  // Hash'lenmiş şifre
+        password_salt: passwordSalt,  // Salt değeri
+        status: 'inactive',
+        vehicle_type: 'motorcycle',
+        created_at: new Date().toISOString()
+    };
+
+    const { data: courier, error } = await this.supabase
+        .from('couriers')
+        .insert([newCourier])
+        .select()
+        .single();
+
+    if (error) throw error;
+    return courier;
+}
     async completeUserLogin(phone, name, userType) {
         try {
             let userData;
@@ -891,113 +891,122 @@ class AuthSystem {
         }
     }
 
-    async handleCustomerLogin(phone, name) {
-        let { data: customer, error } = await this.supabase
+    // WhatsApp login için handle fonksiyonlarını da güncelle
+async handleCustomerLogin(phone, name) {
+    let { data: customer, error } = await this.supabase
+        .from('customers')
+        .select('*')
+        .eq('phone', phone)
+        .single();
+
+    if (error && error.code !== 'PGRST116') {
+        throw new Error('Müşteri kontrolü sırasında hata oluştu');
+    }
+
+    if (!customer) {
+        // WhatsApp ile girişte rastgele hash/salt oluştur
+        const tempPassword = Math.random().toString(36).slice(-8);
+        const { hash, salt } = await this.passwordManager.hashPassword(tempPassword);
+        
+        const newCustomer = {
+            name: name || 'Müşteri',
+            phone: phone,
+            password_hash: hash,  // Rastgele hash
+            password_salt: salt,  // Rastgele salt
+            role: 'üye',
+            customer_type: 'Market Müşterisi',
+            status: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        const { data: createdCustomer, error: createError } = await this.supabase
             .from('customers')
-            .select('*')
-            .eq('phone', phone)
+            .insert([newCustomer])
+            .select()
             .single();
 
-        if (error && error.code !== 'PGRST116') {
-            throw new Error('Müşteri kontrolü sırasında hata oluştu');
-        }
-
-        if (!customer) {
-            // Yeni müşteri oluştur
-            const newCustomer = {
-                name: name || 'Müşteri',
-                phone: phone,
-                password_hash: 'temp_hash', // WhatsApp login'de şifre gerekmez
-                password_salt: 'temp_salt',
-                role: 'üye',
-                customer_type: 'Market Müşterisi',
-                status: 'active',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            };
-
-            const { data: createdCustomer, error: createError } = await this.supabase
-                .from('customers')
-                .insert([newCustomer])
-                .select()
-                .single();
-
-            if (createError) throw createError;
-            return createdCustomer;
-        }
-
-        return customer;
+        if (createError) throw createError;
+        return createdCustomer;
     }
 
-    async handleSellerLogin(phone, name) {
-        let { data: seller, error } = await this.supabase
+    return customer;
+}
+
+async handleSellerLogin(phone, name) {
+    let { data: seller, error } = await this.supabase
+        .from('seller_profiles')
+        .select('*')
+        .eq('phone', phone)
+        .single();
+
+    if (error && error.code !== 'PGRST116') {
+        throw new Error('Satıcı kontrolü sırasında hata oluştu');
+    }
+
+    if (!seller) {
+        const tempPassword = Math.random().toString(36).slice(-8);
+        const { hash, salt } = await this.passwordManager.hashPassword(tempPassword);
+        
+        const newSeller = {
+            business_name: name ? `${name} İşletmesi` : 'Yeni İşletme',
+            phone: phone,
+            password_hash: hash,  // Rastgele hash
+            password_salt: salt,  // Rastgele salt
+            status: false,
+            created_at: new Date().toISOString()
+        };
+
+        const { data: createdSeller, error: createError } = await this.supabase
             .from('seller_profiles')
-            .select('*')
-            .eq('phone', phone)
+            .insert([newSeller])
+            .select()
             .single();
 
-        if (error && error.code !== 'PGRST116') {
-            throw new Error('Satıcı kontrolü sırasında hata oluştu');
-        }
-
-        if (!seller) {
-            const newSeller = {
-                business_name: name ? `${name} İşletmesi` : 'Yeni İşletme',
-                phone: phone,
-                password_hash: 'temp_hash',
-                password_salt: 'temp_salt',
-                status: false,
-                created_at: new Date().toISOString()
-            };
-
-            const { data: createdSeller, error: createError } = await this.supabase
-                .from('seller_profiles')
-                .insert([newSeller])
-                .select()
-                .single();
-
-            if (createError) throw createError;
-            return createdSeller;
-        }
-
-        return seller;
+        if (createError) throw createError;
+        return createdSeller;
     }
 
-    async handleCourierLogin(phone, name) {
-        let { data: courier, error } = await this.supabase
+    return seller;
+}
+
+async handleCourierLogin(phone, name) {
+    let { data: courier, error } = await this.supabase
+        .from('couriers')
+        .select('*')
+        .eq('phone', phone)
+        .single();
+
+    if (error && error.code !== 'PGRST116') {
+        throw new Error('Kurye kontrolü sırasında hata oluştu');
+    }
+
+    if (!courier) {
+        const tempPassword = Math.random().toString(36).slice(-8);
+        const { hash, salt } = await this.passwordManager.hashPassword(tempPassword);
+        
+        const newCourier = {
+            full_name: name || 'Kurye',
+            phone: phone,
+            password_hash: hash,  // Rastgele hash
+            password_salt: salt,  // Rastgele salt
+            status: 'inactive',
+            vehicle_type: 'motorcycle',
+            created_at: new Date().toISOString()
+        };
+
+        const { data: createdCourier, error: createError } = await this.supabase
             .from('couriers')
-            .select('*')
-            .eq('phone', phone)
+            .insert([newCourier])
+            .select()
             .single();
 
-        if (error && error.code !== 'PGRST116') {
-            throw new Error('Kurye kontrolü sırasında hata oluştu');
-        }
-
-        if (!courier) {
-            const newCourier = {
-                full_name: name || 'Kurye',
-                phone: phone,
-                password_hash: 'temp_hash',
-                password_salt: 'temp_salt',
-                status: 'inactive',
-                vehicle_type: 'motorcycle',
-                created_at: new Date().toISOString()
-            };
-
-            const { data: createdCourier, error: createError } = await this.supabase
-                .from('couriers')
-                .insert([newCourier])
-                .select()
-                .single();
-
-            if (createError) throw createError;
-            return createdCourier;
-        }
-
-        return courier;
+        if (createError) throw createError;
+        return createdCourier;
     }
 
+    return courier;
+}
     // Yardımcı Fonksiyonlar
     cleanPhoneNumber(phone) {
         return phone.replace(/\D/g, '');
