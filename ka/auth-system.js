@@ -108,7 +108,7 @@ class AuthSystem {
         try {
             console.log('🏪 Mağaza türleri yükleniyor...');
             const { data, error } = await this.supabase
-                .from('store_types')
+                .from('store_type')
                 .select('id, name')
                 .eq('status', 'Active')
                 .order('name');
