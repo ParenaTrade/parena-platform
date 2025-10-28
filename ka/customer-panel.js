@@ -834,8 +834,6 @@ testAnimationsNow() {
             return;
         }
 
-        // CSS animasyonlarını ekle
-        this.addDeliveryAnimationsCSS();
 
         container.innerHTML = orders.map((order, index) => {
             const sellerName = order.seller && order.seller.business_name ? order.seller.business_name : 'Satıcı';
@@ -1028,8 +1026,6 @@ testAnimationsNow() {
         // Event listener'ları ekle
         this.attachOrderEventListeners();
         
-        // Animasyonları başlat
-        this.startDeliveryAnimations();
     }
 
     // Event Listener Fonksiyonu
