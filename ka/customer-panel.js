@@ -848,80 +848,171 @@ class CustomerPanel {
     return trackerHTML;
 }
     
-    startDeliveryAnimations() {
+    // CustomerPanel class'ına bu fonksiyonları ekleyin:
+
+startDeliveryAnimations() {
     console.log('🎬 Animasyonlar başlatılıyor...');
     
     // Tüm animasyonlu elementleri bul
-    const animatedElements = document.querySelectorAll('.delivery-animation');
-    console.log(`🔍 ${animatedElements.length} adet animasyonlu element bulundu`);
+    const readyAnimations = document.querySelectorAll('[data-status="ready"]');
+    const onTheWayAnimations = document.querySelectorAll('[data-status="on_the_way"]');
     
-    animatedElements.forEach((element, index) => {
+    console.log(`🔍 ${readyAnimations.length} ready, ${onTheWayAnimations.length} on_the_way animasyonu`);
+    
+    // Ready durumu için animasyon
+    readyAnimations.forEach((element, index) => {
         const orderId = element.getAttribute('data-order-id');
-        const status = element.getAttribute('data-status');
-        
-        console.log(`🎯 Sipariş ${orderId} - Durum: ${status}`);
-        
-        switch(status) {
-            case 'ready':
-                this.startMotoToStoreAnimation(orderId);
-                break;
-            case 'on_the_way':
-                this.startMotoToAddressAnimation(orderId);
-                break;
+        this.startSimpleMotoAnimation(orderId, 'ready');
+    });
+    
+    // On_the_way durumu için animasyon
+    onTheWayAnimations.forEach((element, index) => {
+        const orderId = element.getAttribute('data-order-id');
+        this.startSimpleMotoAnimation(orderId, 'on_the_way');
+    });
+}
+
+startSimpleMotoAnimation(orderId, status) {
+    console.log(`🏍️ Basit animasyon başlatılıyor: ${orderId} - ${status}`);
+    
+    const container = document.querySelector(`[data-order-id="${orderId}"] .moto-container`);
+    const motoElement = document.querySelector(`[data-order-id="${orderId}"] .fa-motorcycle`);
+    
+    if (!container || !motoElement) {
+        console.log('❌ Animasyon elementleri bulunamadı');
+        return;
+    }
+    
+    console.log('✅ Animasyon elementleri bulundu');
+    
+    // Mevcut animasyonları temizle
+    motoElement.style.animation = '';
+    
+    // Yeni animasyonu başlat
+    if (status === 'ready') {
+        motoElement.style.animation = 'motoMoveStore 2s ease-in-out infinite';
+    } else if (status === 'on_the_way') {
+        motoElement.style.animation = 'motoMoveAddress 3s ease-in-out infinite';
+    }
+    
+    // Hemen CSS ekle
+    this.addSimpleAnimationsCSS();
+}
+
+addSimpleAnimationsCSS() {
+    if (document.getElementById('simple-delivery-animations')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'simple-delivery-animations';
+    style.textContent = `
+        /* BASİT ANİMASYONLAR */
+        @keyframes motoMoveStore {
+            0% {
+                transform: translateX(0px) translateY(0px);
+            }
+            25% {
+                transform: translateX(15px) translateY(-2px);
+            }
+            50% {
+                transform: translateX(30px) translateY(0px);
+            }
+            75% {
+                transform: translateX(45px) translateY(-2px);
+            }
+            100% {
+                transform: translateX(60px) translateY(0px);
+            }
         }
-    });
+        
+        @keyframes motoMoveAddress {
+            0% {
+                transform: translateX(0px) translateY(0px);
+            }
+            20% {
+                transform: translateX(12px) translateY(-1px);
+            }
+            40% {
+                transform: translateX(24px) translateY(0px);
+            }
+            60% {
+                transform: translateX(36px) translateY(-1px);
+            }
+            80% {
+                transform: translateX(48px) translateY(0px);
+            }
+            100% {
+                transform: translateX(60px) translateY(0px);
+            }
+        }
+        
+        @keyframes simpleBounce {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-3px);
+            }
+        }
+        
+        @keyframes simplePulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+        }
+        
+        /* ANİMASYON UYGULA */
+        .fa-motorcycle[style*="animation"] {
+            color: #007bff !important;
+        }
+        
+        .fa-store {
+            animation: simplePulse 2s ease-in-out infinite !important;
+            color: #28a745 !important;
+        }
+        
+        .fa-map-marker-alt {
+            animation: simplePulse 1.5s ease-in-out infinite !important;
+            color: #dc3545 !important;
+        }
+    `;
+    
+    document.head.appendChild(style);
+    console.log('✅ Basit animasyon CSS yüklendi!');
 }
 
-startMotoToStoreAnimation(orderId) {
-    console.log(`🏍️ Mağaza animasyonu başlatılıyor: ${orderId}`);
+// TEST FONKSİYONU - Hemen deneyin
+testAnimationsNow() {
+    console.log('🚀 ANİMASYON TESTİ BAŞLATILIYOR...');
     
-    const motoElement = document.querySelector(`[data-order-id="${orderId}"] .moto-moving`);
-    const storeElement = document.querySelector(`[data-order-id="${orderId}"] .fa-store`);
+    // Önce CSS'i yükle
+    this.addSimpleAnimationsCSS();
     
-    if (motoElement && storeElement) {
-        console.log('✅ Animasyon elementleri bulundu');
+    // 1 saniye bekle ve animasyonları başlat
+    setTimeout(() => {
+        this.startDeliveryAnimations();
         
-        // Animasyonu manuel tetikle
-        motoElement.style.animation = 'moveToStore 3s ease-in-out infinite, bounceMoto 0.6s ease-in-out infinite';
-        storeElement.style.animation = 'pulseStore 2s ease-in-out infinite';
-        
-        // 5 saniye sonra mağaza ikonunu göster
+        // Animasyonların çalıştığını kontrol et
         setTimeout(() => {
-            storeElement.style.opacity = '1';
-            console.log('🏪 Mağaza ikonu görünür oldu');
-        }, 5000);
+            const animatedElements = document.querySelectorAll('.fa-motorcycle');
+            console.log(`🎯 ${animatedElements.length} motosiklet elementi bulundu`);
+            
+            animatedElements.forEach((el, index) => {
+                const animation = window.getComputedStyle(el).animation;
+                console.log(`Motosiklet ${index + 1} animasyon:`, animation);
+            });
+        }, 1000);
         
-    } else {
-        console.log('❌ Animasyon elementleri bulunamadı:', { moto: !!motoElement, store: !!storeElement });
-    }
+    }, 100);
 }
 
-startMotoToAddressAnimation(orderId) {
-    console.log(`🏍️ Adres animasyonu başlatılıyor: ${orderId}`);
+// HEMEN ÇALIŞTIRMAK İÇİN:
+// customerPanel.testAnimationsNow()
     
-    const motoElement = document.querySelector(`[data-order-id="${orderId}"] .moto-delivering`);
-    const addressElement = document.querySelector(`[data-order-id="${orderId}"] .fa-map-marker-alt`);
-    
-    if (motoElement && addressElement) {
-        console.log('✅ Animasyon elementleri bulundu');
-        
-        // Animasyonu manuel tetikle
-        motoElement.style.animation = 'moveToAddress 4s linear infinite, bounceMoto 0.6s ease-in-out infinite';
-        addressElement.style.animation = 'pulseAddress 2s ease-in-out infinite';
-        
-    } else {
-        console.log('❌ Animasyon elementleri bulunamadı:', { moto: !!motoElement, address: !!addressElement });
-    }
-}
-
-// Animasyonları durdurma fonksiyonu (opsiyonel)
-stopDeliveryAnimations(orderId) {
-    const elements = document.querySelectorAll(`[data-order-id="${orderId}"] .moto-moving, [data-order-id="${orderId}"] .moto-delivering`);
-    elements.forEach(el => {
-        el.style.animation = 'none';
-    });
-}
-
     
     // Ana Sipariş Render Fonksiyonu
     renderCustomerOrders(orders) {
