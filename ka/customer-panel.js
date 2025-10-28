@@ -548,7 +548,7 @@ class CustomerPanel {
             console.error('❌ Siparişler sorgu hatası:', error);
             throw error;
         }
-
+    
         this.orders = orders || [];
         this.renderCustomerOrders(this.orders);
         console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
@@ -977,6 +977,9 @@ class CustomerPanel {
         }
     }
 
+    // Animasyon Başlat
+    this.addDeliveryAnimationsCSS();
+    
     // Ana Sipariş Render Fonksiyonu
     renderCustomerOrders(orders) {
         const container = document.getElementById('customerOrdersList');
@@ -1375,6 +1378,9 @@ class CustomerPanel {
         }
     }
 
+     // Animasyon Çağırma    
+    this.startDeliveryAnimations();
+    
     // Diğer fonksiyonlar (loadCustomerPayments, loadCustomerAddresses, vb.) buraya gelecek
     // ... kalan fonksiyonlar aynı kalacak ...
 
