@@ -8,7 +8,6 @@ class CustomerPanel {
         this.currentSection = '';
         this.isDataLoaded = false;
         
-    this.addDeliveryAnimationsCSS();
         
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
@@ -1379,8 +1378,8 @@ class CustomerPanel {
         }
     }
 
-     // Animasyon Çağırma    
-    this.startDeliveryAnimations();
+  
+    
     
     // Diğer fonksiyonlar (loadCustomerPayments, loadCustomerAddresses, vb.) buraya gelecek
     // ... kalan fonksiyonlar aynı kalacak ...
