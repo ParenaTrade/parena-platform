@@ -1089,8 +1089,7 @@ async showCourierAssignmentModal(orderId) {
             window.panelSystem.showAlert('Kurye atanamadı!', 'error');
         }
     }
-}
-    
+   
     async getSellerLocation() {
         // Satıcı konumunu getir (seller_profiles tablosundan)
         if (this.sellerData?.latitude && this.sellerData?.longitude) {
