@@ -33,32 +33,122 @@ class PanelSystem {
         this.initializeRoleSpecificPanel(this.userProfile);
     }
 
-    // EKSİK METODU EKLEYİN
     setupContainers() {
         console.log('🔧 Container ayarları yapılıyor...');
         
+        // Login container'ı gizle, panel container'ı göster
+        const loginContainer = document.getElementById('loginContainer');
+        const panelContainer = document.getElementById('panelContainer');
+        
+        if (loginContainer) {
+            loginContainer.classList.remove('active');
+            console.log('✅ Login container gizlendi');
+        }
+        
+        if (panelContainer) {
+            panelContainer.style.display = 'block';
+            console.log('✅ Panel container gösterildi');
+        }
+        
         // Tüm section'ları başlangıçta gizle
         document.querySelectorAll('.content-section').forEach(section => {
+            section.classList.remove('active');
             section.style.display = 'none';
         });
         
-        // Navigation container kontrolü
-        const navContainer = document.getElementById('navigation');
-        if (!navContainer) {
-            console.warn('⚠️ Navigation container bulunamadı');
+        // Sidebar container kontrolü
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) {
+            console.warn('⚠️ Sidebar container bulunamadı');
         } else {
-            console.log('✅ Navigation container hazır');
+            console.log('✅ Sidebar container hazır');
         }
         
-        // Content container kontrolü
-        const contentContainer = document.getElementById('mainContent');
-        if (!contentContainer) {
+        // Main content container kontrolü
+        const mainContent = document.querySelector('.main-content');
+        if (!mainContent) {
             console.warn('⚠️ Main content container bulunamadı');
         } else {
             console.log('✅ Main content container hazır');
         }
         
         console.log('✅ Container ayarları tamamlandı');
+    }
+
+    updateUserInfo(userProfile) {
+        console.log('👤 KULLANICI BİLGİLERİ GÜNCELLENİYOR:', userProfile);
+        
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+        const userRole = document.getElementById('userRole');
+
+        if (userAvatar) {
+            userAvatar.textContent = userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U';
+            console.log('✅ Avatar güncellendi:', userAvatar.textContent);
+        }
+
+        if (userName) {
+            userName.textContent = userProfile.name || 'Kullanıcı';
+            console.log('✅ İsim güncellendi:', userName.textContent);
+        }
+
+        if (userRole) {
+            const roleText = this.getRoleText(userProfile.role);
+            userRole.textContent = roleText;
+            console.log('✅ Rol güncellendi:', userProfile.role, '->', roleText);
+        }
+    }
+
+    getRoleText(role) {
+        const roleMap = {
+            'customer': 'Müşteri',
+            'seller': 'Satıcı',
+            'courier': 'Kurye',
+            'admin': 'Yönetici',
+            'üye': 'Müşteri'
+        };
+        return roleMap[role] || role;
+    }
+
+    setupNavigation() {
+        console.log('🧭 Navigation ayarlanıyor...');
+        
+        // Navigation event listeners
+        document.addEventListener('click', (e) => {
+            const navItem = e.target.closest('.nav-item');
+            if (navItem && navItem.hasAttribute('data-section')) {
+                e.preventDefault();
+                const sectionId = navItem.getAttribute('data-section');
+                console.log('📱 Navigation tıklandı:', sectionId);
+                this.showSection(sectionId);
+            }
+        });
+
+        // Mobile menu butonu
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        if (mobileMenuBtn) {
+            mobileMenuBtn.addEventListener('click', () => {
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar) {
+                    sidebar.classList.toggle('mobile-open');
+                    console.log('📱 Mobile menu toggled');
+                }
+            });
+        }
+
+        // Logout butonu
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('🚪 Logout butonuna tıklandı');
+                if (window.authSystem) {
+                    window.authSystem.logout();
+                }
+            });
+        }
+        
+        console.log('✅ Navigation ayarları tamamlandı');
     }
 
     initializeRoleSpecificPanel(userProfile) {
@@ -157,65 +247,6 @@ class PanelSystem {
         console.log('🎯 Panel başlatma tamamlandı. CurrentPanel:', this.currentPanel);
     }
 
-    updateUserInfo(userProfile) {
-        console.log('👤 KULLANICI BİLGİLERİ GÜNCELLENİYOR:', userProfile);
-        
-        const userAvatar = document.getElementById('userAvatar');
-        const userName = document.getElementById('userName');
-        const userRole = document.getElementById('userRole');
-
-        if (userAvatar) {
-            userAvatar.textContent = userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U';
-            console.log('✅ Avatar güncellendi:', userAvatar.textContent);
-        }
-
-        if (userName) {
-            userName.textContent = userProfile.name || 'Kullanıcı';
-            console.log('✅ İsim güncellendi:', userName.textContent);
-        }
-
-        if (userRole) {
-            const roleText = this.getRoleText(userProfile.role);
-            userRole.textContent = roleText;
-            console.log('✅ Rol güncellendi:', userProfile.role, '->', roleText);
-        }
-    }
-
-    getRoleText(role) {
-        const roleMap = {
-            'customer': 'Müşteri',
-            'seller': 'Satıcı',
-            'courier': 'Kurye',
-            'admin': 'Yönetici',
-            'üye': 'Müşteri'
-        };
-        return roleMap[role] || role;
-    }
-
-    setupNavigation() {
-        console.log('🧭 Navigation ayarlanıyor...');
-        
-        // Navigation event listeners
-        document.addEventListener('click', (e) => {
-            if (e.target.matches('[data-section]')) {
-                const sectionId = e.target.getAttribute('data-section');
-                this.showSection(sectionId);
-            }
-        });
-
-        // Logout butonu
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => {
-                if (window.authSystem) {
-                    window.authSystem.logout();
-                }
-            });
-        }
-        
-        console.log('✅ Navigation ayarları tamamlandı');
-    }
-
     showSection(sectionName) {
         console.log('📄 Section gösteriliyor:', sectionName);
         
@@ -236,6 +267,7 @@ class PanelSystem {
             targetSection.classList.add('active');
             targetSection.style.display = 'block';
             
+            // Aktif navigation item'ını bul
             const navItem = document.querySelector(`[data-section="${sectionName}"]`);
             if (navItem) {
                 navItem.classList.add('active');
