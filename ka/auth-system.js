@@ -1,3 +1,5 @@
+// auth-system.js - TAMAMEN YENİLENMİŞ VERSİYON
+
 // WhatsApp Doğrulamalı Auth System - Tüm kullanıcılar için
 class PasswordManager {
     constructor() {
@@ -89,18 +91,62 @@ class AuthSystem {
         this.countdownInterval = null;
         this.resendTimer = null;
         this.resendTimeLeft = 60;
+        this.storeTypes = [];
         
         console.log('🔐 WhatsApp Auth System başlatılıyor...');
         this.init();
     }
 
-    init() {
+    async init() {
+        await this.loadStoreTypes();
         this.setupEventListeners();
         this.checkExistingSession();
         this.updateRoleDisplay();
     }
 
+    async loadStoreTypes() {
+        try {
+            console.log('🏪 Mağaza türleri yükleniyor...');
+            const { data, error } = await this.supabase
+                .from('store_types')
+                .select('id, name')
+                .eq('status', 'Active')
+                .order('name');
+
+            if (error) throw error;
+            
+            this.storeTypes = data || [];
+            console.log('✅ Mağaza türleri yüklendi:', this.storeTypes);
+            this.populateStoreTypes();
+            
+        } catch (error) {
+            console.error('❌ Mağaza türleri yüklenirken hata:', error);
+        }
+    }
+
+    populateStoreTypes() {
+        const storeTypeSelect = document.getElementById('storeType');
+        if (storeTypeSelect) {
+            // Mevcut seçenekleri temizle (ilk seçenek hariç)
+            while (storeTypeSelect.options.length > 1) {
+                storeTypeSelect.remove(1);
+            }
+
+            // Mağaza türlerini ekle
+            this.storeTypes.forEach(storeType => {
+                const option = document.createElement('option');
+                option.value = storeType.id;
+                option.textContent = storeType.name;
+                storeTypeSelect.appendChild(option);
+            });
+            
+            console.log('✅ Mağaza türleri selectbox\'a eklendi');
+        }
+    }
+
     setupEventListeners() {
+        console.log('🎯 Event listener\'lar kuruluyor...');
+        
         // Kullanıcı tipi butonları
         document.querySelectorAll('.user-type-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -200,6 +246,8 @@ class AuthSystem {
                 this.showAuthForm('login');
             });
         }
+
+        console.log('✅ Event listener\'lar kuruldu');
     }
 
     selectUserType(type) {
@@ -212,7 +260,23 @@ class AuthSystem {
         document.querySelector(`[data-type="${type}"]`).classList.add('selected');
         
         this.updateRoleDisplay();
+        this.toggleStoreTypeField();
         console.log(`👤 Kullanıcı tipi seçildi: ${type}`);
+    }
+
+    toggleStoreTypeField() {
+        const storeTypeField = document.getElementById('storeTypeField');
+        const storeTypeSelect = document.getElementById('storeType');
+        
+        if (this.userType === 'seller') {
+            storeTypeField.classList.add('visible');
+            storeTypeSelect.required = true;
+            console.log('🏪 Mağaza türü alanı gösterildi');
+        } else {
+            storeTypeField.classList.remove('visible');
+            storeTypeSelect.required = false;
+            console.log('🏪 Mağaza türü alanı gizlendi');
+        }
     }
 
     switchAuthMethod(method) {
@@ -324,13 +388,15 @@ class AuthSystem {
         const roleNames = {
             'customer': 'MÜŞTERİ',
             'seller': 'SATICI', 
-            'courier': 'KURYE'
+            'courier': 'KURYE',
+            'whatsapp': 'MÜŞTERİ'
         };
         
         const roleDescriptions = {
             'customer': 'Müşteri olarak giriş yapıyorsunuz',
             'seller': 'Satıcı olarak giriş yapıyorsunuz',
-            'courier': 'Kurye olarak giriş yapıyorsunuz'
+            'courier': 'Kurye olarak giriş yapıyorsunuz',
+            'whatsapp': 'WhatsApp ile doğrulama yapıyorsunuz'
         };
 
         // Normal form için
@@ -428,7 +494,12 @@ class AuthSystem {
                     userData = await this.registerCustomer(name, phone, hash, salt);
                     break;
                 case 'seller':
-                    userData = await this.registerSeller(name, phone, hash, salt);
+                    const storeTypeId = document.getElementById('storeType').value;
+                    if (!storeTypeId) {
+                        this.showAlert('Lütfen mağaza türünü seçin!', 'error');
+                        return;
+                    }
+                    userData = await this.registerSeller(name, phone, hash, salt, storeTypeId);
                     break;
                 case 'courier':
                     userData = await this.registerCourier(name, phone, hash, salt);
@@ -771,99 +842,109 @@ class AuthSystem {
     }
 
     // Kayıt fonksiyonlarını güncelle - HASH + SALT ile kayıt yapacak
-async registerCustomer(name, phone, passwordHash, passwordSalt) {
-    const { data: existingCustomer } = await this.supabase
-        .from('customers')
-        .select('id')
-        .eq('phone', phone)
-        .single();
+    async registerCustomer(name, phone, passwordHash, passwordSalt) {
+        const { data: existingCustomer } = await this.supabase
+            .from('customers')
+            .select('id')
+            .eq('phone', phone)
+            .single();
 
-    if (existingCustomer) {
-        throw new Error('Bu telefon numarası zaten kayıtlı');
+        if (existingCustomer) {
+            throw new Error('Bu telefon numarası zaten kayıtlı');
+        }
+
+        const newCustomer = {
+            name: name,
+            phone: phone,
+            password_hash: passwordHash,  // Hash'lenmiş şifre
+            password_salt: passwordSalt,  // Salt değeri
+            role: 'üye',
+            customer_type: 'Market Müşterisi',
+            status: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        const { data: customer, error } = await this.supabase
+            .from('customers')
+            .insert([newCustomer])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return customer;
     }
 
-    const newCustomer = {
-        name: name,
-        phone: phone,
-        password_hash: passwordHash,  // Hash'lenmiş şifre
-        password_salt: passwordSalt,  // Salt değeri
-        role: 'üye',
-        customer_type: 'Market Müşterisi',
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-    };
+    async registerSeller(name, phone, passwordHash, passwordSalt, storeTypeId) {
+        console.log('📝 Satıcı kaydı başlatılıyor:', { name, phone, storeTypeId });
 
-    const { data: customer, error } = await this.supabase
-        .from('customers')
-        .insert([newCustomer])
-        .select()
-        .single();
+        const { data: existingSeller } = await this.supabase
+            .from('seller_profiles')
+            .select('id')
+            .eq('phone', phone)
+            .single();
 
-    if (error) throw error;
-    return customer;
-}
+        if (existingSeller) {
+            throw new Error('Bu telefon numarası zaten kayıtlı');
+        }
 
-async registerSeller(name, phone, passwordHash, passwordSalt) {
-    const { data: existingSeller } = await this.supabase
-        .from('seller_profiles')
-        .select('id')
-        .eq('phone', phone)
-        .single();
+        const newSeller = {
+            business_name: name,
+            phone: phone,
+            password_hash: passwordHash,
+            password_salt: passwordSalt,
+            store_type_id: storeTypeId,
+            status: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
 
-    if (existingSeller) {
-        throw new Error('Bu telefon numarası zaten kayıtlı');
+        const { data: seller, error } = await this.supabase
+            .from('seller_profiles')
+            .insert([newSeller])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ Satıcı kayıt hatası:', error);
+            throw error;
+        }
+
+        console.log('✅ Satıcı kaydı başarılı:', seller);
+        return seller;
     }
 
-    const newSeller = {
-        business_name: name,
-        phone: phone,
-        password_hash: passwordHash,  // Hash'lenmiş şifre
-        password_salt: passwordSalt,  // Salt değeri
-        status: false,
-        created_at: new Date().toISOString()
-    };
+    async registerCourier(name, phone, passwordHash, passwordSalt) {
+        const { data: existingCourier } = await this.supabase
+            .from('couriers')
+            .select('id')
+            .eq('phone', phone)
+            .single();
 
-    const { data: seller, error } = await this.supabase
-        .from('seller_profiles')
-        .insert([newSeller])
-        .select()
-        .single();
+        if (existingCourier) {
+            throw new Error('Bu telefon numarası zaten kayıtlı');
+        }
 
-    if (error) throw error;
-    return seller;
-}
+        const newCourier = {
+            full_name: name,
+            phone: phone,
+            password_hash: passwordHash,  // Hash'lenmiş şifre
+            password_salt: passwordSalt,  // Salt değeri
+            status: 'inactive',
+            vehicle_type: 'motorcycle',
+            created_at: new Date().toISOString()
+        };
 
-async registerCourier(name, phone, passwordHash, passwordSalt) {
-    const { data: existingCourier } = await this.supabase
-        .from('couriers')
-        .select('id')
-        .eq('phone', phone)
-        .single();
+        const { data: courier, error } = await this.supabase
+            .from('couriers')
+            .insert([newCourier])
+            .select()
+            .single();
 
-    if (existingCourier) {
-        throw new Error('Bu telefon numarası zaten kayıtlı');
+        if (error) throw error;
+        return courier;
     }
 
-    const newCourier = {
-        full_name: name,
-        phone: phone,
-        password_hash: passwordHash,  // Hash'lenmiş şifre
-        password_salt: passwordSalt,  // Salt değeri
-        status: 'inactive',
-        vehicle_type: 'motorcycle',
-        created_at: new Date().toISOString()
-    };
-
-    const { data: courier, error } = await this.supabase
-        .from('couriers')
-        .insert([newCourier])
-        .select()
-        .single();
-
-    if (error) throw error;
-    return courier;
-}
     async completeUserLogin(phone, name, userType) {
         try {
             let userData;
@@ -892,121 +973,123 @@ async registerCourier(name, phone, passwordHash, passwordSalt) {
     }
 
     // WhatsApp login için handle fonksiyonlarını da güncelle
-async handleCustomerLogin(phone, name) {
-    let { data: customer, error } = await this.supabase
-        .from('customers')
-        .select('*')
-        .eq('phone', phone)
-        .single();
-
-    if (error && error.code !== 'PGRST116') {
-        throw new Error('Müşteri kontrolü sırasında hata oluştu');
-    }
-
-    if (!customer) {
-        // WhatsApp ile girişte rastgele hash/salt oluştur
-        const tempPassword = Math.random().toString(36).slice(-8);
-        const { hash, salt } = await this.passwordManager.hashPassword(tempPassword);
-        
-        const newCustomer = {
-            name: name || 'Müşteri',
-            phone: phone,
-            password_hash: hash,  // Rastgele hash
-            password_salt: salt,  // Rastgele salt
-            role: 'üye',
-            customer_type: 'Market Müşterisi',
-            status: 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
-
-        const { data: createdCustomer, error: createError } = await this.supabase
+    async handleCustomerLogin(phone, name) {
+        let { data: customer, error } = await this.supabase
             .from('customers')
-            .insert([newCustomer])
-            .select()
+            .select('*')
+            .eq('phone', phone)
             .single();
 
-        if (createError) throw createError;
-        return createdCustomer;
+        if (error && error.code !== 'PGRST116') {
+            throw new Error('Müşteri kontrolü sırasında hata oluştu');
+        }
+
+        if (!customer) {
+            // WhatsApp ile girişte rastgele hash/salt oluştur
+            const tempPassword = Math.random().toString(36).slice(-8);
+            const { hash, salt } = await this.passwordManager.hashPassword(tempPassword);
+            
+            const newCustomer = {
+                name: name || 'Müşteri',
+                phone: phone,
+                password_hash: hash,  // Rastgele hash
+                password_salt: salt,  // Rastgele salt
+                role: 'üye',
+                customer_type: 'Market Müşterisi',
+                status: 'active',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
+            const { data: createdCustomer, error: createError } = await this.supabase
+                .from('customers')
+                .insert([newCustomer])
+                .select()
+                .single();
+
+            if (createError) throw createError;
+            return createdCustomer;
+        }
+
+        return customer;
     }
 
-    return customer;
-}
-
-async handleSellerLogin(phone, name) {
-    let { data: seller, error } = await this.supabase
-        .from('seller_profiles')
-        .select('*')
-        .eq('phone', phone)
-        .single();
-
-    if (error && error.code !== 'PGRST116') {
-        throw new Error('Satıcı kontrolü sırasında hata oluştu');
-    }
-
-    if (!seller) {
-        const tempPassword = Math.random().toString(36).slice(-8);
-        const { hash, salt } = await this.passwordManager.hashPassword(tempPassword);
-        
-        const newSeller = {
-            business_name: name ? `${name} İşletmesi` : 'Yeni İşletme',
-            phone: phone,
-            password_hash: hash,  // Rastgele hash
-            password_salt: salt,  // Rastgele salt
-            status: false,
-            created_at: new Date().toISOString()
-        };
-
-        const { data: createdSeller, error: createError } = await this.supabase
+    async handleSellerLogin(phone, name) {
+        let { data: seller, error } = await this.supabase
             .from('seller_profiles')
-            .insert([newSeller])
-            .select()
+            .select('*')
+            .eq('phone', phone)
             .single();
 
-        if (createError) throw createError;
-        return createdSeller;
+        if (error && error.code !== 'PGRST116') {
+            throw new Error('Satıcı kontrolü sırasında hata oluştu');
+        }
+
+        if (!seller) {
+            const tempPassword = Math.random().toString(36).slice(-8);
+            const { hash, salt } = await this.passwordManager.hashPassword(tempPassword);
+            
+            const newSeller = {
+                business_name: name ? `${name} İşletmesi` : 'Yeni İşletme',
+                phone: phone,
+                password_hash: hash,  // Rastgele hash
+                password_salt: salt,  // Rastgele salt
+                status: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
+            const { data: createdSeller, error: createError } = await this.supabase
+                .from('seller_profiles')
+                .insert([newSeller])
+                .select()
+                .single();
+
+            if (createError) throw createError;
+            return createdSeller;
+        }
+
+        return seller;
     }
 
-    return seller;
-}
-
-async handleCourierLogin(phone, name) {
-    let { data: courier, error } = await this.supabase
-        .from('couriers')
-        .select('*')
-        .eq('phone', phone)
-        .single();
-
-    if (error && error.code !== 'PGRST116') {
-        throw new Error('Kurye kontrolü sırasında hata oluştu');
-    }
-
-    if (!courier) {
-        const tempPassword = Math.random().toString(36).slice(-8);
-        const { hash, salt } = await this.passwordManager.hashPassword(tempPassword);
-        
-        const newCourier = {
-            full_name: name || 'Kurye',
-            phone: phone,
-            password_hash: hash,  // Rastgele hash
-            password_salt: salt,  // Rastgele salt
-            status: 'inactive',
-            vehicle_type: 'motorcycle',
-            created_at: new Date().toISOString()
-        };
-
-        const { data: createdCourier, error: createError } = await this.supabase
+    async handleCourierLogin(phone, name) {
+        let { data: courier, error } = await this.supabase
             .from('couriers')
-            .insert([newCourier])
-            .select()
+            .select('*')
+            .eq('phone', phone)
             .single();
 
-        if (createError) throw createError;
-        return createdCourier;
+        if (error && error.code !== 'PGRST116') {
+            throw new Error('Kurye kontrolü sırasında hata oluştu');
+        }
+
+        if (!courier) {
+            const tempPassword = Math.random().toString(36).slice(-8);
+            const { hash, salt } = await this.passwordManager.hashPassword(tempPassword);
+            
+            const newCourier = {
+                full_name: name || 'Kurye',
+                phone: phone,
+                password_hash: hash,  // Rastgele hash
+                password_salt: salt,  // Rastgele salt
+                status: 'inactive',
+                vehicle_type: 'motorcycle',
+                created_at: new Date().toISOString()
+            };
+
+            const { data: createdCourier, error: createError } = await this.supabase
+                .from('couriers')
+                .insert([newCourier])
+                .select()
+                .single();
+
+            if (createError) throw createError;
+            return createdCourier;
+        }
+
+        return courier;
     }
 
-    return courier;
-}
     // Yardımcı Fonksiyonlar
     cleanPhoneNumber(phone) {
         return phone.replace(/\D/g, '');
@@ -1039,151 +1122,126 @@ async handleCourierLogin(phone, name) {
     }
 
     redirectToIndex() {
-    // Mevcut sayfanın zaten index.html olup olmadığını kontrol et
-    const isAlreadyOnIndex = window.location.pathname.includes('index.html') || 
-                            window.location.pathname === '/' ||
-                            window.location.pathname.endsWith('/');
-    
-    if (isAlreadyOnIndex) {
-        console.log('ℹ️ Zaten index sayfasındayız');
-        return;
+        // Mevcut sayfanın zaten index.html olup olmadığını kontrol et
+        const isAlreadyOnIndex = window.location.pathname.includes('index.html') || 
+                                window.location.pathname === '/' ||
+                                window.location.pathname.endsWith('/');
+        
+        if (isAlreadyOnIndex) {
+            console.log('ℹ️ Zaten index sayfasındayız');
+            return;
+        }
+        
+        console.log('🔄 Index sayfasına yönlendiriliyor...');
+        
+        // Yönlendirmeden önce küçük bir gecikme
+        setTimeout(() => {
+            try {
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error('❌ Yönlendirme hatası:', error);
+            }
+        }, 500);
     }
     
-    console.log('🔄 Index sayfasına yönlendiriliyor...');
-    
-    // Yönlendirmeden önce küçük bir gecikme
-    setTimeout(() => {
+    async checkExistingSession() {
         try {
-            window.location.href = 'index.html';
-        } catch (error) {
-            console.error('❌ Yönlendirme hatası:', error);
-        }
-    }, 500);
-}
-    
-async checkExistingSession() {
-    try {
-        const currentPage = window.location.pathname;
-        const isIndexPage = currentPage.includes('index.html') || 
-                           currentPage === '/' || 
-                           currentPage.endsWith('/');
-        const isLoginPage = currentPage.includes('login.html');
+            const currentPage = window.location.pathname;
+            const isIndexPage = currentPage.includes('index.html') || 
+                               currentPage === '/' || 
+                               currentPage.endsWith('/');
+            const isLoginPage = currentPage.includes('login.html');
 
-        console.log(`📄 Mevcut sayfa: ${currentPage}, Index: ${isIndexPage}, Login: ${isLoginPage}`);
+            console.log(`📄 Mevcut sayfa: ${currentPage}, Index: ${isIndexPage}, Login: ${isLoginPage}`);
 
-        const userSession = localStorage.getItem('userSession');
-        
-        if (!userSession) {
-            console.log('ℹ️ Oturum bulunamadı');
-            if (isIndexPage) {
-                console.log('🚫 Index sayfasında oturum yok, login sayfasına yönlendiriliyor...');
-                setTimeout(() => {
-                    window.location.href = 'login.html';
-                }, 1000);
-            }
-            return;
-        }
-
-        const session = JSON.parse(userSession);
-        const loginTime = new Date(session.loginTime);
-        const now = new Date();
-        const daysDiff = (now - loginTime) / (1000 * 60 * 60 * 24);
-        
-        if (daysDiff >= 7) {
-            console.log('⚠️ Oturum süresi dolmuş');
-            localStorage.removeItem('userSession');
-            if (isIndexPage) {
-                setTimeout(() => {
-                    window.location.href = 'login.html';
-                }, 1000);
-            }
-            return;
-        }
-
-        console.log('✅ Geçerli oturum bulundu:', session.type);
-        
-        this.userType = session.type;
-        this.userProfile = {
-            id: session.id,
-            name: session.name,
-            role: session.type,
-            phone: session.phone
-        };
-
-        // YENİ (düzeltilmiş):
-        if (isLoginPage) {
-        console.log('🔐 Login sayfasındayız, oturum kontrolü atlanıyor...');
-        return; // ❌ Yönlendirme YOK!
-        } else if (isIndexPage) {
-            console.log('✅ Index sayfasındayız ve oturum geçerli');
+            const userSession = localStorage.getItem('userSession');
             
-            // PanelSystem kontrolü - null ise hata verme
-            if (typeof window.panelSystem !== 'undefined' && window.panelSystem !== null) {
-                window.panelSystem.initializePanel(this.userProfile);
-            } else {
-                console.log('⚠️ PanelSystem henüz yüklenmedi veya mevcut değil');
-                // PanelSystem yüklenene kadar bekle
-                setTimeout(() => {
-                    if (typeof window.panelSystem !== 'undefined' && window.panelSystem !== null) {
-                        window.panelSystem.initializePanel(this.userProfile);
-                    }
-                }, 1000);
+            if (!userSession) {
+                console.log('ℹ️ Oturum bulunamadı');
+                if (isIndexPage) {
+                    console.log('🚫 Index sayfasında oturum yok, login sayfasına yönlendiriliyor...');
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 1000);
+                }
+                return;
             }
-        }
 
-    } catch (error) {
-        console.error('❌ Oturum kontrol hatası:', error);
-        // Hata durumunda oturumu temizle
-        localStorage.removeItem('userSession');
-    }
-}
+            const session = JSON.parse(userSession);
+            const loginTime = new Date(session.loginTime);
+            const now = new Date();
+            const daysDiff = (now - loginTime) / (1000 * 60 * 60 * 24);
+            
+            if (daysDiff >= 7) {
+                console.log('⚠️ Oturum süresi dolmuş');
+                localStorage.removeItem('userSession');
+                if (isIndexPage) {
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 1000);
+                }
+                return;
+            }
 
-// redirectToIndex fonksiyonunu da güçlendirelim
-redirectToIndex() {
-    const currentPage = window.location.pathname;
-    const isAlreadyOnIndex = currentPage.includes('index.html') || 
-                            currentPage === '/' || 
-                            currentPage.endsWith('/');
-    
-    if (isAlreadyOnIndex) {
-        console.log('ℹ️ Zaten index sayfasındayız, yönlendirme yapılmıyor');
-        return;
-    }
-    
-    console.log('🔄 Index sayfasına yönlendiriliyor...');
-    
-    // Yönlendirmeden önce küçük bir gecikme
-    setTimeout(() => {
-        try {
-            window.location.href = 'index.html';
+            console.log('✅ Geçerli oturum bulundu:', session.type);
+            
+            this.userType = session.type;
+            this.userProfile = {
+                id: session.id,
+                name: session.name,
+                role: session.type,
+                phone: session.phone
+            };
+
+            // YENİ (düzeltilmiş):
+            if (isLoginPage) {
+            console.log('🔐 Login sayfasındayız, oturum kontrolü atlanıyor...');
+            return; // ❌ Yönlendirme YOK!
+            } else if (isIndexPage) {
+                console.log('✅ Index sayfasındayız ve oturum geçerli');
+                
+                // PanelSystem kontrolü - null ise hata verme
+                if (typeof window.panelSystem !== 'undefined' && window.panelSystem !== null) {
+                    window.panelSystem.initializePanel(this.userProfile);
+                } else {
+                    console.log('⚠️ PanelSystem henüz yüklenmedi veya mevcut değil');
+                    // PanelSystem yüklenene kadar bekle
+                    setTimeout(() => {
+                        if (typeof window.panelSystem !== 'undefined' && window.panelSystem !== null) {
+                            window.panelSystem.initializePanel(this.userProfile);
+                        }
+                    }, 1000);
+                }
+            }
+
         } catch (error) {
-            console.error('❌ Yönlendirme hatası:', error);
+            console.error('❌ Oturum kontrol hatası:', error);
+            // Hata durumunda oturumu temizle
+            localStorage.removeItem('userSession');
         }
-    }, 500);
-}
-
-
-showAlert(message, type) {
-    const alert = document.getElementById('authAlert');
-    if (!alert) {
-        console.log(`${type}: ${message}`);
-        return;
     }
-    
-    alert.textContent = message;
-    alert.className = `alert alert-${type}`;
-    alert.style.display = 'block';
-    
-    setTimeout(() => {
-        alert.style.display = 'none';
-    }, 5000);
-}
 
-logout() {
-    localStorage.removeItem('userSession');
-    console.log('✅ Oturum sonlandırıldı');
-    location.reload();
-}
+    showAlert(message, type) {
+        const alert = document.getElementById('authAlert');
+        if (!alert) {
+            console.log(`${type}: ${message}`);
+            return;
+        }
+        
+        alert.textContent = message;
+        alert.className = `alert alert-${type}`;
+        alert.style.display = 'block';
+        
+        setTimeout(() => {
+            alert.style.display = 'none';
+        }, 5000);
+    }
+
+    logout() {
+        localStorage.removeItem('userSession');
+        console.log('✅ Oturum sonlandırıldı');
+        location.reload();
+    }
 }
 
 // Uygulamayı başlat
