@@ -4,11 +4,15 @@ class PanelSystem {
         this.userProfile = null; // userProfile'ı burada tanımla
     }
 
-    initializePanel(userProfile) {
-        console.log('🎯 Panel başlatılıyor:', userProfile);
-        
-        // userProfile'ı set et - BU EKSİKTİ!
-        this.userProfile = userProfile;
+initializePanel(userProfile) {
+    console.log('🎯 Panel başlatılıyor:', userProfile);
+    
+    // ⚡ HIZLI FIX: Container'ları ayarla
+    document.getElementById('loginContainer').style.display = 'none';
+    document.getElementById('panelContainer').style.display = 'grid';
+    
+    // userProfile'ı set et
+    this.userProfile = userProfile;
         
         // Auth kontrolünü kaldır - sadece session'a güven
         if (!this.userProfile || !this.userProfile.role) {
