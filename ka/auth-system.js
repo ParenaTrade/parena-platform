@@ -1039,32 +1039,67 @@ async handleCourierLogin(phone, name) {
     }
 
     redirectToIndex() {
-        window.location.href = 'index.html';
+    // Mevcut sayfanın zaten index.html olup olmadığını kontrol et
+    const isAlreadyOnIndex = window.location.pathname.includes('index.html') || 
+                            window.location.pathname === '/' ||
+                            window.location.pathname.endsWith('/');
+    
+    if (isAlreadyOnIndex) {
+        console.log('ℹ️ Zaten index sayfasındayız');
+        return;
     }
-
-    async checkExistingSession() {
+    
+    console.log('🔄 Index sayfasına yönlendiriliyor...');
+    
+    // Yönlendirmeden önce küçük bir gecikme
+    setTimeout(() => {
         try {
-            const userSession = localStorage.getItem('userSession');
-            if (userSession) {
-                const session = JSON.parse(userSession);
-                
-                const loginTime = new Date(session.loginTime);
-                const now = new Date();
-                const daysDiff = (now - loginTime) / (1000 * 60 * 60 * 24);
-                
-                if (daysDiff < 7) {
-                    console.log('✅ Mevcut oturum bulundu:', session.type);
-                    this.redirectToIndex();
-                    return;
-                } else {
-                    localStorage.removeItem('userSession');
-                }
-            }
+            window.location.href = 'index.html';
         } catch (error) {
-            console.error('❌ Oturum kontrol hatası:', error);
+            console.error('❌ Yönlendirme hatası:', error);
         }
-    }
+    }, 500);
+}
+        const userSession = localStorage.getItem('userSession');
+        if (userSession) {
+            const session = JSON.parse(userSession);
+            
+            // Oturum süresi kontrolü (7 gün)
+            const loginTime = new Date(session.loginTime);
+            const now = new Date();
+            const daysDiff = (now - loginTime) / (1000 * 60 * 60 * 24);
+            
+            if (daysDiff < 7) {
+                console.log('✅ Mevcut oturum bulundu, index sayfasına yönlendiriliyor:', session.type);
+                
+                this.userType = session.type;
+                this.userProfile = {
+                    id: session.id,
+                    name: session.name,
+                    role: session.type,
+                    phone: session.phone
+                };
 
+                // Sadece login sayfasındaysak yönlendir
+                if (window.location.pathname.includes('login.html') || 
+                    !window.location.pathname.includes('index.html')) {
+                    setTimeout(() => {
+                        this.redirectToIndex();
+                    }, 1000);
+                }
+                return;
+            } else {
+                console.log('⚠️ Oturum süresi dolmuş');
+                localStorage.removeItem('userSession');
+            }
+        }
+
+        console.log('ℹ️ Mevcut oturum bulunamadı veya yönlendirme gerekmiyor');
+
+    } catch (error) {
+        console.error('❌ Oturum kontrol hatası:', error);
+    }
+}
     showAlert(message, type) {
         const alert = document.getElementById('authAlert');
         if (!alert) {
