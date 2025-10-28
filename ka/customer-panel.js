@@ -562,262 +562,175 @@ class CustomerPanel {
 }
     // CSS Animasyonlarını Ekleme Fonksiyonu
     addDeliveryAnimationsCSS() {
-        if (document.getElementById('delivery-animations-css')) return;
+    if (document.getElementById('delivery-animations-css')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'delivery-animations-css';
+    style.textContent = `
+        /* Kurye Animasyonları - DÜZELTİLMİŞ */
+        @keyframes moveToStore {
+            0% { 
+                transform: translateX(-20px) translateY(0);
+                opacity: 0; 
+            }
+            20% { 
+                opacity: 1; 
+            }
+            50% { 
+                transform: translateX(10px) translateY(-2px);
+            }
+            80% { 
+                transform: translateX(15px) translateY(0);
+            }
+            100% { 
+                transform: translateX(20px) translateY(0);
+            }
+        }
         
-        const style = document.createElement('style');
-        style.id = 'delivery-animations-css';
-        style.textContent = `
-            /* Kurye Animasyonları */
-            @keyframes moveToStore {
-                0% { 
-                    transform: translateX(-20px) translateY(0);
-                    opacity: 0; 
-                }
-                20% { 
-                    opacity: 1; 
-                }
-                50% { 
-                    transform: translateX(10px) translateY(-2px);
-                }
-                80% { 
-                    transform: translateX(15px) translateY(0);
-                }
-                100% { 
-                    transform: translateX(20px) translateY(0);
-                }
+        @keyframes moveToAddress {
+            0% { 
+                transform: translateX(0px) translateY(0);
             }
-            
-            @keyframes moveToAddress {
-                0% { 
-                    transform: translateX(0px) translateY(0);
-                }
-                25% { 
-                    transform: translateX(15px) translateY(-1px);
-                }
-                50% { 
-                    transform: translateX(30px) translateY(0);
-                }
-                75% { 
-                    transform: translateX(45px) translateY(-1px);
-                }
-                100% { 
-                    transform: translateX(60px) translateY(0);
-                }
+            25% { 
+                transform: translateX(15px) translateY(-1px);
             }
-            
-            @keyframes bounceMoto {
-                0%, 100% { 
-                    transform: translateY(0); 
-                }
-                50% { 
-                    transform: translateY(-3px); 
-                }
+            50% { 
+                transform: translateX(30px) translateY(0);
             }
-            
-            @keyframes pulseStore {
-                0%, 100% { 
-                    transform: scale(1); 
-                    color: #28a745;
-                }
-                50% { 
-                    transform: scale(1.2); 
-                    color: #20c997;
-                }
+            75% { 
+                transform: translateX(45px) translateY(-1px);
             }
-            
-            @keyframes pulseAddress {
-                0%, 100% { 
-                    transform: scale(1); 
-                    color: #dc3545;
-                }
-                50% { 
-                    transform: scale(1.1); 
-                    color: #e35d6a;
-                }
+            100% { 
+                transform: translateX(60px) translateY(0);
             }
-            
-            @keyframes spinClock {
-                0% { 
-                    transform: rotate(0deg); 
-                }
-                100% { 
-                    transform: rotate(360deg); 
-                }
+        }
+        
+        @keyframes bounceMoto {
+            0%, 100% { 
+                transform: translateY(0); 
             }
-            
-            @keyframes checkmark {
-                0% { 
-                    transform: scale(0); 
-                    opacity: 0;
-                }
-                50% { 
-                    transform: scale(1.2); 
-                }
-                100% { 
-                    transform: scale(1); 
-                    opacity: 1;
+            50% { 
+                transform: translateY(-3px); 
             }
-            
-            /* Animasyon Classları */
-            .moto-moving {
-                animation: moveToStore 3s ease-in-out infinite, bounceMoto 0.6s ease-in-out infinite;
-                color: #007bff !important;
-            }
-            
-            .moto-delivering {
-                animation: moveToAddress 4s linear infinite, bounceMoto 0.6s ease-in-out infinite;
-                color: #007bff !important;
-            }
-            
-            .store-pulsing {
-                animation: pulseStore 2s ease-in-out infinite;
-            }
-            
-            .address-pulsing {
-                animation: pulseAddress 2s ease-in-out infinite;
-            }
-            
-            .fa-spin-slow {
-                animation: spinClock 2s linear infinite;
-            }
-            
-            .checkmark-animation {
-                animation: checkmark 0.6s ease-out;
-                color: #28a745 !important;
-            }
-            
-            /* Kurye Container Stilleri */
-            .moto-container {
-                position: relative;
-                width: 80px;
-                height: 25px;
-                display: flex;
-                align-items: center;
-            }
-            
-            .moto-container .fa-store {
-                position: absolute;
-                left: 0;
-                font-size: 14px;
-            }
-            
-            .moto-container .fa-motorcycle {
-                position: absolute;
-                font-size: 16px;
-                z-index: 2;
-            }
-            
-            .moto-container .fa-map-marker-alt {
-                position: absolute;
-                right: 0;
-                font-size: 14px;
-            }
-            
-            /* Durum Badge Stilleri */
-            .status-badge {
-                padding: 4px 12px;
-                border-radius: 20px;
-                font-size: 11px;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-            
-            .status-pending { 
-                background: linear-gradient(135deg, #fff3cd, #ffeaa7); 
-                color: #856404; 
-                border: 1px solid #ffeaa7;
-            }
-            
-            .status-confirmed { 
-                background: linear-gradient(135deg, #d1ecf1, #a6e1ec); 
-                color: #0c5460; 
-                border: 1px solid #a6e1ec;
-            }
-            
-            .status-preparing { 
-                background: linear-gradient(135deg, #d1ecf1, #a6e1ec); 
-                color: #0c5460; 
-                border: 1px solid #a6e1ec;
-            }
-            
-            .status-ready { 
-                background: linear-gradient(135deg, #d4edda, #c3e6cb); 
-                color: #155724; 
-                border: 1px solid #c3e6cb;
-            }
-            
-            .status-on_the_way { 
-                background: linear-gradient(135deg, #cce7ff, #b3d9ff); 
-                color: #004085; 
-                border: 1px solid #b3d9ff;
-            }
-            
-            .status-delivered { 
-                background: linear-gradient(135deg, #d4edda, #c3e6cb); 
-                color: #155724; 
-                border: 1px solid #c3e6cb;
-            }
-            
-            .status-cancelled { 
-                background: linear-gradient(135deg, #f8d7da, #f5c6cb); 
-                color: #721c24; 
-                border: 1px solid #f5c6cb;
-            }
-            
-            /* Delivery Tracker Stilleri */
-            .delivery-tracker {
-                margin-top: 12px;
-                padding: 8px 12px;
-                background: rgba(255, 255, 255, 0.7);
-                border-radius: 8px;
-                border: 1px solid #e9ecef;
-            }
-            
-            .delivery-tracker .fa-clock {
-                color: #ffc107;
-            }
-            
-            .delivery-tracker .fa-check-circle {
+        }
+        
+        @keyframes pulseStore {
+            0%, 100% { 
+                transform: scale(1); 
                 color: #28a745;
             }
-            
-            .delivery-tracker .fa-info-circle {
-                color: #6c757d;
+            50% { 
+                transform: scale(1.2); 
+                color: #20c997;
             }
-            
-            /* Responsive Tasarım */
-            @media (max-width: 768px) {
-                .moto-container {
-                    width: 60px;
-                }
-                
-                .status-badge {
-                    font-size: 10px;
-                    padding: 3px 8px;
-                }
-                
-                .delivery-tracker {
-                    font-size: 11px;
-                    padding: 6px 8px;
-                }
-            }
-            
-            /* Kurye Yol Çizgisi */
-            .delivery-road {
-                position: absolute;
-                bottom: 8px;
-                left: 0;
-                right: 0;
-                height: 2px;
-                background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);
-                z-index: 1;
-            }
-        `;
+        }
         
-        document.head.appendChild(style);
-    }
-
+        @keyframes pulseAddress {
+            0%, 100% { 
+                transform: scale(1); 
+                color: #dc3545;
+            }
+            50% { 
+                transform: scale(1.1); 
+                color: #e35d6a;
+            }
+        }
+        
+        @keyframes spinClock {
+            0% { 
+                transform: rotate(0deg); 
+            }
+            100% { 
+                transform: rotate(360deg); 
+            }
+        }
+        
+        @keyframes checkmark {
+            0% { 
+                transform: scale(0); 
+                opacity: 0;
+            }
+            50% { 
+                transform: scale(1.2); 
+            }
+            100% { 
+                transform: scale(1); 
+                opacity: 1;
+            }
+        }
+        
+        /* Animasyon Classları - DÜZELTİLMİŞ */
+        .moto-moving {
+            animation: moveToStore 3s ease-in-out infinite, bounceMoto 0.6s ease-in-out infinite !important;
+            color: #007bff !important;
+        }
+        
+        .moto-delivering {
+            animation: moveToAddress 4s linear infinite, bounceMoto 0.6s ease-in-out infinite !important;
+            color: #007bff !important;
+        }
+        
+        .store-pulsing {
+            animation: pulseStore 2s ease-in-out infinite !important;
+        }
+        
+        .address-pulsing {
+            animation: pulseAddress 2s ease-in-out infinite !important;
+        }
+        
+        .fa-spin-slow {
+            animation: spinClock 2s linear infinite !important;
+        }
+        
+        .checkmark-animation {
+            animation: checkmark 0.6s ease-out !important;
+            color: #28a745 !important;
+        }
+        
+        /* Kurye Container Stilleri */
+        .moto-container {
+            position: relative;
+            width: 80px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .moto-container .fa-store {
+            position: absolute;
+            left: 0;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        
+        .moto-container .fa-motorcycle {
+            position: absolute;
+            font-size: 16px;
+            z-index: 2;
+        }
+        
+        .moto-container .fa-map-marker-alt {
+            position: absolute;
+            right: 0;
+            font-size: 14px;
+        }
+        
+        /* Kurye Yol Çizgisi */
+        .delivery-road {
+            position: absolute;
+            bottom: 8px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);
+            z-index: 1;
+        }
+    `;
+    
+    document.head.appendChild(style);
+    console.log('✅ CSS animasyonları yüklendi!');
+}
     renderDeliveryTracker(order) {
     const status = order.status;
     
@@ -935,49 +848,79 @@ class CustomerPanel {
     return trackerHTML;
 }
     
-    // Animasyonları Başlatma Fonksiyonu
     startDeliveryAnimations() {
-        const animatedElements = document.querySelectorAll('.delivery-animation');
+    console.log('🎬 Animasyonlar başlatılıyor...');
+    
+    // Tüm animasyonlu elementleri bul
+    const animatedElements = document.querySelectorAll('.delivery-animation');
+    console.log(`🔍 ${animatedElements.length} adet animasyonlu element bulundu`);
+    
+    animatedElements.forEach((element, index) => {
+        const orderId = element.getAttribute('data-order-id');
+        const status = element.getAttribute('data-status');
         
-        animatedElements.forEach(element => {
-            const orderId = element.getAttribute('data-order-id');
-            const status = element.getAttribute('data-status');
-            
-            switch(status) {
-                case 'ready':
-                    this.startMotoToStoreAnimation(orderId);
-                    break;
-                case 'on_the_way':
-                    this.startMotoToAddressAnimation(orderId);
-                    break;
-            }
-        });
-    }
-
-    startMotoToStoreAnimation(orderId) {
-        const element = document.querySelector(`[data-order-id="${orderId}"] .moto-moving`);
-        if (!element) return;
+        console.log(`🎯 Sipariş ${orderId} - Durum: ${status}`);
         
-        setTimeout(() => {
-            const storeIcon = document.querySelector(`[data-order-id="${orderId}"] .fa-store`);
-            if (storeIcon) {
-                storeIcon.style.opacity = '1';
-            }
-        }, 5000);
-    }
-
-    startMotoToAddressAnimation(orderId) {
-        const orderCard = document.querySelector(`[data-order-id="${orderId}"]`)?.closest('.order-card');
-        const statusBadge = orderCard?.querySelector('.status-badge');
-        
-        if (statusBadge && statusBadge.classList.contains('status-delivered')) {
-            const motoElement = document.querySelector(`[data-order-id="${orderId}"] .moto-delivering`);
-            if (motoElement) {
-                motoElement.style.animation = 'none';
-            }
+        switch(status) {
+            case 'ready':
+                this.startMotoToStoreAnimation(orderId);
+                break;
+            case 'on_the_way':
+                this.startMotoToAddressAnimation(orderId);
+                break;
         }
-    }
+    });
+}
 
+startMotoToStoreAnimation(orderId) {
+    console.log(`🏍️ Mağaza animasyonu başlatılıyor: ${orderId}`);
+    
+    const motoElement = document.querySelector(`[data-order-id="${orderId}"] .moto-moving`);
+    const storeElement = document.querySelector(`[data-order-id="${orderId}"] .fa-store`);
+    
+    if (motoElement && storeElement) {
+        console.log('✅ Animasyon elementleri bulundu');
+        
+        // Animasyonu manuel tetikle
+        motoElement.style.animation = 'moveToStore 3s ease-in-out infinite, bounceMoto 0.6s ease-in-out infinite';
+        storeElement.style.animation = 'pulseStore 2s ease-in-out infinite';
+        
+        // 5 saniye sonra mağaza ikonunu göster
+        setTimeout(() => {
+            storeElement.style.opacity = '1';
+            console.log('🏪 Mağaza ikonu görünür oldu');
+        }, 5000);
+        
+    } else {
+        console.log('❌ Animasyon elementleri bulunamadı:', { moto: !!motoElement, store: !!storeElement });
+    }
+}
+
+startMotoToAddressAnimation(orderId) {
+    console.log(`🏍️ Adres animasyonu başlatılıyor: ${orderId}`);
+    
+    const motoElement = document.querySelector(`[data-order-id="${orderId}"] .moto-delivering`);
+    const addressElement = document.querySelector(`[data-order-id="${orderId}"] .fa-map-marker-alt`);
+    
+    if (motoElement && addressElement) {
+        console.log('✅ Animasyon elementleri bulundu');
+        
+        // Animasyonu manuel tetikle
+        motoElement.style.animation = 'moveToAddress 4s linear infinite, bounceMoto 0.6s ease-in-out infinite';
+        addressElement.style.animation = 'pulseAddress 2s ease-in-out infinite';
+        
+    } else {
+        console.log('❌ Animasyon elementleri bulunamadı:', { moto: !!motoElement, address: !!addressElement });
+    }
+}
+
+// Animasyonları durdurma fonksiyonu (opsiyonel)
+stopDeliveryAnimations(orderId) {
+    const elements = document.querySelectorAll(`[data-order-id="${orderId}"] .moto-moving, [data-order-id="${orderId}"] .moto-delivering`);
+    elements.forEach(el => {
+        el.style.animation = 'none';
+    });
+}
 
     
     // Ana Sipariş Render Fonksiyonu
