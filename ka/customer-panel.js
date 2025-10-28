@@ -860,7 +860,7 @@ class CustomerPanel {
                 .from('customer_payments')
                 .select(`
                     *,
-                    order:orders(order_number, total_amount)
+                    order:orders(order_id, total_amount)
                 `)
                 .eq('customer_id', this.customerData.id)
                 .order('payment_date', { ascending: false });
