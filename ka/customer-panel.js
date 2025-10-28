@@ -1116,8 +1116,7 @@ class CustomerPanel {
                             </div>
                         </div>
                         
-                        // Sipariş detayları içindeki kurye bilgisi kısmı
-<div>
+    <div>
     <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
         <i class="fas fa-shipping-fast" style="margin-right: 8px;"></i>
         Teslimat Bilgileri
