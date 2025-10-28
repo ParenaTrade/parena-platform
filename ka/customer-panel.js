@@ -578,7 +578,7 @@ class CustomerPanel {
             <!-- Sipariş Özeti - Her Zaman Görünür -->
             <div class="order-summary" 
                  style="padding: 20px; cursor: pointer; background: #f8f9fa;"
-                 onclick="customerPanel.toggleOrderDetails('${order.id}')">
+                 onclick="window.customerPanel.toggleOrderDetails('${order.id}')">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="flex: 1;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
@@ -714,25 +714,25 @@ class CustomerPanel {
                 <!-- Aksiyon Butonları -->
                 <div class="order-actions" style="display: flex; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e1e5e9;">
                     ${order.status === 'delivered' ? `
-                        <button class="btn btn-sm btn-success" onclick="customerPanel.rateOrder('${order.id}')">
+                        <button class="btn btn-sm btn-success" onclick="window.customerPanel.rateOrder('${order.id}')">
                             <i class="fas fa-star"></i> Değerlendir
                         </button>
                     ` : ''}
                     
                     ${order.status === 'pending' ? `
                         ${order.cancellation_requested ? `
-                            <button class="btn btn-sm btn-secondary" onclick="customerPanel.viewCancellationStatus('${order.id}')">
+                            <button class="btn btn-sm btn-secondary" onclick="window.customerPanel.viewCancellationStatus('${order.id}')">
                                 <i class="fas fa-info-circle"></i> İptal Durumu
                             </button>
                         ` : `
-                            <button class="btn btn-sm btn-warning" onclick="customerPanel.cancelOrder('${order.id}')">
+                            <button class="btn btn-sm btn-warning" onclick="window.customerPanel.cancelOrder('${order.id}')">
                                 <i class="fas fa-times"></i> İptal Talebi
                             </button>
                         `}
                     ` : ''}
                     
                     <button class="btn btn-sm btn-outline-primary" 
-                            onclick="customerPanel.toggleOrderDetails('${order.id}')">
+                            onclick="window.customerPanel.toggleOrderDetails('${order.id}')">
                         <i class="fas fa-times"></i> Kapat
                     </button>
                 </div>
@@ -741,17 +741,19 @@ class CustomerPanel {
     `).join('');
 }
 
-// Açılır-kapanır fonksiyonu
+// Açılır-kapanır fonksiyonu - window objesine bağlı
 toggleOrderDetails(orderId) {
     const detailsElement = document.getElementById(`details-${orderId}`);
     const chevronElement = document.getElementById(`chevron-${orderId}`);
     
-    if (detailsElement.style.display === 'none') {
-        detailsElement.style.display = 'block';
-        chevronElement.style.transform = 'rotate(180deg)';
-    } else {
-        detailsElement.style.display = 'none';
-        chevronElement.style.transform = 'rotate(0deg)';
+    if (detailsElement && chevronElement) {
+        if (detailsElement.style.display === 'none') {
+            detailsElement.style.display = 'block';
+            chevronElement.style.transform = 'rotate(180deg)';
+        } else {
+            detailsElement.style.display = 'none';
+            chevronElement.style.transform = 'rotate(0deg)';
+        }
     }
 }
     filterOrders(status) {
