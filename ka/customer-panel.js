@@ -8,6 +8,8 @@ class CustomerPanel {
         this.currentSection = '';
         this.isDataLoaded = false;
         
+    this.addDeliveryAnimationsCSS();
+        
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
         
@@ -977,8 +979,7 @@ class CustomerPanel {
         }
     }
 
-    // Animasyon Başlat
-    this.addDeliveryAnimationsCSS();
+
     
     // Ana Sipariş Render Fonksiyonu
     renderCustomerOrders(orders) {
