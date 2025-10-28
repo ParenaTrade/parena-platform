@@ -2,8 +2,29 @@ class PanelSystem {
     constructor() {
         this.currentPanel = null;
         this.userProfile = null;
+        this.setupMobileMenu();
     }
 
+    setupMobileMenu() {
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        
+        if (mobileMenuBtn && sidebar) {
+            mobileMenuBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('mobile-open');
+            });
+            
+            // Mobile menüyü kapatmak için overlay tıklama
+            document.addEventListener('click', (e) => {
+                if (sidebar.classList.contains('mobile-open') && 
+                    !sidebar.contains(e.target) && 
+                    e.target !== mobileMenuBtn) {
+                    sidebar.classList.remove('mobile-open');
+                }
+            });
+        }
+    }
+    
     initializePanel(userProfile) {
         console.log('🎯 PANEL BAŞLATMA - Gelen userProfile:', userProfile);
         console.log('🔍 Rol kontrolü:', userProfile.role);
