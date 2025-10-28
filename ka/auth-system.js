@@ -1061,48 +1061,106 @@ async handleCourierLogin(phone, name) {
     }, 500);
 }
       // checkExistingSession fonksiyonu düzgün kapanmamış, bu şekilde olmalı:
+// AuthSystem class içinde checkExistingSession fonksiyonunu güncelle
 async checkExistingSession() {
     try {
-        const userSession = localStorage.getItem('userSession');
-        if (userSession) {
-            const session = JSON.parse(userSession);
-            
-            // Oturum süresi kontrolü (7 gün)
-            const loginTime = new Date(session.loginTime);
-            const now = new Date();
-            const daysDiff = (now - loginTime) / (1000 * 60 * 60 * 24);
-            
-            if (daysDiff < 7) {
-                console.log('✅ Mevcut oturum bulundu, index sayfasına yönlendiriliyor:', session.type);
-                
-                this.userType = session.type;
-                this.userProfile = {
-                    id: session.id,
-                    name: session.name,
-                    role: session.type,
-                    phone: session.phone
-                };
+        // Mevcut sayfanın index.html olup olmadığını kontrol et
+        const currentPage = window.location.pathname;
+        const isIndexPage = currentPage.includes('index.html') || 
+                           currentPage === '/' || 
+                           currentPage.endsWith('/');
+        const isLoginPage = currentPage.includes('login.html');
 
-                // Sadece login sayfasındaysak yönlendir
-                if (window.location.pathname.includes('login.html') || 
-                    !window.location.pathname.includes('index.html')) {
-                    setTimeout(() => {
-                        this.redirectToIndex();
-                    }, 1000);
-                }
-                return;
-            } else {
-                console.log('⚠️ Oturum süresi dolmuş');
-                localStorage.removeItem('userSession');
+        console.log(`📄 Mevcut sayfa: ${currentPage}, Index: ${isIndexPage}, Login: ${isLoginPage}`);
+
+        const userSession = localStorage.getItem('userSession');
+        
+        if (!userSession) {
+            console.log('ℹ️ Oturum bulunamadı');
+            
+            // Eğer index sayfasındaysak ve oturum yoksa, login'e yönlendir
+            if (isIndexPage) {
+                console.log('🚫 Index sayfasında oturum yok, login sayfasına yönlendiriliyor...');
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 1000);
             }
+            return;
         }
 
-        console.log('ℹ️ Mevcut oturum bulunamadı veya yönlendirme gerekmiyor');
+        const session = JSON.parse(userSession);
+        
+        // Oturum süresi kontrolü (7 gün)
+        const loginTime = new Date(session.loginTime);
+        const now = new Date();
+        const daysDiff = (now - loginTime) / (1000 * 60 * 60 * 24);
+        
+        if (daysDiff >= 7) {
+            console.log('⚠️ Oturum süresi dolmuş');
+            localStorage.removeItem('userSession');
+            
+            // Oturum süresi dolmuşsa, index'teysek login'e yönlendir
+            if (isIndexPage) {
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 1000);
+            }
+            return;
+        }
+
+        console.log('✅ Geçerli oturum bulundu:', session.type);
+        
+        this.userType = session.type;
+        this.userProfile = {
+            id: session.id,
+            name: session.name,
+            role: session.type,
+            phone: session.phone
+        };
+
+        // SADECE login sayfasındaysak index'e yönlendir
+        if (isLoginPage) {
+            console.log('🔄 Login sayfasındayız, index sayfasına yönlendiriliyor...');
+            setTimeout(() => {
+                this.redirectToIndex();
+            }, 1000);
+        } else if (isIndexPage) {
+            console.log('✅ Index sayfasındayız ve oturum geçerli, panele devam...');
+            // Index sayfasındayız ve oturum geçerli, panele devam et
+            if (typeof window.panelSystem !== 'undefined') {
+                window.panelSystem.initializePanel(this.userProfile);
+            }
+        }
 
     } catch (error) {
         console.error('❌ Oturum kontrol hatası:', error);
     }
 }
+
+// redirectToIndex fonksiyonunu da güçlendirelim
+redirectToIndex() {
+    const currentPage = window.location.pathname;
+    const isAlreadyOnIndex = currentPage.includes('index.html') || 
+                            currentPage === '/' || 
+                            currentPage.endsWith('/');
+    
+    if (isAlreadyOnIndex) {
+        console.log('ℹ️ Zaten index sayfasındayız, yönlendirme yapılmıyor');
+        return;
+    }
+    
+    console.log('🔄 Index sayfasına yönlendiriliyor...');
+    
+    // Yönlendirmeden önce küçük bir gecikme
+    setTimeout(() => {
+        try {
+            window.location.href = 'index.html';
+        } catch (error) {
+            console.error('❌ Yönlendirme hatası:', error);
+        }
+    }, 500);
+}
+
 
 showAlert(message, type) {
     const alert = document.getElementById('authAlert');
