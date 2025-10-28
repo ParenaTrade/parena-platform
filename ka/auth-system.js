@@ -1060,6 +1060,9 @@ async handleCourierLogin(phone, name) {
         }
     }, 500);
 }
+      // checkExistingSession fonksiyonu düzgün kapanmamış, bu şekilde olmalı:
+async checkExistingSession() {
+    try {
         const userSession = localStorage.getItem('userSession');
         if (userSession) {
             const session = JSON.parse(userSession);
@@ -1100,27 +1103,28 @@ async handleCourierLogin(phone, name) {
         console.error('❌ Oturum kontrol hatası:', error);
     }
 }
-    showAlert(message, type) {
-        const alert = document.getElementById('authAlert');
-        if (!alert) {
-            console.log(`${type}: ${message}`);
-            return;
-        }
-        
-        alert.textContent = message;
-        alert.className = `alert alert-${type}`;
-        alert.style.display = 'block';
-        
-        setTimeout(() => {
-            alert.style.display = 'none';
-        }, 5000);
-    }
 
-    logout() {
-        localStorage.removeItem('userSession');
-        console.log('✅ Oturum sonlandırıldı');
-        location.reload();
+showAlert(message, type) {
+    const alert = document.getElementById('authAlert');
+    if (!alert) {
+        console.log(`${type}: ${message}`);
+        return;
     }
+    
+    alert.textContent = message;
+    alert.className = `alert alert-${type}`;
+    alert.style.display = 'block';
+    
+    setTimeout(() => {
+        alert.style.display = 'none';
+    }, 5000);
+}
+
+logout() {
+    localStorage.removeItem('userSession');
+    console.log('✅ Oturum sonlandırıldı');
+    location.reload();
+}
 }
 
 // Uygulamayı başlat
