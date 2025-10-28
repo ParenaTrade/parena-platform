@@ -1,85 +1,191 @@
 class PanelSystem {
     constructor() {
-        this.currentSection = 'dashboard';
         this.currentPanel = null;
-        this.userProfile = null;
+        this.userProfile = null; // userProfile'ı burada tanımla
     }
 
-    initializePanel(userProfile) {
-        this.userProfile = userProfile;
-        this.updateUI();
-        this.setupEventListeners();
-        this.initializeRoleSpecificPanel();
+initializePanel(userProfile) {
+    console.log('🎯 PANEL BAŞLATMA - Gelen userProfile:', userProfile);
+    console.log('🔍 Rol kontrolü:', userProfile.role);
+    console.log('🔍 Tüm userProfile:', JSON.stringify(userProfile, null, 2));
+    
+    // userProfile'ı set et
+    this.userProfile = userProfile;
+    
+    // Container'ları ayarla
+    this.setupContainers();
+    
+    // Rol kontrolü
+    if (!this.userProfile || !this.userProfile.role) {
+        console.error('❌ GEÇERSİZ USER PROFILE - Rol yok:', this.userProfile);
+        return;
     }
 
-    updateUI() {
-        // Null check ekleyelim
-        if (!this.userProfile) {
-            console.error('User profile is null');
-            return;
+    console.log('✅ Rol bulundu:', this.userProfile.role);
+    
+    // Kullanıcı bilgilerini güncelle
+    this.updateUserInfo(this.userProfile);
+    
+    // Navigation'ı kur
+    this.setupNavigation();
+    
+    // Rol bazlı paneli başlat
+    this.initializeRoleSpecificPanel(this.userProfile);
+}
+    initializeRoleSpecificPanel(userProfile) {
+    console.log('🔄 ROL BAZLI PANEL BAŞLATILIYOR - Rol:', userProfile.role);
+    
+    // Mevcut paneli temizle
+    this.currentPanel = null;
+
+    // Tüm rol menülerini gizle
+    document.querySelectorAll('.role-menu').forEach(menu => {
+        menu.style.display = 'none';
+        console.log('❌ Menü gizlendi:', menu.id);
+    });
+
+    // Doğru rol menüsünü göster
+    let roleMenuId;
+    
+    if (userProfile.role === 'üye' || userProfile.role === 'customer') {
+        roleMenuId = 'customerMenu';
+    } else {
+        roleMenuId = userProfile.role + 'Menu';
+    }
+    
+    console.log('🎯 Gösterilecek menü ID:', roleMenuId);
+    
+    const roleMenu = document.getElementById(roleMenuId);
+    if (roleMenu) {
+        roleMenu.style.display = 'block';
+        console.log('✅ Rol menüsü gösterildi:', roleMenuId);
+    } else {
+        console.error('❌ Rol menüsü bulunamadı:', roleMenuId);
+        // Fallback: customer menu göster
+        const fallbackMenu = document.getElementById('customerMenu');
+        if (fallbackMenu) {
+            fallbackMenu.style.display = 'block';
+            console.log('🔄 Fallback customer menü gösterildi');
         }
-
-        // Kullanıcı bilgilerini UI'da göster
-        const userName = this.userProfile.full_name || 
-                        this.userProfile.name || 
-                        this.userProfile.email || 
-                        'Kullanıcı';
-        
-        document.getElementById('userName').textContent = userName;
-        
-        // Rol bilgisini düzgün göster
-        const roleText = this.getRoleText(this.userProfile.role);
-        document.getElementById('userRole').textContent = roleText;
-        
-        document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
-
-        // Update role badge
-        const roleBadge = document.getElementById('userRole');
-        roleBadge.className = `role-badge role-${this.userProfile.role || 'customer'}`;
     }
 
-    getRoleText(role) {
-        const roleMap = {
-            'seller': 'Satıcı',
-            'courier': 'Kurye',
-            'admin': 'Admin',
-            'üye': 'Müşteri',
-            'customer': 'Müşteri'
-        };
-        return roleMap[role] || role;
+    // Özel panel class'ını başlat
+    console.log('🚀 Özel panel başlatılıyor, rol:', userProfile.role);
+    
+    try {
+        switch (userProfile.role) {
+            case 'üye':
+            case 'customer':
+                console.log('🎯 Customer panel seçildi');
+                if (typeof CustomerPanel !== 'undefined') {
+                    this.currentPanel = new CustomerPanel(userProfile);
+                    console.log('✅ CustomerPanel başlatıldı');
+                    this.showSection('customerDashboard');
+                } else {
+                    console.error('❌ CustomerPanel tanımsız!');
+                }
+                break;
+                
+            case 'seller':
+                console.log('🎯 Seller panel seçildi');
+                if (typeof SellerPanel !== 'undefined') {
+                    this.currentPanel = new SellerPanel(userProfile);
+                    console.log('✅ SellerPanel başlatıldı');
+                    this.showSection('sellerDashboard');
+                }
+                break;
+                
+            case 'courier':
+                console.log('🎯 Courier panel seçildi');
+                if (typeof CourierPanel !== 'undefined') {
+                    this.currentPanel = new CourierPanel(userProfile);
+                    console.log('✅ CourierPanel başlatıldı');
+                    this.showSection('courierDashboard');
+                }
+                break;
+                
+            case 'admin':
+                console.log('🎯 Admin panel seçildi');
+                if (typeof AdminPanel !== 'undefined') {
+                    this.currentPanel = new AdminPanel(userProfile);
+                    console.log('✅ AdminPanel başlatıldı');
+                    this.showSection('dashboard');
+                }
+                break;
+                
+            default:
+                console.error('❌ TANIMSIZ ROL:', userProfile.role);
+                // Varsayılan olarak customer panel
+                if (typeof CustomerPanel !== 'undefined') {
+                    this.currentPanel = new CustomerPanel(userProfile);
+                    this.showSection('customerDashboard');
+                }
+        }
+    } catch (error) {
+        console.error('❌ Panel başlatma hatası:', error);
+    }
+    
+    console.log('🎯 Panel başlatma tamamlandı. CurrentPanel:', this.currentPanel);
+}
+   updateUserInfo(userProfile) {
+    console.log('👤 KULLANICI BİLGİLERİ GÜNCELLENİYOR:', userProfile);
+    
+    const userAvatar = document.getElementById('userAvatar');
+    const userName = document.getElementById('userName');
+    const userRole = document.getElementById('userRole');
+
+    if (userAvatar) {
+        userAvatar.textContent = userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U';
+        console.log('✅ Avatar güncellendi:', userAvatar.textContent);
     }
 
-    setupEventListeners() {
-        // Navigation
-        document.querySelectorAll('.nav-item').forEach(item => {
-            if (item.id !== 'logoutBtn') {
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const section = item.getAttribute('data-section');
-                    this.showSection(section);
-                });
+    if (userName) {
+        userName.textContent = userProfile.name || 'Kullanıcı';
+        console.log('✅ İsim güncellendi:', userName.textContent);
+    }
+
+    if (userRole) {
+        const roleText = this.getRoleText(userProfile.role);
+        userRole.textContent = roleText;
+        console.log('✅ Rol güncellendi:', userProfile.role, '->', roleText);
+    }
+}
+
+getRoleText(role) {
+    const roleMap = {
+        'customer': 'Müşteri',
+        'seller': 'Satıcı',
+        'courier': 'Kurye',
+        'admin': 'Yönetici',
+        'üye': 'Müşteri'
+    };
+    return roleMap[role] || role;
+}
+    setupNavigation() {
+        // Navigation event listeners
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('[data-section]')) {
+                const sectionId = e.target.getAttribute('data-section');
+                this.showSection(sectionId);
             }
         });
 
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-            if (window.authSystem) {
-                await window.authSystem.logout();
-            } else {
-                location.reload();
-            }
-        });
-
-        // Mobile menu
-        document.getElementById('mobileMenuBtn').addEventListener('click', () => {
-            document.getElementById('sidebar').classList.toggle('active');
-        });
+        // Logout butonu
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                if (window.authSystem) {
+                    window.authSystem.logout();
+                }
+            });
+        }
     }
 
     showSection(sectionName) {
         // Hide all sections
         document.querySelectorAll('.content-section').forEach(section => {
             section.classList.remove('active');
+            section.style.display = 'none';
         });
 
         // Update navigation
@@ -91,12 +197,13 @@ class PanelSystem {
         const targetSection = document.getElementById(sectionName + 'Section');
         if (targetSection) {
             targetSection.classList.add('active');
+            targetSection.style.display = 'block';
+            
             const navItem = document.querySelector(`[data-section="${sectionName}"]`);
             if (navItem) {
                 navItem.classList.add('active');
             }
             
-            this.currentSection = sectionName;
             this.updatePageTitle(sectionName);
             
             // Load section data
@@ -129,57 +236,16 @@ class PanelSystem {
             'referral': 'Arkadaşını Davet Et'
         };
         
-        document.getElementById('pageTitle').textContent = titles[sectionName] || 'Panel';
+        const pageTitleElement = document.getElementById('pageTitle');
+        if (pageTitleElement) {
+            pageTitleElement.textContent = titles[sectionName] || 'Panel';
+        }
     }
 
-    initializeRoleSpecificPanel() {
-        // Hide all role menus
-        document.querySelectorAll('.role-menu').forEach(menu => {
-            menu.style.display = 'none';
-        });
-
-        // Show appropriate role menu
-        let roleMenuId;
-        const userRole = this.userProfile.role;
-        
-        if (userRole === 'üye' || userRole === 'customer') {
-            roleMenuId = 'customerMenu';
-        } else {
-            roleMenuId = userRole + 'Menu';
-        }
-        
-        const roleMenu = document.getElementById(roleMenuId);
-        if (roleMenu) {
-            roleMenu.style.display = 'block';
-        } else {
-            // Fallback: customer menu göster
-            document.getElementById('customerMenu').style.display = 'block';
-        }
-
-        // Initialize specific panel class
-        switch (userRole) {
-            case 'üye':
-            case 'customer':
-                this.currentPanel = new CustomerPanel(this.userProfile);
-                break;
-            case 'seller':
-                this.currentPanel = new SellerPanel(this.userProfile);
-                break;
-            case 'courier':
-                this.currentPanel = new CourierPanel(this.userProfile);
-                break;
-            case 'admin':
-                this.currentPanel = new AdminPanel(this.userProfile);
-                break;
-            default:
-                // Varsayılan olarak customer panel
-                this.currentPanel = new CustomerPanel(this.userProfile);
-        }
-
-        // Show initial section
-        const initialSection = this.getInitialSection();
-        this.showSection(initialSection);
-    }
+    // BU FONKSİYONU SİLİN - ÇAKIŞMA YARATIYOR
+    // initializeRoleSpecificPanel() {
+    //     // Bu fonksiyon zaten yukarıda var ve parametre alıyor
+    // }
 
     getInitialSection() {
         const roleSections = {
