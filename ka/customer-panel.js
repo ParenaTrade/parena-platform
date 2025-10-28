@@ -546,7 +546,7 @@ class CustomerPanel {
             return;
         }
 
-        // İLİŞKİSİZ SORGU - courier tamamen kaldırıldı
+        // İLİŞKİSİZ SORGU - sadece orders tablosundaki direkt alanlar
         const { data: orders, error } = await this.supabase
             .from('orders')
             .select(`
