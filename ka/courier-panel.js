@@ -106,7 +106,7 @@ class CourierPanel {
             window.panelSystem.showAlert('Durum güncellenemedi!', 'error');
         }
     }
-}
+
     async loadSectionData(sectionName) {
         const section = document.getElementById(sectionName + 'Section');
         
