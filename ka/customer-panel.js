@@ -578,7 +578,7 @@ class CustomerPanel {
             <!-- Sipariş Özeti - Her Zaman Görünür -->
             <div class="order-summary" 
                  style="padding: 20px; cursor: pointer; background: #f8f9fa;"
-                 onclick="window.customerPanel.toggleOrderDetails('${order.id}')">
+                 data-order-id="${order.id}">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="flex: 1;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
@@ -714,40 +714,79 @@ class CustomerPanel {
                 <!-- Aksiyon Butonları -->
                 <div class="order-actions" style="display: flex; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e1e5e9;">
                     ${order.status === 'delivered' ? `
-                        <button class="btn btn-sm btn-success" onclick="window.customerPanel.rateOrder('${order.id}')">
+                        <button class="btn btn-sm btn-success" data-action="rate" data-order-id="${order.id}">
                             <i class="fas fa-star"></i> Değerlendir
                         </button>
                     ` : ''}
                     
                     ${order.status === 'pending' ? `
                         ${order.cancellation_requested ? `
-                            <button class="btn btn-sm btn-secondary" onclick="window.customerPanel.viewCancellationStatus('${order.id}')">
+                            <button class="btn btn-sm btn-secondary" data-action="view-cancellation" data-order-id="${order.id}">
                                 <i class="fas fa-info-circle"></i> İptal Durumu
                             </button>
                         ` : `
-                            <button class="btn btn-sm btn-warning" onclick="window.customerPanel.cancelOrder('${order.id}')">
+                            <button class="btn btn-sm btn-warning" data-action="cancel" data-order-id="${order.id}">
                                 <i class="fas fa-times"></i> İptal Talebi
                             </button>
                         `}
                     ` : ''}
                     
-                    <button class="btn btn-sm btn-outline-primary" 
-                            onclick="window.customerPanel.toggleOrderDetails('${order.id}')">
+                    <button class="btn btn-sm btn-outline-primary" data-action="close" data-order-id="${order.id}">
                         <i class="fas fa-times"></i> Kapat
                     </button>
                 </div>
             </div>
         </div>
     `).join('');
+
+    // Event listener'ları ekle
+    this.attachOrderEventListeners();
 }
 
-// Açılır-kapanır fonksiyonu - window objesine bağlı
+attachOrderEventListeners() {
+    const orderSummaries = document.querySelectorAll('.order-summary');
+    const actionButtons = document.querySelectorAll('[data-action]');
+    
+    // Sipariş özeti tıklama
+    orderSummaries.forEach(summary => {
+        summary.addEventListener('click', (e) => {
+            const orderId = e.currentTarget.getAttribute('data-order-id');
+            this.toggleOrderDetails(orderId);
+        });
+    });
+    
+    // Aksiyon butonları
+    actionButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation(); // Üst elementlere yayılmayı engelle
+            const action = e.currentTarget.getAttribute('data-action');
+            const orderId = e.currentTarget.getAttribute('data-order-id');
+            
+            switch(action) {
+                case 'rate':
+                    this.rateOrder(orderId);
+                    break;
+                case 'view-cancellation':
+                    this.viewCancellationStatus(orderId);
+                    break;
+                case 'cancel':
+                    this.cancelOrder(orderId);
+                    break;
+                case 'close':
+                    this.toggleOrderDetails(orderId);
+                    break;
+            }
+        });
+    });
+}
+
+// Açılır-kapanır fonksiyonu
 toggleOrderDetails(orderId) {
     const detailsElement = document.getElementById(`details-${orderId}`);
     const chevronElement = document.getElementById(`chevron-${orderId}`);
     
     if (detailsElement && chevronElement) {
-        if (detailsElement.style.display === 'none') {
+        if (detailsElement.style.display === 'none' || !detailsElement.style.display) {
             detailsElement.style.display = 'block';
             chevronElement.style.transform = 'rotate(180deg)';
         } else {
