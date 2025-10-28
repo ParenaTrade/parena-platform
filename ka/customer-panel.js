@@ -819,15 +819,10 @@ class CustomerPanel {
 
     renderDeliveryTracker(order) {
     const status = order.status;
-    // Kurye kontrolünü güncelle - hem courier_id hem de courier relation kontrolü
-    const hasCourier = order.courier_id || (order.courier && order.courier.name);
-    const courierName = order.courier ? order.courier.name : order.courier_name;
     
-    console.log(`🔍 Sipariş ${order.id} - Durum: ${status}, Kurye:`, { 
-        courier_id: order.courier_id,
-        courier: order.courier,
-        courier_name: order.courier_name
-    });
+    // Sipariş detaylarındakiyle AYNI kurye kontrolü
+    const hasCourier = order.courier_id || order.courier_name;
+    const courierName = order.courier_name || 'Atandı';
     
     let trackerHTML = '';
     
@@ -835,20 +830,33 @@ class CustomerPanel {
         case 'pending':
         case 'confirmed':
         case 'preparing':
-            trackerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
-                    <i class="fas fa-clock fa-spin-slow" style="font-size: 16px;"></i>
-                    <div>
-                        <div style="font-size: 13px; font-weight: 600;">Kurye aranıyor</div>
-                        <div style="font-size: 11px; color: #666;">Siparişiniz hazırlanıyor</div>
+            if (hasCourier) {
+                // Kurye atanmış ama sipariş henüz hazır değil
+                trackerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px; color: #0c5460;">
+                        <i class="fas fa-user-check" style="font-size: 16px;"></i>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600;">Kurye atandı</div>
+                            <div style="font-size: 11px; color: #666;">${courierName} bekleniyor</div>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // Kurye atanmamış
+                trackerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
+                        <i class="fas fa-clock fa-spin-slow" style="font-size: 16px;"></i>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600;">Kurye aranıyor</div>
+                            <div style="font-size: 11px; color: #666;">Siparişiniz hazırlanıyor</div>
+                        </div>
+                    </div>
+                `;
+            }
             break;
             
         case 'ready':
             if (hasCourier) {
-                const displayCourierName = courierName || 'Kurye';
                 trackerHTML = `
                     <div class="delivery-animation" data-order-id="${order.id}" data-status="ready">
                         <div style="display: flex; align-items: center; gap: 12px; color: #155724;">
@@ -859,7 +867,7 @@ class CustomerPanel {
                             </div>
                             <div>
                                 <div style="font-size: 13px; font-weight: 600;">Kurye mağazaya geliyor</div>
-                                <div style="font-size: 11px; color: #666;">${displayCourierName} yola çıktı</div>
+                                <div style="font-size: 11px; color: #666;">${courierName} yola çıktı</div>
                             </div>
                         </div>
                     </div>
@@ -878,7 +886,6 @@ class CustomerPanel {
             break;
             
         case 'on_the_way':
-            const displayCourierNameOnWay = courierName || 'Kurye';
             trackerHTML = `
                 <div class="delivery-animation" data-order-id="${order.id}" data-status="on_the_way">
                     <div style="display: flex; align-items: center; gap: 12px; color: #004085;">
@@ -889,7 +896,7 @@ class CustomerPanel {
                         </div>
                         <div>
                             <div style="font-size: 13px; font-weight: 600;">Kurye yolda</div>
-                            <div style="font-size: 11px; color: #666;">${displayCourierNameOnWay} adresinize geliyor</div>
+                            <div style="font-size: 11px; color: #666;">${courierName} adresinize geliyor</div>
                         </div>
                     </div>
                 </div>
@@ -926,6 +933,7 @@ class CustomerPanel {
     
     return trackerHTML;
 }
+    
     // Animasyonları Başlatma Fonksiyonu
     startDeliveryAnimations() {
         const animatedElements = document.querySelectorAll('.delivery-animation');
