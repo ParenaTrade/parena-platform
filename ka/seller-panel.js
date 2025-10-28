@@ -971,56 +971,68 @@ if (order.status === 'ready' && !order.courier_id) {
     
        
      // Manuel kurye atama modalı
-    async showCourierAssignmentModal(orderId) {
-        const availableCouriers = await window.orderSystem.getAvailableCouriers();
-        
-        const modalHtml = `
-            <div class="modal-overlay">
-                <div class="modal">
-                    <div class="modal-header">
-                        <h3>Kurye Atama</h3>
-                        <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label for="courierSelect">Kurye Seçin</label>
-                            <select id="courierSelect" class="form-control">
-                                <option value="">Kurye seçin...</option>
-                                ${availableCouriers.map(courier => `
-                                    <option value="${courier.id}">
-                                        ${courier.full_name} - ${courier.vehicle_type} 
-                                        (${courier.current_deliveries || 0}/5 teslimat)
-                                    </option>
-                                `).join('')}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
-                        <button type="button" class="btn btn-primary" onclick="sellerPanel.assignCourierManually('${orderId}')">
-                            Kurye Ata
-                        </button>
+async showCourierAssignmentModal(orderId) {
+    const availableCouriers = await window.orderSystem.getAvailableCouriers();
+    
+    const modalHtml = `
+        <div class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Kurye Atama</h3>
+                    <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="courierSelect">Kurye Seçin</label>
+                        <select id="courierSelect" class="form-control">
+                            <option value="">Kurye seçin...</option>
+                            ${availableCouriers.map(courier => `
+                                <option value="${courier.id}">
+                                    ${courier.full_name} - ${courier.vehicle_type} 
+                                    (${courier.current_deliveries || 0}/5 teslimat)
+                                </option>
+                            `).join('')}
+                        </select>
                     </div>
                 </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
+                    <button type="button" class="btn btn-primary" onclick="sellerPanel.assignCourierManually('${orderId}')">
+                        Kurye Ata
+                    </button>
+                </div>
             </div>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-    }    
-        // Event listeners
-        document.getElementById('autoAssignBtn').addEventListener('click', async () => {
-            await this.assignCourierAutomatically(orderId);
-        });
+        </div>
+    `;
     
-        document.getElementById('manualAssignBtn').addEventListener('click', () => {
-            document.getElementById('manualAssignmentSection').style.display = 'block';
-            document.getElementById('autoAssignmentResult').style.display = 'none';
-        });
-    }
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Event listeners - MODAL AÇILDIKTAN SONRA EKLENMELİ
+    setTimeout(() => {
+        const autoAssignBtn = document.getElementById('autoAssignBtn');
+        const manualAssignBtn = document.getElementById('manualAssignBtn');
+        
+        if (autoAssignBtn) {
+            autoAssignBtn.addEventListener('click', async () => {
+                await this.assignCourierAutomatically(orderId);
+            });
+        }
+        
+        if (manualAssignBtn) {
+            manualAssignBtn.addEventListener('click', () => {
+                const manualSection = document.getElementById('manualAssignmentSection');
+                const autoResult = document.getElementById('autoAssignmentResult');
+                
+                if (manualSection) manualSection.style.display = 'block';
+                if (autoResult) autoResult.style.display = 'none';
+            });
+        }
+    }, 100);
+}
     
     async getAvailableCouriers() {
         const { data: couriers, error } = await this.supabase
