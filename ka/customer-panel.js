@@ -848,136 +848,216 @@ class CustomerPanel {
     }
 
     async loadCustomerPaymentsData() {
-        try {
-            console.log('💳 Müşteri ödemeleri yükleniyor...');
-            
-            if (!this.supabase || !this.customerData || !this.customerData.id) {
-                this.showNoPaymentsMessage('Sistem hazır değil.');
-                return;
-            }
-
-            const { data: payments, error } = await this.supabase
-                .from('customer_payments')
-                .select(`
-                    *,
-                    order:orders(order_id, total_amount)
-                `)
-                .eq('customer_id', this.customerData.id)
-                .order('payment_date', { ascending: false });
-
-            if (error) {
-                console.error('❌ Ödemeler sorgu hatası:', error);
-                throw error;
-            }
-
-            this.payments = payments || [];
-            this.renderCustomerPayments(this.payments);
-            console.log('✅ Ödemeler yüklendi:', this.payments.length);
-
-        } catch (error) {
-            console.error('❌ Ödemeler yükleme hatası:', error);
-            this.showNoPaymentsMessage('Ödemeler yüklenirken hata oluştu.');
-        }
-    }
-
-    renderCustomerPayments(payments) {
-        const container = document.getElementById('customerPaymentsContent');
+    try {
+        console.log('💳 Müşteri ödemeleri yükleniyor...');
         
-        if (!payments.length) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: #666;">
-                    <i class="fas fa-credit-card" style="font-size: 48px; margin-bottom: 20px;"></i>
-                    <h3>Henüz ödeme kaydınız bulunmuyor</h3>
-                    <p>Ödeme geçmişiniz burada görünecek.</p>
-                </div>
-            `;
+        if (!this.supabase || !this.customerData || !this.customerData.id) {
+            this.showNoPaymentsMessage('Sistem hazır değil.');
             return;
         }
 
-        const totalAmount = payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
-        const completedPayments = payments.filter(p => p.status === 'completed').length;
+        // Doğru kolon isimleriyle join sorgusu
+        const { data: payments, error } = await this.supabase
+            .from('customer_payments')
+            .select(`
+                *,
+                order:orders(
+                    id,
+                    total_amount,
+                    created_at,
+                    status,
+                    customer_name,
+                    delivery_address
+                )
+            `)
+            .eq('customer_id', this.customerData.id)
+            .order('payment_date', { ascending: false });
 
+        if (error) {
+            console.error('❌ Ödemeler sorgu hatası:', error);
+            
+            // Eğer join hatası verirse, basit sorgu yap
+            if (error.code === '42703' || error.code === 'PGRST200') {
+                console.log('🔄 Basit sorgu yöntemi kullanılıyor...');
+                return await this.loadPaymentsWithoutJoin();
+            }
+            throw error;
+        }
+
+        this.payments = payments || [];
+        this.renderCustomerPayments(this.payments);
+        console.log('✅ Ödemeler yüklendi:', this.payments.length);
+
+    } catch (error) {
+        console.error('❌ Ödemeler yükleme hatası:', error);
+        this.showNoPaymentsMessage('Ödemeler yüklenirken hata oluştu.');
+    }
+}
+
+async loadPaymentsWithoutJoin() {
+    try {
+        const { data: payments, error } = await this.supabase
+            .from('customer_payments')
+            .select('*')
+            .eq('customer_id', this.customerData.id)
+            .order('payment_date', { ascending: false });
+
+        if (error) throw error;
+
+        // Sipariş bilgilerini manuel olarak ekle
+        if (payments && payments.length > 0) {
+            const orderIds = payments
+                .map(p => p.order_id)
+                .filter(id => id)
+                .filter((id, index, array) => array.indexOf(id) === index);
+
+            if (orderIds.length > 0) {
+                const { data: orders, error: ordersError } = await this.supabase
+                    .from('orders')
+                    .select('id, total_amount, created_at, status, customer_name, delivery_address')
+                    .in('id', orderIds);
+
+                if (!ordersError && orders) {
+                    const ordersMap = {};
+                    orders.forEach(order => {
+                        ordersMap[order.id] = order;
+                    });
+
+                    payments.forEach(payment => {
+                        payment.order = ordersMap[payment.order_id] || {
+                            id: payment.order_id,
+                            total_amount: payment.amount,
+                            created_at: payment.payment_date
+                        };
+                    });
+                }
+            } else {
+                // Order ID yoksa temel bilgileri ekle
+                payments.forEach(payment => {
+                    payment.order = {
+                        id: payment.id,
+                        total_amount: payment.amount,
+                        created_at: payment.payment_date
+                    };
+                });
+            }
+        }
+
+        this.payments = payments || [];
+        this.renderCustomerPayments(this.payments);
+        console.log('✅ Ödemeler (basit sorgu) yüklendi:', this.payments.length);
+
+    } catch (error) {
+        console.error('❌ Basit ödeme sorgu hatası:', error);
+        throw error;
+    }
+}
+
+    renderCustomerPayments(payments) {
+    const container = document.getElementById('customerPaymentsContent');
+    
+    if (!payments || !payments.length) {
         container.innerHTML = `
-            <div class="stats-grid" style="margin-bottom: 25px;">
-                <div class="stat-card">
-                    <div class="stat-icon primary">
-                        <i class="fas fa-receipt"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3>${payments.length}</h3>
-                        <p>Toplam Ödeme</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon success">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3>${completedPayments}</h3>
-                        <p>Tamamlanan</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon warning">
-                        <i class="fas fa-money-bill-wave"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3>${totalAmount.toFixed(2)} ₺</h3>
-                        <p>Toplam Tutar</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Tarih</th>
-                            <th>Sipariş No</th>
-                            <th>Yöntem</th>
-                            <th>Tür</th>
-                            <th>Toplam</th>
-                            <th>Bonus</th>
-                            <th>Nakit</th>
-                            <th>Kart</th>
-                            <th>Durum</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${payments.map(payment => `
-                            <tr>
-                                <td>
-                                    <div>${new Date(payment.payment_date).toLocaleDateString('tr-TR')}</div>
-                                    <small style="color: #666;">${new Date(payment.payment_date).toLocaleTimeString('tr-TR')}</small>
-                                </td>
-                                <td>
-                                    ${payment.order?.order_number ? `#${payment.order.order_number}` : 'Sipariş #' + payment.order_id.slice(-8)}
-                                </td>
-                                <td>
-                                    <span class="payment-method-badge method-${payment.payment_method}">
-                                        ${this.getPaymentMethodText(payment.payment_method)}
-                                    </span>
-                                </td>
-                                <td>${this.getPaymentTypeText(payment.payment_type)}</td>
-                                <td style="font-weight: bold; color: var(--primary);">
-                                    ${parseFloat(payment.amount || 0).toFixed(2)} ₺
-                                </td>
-                                <td>${parseFloat(payment.bonus_used || 0).toFixed(2)} ₺</td>
-                                <td>${parseFloat(payment.cash_amount || 0).toFixed(2)} ₺</td>
-                                <td>${parseFloat(payment.card_amount || 0).toFixed(2)} ₺</td>
-                                <td>
-                                    <span class="status-badge status-${payment.status}">
-                                        ${this.getPaymentStatusText(payment.status)}
-                                    </span>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <i class="fas fa-credit-card" style="font-size: 48px; margin-bottom: 20px;"></i>
+                <h3>Henüz ödeme kaydınız bulunmuyor</h3>
+                <p>Ödeme geçmişiniz burada görünecek.</p>
             </div>
         `;
+        return;
     }
 
+    const totalAmount = payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
+    const completedPayments = payments.filter(p => p.status === 'completed').length;
+
+    container.innerHTML = `
+        <div class="stats-grid" style="margin-bottom: 25px;">
+            <div class="stat-card">
+                <div class="stat-icon primary">
+                    <i class="fas fa-receipt"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>${payments.length}</h3>
+                    <p>Toplam Ödeme</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>${completedPayments}</h3>
+                    <p>Tamamlanan</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon warning">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>${totalAmount.toFixed(2)} ₺</h3>
+                    <p>Toplam Tutar</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>Sipariş No</th>
+                        <th>Yöntem</th>
+                        <th>Tür</th>
+                        <th>Toplam</th>
+                        <th>Bonus</th>
+                        <th>Nakit</th>
+                        <th>Kart</th>
+                        <th>Durum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${payments.map(payment => {
+                        // Sipariş numarasını oluştur
+                        const orderNumber = payment.order_id ? 
+                            `Sipariş #${payment.order_id.slice(-8)}` : 
+                            `Ödeme #${payment.id.slice(-8)}`;
+                        
+                        // Toplam tutarı belirle
+                        const totalAmount = payment.order?.total_amount || payment.amount || 0;
+                        
+                        return `
+                        <tr>
+                            <td>
+                                <div>${new Date(payment.payment_date).toLocaleDateString('tr-TR')}</div>
+                                <small style="color: #666;">${new Date(payment.payment_date).toLocaleTimeString('tr-TR')}</small>
+                            </td>
+                            <td>${orderNumber}</td>
+                            <td>
+                                <span class="payment-method-badge method-${payment.payment_method}">
+                                    ${this.getPaymentMethodText(payment.payment_method)}
+                                </span>
+                            </td>
+                            <td>${this.getPaymentTypeText(payment.payment_type)}</td>
+                            <td style="font-weight: bold; color: var(--primary);">
+                                ${parseFloat(totalAmount).toFixed(2)} ₺
+                            </td>
+                            <td>${parseFloat(payment.bonus_used || 0).toFixed(2)} ₺</td>
+                            <td>${parseFloat(payment.cash_amount || 0).toFixed(2)} ₺</td>
+                            <td>${parseFloat(payment.card_amount || 0).toFixed(2)} ₺</td>
+                            <td>
+                                <span class="status-badge status-${payment.status}">
+                                    ${this.getPaymentStatusText(payment.status)}
+                                </span>
+                            </td>
+                        </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
     filterPaymentsByStatus(status) {
         if (!status) {
             this.renderCustomerPayments(this.payments);
