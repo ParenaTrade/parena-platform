@@ -375,71 +375,83 @@ class CustomerPanel {
     }
 
     async loadCustomerProfile() {
-        const section = document.getElementById('customerProfileSection');
-        if (!section) return;
+    const section = document.getElementById('customerProfileSection');
+    if (!section) return;
 
-        section.innerHTML = `
-            <div class="section-header">
-                <h2>Profil Bilgilerim</h2>
+    section.innerHTML = `
+        <div class="section-header">
+            <h2>Profil Bilgilerim</h2>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3>Kişisel Bilgiler</h3>
             </div>
-            <div class="card">
-                <div class="card-body">
-                    <form id="customerProfileForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerName">Ad Soyad</label>
-                                <input type="text" id="customerName" class="form-control" 
-                                       value="${this.customerData?.name || ''}">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerPhone">Telefon</label>
-                                <input type="text" id="customerPhone" class="form-control" 
-                                       value="${this.customerData?.phone || ''}" readonly>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerEmail">E-posta</label>
-                                <input type="email" id="customerEmail" class="form-control" 
-                                       value="${this.customerData?.email || ''}">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerBonus">Bonus Bakiyesi</label>
-                                <input type="text" id="customerBonus" class="form-control" 
-                                       value="${this.customerData?.bonus_balance || 0} ₺" readonly>
-                            </div>
+            <div class="card-body">
+                <form id="customerProfileForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="customerName">Ad Soyad *</label>
+                            <input type="text" id="customerName" class="form-control" 
+                                   value="${this.customerData?.name || ''}" required>
                         </div>
                         <div class="form-group">
-                            <label for="customerAddress">Adres</label>
-                            <textarea id="customerAddress" class="form-control" rows="3">${this.customerData?.address || ''}</textarea>
+                            <label for="customerPhone">Telefon</label>
+                            <input type="text" id="customerPhone" class="form-control" 
+                                   value="${this.customerData?.phone || ''}" readonly>
+                            <small class="text-muted">Telefon numarası değiştirilemez</small>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerCity">Şehir</label>
-                                <input type="text" id="customerCity" class="form-control" 
-                                       value="${this.customerData?.city || ''}">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerDistrict">İlçe</label>
-                                <input type="text" id="customerDistrict" class="form-control" 
-                                       value="${this.customerData?.district || ''}">
-                            </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="customerEmail">E-posta</label>
+                            <input type="email" id="customerEmail" class="form-control" 
+                                   value="${this.customerData?.email || ''}" 
+                                   placeholder="ornek@email.com">
                         </div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Bilgileri Güncelle
-                        </button>
-                    </form>
-                </div>
+                        <div class="form-group">
+                            <label for="customerBonus">Bonus Bakiyesi</label>
+                            <input type="text" id="customerBonus" class="form-control" 
+                                   value="${this.customerData?.bonus_balance || 0} ₺" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="customerCity">Şehir</label>
+                            <input type="text" id="customerCity" class="form-control" 
+                                   value="${this.customerData?.city || ''}" 
+                                   placeholder="İstanbul">
+                        </div>
+                        <div class="form-group">
+                            <label for="customerDistrict">İlçe</label>
+                            <input type="text" id="customerDistrict" class="form-control" 
+                                   value="${this.customerData?.district || ''}" 
+                                   placeholder="Kadıköy">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="customerAddress">Adres</label>
+                        <textarea id="customerAddress" class="form-control" rows="3" 
+                                  placeholder="Örnek Mah. Test Sok. No:1 Daire:2">${this.customerData?.address || ''}</textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Bilgileri Güncelle
+                    </button>
+                </form>
             </div>
-        `;
+        </div>
+    `;
 
-        // Form submit eventini ekle
-        const form = document.getElementById('customerProfileForm');
-        if (form) {
-            form.addEventListener('submit', (e) => this.updateCustomerProfile(e));
-        }
+    // Form submit eventini ekle
+    const form = document.getElementById('customerProfileForm');
+    if (form) {
+        form.addEventListener('submit', (e) => this.updateCustomerProfile(e));
     }
-
+}
     async updateCustomerProfile(e) {
         e.preventDefault();
         
@@ -525,134 +537,158 @@ class CustomerPanel {
     }
 
     async loadAllCustomerOrders() {
-        try {
-            console.log('📋 Tüm siparişler yükleniyor...');
-            
-            if (!this.supabase || !this.customerData || !this.customerData.id) {
-                const container = document.getElementById('customerOrdersList');
-                container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
-                return;
-            }
+    try {
+        console.log('📋 Tüm siparişler yükleniyor...');
+        
+        if (!this.supabase || !this.customerData || !this.customerData.id) {
+            const container = document.getElementById('customerOrdersList');
+            container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
+            return;
+        }
 
-            const { data: orders, error } = await this.supabase
+        // DÜZELTİLMİŞ SORGU - courier ilişkisi opsiyonel
+        const { data: orders, error } = await this.supabase
+            .from('orders')
+            .select(`
+                *,
+                order_details(*),
+                seller:seller_profiles(business_name, phone),
+                courier:couriers(full_name, phone)
+            `)
+            .eq('customer_id', this.customerData.id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('❌ Siparişler sorgu hatası:', error);
+            
+            // Eğer hala ilişki hatası veriyorsa, alternatif sorgu
+            const { data: ordersAlt, error: errorAlt } = await this.supabase
                 .from('orders')
                 .select(`
                     *,
                     order_details(*),
-                    seller:seller_profiles(business_name, phone),
-                    courier:couriers(full_name, phone)
+                    seller:seller_profiles(business_name, phone)
                 `)
                 .eq('customer_id', this.customerData.id)
                 .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('❌ Siparişler sorgu hatası:', error);
-                throw error;
+                
+            if (errorAlt) {
+                throw errorAlt;
             }
-
+            
+            this.orders = ordersAlt || [];
+        } else {
             this.orders = orders || [];
-            this.renderCustomerOrders(this.orders);
-            console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
-
-        } catch (error) {
-            console.error('❌ Siparişler yükleme hatası:', error);
-            const container = document.getElementById('customerOrdersList');
-            container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
         }
-    }
 
-    renderCustomerOrders(orders) {
+        this.renderCustomerOrders(this.orders);
+        console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
+
+    } catch (error) {
+        console.error('❌ Siparişler yükleme hatası:', error);
         const container = document.getElementById('customerOrdersList');
-        
-        if (!orders.length) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: #666;">
-                    <i class="fas fa-shopping-bag" style="font-size: 48px; margin-bottom: 20px;"></i>
-                    <h3>Henüz siparişiniz bulunmuyor</h3>
-                    <p>İlk siparişinizi vermek için alışverişe başlayın!</p>
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = orders.map(order => `
-            <div class="order-card" style="border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
-                <div class="order-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                    <div>
-                        <strong style="font-size: 16px;">Sipariş #${order.id.slice(-8)}</strong>
-                        <div style="color: #666; font-size: 14px; margin-top: 5px;">
-                            ${order.seller?.business_name || 'Satıcı'}
-                        </div>
-                        ${order.delivery_address ? `
-                            <div style="color: #666; font-size: 12px; margin-top: 2px;">
-                                <i class="fas fa-map-marker-alt"></i> ${order.delivery_address}
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div style="text-align: right;">
-                        <span class="status-badge status-${order.status}">
-                            ${this.getStatusText(order.status)}
-                        </span>
-                        <div style="margin-top: 5px; font-size: 14px; font-weight: bold; color: var(--primary);">
-                            ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
-                        </div>
-                    </div>
-                </div>
-                
-                ${order.order_details && order.order_details.length > 0 ? `
-                    <div class="order-items" style="margin-bottom: 15px;">
-                        ${order.order_details.map(item => `
-                            <div style="display: flex; justify-content: space-between; padding: 8px; background: #f8f9fa; border-radius: 4px; margin-bottom: 5px;">
-                                <div>
-                                    <span style="font-weight: 500;">${item.product_name}</span>
-                                    <div style="font-size: 12px; color: #666;">
-                                        ${item.quantity} adet × ${parseFloat(item.unit_price || 0).toFixed(2)} ₺
-                                        ${item.discount > 0 ? `(-${parseFloat(item.discount).toFixed(2)} ₺ indirim)` : ''}
-                                    </div>
-                                </div>
-                                <div style="font-weight: bold;">
-                                    ${parseFloat(item.total_price || 0).toFixed(2)} ₺
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-                
-                <div class="order-footer" style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid #e1e5e9;">
-                    <div style="color: #666; font-size: 14px;">
-                        <div>${new Date(order.created_at).toLocaleString('tr-TR')}</div>
-                        ${order.courier ? `
-                            <div>
-                                <i class="fas fa-motorcycle"></i> Kurye: ${order.courier.full_name}
-                            </div>
-                        ` : ''}
-                        ${order.payment_method ? `
-                            <div>Ödeme: ${this.getPaymentMethodText(order.payment_method)}</div>
-                        ` : ''}
-                    </div>
-                    <div class="order-actions">
-                        ${order.status === 'delivered' ? `
-                            <button class="btn btn-sm btn-success" onclick="customerPanel.rateOrder('${order.id}')">
-                                <i class="fas fa-star"></i> Değerlendir
-                            </button>
-                        ` : ''}
-                        ${['pending', 'confirmed'].includes(order.status) ? `
-                            <button class="btn btn-sm btn-danger" onclick="customerPanel.cancelOrder('${order.id}')">
-                                <i class="fas fa-times"></i> İptal Et
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-                
-                ${order.customer_notes ? `
-                    <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 5px; font-size: 14px;">
-                        <strong>Notunuz:</strong> ${order.customer_notes}
-                    </div>
-                ` : ''}
+        container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+    }
+}
+    renderCustomerOrders(orders) {
+    const container = document.getElementById('customerOrdersList');
+    
+    if (!orders.length) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <i class="fas fa-shopping-bag" style="font-size: 48px; margin-bottom: 20px;"></i>
+                <h3>Henüz siparişiniz bulunmuyor</h3>
+                <p>İlk siparişinizi vermek için alışverişe başlayın!</p>
             </div>
-        `).join('');
+        `;
+        return;
     }
 
+    container.innerHTML = orders.map(order => `
+        <div class="order-card" style="border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+            <div class="order-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                <div>
+                    <strong style="font-size: 16px;">Sipariş #${order.id.slice(-8)}</strong>
+                    <div style="color: #666; font-size: 14px; margin-top: 5px;">
+                        ${order.seller?.business_name || 'Satıcı'}
+                    </div>
+                    ${order.delivery_address ? `
+                        <div style="color: #666; font-size: 12px; margin-top: 2px;">
+                            <i class="fas fa-map-marker-alt"></i> ${order.delivery_address}
+                        </div>
+                    ` : ''}
+                </div>
+                <div style="text-align: right;">
+                    <span class="status-badge status-${order.status}">
+                        ${this.getStatusText(order.status)}
+                    </span>
+                    <div style="margin-top: 5px; font-size: 14px; font-weight: bold; color: var(--primary);">
+                        ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
+                    </div>
+                </div>
+            </div>
+            
+            ${order.order_details && order.order_details.length > 0 ? `
+                <div class="order-items" style="margin-bottom: 15px;">
+                    ${order.order_details.map(item => `
+                        <div style="display: flex; justify-content: space-between; padding: 8px; background: #f8f9fa; border-radius: 4px; margin-bottom: 5px;">
+                            <div>
+                                <span style="font-weight: 500;">${item.product_name}</span>
+                                <div style="font-size: 12px; color: #666;">
+                                    ${item.quantity} adet × ${parseFloat(item.unit_price || 0).toFixed(2)} ₺
+                                    ${item.discount > 0 ? `(-${parseFloat(item.discount).toFixed(2)} ₺ indirim)` : ''}
+                                </div>
+                            </div>
+                            <div style="font-weight: bold;">
+                                ${parseFloat(item.total_price || 0).toFixed(2)} ₺
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            
+            <div class="order-footer" style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid #e1e5e9;">
+                <div style="color: #666; font-size: 14px;">
+                    <div>${new Date(order.created_at).toLocaleString('tr-TR')}</div>
+                    ${order.courier ? `
+                        <div>
+                            <i class="fas fa-motorcycle"></i> Kurye: ${order.courier.full_name}
+                        </div>
+                    ` : order.courier_name ? `
+                        <div>
+                            <i class="fas fa-motorcycle"></i> Kurye: ${order.courier_name}
+                        </div>
+                    ` : `
+                        <div>
+                            <i class="fas fa-clock"></i> Kurye atanacak
+                        </div>
+                    `}
+                    ${order.payment_method ? `
+                        <div>Ödeme: ${this.getPaymentMethodText(order.payment_method)}</div>
+                    ` : ''}
+                </div>
+                <div class="order-actions">
+                    ${order.status === 'delivered' ? `
+                        <button class="btn btn-sm btn-success" onclick="customerPanel.rateOrder('${order.id}')">
+                            <i class="fas fa-star"></i> Değerlendir
+                        </button>
+                    ` : ''}
+                    ${['pending', 'confirmed'].includes(order.status) ? `
+                        <button class="btn btn-sm btn-danger" onclick="customerPanel.cancelOrder('${order.id}')">
+                            <i class="fas fa-times"></i> İptal Et
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+            
+            ${order.customer_notes ? `
+                <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 5px; font-size: 14px;">
+                    <strong>Notunuz:</strong> ${order.customer_notes}
+                </div>
+            ` : ''}
+        </div>
+    `).join('');
+}
     filterOrders(status) {
         if (!status) {
             this.renderCustomerOrders(this.orders);
@@ -706,50 +742,199 @@ class CustomerPanel {
     }
 
     async loadCustomerAddressesData() {
-        // Şimdilik demo adresler
-        const addresses = [
-            {
-                id: 1,
-                title: 'Ev Adresi',
-                address: 'Örnek Mah. Test Sok. No:1 İstanbul',
-                is_default: true
-            },
-            {
-                id: 2,
-                title: 'İş Adresi', 
-                address: 'İş Merkezi Kat:5 No:10 Maslak/İstanbul',
-                is_default: false
-            }
-        ];
+    try {
+        console.log('🏠 Müşteri adres bilgileri yükleniyor...');
+        
+        if (!this.customerData) {
+            this.showNoAddressMessage();
+            return;
+        }
 
-        const container = document.getElementById('customerAddressesList');
-        container.innerHTML = addresses.map(addr => `
-            <div class="address-card" style="border: 1px solid #e1e5e9; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-                            <strong>${addr.title}</strong>
-                            ${addr.is_default ? '<span class="badge badge-primary">Varsayılan</span>' : ''}
-                        </div>
-                        <div style="color: #666; font-size: 14px;">
-                            ${addr.address}
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 5px;">
-                        <button class="btn btn-sm btn-primary" onclick="customerPanel.editAddress(${addr.id})">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        ${!addr.is_default ? `
-                            <button class="btn btn-sm btn-danger" onclick="customerPanel.deleteAddress(${addr.id})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
+        // Sadece customers tablosundaki ana adresi göster
+        const mainAddress = {
+            id: 'main',
+            title: 'Ana Adresim',
+            address: this.customerData.address || '',
+            city: this.customerData.city || '',
+            district: this.customerData.district || '',
+            is_default: true,
+            type: 'main'
+        };
+
+        this.renderCustomerAddresses([mainAddress]);
+        console.log('✅ Adres bilgileri yüklendi');
+
+    } catch (error) {
+        console.error('❌ Adres bilgileri yükleme hatası:', error);
+        this.showNoAddressMessage();
+    }
+}
+
+renderCustomerAddresses(addresses) {
+    const container = document.getElementById('customerAddressesList');
+    
+    const mainAddress = addresses[0];
+    
+    if (!mainAddress?.address) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <i class="fas fa-map-marker-alt" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
+                <h3>Ana Adresiniz Bulunmuyor</h3>
+                <p>Ana adresinizi profil sayfasından ekleyebilirsiniz.</p>
+                <button class="btn btn-primary" onclick="window.panelSystem.showSection('customerProfile')">
+                    <i class="fas fa-user-edit"></i> Profili Düzenle
+                </button>
             </div>
-        `).join('');
+        `;
+        return;
     }
 
+    container.innerHTML = `
+        <div class="address-card" style="border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <strong style="font-size: 16px;">${mainAddress.title}</strong>
+                        <span class="badge badge-primary" style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px;">Varsayılan</span>
+                    </div>
+                    
+                    <div style="color: #666; font-size: 14px; margin-bottom: 8px;">
+                        <i class="fas fa-map-marker-alt" style="margin-right: 8px; color: var(--primary);"></i>
+                        ${mainAddress.address}
+                    </div>
+                    
+                    ${mainAddress.district || mainAddress.city ? `
+                        <div style="color: #888; font-size: 13px;">
+                            <i class="fas fa-location-dot" style="margin-right: 5px;"></i>
+                            ${mainAddress.district ? `${mainAddress.district}` : ''}${mainAddress.district && mainAddress.city ? ', ' : ''}${mainAddress.city || ''}
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div style="display: flex; gap: 8px; margin-left: 15px;">
+                    <button class="btn btn-sm btn-primary" onclick="customerPanel.editAddress('${mainAddress.id}')">
+                        <i class="fas fa-edit"></i> Düzenle
+                    </button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f0f0f0;">
+                <div style="font-size: 13px; color: #666;">
+                    <i class="fas fa-info-circle" style="margin-right: 5px;"></i>
+                    <strong>Not:</strong> Siparişlerinizde farklı teslimat adresi kullanabilirsiniz. 
+                    Bu adres varsayılan adresinizdir.
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn btn-outline-primary" onclick="window.panelSystem.showSection('customerProfile')">
+                <i class="fas fa-user-edit"></i> Profil Bilgilerini Güncelle
+            </button>
+        </div>
+    `;
+}
+
+async editAddress(addressId) {
+    // Mevcut adres bilgilerini al
+    const currentAddress = this.customerData.address || '';
+    const currentCity = this.customerData.city || '';
+    const currentDistrict = this.customerData.district || '';
+
+    // Basit prompt yerine daha kullanıcı dostu bir modal gösterilebilir
+    const newAddress = prompt('Adres:', currentAddress);
+    if (newAddress === null) return;
+
+    const newCity = prompt('Şehir:', currentCity);
+    if (newCity === null) return;
+
+    const newDistrict = prompt('İlçe:', currentDistrict);
+    if (newDistrict === null) return;
+
+    try {
+        const { error } = await this.supabase
+            .from('customers')
+            .update({
+                address: newAddress,
+                city: newCity,
+                district: newDistrict,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', this.customerData.id);
+
+        if (error) throw error;
+
+        // Yerel veriyi güncelle
+        this.customerData.address = newAddress;
+        this.customerData.city = newCity;
+        this.customerData.district = newDistrict;
+
+        window.panelSystem.showAlert('Adres bilgileriniz güncellendi!', 'success');
+        
+        // Adresleri yeniden yükle
+        await this.loadCustomerAddressesData();
+
+    } catch (error) {
+        console.error('Adres güncelleme hatası:', error);
+        window.panelSystem.showAlert('Adres güncellenemedi!', 'error');
+    }
+}
+
+showNoAddressMessage() {
+    const container = document.getElementById('customerAddressesList');
+    container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: #666;">
+            <i class="fas fa-map-marker-alt" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
+            <h3>Ana Adresiniz Bulunmuyor</h3>
+            <p>Ana adresinizi eklemek için profil sayfasına gidin.</p>
+            <button class="btn btn-primary" onclick="window.panelSystem.showSection('customerProfile')">
+                <i class="fas fa-user-edit"></i> Profil Sayfasına Git
+            </button>
+        </div>
+    `;
+}
+
+// AddAddress fonksiyonunu da güncelle - artık sadece düzenleme yapacak
+showAddAddressModal() {
+    this.editAddress(this.customerData.id);
+}
+
+// DeleteAddress fonksiyonunu kaldır veya gizle
+deleteAddress(addressId) {
+    // Customers tablosunda sadece bir adres olduğu için silme işlemi yapılmıyor
+    // Sadece adres bilgilerini temizleme seçeneği sunulabilir
+    if (confirm('Adres bilgilerinizi temizlemek istediğinizden emin misiniz?')) {
+        this.clearAddress();
+    }
+}
+
+async clearAddress() {
+    try {
+        const { error } = await this.supabase
+            .from('customers')
+            .update({
+                address: null,
+                city: null,
+                district: null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', this.customerData.id);
+
+        if (error) throw error;
+
+        // Yerel veriyi güncelle
+        this.customerData.address = null;
+        this.customerData.city = null;
+        this.customerData.district = null;
+
+        window.panelSystem.showAlert('Adres bilgileriniz temizlendi!', 'success');
+        await this.loadCustomerAddressesData();
+
+    } catch (error) {
+        console.error('Adres temizleme hatası:', error);
+        window.panelSystem.showAlert('Adres temizlenemedi!', 'error');
+    }
+}
     async loadCustomerSupport() {
         const section = document.getElementById('customerSupportSection');
         if (!section) return;
