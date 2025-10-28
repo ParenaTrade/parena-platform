@@ -1060,11 +1060,9 @@ async handleCourierLogin(phone, name) {
         }
     }, 500);
 }
-      // checkExistingSession fonksiyonu düzgün kapanmamış, bu şekilde olmalı:
-// AuthSystem class içinde checkExistingSession fonksiyonunu güncelle
+    
 async checkExistingSession() {
     try {
-        // Mevcut sayfanın index.html olup olmadığını kontrol et
         const currentPage = window.location.pathname;
         const isIndexPage = currentPage.includes('index.html') || 
                            currentPage === '/' || 
@@ -1077,8 +1075,6 @@ async checkExistingSession() {
         
         if (!userSession) {
             console.log('ℹ️ Oturum bulunamadı');
-            
-            // Eğer index sayfasındaysak ve oturum yoksa, login'e yönlendir
             if (isIndexPage) {
                 console.log('🚫 Index sayfasında oturum yok, login sayfasına yönlendiriliyor...');
                 setTimeout(() => {
@@ -1089,8 +1085,6 @@ async checkExistingSession() {
         }
 
         const session = JSON.parse(userSession);
-        
-        // Oturum süresi kontrolü (7 gün)
         const loginTime = new Date(session.loginTime);
         const now = new Date();
         const daysDiff = (now - loginTime) / (1000 * 60 * 60 * 24);
@@ -1098,8 +1092,6 @@ async checkExistingSession() {
         if (daysDiff >= 7) {
             console.log('⚠️ Oturum süresi dolmuş');
             localStorage.removeItem('userSession');
-            
-            // Oturum süresi dolmuşsa, index'teysek login'e yönlendir
             if (isIndexPage) {
                 setTimeout(() => {
                     window.location.href = 'login.html';
@@ -1125,15 +1117,26 @@ async checkExistingSession() {
                 this.redirectToIndex();
             }, 1000);
         } else if (isIndexPage) {
-            console.log('✅ Index sayfasındayız ve oturum geçerli, panele devam...');
-            // Index sayfasındayız ve oturum geçerli, panele devam et
-            if (typeof window.panelSystem !== 'undefined') {
+            console.log('✅ Index sayfasındayız ve oturum geçerli');
+            
+            // PanelSystem kontrolü - null ise hata verme
+            if (typeof window.panelSystem !== 'undefined' && window.panelSystem !== null) {
                 window.panelSystem.initializePanel(this.userProfile);
+            } else {
+                console.log('⚠️ PanelSystem henüz yüklenmedi veya mevcut değil');
+                // PanelSystem yüklenene kadar bekle
+                setTimeout(() => {
+                    if (typeof window.panelSystem !== 'undefined' && window.panelSystem !== null) {
+                        window.panelSystem.initializePanel(this.userProfile);
+                    }
+                }, 1000);
             }
         }
 
     } catch (error) {
         console.error('❌ Oturum kontrol hatası:', error);
+        // Hata durumunda oturumu temizle
+        localStorage.removeItem('userSession');
     }
 }
 
