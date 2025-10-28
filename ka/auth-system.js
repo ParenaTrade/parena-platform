@@ -1114,7 +1114,6 @@ async checkExistingSession() {
         if (isLoginPage) {
         console.log('🔐 Login sayfasındayız, oturum kontrolü atlanıyor...');
         return; // ❌ Yönlendirme YOK!
-    }
         } else if (isIndexPage) {
             console.log('✅ Index sayfasındayız ve oturum geçerli');
             
