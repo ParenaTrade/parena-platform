@@ -560,116 +560,200 @@ class CustomerPanel {
     }
 
     renderCustomerOrders(orders) {
-        const container = document.getElementById('customerOrdersList');
-        
-        if (!orders.length) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: #666;">
-                    <i class="fas fa-shopping-bag" style="font-size: 48px; margin-bottom: 20px;"></i>
-                    <h3>Henüz siparişiniz bulunmuyor</h3>
-                    <p>İlk siparişinizi vermek için alışverişe başlayın!</p>
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = orders.map(order => `
-            <div class="order-card" style="border: 1px solid #e1e5e9; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
-                <div class="order-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                    <div>
-                        <strong style="font-size: 16px;">Sipariş #${order.id.slice(-8)}</strong>
-                        <div style="color: #666; font-size: 14px; margin-top: 5px;">
-                            ${order.seller?.business_name || 'Satıcı'}
-                        </div>
-                        ${order.delivery_address ? `
-                            <div style="color: #666; font-size: 12px; margin-top: 2px;">
-                                <i class="fas fa-map-marker-alt"></i> ${order.delivery_address}
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div style="text-align: right;">
-                        <span class="status-badge status-${order.status}">
-                            ${this.getStatusText(order.status)}
-                        </span>
-                        <div style="margin-top: 5px; font-size: 14px; font-weight: bold; color: var(--primary);">
-                            ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
-                        </div>
-                    </div>
-                </div>
-                
-                ${order.order_details && order.order_details.length > 0 ? `
-                    <div class="order-items" style="margin-bottom: 15px;">
-                        ${order.order_details.map(item => `
-                            <div style="display: flex; justify-content: space-between; padding: 8px; background: #f8f9fa; border-radius: 4px; margin-bottom: 5px;">
-                                <div>
-                                    <span style="font-weight: 500;">${item.product_name}</span>
-                                    <div style="font-size: 12px; color: #666;">
-                                        ${item.quantity} adet × ${parseFloat(item.unit_price || 0).toFixed(2)} ₺
-                                        ${item.discount > 0 ? `(-${parseFloat(item.discount).toFixed(2)} ₺ indirim)` : ''}
-                                    </div>
-                                </div>
-                                <div style="font-weight: bold;">
-                                    ${parseFloat(item.total_price || 0).toFixed(2)} ₺
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-                
-                <div class="order-footer" style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid #e1e5e9;">
-                    <div style="color: #666; font-size: 14px;">
-                        <div>${new Date(order.created_at).toLocaleString('tr-TR')}</div>
-                        
-                        ${order.courier_id ? `
-                            <div style="color: var(--success);">
-                                <i class="fas fa-motorcycle"></i> Kurye: ${order.courier_name || 'Atandı'}
-                            </div>
-                        ` : `
-                            <div style="color: var(--warning);">
-                                <i class="fas fa-clock"></i> Kurye atanıyor
-                            </div>
-                        `}
-                        
-                        ${order.payment_method ? `
-                            <div>Ödeme: ${this.getPaymentMethodText(order.payment_method)}</div>
-                        ` : ''}
-
-                        ${order.cancellation_requested ? `
-                            <div style="color: var(--warning); margin-top: 5px;">
-                                <i class="fas fa-exclamation-triangle"></i> İptal talebiniz inceleniyor
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div class="order-actions">
-                        ${order.status === 'delivered' ? `
-                            <button class="btn btn-sm btn-success" onclick="customerPanel.rateOrder('${order.id}')">
-                                <i class="fas fa-star"></i> Değerlendir
-                            </button>
-                        ` : ''}
-                        
-                        ${order.status === 'pending' ? `
-                            ${order.cancellation_requested ? `
-                                <button class="btn btn-sm btn-secondary" onclick="customerPanel.viewCancellationStatus('${order.id}')">
-                                    <i class="fas fa-info-circle"></i> İptal Durumu
-                                </button>
-                            ` : `
-                                <button class="btn btn-sm btn-warning" onclick="customerPanel.cancelOrder('${order.id}')">
-                                    <i class="fas fa-times"></i> İptal Talebi
-                                </button>
-                            `}
-                        ` : ''}
-                    </div>
-                </div>
-                
-                ${order.customer_notes ? `
-                    <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 5px; font-size: 14px;">
-                        <strong>Notunuz:</strong> ${order.customer_notes}
-                    </div>
-                ` : ''}
+    const container = document.getElementById('customerOrdersList');
+    
+    if (!orders.length) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <i class="fas fa-shopping-bag" style="font-size: 48px; margin-bottom: 20px;"></i>
+                <h3>Henüz siparişiniz bulunmuyor</h3>
+                <p>İlk siparişinizi vermek için alışverişe başlayın!</p>
             </div>
-        `).join('');
+        `;
+        return;
     }
 
+    container.innerHTML = orders.map((order, index) => `
+        <div class="order-card" style="border: 1px solid #e1e5e9; border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+            <!-- Sipariş Özeti - Her Zaman Görünür -->
+            <div class="order-summary" 
+                 style="padding: 20px; cursor: pointer; background: #f8f9fa;"
+                 onclick="customerPanel.toggleOrderDetails('${order.id}')">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <strong style="font-size: 16px;">Sipariş #${order.id.slice(-8)}</strong>
+                            <span class="status-badge status-${order.status}">
+                                ${this.getStatusText(order.status)}
+                            </span>
+                        </div>
+                        
+                        <div style="color: #666; font-size: 14px; margin-bottom: 5px;">
+                            <i class="fas fa-store" style="margin-right: 5px;"></i>
+                            ${order.seller?.business_name || 'Satıcı'}
+                        </div>
+                        
+                        ${order.delivery_address ? `
+                            <div style="color: #666; font-size: 12px;">
+                                <i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i> 
+                                ${order.delivery_address}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div style="text-align: right;">
+                        <div style="font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">
+                            ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
+                        </div>
+                        <div style="color: #666; font-size: 12px;">
+                            ${new Date(order.created_at).toLocaleDateString('tr-TR')}
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <i class="fas fa-chevron-down" id="chevron-${order.id}" 
+                               style="transition: transform 0.3s ease;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sipariş Detayları - Açılır/Kapanır -->
+            <div class="order-details" id="details-${order.id}" 
+                 style="display: none; padding: 0 20px 20px 20px; background: white;">
+                
+                <!-- Ürünler -->
+                ${order.order_details && order.order_details.length > 0 ? `
+                    <div style="margin: 15px 0;">
+                        <h4 style="margin-bottom: 10px; color: #333; font-size: 14px;">
+                            <i class="fas fa-list" style="margin-right: 8px;"></i>
+                            Sipariş İçeriği
+                        </h4>
+                        <div class="order-items">
+                            ${order.order_details.map(item => `
+                                <div style="display: flex; justify-content: space-between; padding: 10px; 
+                                         background: #f8f9fa; border-radius: 6px; margin-bottom: 8px;">
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 500; margin-bottom: 4px;">${item.product_name}</div>
+                                        <div style="font-size: 12px; color: #666;">
+                                            ${item.quantity} adet × ${parseFloat(item.unit_price || 0).toFixed(2)} ₺
+                                            ${item.discount > 0 ? 
+                                                `<span style="color: var(--success); margin-left: 8px;">
+                                                    -${parseFloat(item.discount).toFixed(2)} ₺ indirim
+                                                </span>` : ''}
+                                        </div>
+                                    </div>
+                                    <div style="font-weight: bold; color: var(--primary);">
+                                        ${parseFloat(item.total_price || 0).toFixed(2)} ₺
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Sipariş Bilgileri -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0;">
+                    <div>
+                        <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
+                            <i class="fas fa-info-circle" style="margin-right: 8px;"></i>
+                            Sipariş Bilgileri
+                        </h4>
+                        <div style="font-size: 13px; color: #666;">
+                            <div style="margin-bottom: 4px;">
+                                <strong>Sipariş Tarihi:</strong> 
+                                ${new Date(order.created_at).toLocaleString('tr-TR')}
+                            </div>
+                            <div style="margin-bottom: 4px;">
+                                <strong>Ödeme Yöntemi:</strong> 
+                                ${order.payment_method ? this.getPaymentMethodText(order.payment_method) : 'Belirtilmemiş'}
+                            </div>
+                            ${order.customer_notes ? `
+                                <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 4px;">
+                                    <strong>Notunuz:</strong> ${order.customer_notes}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
+                            <i class="fas fa-shipping-fast" style="margin-right: 8px;"></i>
+                            Teslimat Bilgileri
+                        </h4>
+                        <div style="font-size: 13px; color: #666;">
+                            ${order.courier_id ? `
+                                <div style="color: var(--success); margin-bottom: 4px;">
+                                    <i class="fas fa-motorcycle"></i> 
+                                    <strong>Kurye:</strong> ${order.courier_name || 'Atandı'}
+                                </div>
+                            ` : `
+                                <div style="color: var(--warning); margin-bottom: 4px;">
+                                    <i class="fas fa-clock"></i> 
+                                    <strong>Kurye:</strong> Atanıyor
+                                </div>
+                            `}
+                            
+                            ${order.delivery_address ? `
+                                <div style="margin-bottom: 4px;">
+                                    <strong>Adres:</strong> ${order.delivery_address}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- İptal Durumu -->
+                ${order.cancellation_requested ? `
+                    <div style="margin: 15px 0; padding: 12px; background: #fff3cd; border-radius: 6px;">
+                        <div style="display: flex; align-items: center; gap: 8px; color: var(--warning);">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>İptal Talebiniz İnceleniyor</strong>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Aksiyon Butonları -->
+                <div class="order-actions" style="display: flex; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e1e5e9;">
+                    ${order.status === 'delivered' ? `
+                        <button class="btn btn-sm btn-success" onclick="customerPanel.rateOrder('${order.id}')">
+                            <i class="fas fa-star"></i> Değerlendir
+                        </button>
+                    ` : ''}
+                    
+                    ${order.status === 'pending' ? `
+                        ${order.cancellation_requested ? `
+                            <button class="btn btn-sm btn-secondary" onclick="customerPanel.viewCancellationStatus('${order.id}')">
+                                <i class="fas fa-info-circle"></i> İptal Durumu
+                            </button>
+                        ` : `
+                            <button class="btn btn-sm btn-warning" onclick="customerPanel.cancelOrder('${order.id}')">
+                                <i class="fas fa-times"></i> İptal Talebi
+                            </button>
+                        `}
+                    ` : ''}
+                    
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="customerPanel.toggleOrderDetails('${order.id}')">
+                        <i class="fas fa-times"></i> Kapat
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Açılır-kapanır fonksiyonu
+toggleOrderDetails(orderId) {
+    const detailsElement = document.getElementById(`details-${orderId}`);
+    const chevronElement = document.getElementById(`chevron-${orderId}`);
+    
+    if (detailsElement.style.display === 'none') {
+        detailsElement.style.display = 'block';
+        chevronElement.style.transform = 'rotate(180deg)';
+    } else {
+        detailsElement.style.display = 'none';
+        chevronElement.style.transform = 'rotate(0deg)';
+    }
+}
     filterOrders(status) {
         if (!status) {
             this.renderCustomerOrders(this.orders);
