@@ -772,40 +772,46 @@ if (order.status === 'ready' && !order.courier_id) {
 
     return actions.join('');
 }
-      // Mevcut updateOrderStatus fonksiyonunu güncelle (opsiyonel - otomatik atama için)
+       // Sipariş durumunu güncelle
     async updateOrderStatus(orderId, newStatus) {
         try {
-            const { error } = await this.supabase
-                .from('orders')
-                .update({ 
-                    status: newStatus,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', orderId);
-    
-            if (error) throw error;
-    
-            // YENİ: Eğer sipariş hazır durumuna geçiyorsa ve otomatik atama aktifse
+            const updateData = {
+                status: newStatus,
+                updated_at: new Date().toISOString()
+            };
+
+            // Eğer sipariş "ready" durumuna geçiyorsa, otomatik kurye ata
             if (newStatus === 'ready') {
-                const autoAssignEnabled = await this.isAutoAssignmentEnabled();
-                if (autoAssignEnabled) {
-                    setTimeout(() => {
-                        this.assignCourierAutomatically(orderId);
-                    }, 2000); // 2 saniye sonra otomatik ata
+                const autoAssign = await this.isAutoAssignmentEnabled();
+                if (autoAssign) {
+                    // 2 saniye sonra otomatik kurye ata
+                    setTimeout(async () => {
+                        try {
+                            const sellerLocation = await this.getSellerLocation();
+                            await window.orderSystem.assignCourierAutomatically(orderId, sellerLocation);
+                            window.panelSystem.showAlert('Otomatik kurye atandı!', 'success');
+                        } catch (error) {
+                            console.error('Otomatik kurye atama hatası:', error);
+                        }
+                    }, 2000);
                 }
             }
-    
+
+            const { error } = await this.supabase
+                .from('orders')
+                .update(updateData)
+                .eq('id', orderId);
+
+            if (error) throw error;
+
             window.panelSystem.showAlert(`Sipariş durumu güncellendi: ${this.getStatusText(newStatus)}`, 'success');
-            
-            // Reload orders
             await this.loadAllSellerOrders();
-    
+
         } catch (error) {
             console.error('Sipariş durumu güncelleme hatası:', error);
             window.panelSystem.showAlert('Sipariş durumu güncellenemedi!', 'error');
         }
     }
-
     async cancelOrder(orderId) {
         const reason = prompt('İptal nedeni:');
         if (!reason) return;
@@ -964,64 +970,47 @@ if (order.status === 'ready' && !order.courier_id) {
         }
     
        
+     // Manuel kurye atama modalı
     async showCourierAssignmentModal(orderId) {
-        // Müsait kuryeleri getir
-        const availableCouriers = await this.getAvailableCouriers();
+        const availableCouriers = await window.orderSystem.getAvailableCouriers();
+        
         const modalHtml = `
-            <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
-                <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto;">
-                    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="margin: 0;">Kurye Atama</h3>
+            <div class="modal-overlay">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3>Kurye Atama</h3>
                         <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                     
-                <div class="assignment-options" style="margin-bottom: 20px;">
-                    <div class="form-group">
-                        <label>Atama Türü</label>
-                        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                            <button class="btn btn-primary" id="autoAssignBtn">
-                                <i class="fas fa-robot"></i> Otomatik Ata
-                            </button>
-                            <button class="btn btn-secondary" id="manualAssignBtn">
-                                <i class="fas fa-user"></i> Manuel Ata
-                            </button>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="courierSelect">Kurye Seçin</label>
+                            <select id="courierSelect" class="form-control">
+                                <option value="">Kurye seçin...</option>
+                                ${availableCouriers.map(courier => `
+                                    <option value="${courier.id}">
+                                        ${courier.full_name} - ${courier.vehicle_type} 
+                                        (${courier.current_deliveries || 0}/5 teslimat)
+                                    </option>
+                                `).join('')}
+                            </select>
                         </div>
                     </div>
-                </div>
 
-                <div id="manualAssignmentSection" style="display: none;">
-                    <div class="form-group">
-                        <label for="courierSelect">Kurye Seçin</label>
-                        <select id="courierSelect" class="form-control">
-                            <option value="">Kurye seçin...</option>
-                            ${availableCouriers.map(courier => `
-                                <option value="${courier.id}">
-                                    ${courier.full_name} - ${courier.vehicle_type} 
-                                    (${courier.current_deliveries || 0}/5 teslimat)
-                                    ${courier.distance ? `- ${courier.distance.toFixed(1)}km` : ''}
-                                </option>
-                            `).join('')}
-                        </select>
-                    </div>
-                    <div class="form-actions" style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
                         <button type="button" class="btn btn-primary" onclick="sellerPanel.assignCourierManually('${orderId}')">
                             Kurye Ata
                         </button>
                     </div>
                 </div>
-
-                <div id="autoAssignmentResult" style="display: none;">
-                    <!-- Otomatik atama sonucu burada gösterilecek -->
-                </div>
             </div>
-        </div>
         `;
-    
+        
         document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
+    }    
         // Event listeners
         document.getElementById('autoAssignBtn').addEventListener('click', async () => {
             await this.assignCourierAutomatically(orderId);
@@ -1067,31 +1056,28 @@ if (order.status === 'ready' && !order.courier_id) {
         }
     }
     
+    // Manuel kurye ata
     async assignCourierManually(orderId) {
         const courierSelect = document.getElementById('courierSelect');
         const courierId = courierSelect.value;
-    
+
         if (!courierId) {
             window.panelSystem.showAlert('Lütfen bir kurye seçin!', 'error');
             return;
         }
-    
+
         try {
-            const success = await this.window.courierAssignmentSystem.assignCourierManually(orderId, courierId);
-            
-            if (success) {
-                window.panelSystem.showAlert('Kurye başarıyla atandı!', 'success');
-                document.querySelector('.modal-overlay').remove();
-                await this.loadAllSellerOrders();
-            } else {
-                window.panelSystem.showAlert('Kurye atanamadı!', 'error');
-            }
-    
+            await window.orderSystem.assignCourierToOrder(orderId, courierId);
+            window.panelSystem.showAlert('Kurye başarıyla atandı!', 'success');
+            document.querySelector('.modal-overlay').remove();
+            await this.loadAllSellerOrders();
+
         } catch (error) {
             console.error('Manuel kurye atama hatası:', error);
             window.panelSystem.showAlert('Kurye atanamadı!', 'error');
         }
     }
+}
     
     async getSellerLocation() {
         // Satıcı konumunu getir (seller_profiles tablosundan)
