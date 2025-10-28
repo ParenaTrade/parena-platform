@@ -848,8 +848,63 @@ class CustomerPanel {
     return trackerHTML;
 }
     
-    // CustomerPanel class'ına bu fonksiyonları ekleyin:
+    
+// CSS yerine JavaScript ile animasyon
+startJavaScriptAnimation() {
+    console.log('⭐ JavaScript animasyonu başlatılıyor...');
+    
+    const animations = document.querySelectorAll('.delivery-animation');
+    
+    animations.forEach(animation => {
+        const orderId = animation.getAttribute('data-order-id');
+        const status = animation.getAttribute('data-status');
+        const moto = animation.querySelector('.fa-motorcycle');
+        
+        if (!moto) return;
+        
+        // CSS animasyonunu kaldır, JS animasyonu ekle
+        moto.style.animation = 'none';
+        moto.classList.add('js-animated');
+        
+        if (status === 'ready') {
+            this.animateMotoToStore(moto);
+        } else if (status === 'on_the_way') {
+            this.animateMotoToAddress(moto);
+        }
+    });
+}
 
+animateMotoToStore(moto) {
+    let position = 0;
+    const animate = () => {
+        position += 1;
+        if (position > 60) position = 0;
+        
+        const bounce = Math.sin(position * 0.2) * 2;
+        moto.style.transform = `translateX(${position}px) translateY(${bounce}px)`;
+        
+        requestAnimationFrame(animate);
+    };
+    animate();
+}
+
+    
+
+animateMotoToAddress(moto) {
+    let position = 0;
+    const animate = () => {
+        position += 1.5; // Daha hızlı
+        if (position > 60) position = 0;
+        
+        const bounce = Math.cos(position * 0.3) * 3;
+        moto.style.transform = `translateX(${position}px) translateY(${bounce}px)`;
+        
+        requestAnimationFrame(animate);
+    };
+    animate();
+}
+    
+// CustomerPanel class'ına bu fonksiyonları ekleyin:
 startDeliveryAnimations() {
     console.log('🎬 Animasyonlar başlatılıyor...');
     
