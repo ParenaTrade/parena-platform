@@ -2,25 +2,111 @@ class CourierPanel {
     constructor(userProfile) {
         this.userProfile = userProfile;
         this.courierData = null;
+        this.currentDeliveries = [];
+        this.supabase = window.SUPABASE_CLIENT;
+        
         this.init();
     }
 
     async init() {
         await this.loadCourierData();
+        await this.loadCurrentDeliveries();
     }
 
+    // Kurye verilerini yükle
     async loadCourierData() {
-        const { data, error } = await supabase
-            .from('couriers')
-            .select('*')
-            .eq('user_id', this.userProfile.id)
-            .single();
+        try {
+            const { data, error } = await this.supabase
+                .from('couriers')
+                .select('*')
+                .eq('phone', this.userProfile.phone)
+                .single();
 
-        if (data) {
+            if (error) throw error;
             this.courierData = data;
+
+        } catch (error) {
+            console.error('Kurye verisi yükleme hatası:', error);
         }
     }
 
+    // Aktif teslimatları getir
+    async loadCurrentDeliveries() {
+        try {
+            const { data: orders, error } = await this.supabase
+                .from('orders')
+                .select(`
+                    *,
+                    customer:customers(name, phone),
+                    seller:seller_profiles(business_name, address)
+                `)
+                .eq('courier_id', this.courierData.id)
+                .in('status', ['on_the_way', 'ready'])
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+            this.currentDeliveries = orders || [];
+
+        } catch (error) {
+            console.error('Teslimatları yükleme hatası:', error);
+        }
+    }
+
+    // Teslimat durumunu güncelle
+    async updateDeliveryStatus(orderId, newStatus) {
+        try {
+            const { error } = await this.supabase
+                .from('orders')
+                .update({
+                    status: newStatus,
+                    updated_at: new Date().toISOString(),
+                    ...(newStatus === 'delivered' && {
+                        actual_delivery_time: new Date().toISOString()
+                    })
+                })
+                .eq('id', orderId);
+
+            if (error) throw error;
+
+            // Eğer teslimat tamamlandıysa, kuryenin teslimat sayısını azalt
+            if (newStatus === 'delivered') {
+                await window.orderSystem.updateCourierDeliveryCount(this.courierData.id, -1);
+            }
+
+            window.panelSystem.showAlert(`Teslimat durumu güncellendi: ${this.getStatusText(newStatus)}`, 'success');
+            await this.loadCurrentDeliveries();
+
+        } catch (error) {
+            console.error('Teslimat durumu güncelleme hatası:', error);
+            window.panelSystem.showAlert('Durum güncellenemedi!', 'error');
+        }
+    }
+
+    // Çevrimiçi/çevrimdışı durumu
+    async toggleOnlineStatus(isOnline) {
+        try {
+            const { error } = await this.supabase
+                .from('couriers')
+                .update({
+                    is_online: isOnline,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', this.courierData.id);
+
+            if (error) throw error;
+
+            this.courierData.is_online = isOnline;
+            window.panelSystem.showAlert(
+                isOnline ? 'Çevrimiçi oldunuz!' : 'Çevrimdışı oldunuz!', 
+                'success'
+            );
+
+        } catch (error) {
+            console.error('Durum güncelleme hatası:', error);
+            window.panelSystem.showAlert('Durum güncellenemedi!', 'error');
+        }
+    }
+}
     async loadSectionData(sectionName) {
         const section = document.getElementById(sectionName + 'Section');
         
