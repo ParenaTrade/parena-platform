@@ -135,59 +135,63 @@ class CustomerPanel {
     }
 
     async createReferralLink() {
-        try {
-            console.log('🔗 Yeni referral link oluşturuluyor...');
-            
-            // Önce kullanıcının bir grubu var mı kontrol et
-            const { data: userGroup, error: groupError } = await this.supabase
+    try {
+        console.log('🔗 Yeni referral link oluşturuluyor...');
+        
+        let groupCode = 'DEFAULT'; // Varsayılan grup kodu
+
+        // Önce kullanıcının bir grubu var mı kontrol et
+        const { data: userGroup, error: groupError } = await this.supabase
+            .from('referral_groups')
+            .select('*')
+            .eq('leader_user_id', this.customerData.id)
+            .single();
+
+        if (!groupError && userGroup) {
+            groupCode = userGroup.group_code;
+        } else {
+            // Grup yoksa, varsayılan bir grup bul
+            const { data: defaultGroup, error: defaultError } = await this.supabase
                 .from('referral_groups')
                 .select('*')
-                .eq('leader_user_id', this.customerData.id)
+                .eq('is_active', true)
+                .limit(1)
                 .single();
 
-            let groupCode;
-            
-            if (groupError || !userGroup) {
-                // Grup yoksa, varsayılan bir grup bul veya oluştur
-                const { data: defaultGroup, error: defaultError } = await this.supabase
-                    .from('referral_groups')
-                    .select('*')
-                    .eq('is_active', true)
-                    .limit(1)
-                    .single();
-
-                if (defaultError || !defaultGroup) {
-                    console.error('❌ Aktif referral grubu bulunamadı');
-                    return;
-                }
+            if (!defaultError && defaultGroup) {
                 groupCode = defaultGroup.group_code;
-            } else {
-                groupCode = userGroup.group_code;
             }
-
-            // Benzersiz referral code oluştur
-            const referralCode = this.generateReferralCode();
-            
-            const { data: newLink, error } = await this.supabase
-                .from('referral_links')
-                .insert({
-                    group_code: groupCode,
-                    owner_user_id: this.customerData.id,
-                    referral_code: referralCode,
-                    is_used: false
-                })
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            this.referralData = newLink;
-            console.log('✅ Yeni referral link oluşturuldu:', referralCode);
-
-        } catch (error) {
-            console.error('❌ Referral link oluşturma hatası:', error);
+            // Varsayılan grup da yoksa 'DEFAULT' kullan
         }
+
+        // Benzersiz referral code oluştur
+        const referralCode = this.generateReferralCode();
+        
+        const { data: newLink, error } = await this.supabase
+            .from('referral_links')
+            .insert({
+                group_code: groupCode,
+                owner_user_id: this.customerData.id,
+                referral_code: referralCode,
+                is_used: false
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        this.referralData = newLink;
+        console.log('✅ Yeni referral link oluşturuldu:', referralCode);
+
+    } catch (error) {
+        console.error('❌ Referral link oluşturma hatası:', error);
+        // Hata durumunda bile referralData'yı boş bırakma
+        this.referralData = {
+            referral_code: 'ERROR-' + Date.now(),
+            group_code: 'DEFAULT'
+        };
     }
+}
 
     generateReferralCode() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -199,79 +203,115 @@ class CustomerPanel {
     }
 
     async loadReferralStats() {
-        try {
-            if (!this.customerData?.id) return;
+    try {
+        if (!this.customerData?.id) return;
 
-            // Davet edilen kullanıcı sayısı
-            const { data: invites, error: invitesError } = await this.supabase
-                .from('referral_tracking')
-                .select('id, new_user_id, created_at')
-                .eq('referrer_user_id', this.customerData.id);
+        // Davet edilen kullanıcı sayısı
+        const { data: invites, error: invitesError } = await this.supabase
+            .from('referral_tracking')
+            .select('id, new_user_id, created_at')
+            .eq('referrer_user_id', this.customerData.id);
 
-            // Toplam kazanç
-            const { data: totalEarnings, error: earningsError } = await this.supabase
-                .from('referral_bonus_usage')
-                .select('order_bonus')
-                .eq('user_id', this.customerData.id)
-                .not('order_bonus', 'is', null);
+        // Toplam kazanç - SADECE order_bonus değil, amount da ekle
+        const { data: totalEarnings, error: earningsError } = await this.supabase
+            .from('referral_bonus_usage')
+            .select('order_bonus, amount, bonus_type')
+            .eq('user_id', this.customerData.id);
 
-            this.referralStats = {
-                totalInvites: invites?.length || 0,
-                activeUsers: invites?.filter(invite => invite.new_user_id).length || 0,
-                totalEarnings: totalEarnings?.reduce((sum, item) => sum + parseFloat(item.order_bonus || 0), 0) || 0,
-                pendingEarnings: 0 // Basit implementasyon
-            };
+        let totalEarningsAmount = 0;
+        let pendingEarnings = 0;
 
-        } catch (error) {
-            console.error('❌ Referral istatistik yükleme hatası:', error);
+        if (totalEarnings) {
+            totalEarnings.forEach(earning => {
+                if (earning.order_bonus) {
+                    totalEarningsAmount += parseFloat(earning.order_bonus);
+                } else if (earning.amount) {
+                    pendingEarnings += parseFloat(earning.amount);
+                }
+            });
         }
+
+        this.referralStats = {
+            totalInvites: invites?.length || 0,
+            activeUsers: invites?.filter(invite => invite.new_user_id).length || 0,
+            totalEarnings: totalEarningsAmount,
+            pendingEarnings: pendingEarnings
+        };
+
+    } catch (error) {
+        console.error('❌ Referral istatistik yükleme hatası:', error);
     }
-
+}
     async loadReferralEarnings() {
-        try {
-            if (!this.customerData?.id) return;
+    try {
+        if (!this.customerData?.id) return;
 
-            const { data: earnings, error } = await this.supabase
+        const { data: earnings, error } = await this.supabase
+            .from('referral_bonus_usage')
+            .select(`
+                *,
+                orders!inner(total_amount, customer_name, created_at)
+            `)
+            .eq('user_id', this.customerData.id)
+            .order('created_at', { ascending: false });
+
+        if (!error && earnings) {
+            this.referralEarnings = earnings;
+        } else if (error) {
+            console.warn('⚠️ Orders join hatası, basit sorgu deneniyor:', error);
+            // Basit sorgu fallback
+            const { data: simpleEarnings, error: simpleError } = await this.supabase
                 .from('referral_bonus_usage')
-                .select(`
-                    *,
-                    orders(total_amount, customer_name)
-                `)
+                .select('*')
                 .eq('user_id', this.customerData.id)
                 .order('created_at', { ascending: false });
-
-            if (!error && earnings) {
-                this.referralEarnings = earnings;
+            
+            if (!simpleError && simpleEarnings) {
+                this.referralEarnings = simpleEarnings;
             }
-
-        } catch (error) {
-            console.error('❌ Referral kazanç geçmişi yükleme hatası:', error);
         }
+
+    } catch (error) {
+        console.error('❌ Referral kazanç geçmişi yükleme hatası:', error);
     }
-
+}
     async loadReferralInvites() {
-        try {
-            if (!this.customerData?.id) return;
+    try {
+        if (!this.customerData?.id) return;
 
-            const { data: invites, error } = await this.supabase
+        const { data: invites, error } = await this.supabase
+            .from('referral_tracking')
+            .select(`
+                *,
+                new_user:customers(name, phone, created_at),
+                referral_bonus!inner(bonus_amount)
+            `)
+            .eq('referrer_user_id', this.customerData.id)
+            .order('created_at', { ascending: false });
+
+        if (!error && invites) {
+            this.referralInvites = invites;
+        } else if (error) {
+            console.warn('⚠️ Bonus join hatası, basit sorgu deneniyor:', error);
+            // Basit sorgu fallback
+            const { data: simpleInvites, error: simpleError } = await this.supabase
                 .from('referral_tracking')
                 .select(`
                     *,
-                    new_user:customers(name, phone, created_at),
-                    referral_bonus(bonus_amount)
+                    new_user:customers(name, phone, created_at)
                 `)
                 .eq('referrer_user_id', this.customerData.id)
                 .order('created_at', { ascending: false });
-
-            if (!error && invites) {
-                this.referralInvites = invites;
+            
+            if (!simpleError && simpleInvites) {
+                this.referralInvites = simpleInvites;
             }
-
-        } catch (error) {
-            console.error('❌ Davet edilenler yükleme hatası:', error);
         }
-    }
 
+    } catch (error) {
+        console.error('❌ Davet edilenler yükleme hatası:', error);
+    }
+}
     async loadSectionData(sectionName) {
         this.currentSection = sectionName;
         
