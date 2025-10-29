@@ -1,4 +1,4 @@
-// Customer Panel - Müşteri Paneli Yönetimi
+// Customer Panel - Müşteri Paneli Yönetimi (Referral Sistemi Entegre)
 class CustomerPanel {
     constructor(userProfile) {
         this.userProfile = userProfile;
@@ -8,11 +8,16 @@ class CustomerPanel {
         this.currentSection = '';
         this.isDataLoaded = false;
         
+        // Referral özellikleri
+        this.referralData = null;
+        this.referralStats = null;
+        this.referralEarnings = [];
+        this.referralInvites = [];
         
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
         
-        console.log('👤 CustomerPanel başlatılıyor - Müşteri Oturumu');
+        console.log('👤 CustomerPanel başlatılıyor - Müşteri Oturumu + Referral Sistem');
         console.log('Müşteri Profili:', {
             id: userProfile.id,
             name: userProfile.name,
@@ -30,6 +35,7 @@ class CustomerPanel {
 
     async init() {
         await this.loadCustomerData();
+        await this.loadReferralData();
         this.isDataLoaded = true;
         console.log('✅ CustomerPanel başlatma tamamlandı');
     }
@@ -84,6 +90,188 @@ class CustomerPanel {
         }
     }
 
+    // REFERRAL SİSTEMİ FONKSİYONLARI
+    async loadReferralData() {
+        try {
+            console.log('📊 Referral verileri yükleniyor...');
+            
+            if (!this.supabase || !this.customerData?.id) {
+                console.warn('⚠️ Referral verileri yüklenemedi: Supabase veya müşteri ID yok');
+                return;
+            }
+
+            // Kullanıcının referral link'ini ve grup bilgilerini al
+            const { data: referralLink, error: linkError } = await this.supabase
+                .from('referral_links')
+                .select(`
+                    *,
+                    referral_groups(name, group_code, leader_user_id)
+                `)
+                .eq('owner_user_id', this.customerData.id)
+                .eq('is_used', false)
+                .single();
+
+            if (!linkError && referralLink) {
+                this.referralData = referralLink;
+            } else {
+                // Eğer referral link yoksa, yeni bir tane oluştur
+                await this.createReferralLink();
+            }
+
+            // Referral istatistiklerini yükle
+            await this.loadReferralStats();
+            
+            // Kazanç geçmişini yükle
+            await this.loadReferralEarnings();
+            
+            // Davet edilenleri yükle
+            await this.loadReferralInvites();
+
+            console.log('✅ Referral verileri yüklendi');
+
+        } catch (error) {
+            console.error('❌ Referral veri yükleme hatası:', error);
+        }
+    }
+
+    async createReferralLink() {
+        try {
+            console.log('🔗 Yeni referral link oluşturuluyor...');
+            
+            // Önce kullanıcının bir grubu var mı kontrol et
+            const { data: userGroup, error: groupError } = await this.supabase
+                .from('referral_groups')
+                .select('*')
+                .eq('leader_user_id', this.customerData.id)
+                .single();
+
+            let groupCode;
+            
+            if (groupError || !userGroup) {
+                // Grup yoksa, varsayılan bir grup bul veya oluştur
+                const { data: defaultGroup, error: defaultError } = await this.supabase
+                    .from('referral_groups')
+                    .select('*')
+                    .eq('is_active', true)
+                    .limit(1)
+                    .single();
+
+                if (defaultError || !defaultGroup) {
+                    console.error('❌ Aktif referral grubu bulunamadı');
+                    return;
+                }
+                groupCode = defaultGroup.group_code;
+            } else {
+                groupCode = userGroup.group_code;
+            }
+
+            // Benzersiz referral code oluştur
+            const referralCode = this.generateReferralCode();
+            
+            const { data: newLink, error } = await this.supabase
+                .from('referral_links')
+                .insert({
+                    group_code: groupCode,
+                    owner_user_id: this.customerData.id,
+                    referral_code: referralCode,
+                    is_used: false
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            this.referralData = newLink;
+            console.log('✅ Yeni referral link oluşturuldu:', referralCode);
+
+        } catch (error) {
+            console.error('❌ Referral link oluşturma hatası:', error);
+        }
+    }
+
+    generateReferralCode() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 8; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    }
+
+    async loadReferralStats() {
+        try {
+            if (!this.customerData?.id) return;
+
+            // Davet edilen kullanıcı sayısı
+            const { data: invites, error: invitesError } = await this.supabase
+                .from('referral_tracking')
+                .select('id, new_user_id, created_at')
+                .eq('referrer_user_id', this.customerData.id);
+
+            // Toplam kazanç
+            const { data: totalEarnings, error: earningsError } = await this.supabase
+                .from('referral_bonus_usage')
+                .select('order_bonus')
+                .eq('user_id', this.customerData.id)
+                .not('order_bonus', 'is', null);
+
+            this.referralStats = {
+                totalInvites: invites?.length || 0,
+                activeUsers: invites?.filter(invite => invite.new_user_id).length || 0,
+                totalEarnings: totalEarnings?.reduce((sum, item) => sum + parseFloat(item.order_bonus || 0), 0) || 0,
+                pendingEarnings: 0 // Basit implementasyon
+            };
+
+        } catch (error) {
+            console.error('❌ Referral istatistik yükleme hatası:', error);
+        }
+    }
+
+    async loadReferralEarnings() {
+        try {
+            if (!this.customerData?.id) return;
+
+            const { data: earnings, error } = await this.supabase
+                .from('referral_bonus_usage')
+                .select(`
+                    *,
+                    orders(total_amount, customer_name)
+                `)
+                .eq('user_id', this.customerData.id)
+                .order('created_at', { ascending: false });
+
+            if (!error && earnings) {
+                this.referralEarnings = earnings;
+            }
+
+        } catch (error) {
+            console.error('❌ Referral kazanç geçmişi yükleme hatası:', error);
+        }
+    }
+
+    async loadReferralInvites() {
+        try {
+            if (!this.customerData?.id) return;
+
+            const { data: invites, error } = await this.supabase
+                .from('referral_tracking')
+                .select(`
+                    *,
+                    new_user:customers(name, phone, created_at),
+                    referral_bonus(bonus_amount)
+                `)
+                .eq('referrer_user_id', this.customerData.id)
+                .order('created_at', { ascending: false });
+
+            if (!error && invites) {
+                this.referralInvites = invites;
+            }
+
+        } catch (error) {
+            console.error('❌ Davet edilenler yükleme hatası:', error);
+        }
+    }
+
     async loadSectionData(sectionName) {
         this.currentSection = sectionName;
         
@@ -127,6 +315,16 @@ class CustomerPanel {
             case 'customerSupport':
                 await this.loadCustomerSupport();
                 break;
+            // Yeni referral section'ları
+            case 'customerReferral':
+                await this.loadCustomerReferral();
+                break;
+            case 'referralEarnings':
+                await this.loadReferralEarningsSection();
+                break;
+            case 'referralInvites':
+                await this.loadReferralInvitesSection();
+                break;
         }
     }
 
@@ -159,6 +357,509 @@ class CustomerPanel {
         }
     }
 
+    // REFERRAL DASHBOARD
+    async loadCustomerReferral() {
+        const section = document.getElementById('customerReferralSection');
+        if (!section) return;
+
+        const referralLink = this.referralData ? 
+            `${window.location.origin}?ref=${this.referralData.referral_code}` : 
+            'Yükleniyor...';
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Arkadaşını Davet Et</h2>
+                <p class="subtitle">Arkadaşlarını davet et, bonus kazan!</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${this.referralStats?.totalInvites || 0}</h3>
+                        <p>Toplam Davet</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${this.referralStats?.activeUsers || 0}</h3>
+                        <p>Üye Olanlar</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${(this.referralStats?.totalEarnings || 0).toFixed(2)} ₺</h3>
+                        <p>Toplam Kazanç</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-row">
+                <div class="content-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Davet Linkiniz</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="referral-link-container">
+                                <div class="input-group">
+                                    <input type="text" id="referralLinkInput" class="form-control" 
+                                           value="${referralLink}" readonly>
+                                    <button class="btn btn-primary" onclick="customerPanel.copyReferralLink()">
+                                        <i class="fas fa-copy"></i> Kopyala
+                                    </button>
+                                </div>
+                                <small class="text-muted">
+                                    Bu linki arkadaşlarınla paylaş, hem onlar hem sen kazanın!
+                                </small>
+                            </div>
+
+                            <div class="share-buttons" style="margin-top: 20px;">
+                                <button class="btn btn-outline-primary btn-sm" onclick="customerPanel.shareOnWhatsApp()">
+                                    <i class="fab fa-whatsapp"></i> WhatsApp
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm" onclick="customerPanel.shareOnTelegram()">
+                                    <i class="fab fa-telegram"></i> Telegram
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm" onclick="customerPanel.shareAsMessage()">
+                                    <i class="fas fa-sms"></i> SMS
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Bonus Kuralları</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="bonus-rules">
+                                <div class="rule-item">
+                                    <i class="fas fa-gift text-primary"></i>
+                                    <div>
+                                        <strong>Referans Bonusu</strong>
+                                        <p>Arkadaşın üye olduğunda sabit bonus kazan</p>
+                                    </div>
+                                </div>
+                                <div class="rule-item">
+                                    <i class="fas fa-shopping-cart text-success"></i>
+                                    <div>
+                                        <strong>Sipariş Bonusu</strong>
+                                        <p>Arkadaşın sipariş verdikçe % bazlı bonus kazan</p>
+                                    </div>
+                                </div>
+                                <div class="rule-item">
+                                    <i class="fas fa-calendar-alt text-warning"></i>
+                                    <div>
+                                        <strong>Ay Sonu Hakediş</strong>
+                                        <p>Bonuslar ay sonunda bakiyene eklenecek</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-row">
+                <div class="content-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Hızlı İşlemler</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="quick-actions">
+                                <button class="btn btn-outline-primary" onclick="window.panelSystem.showSection('referralEarnings')">
+                                    <i class="fas fa-chart-line"></i> Kazançlarımı Gör
+                                </button>
+                                <button class="btn btn-outline-primary" onclick="window.panelSystem.showSection('referralInvites')">
+                                    <i class="fas fa-list"></i> Davet Ettiklerim
+                                </button>
+                                <button class="btn btn-outline-primary" onclick="customerPanel.refreshReferralData()">
+                                    <i class="fas fa-sync-alt"></i> Verileri Yenile
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // REFERRAL KAZANÇLAR SAYFASI
+    async loadReferralEarningsSection() {
+        const section = document.getElementById('referralEarningsSection');
+        if (!section) return;
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Bonus Kazançlarım</h2>
+                <div class="header-actions">
+                    <select id="earningTypeFilter" class="form-control" onchange="customerPanel.filterEarnings()">
+                        <option value="">Tüm Kazançlar</option>
+                        <option value="referral_bonus">Referans Bonusu</option>
+                        <option value="order_bonus">Sipariş Bonusu</option>
+                    </select>
+                    <input type="date" id="earningDateFilter" class="form-control" onchange="customerPanel.filterEarnings()">
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div id="referralEarningsList">
+                        ${this.renderReferralEarnings()}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderReferralEarnings() {
+        if (!this.referralEarnings.length) {
+            return `
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <i class="fas fa-coins" style="font-size: 48px; margin-bottom: 20px;"></i>
+                    <h3>Henüz bonus kazancınız bulunmuyor</h3>
+                    <p>Arkadaşlarını davet ederek bonus kazanmaya başla!</p>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tarih</th>
+                            <th>Açıklama</th>
+                            <th>Bonus Türü</th>
+                            <th>Miktar</th>
+                            <th>Sipariş Bonusu</th>
+                            <th>Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${this.referralEarnings.map(earning => `
+                            <tr>
+                                <td>
+                                    <div>${new Date(earning.created_at).toLocaleDateString('tr-TR')}</div>
+                                    <small style="color: #666;">${new Date(earning.created_at).toLocaleTimeString('tr-TR')}</small>
+                                </td>
+                                <td>${earning.description || 'Bonus Kazanç'}</td>
+                                <td>
+                                    <span class="badge ${earning.bonus_type === 'referral_bonus' ? 'badge-primary' : 'badge-success'}">
+                                        ${earning.bonus_type === 'referral_bonus' ? 'Referans Bonusu' : 'Sipariş Bonusu'}
+                                    </span>
+                                </td>
+                                <td style="font-weight: bold; color: var(--primary);">
+                                    ${parseFloat(earning.amount || 0).toFixed(2)} ₺
+                                </td>
+                                <td style="font-weight: bold; color: var(--success);">
+                                    ${earning.order_bonus ? parseFloat(earning.order_bonus).toFixed(2) + ' ₺' : 'Beklemede'}
+                                </td>
+                                <td>
+                                    <span class="status-badge ${earning.order_bonus ? 'status-delivered' : 'status-pending'}">
+                                        ${earning.order_bonus ? 'Ödendi' : 'Bekliyor'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // DAVET EDİLENLER SAYFASI
+    async loadReferralInvitesSection() {
+        const section = document.getElementById('referralInvitesSection');
+        if (!section) return;
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Davet Ettiklerim</h2>
+                <div class="header-actions">
+                    <select id="inviteStatusFilter" class="form-control" onchange="customerPanel.filterInvites()">
+                        <option value="">Tüm Davetler</option>
+                        <option value="used">Üye Olanlar</option>
+                        <option value="not_used">Üye Olmayanlar</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div id="referralInvitesList">
+                        ${this.renderReferralInvites()}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderReferralInvites() {
+        if (!this.referralInvites.length) {
+            return `
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <i class="fas fa-user-friends" style="font-size: 48px; margin-bottom: 20px;"></i>
+                    <h3>Henüz kimseyi davet etmediniz</h3>
+                    <p>Davet linkinizi paylaşarak arkadaşlarınızı davet edin!</p>
+                </div>
+            `;
+        }
+
+        const usedInvites = this.referralInvites.filter(invite => invite.new_user_id);
+        const notUsedInvites = this.referralInvites.filter(invite => !invite.new_user_id);
+
+        return `
+            <div class="invites-stats" style="margin-bottom: 20px;">
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div class="stat-badge">
+                        <strong>${this.referralInvites.length}</strong>
+                        <span>Toplam Davet</span>
+                    </div>
+                    <div class="stat-badge success">
+                        <strong>${usedInvites.length}</strong>
+                        <span>Üye Olan</span>
+                    </div>
+                    <div class="stat-badge warning">
+                        <strong>${notUsedInvites.length}</strong>
+                        <span>Üye Olmayan</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Davet Tarihi</th>
+                            <th>Kullanıcı</th>
+                            <th>Durum</th>
+                            <th>Bonus</th>
+                            <th>Üyelik Tarihi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${this.referralInvites.map(invite => {
+                            const isUsed = !!invite.new_user_id;
+                            const userName = invite.new_user?.name || 'Belirtilmemiş';
+                            const userPhone = invite.new_user?.phone || 'Belirtilmemiş';
+                            const bonusAmount = invite.referral_bonus?.[0]?.bonus_amount || 0;
+                            
+                            return `
+                                <tr>
+                                    <td>
+                                        <div>${new Date(invite.created_at).toLocaleDateString('tr-TR')}</div>
+                                        <small style="color: #666;">${new Date(invite.created_at).toLocaleTimeString('tr-TR')}</small>
+                                    </td>
+                                    <td>
+                                        <div>${userName}</div>
+                                        <small style="color: #666;">${userPhone}</small>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge ${isUsed ? 'status-delivered' : 'status-pending'}">
+                                            ${isUsed ? 'Üye Oldu' : 'Bekliyor'}
+                                        </span>
+                                    </td>
+                                    <td style="font-weight: bold; color: var(--success);">
+                                        ${parseFloat(bonusAmount).toFixed(2)} ₺
+                                    </td>
+                                    <td>
+                                        ${isUsed && invite.new_user?.created_at ? 
+                                            new Date(invite.new_user.created_at).toLocaleDateString('tr-TR') : 
+                                            '-'
+                                        }
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // REFERRAL UTILITY FONKSİYONLARI
+    copyReferralLink() {
+        const input = document.getElementById('referralLinkInput');
+        if (input) {
+            input.select();
+            document.execCommand('copy');
+            window.panelSystem.showAlert('Davet linki kopyalandı!', 'success');
+        }
+    }
+
+    shareOnWhatsApp() {
+        const message = `Seni yemek siparişi uygulamasına davet ediyorum! Bu linkten üye ol, ikimiz de bonus kazanalım: ${this.referralData ? window.location.origin + '?ref=' + this.referralData.referral_code : ''}`;
+        const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+    }
+
+    shareOnTelegram() {
+        const message = `Seni yemek siparişi uygulamasına davet ediyorum! Bu linkten üye ol, ikimiz de bonus kazanalım: ${this.referralData ? window.location.origin + '?ref=' + this.referralData.referral_code : ''}`;
+        const url = `https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+    }
+
+    shareAsMessage() {
+        const message = `Seni yemek siparişi uygulamasına davet ediyorum! Link: ${this.referralData ? window.location.origin + '?ref=' + this.referralData.referral_code : ''}`;
+        if (navigator.share) {
+            navigator.share({
+                title: 'Davet Linkim',
+                text: message,
+                url: window.location.origin
+            });
+        } else {
+            alert(`Mesajı kopyalayın: ${message}`);
+        }
+    }
+
+    async refreshReferralData() {
+        await this.loadReferralData();
+        await this.loadCustomerReferral();
+        window.panelSystem.showAlert('Referral verileri yenilendi!', 'success');
+    }
+
+    filterEarnings() {
+        const typeFilter = document.getElementById('earningTypeFilter').value;
+        const dateFilter = document.getElementById('earningDateFilter').value;
+        
+        let filtered = this.referralEarnings;
+        
+        if (typeFilter) {
+            filtered = filtered.filter(earning => earning.bonus_type === typeFilter);
+        }
+        
+        if (dateFilter) {
+            filtered = filtered.filter(earning => 
+                earning.created_at.startsWith(dateFilter)
+            );
+        }
+        
+        document.getElementById('referralEarningsList').innerHTML = this.renderFilteredEarnings(filtered);
+    }
+
+    renderFilteredEarnings(earnings) {
+        if (!earnings.length) {
+            return `<div style="text-align: center; padding: 20px; color: #666;">Filtreye uygun kayıt bulunamadı</div>`;
+        }
+        
+        return `
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tarih</th>
+                            <th>Açıklama</th>
+                            <th>Bonus Türü</th>
+                            <th>Miktar</th>
+                            <th>Sipariş Bonusu</th>
+                            <th>Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${earnings.map(earning => `
+                            <tr>
+                                <td>${new Date(earning.created_at).toLocaleDateString('tr-TR')}</td>
+                                <td>${earning.description || 'Bonus Kazanç'}</td>
+                                <td>
+                                    <span class="badge ${earning.bonus_type === 'referral_bonus' ? 'badge-primary' : 'badge-success'}">
+                                        ${earning.bonus_type === 'referral_bonus' ? 'Referans Bonusu' : 'Sipariş Bonusu'}
+                                    </span>
+                                </td>
+                                <td>${parseFloat(earning.amount || 0).toFixed(2)} ₺</td>
+                                <td>${earning.order_bonus ? parseFloat(earning.order_bonus).toFixed(2) + ' ₺' : 'Beklemede'}</td>
+                                <td>
+                                    <span class="status-badge ${earning.order_bonus ? 'status-delivered' : 'status-pending'}">
+                                        ${earning.order_bonus ? 'Ödendi' : 'Bekliyor'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    filterInvites() {
+        const statusFilter = document.getElementById('inviteStatusFilter').value;
+        
+        let filtered = this.referralInvites;
+        
+        if (statusFilter === 'used') {
+            filtered = filtered.filter(invite => invite.new_user_id);
+        } else if (statusFilter === 'not_used') {
+            filtered = filtered.filter(invite => !invite.new_user_id);
+        }
+        
+        document.getElementById('referralInvitesList').innerHTML = this.renderFilteredInvites(filtered);
+    }
+
+    renderFilteredInvites(invites) {
+        if (!invites.length) {
+            return `<div style="text-align: center; padding: 20px; color: #666;">Filtreye uygun kayıt bulunamadı</div>`;
+        }
+        
+        return `
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Davet Tarihi</th>
+                            <th>Kullanıcı</th>
+                            <th>Durum</th>
+                            <th>Bonus</th>
+                            <th>Üyelik Tarihi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${invites.map(invite => {
+                            const isUsed = !!invite.new_user_id;
+                            const userName = invite.new_user?.name || 'Belirtilmemiş';
+                            const userPhone = invite.new_user?.phone || 'Belirtilmemiş';
+                            const bonusAmount = invite.referral_bonus?.[0]?.bonus_amount || 0;
+                            
+                            return `
+                                <tr>
+                                    <td>${new Date(invite.created_at).toLocaleDateString('tr-TR')}</td>
+                                    <td>
+                                        <div>${userName}</div>
+                                        <small style="color: #666;">${userPhone}</small>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge ${isUsed ? 'status-delivered' : 'status-pending'}">
+                                            ${isUsed ? 'Üye Oldu' : 'Bekliyor'}
+                                        </span>
+                                    </td>
+                                    <td>${parseFloat(bonusAmount).toFixed(2)} ₺</td>
+                                    <td>
+                                        ${isUsed && invite.new_user?.created_at ? 
+                                            new Date(invite.new_user.created_at).toLocaleDateString('tr-TR') : 
+                                            '-'
+                                        }
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // ANA DASHBOARD (REFERRAL ENTEGRE)
     async loadCustomerDashboard() {
         const section = document.getElementById('customerDashboardSection');
         if (!section) {
@@ -200,6 +901,15 @@ class CustomerPanel {
                         <p>Bonus Bakiyesi</p>
                     </div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-icon info">
+                        <i class="fas fa-user-friends"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${this.referralStats?.totalInvites || 0}</h3>
+                        <p>Davet Edilen</p>
+                    </div>
+                </div>
             </div>
 
             <div class="content-row">
@@ -219,6 +929,29 @@ class CustomerPanel {
                         </div>
                     </div>
                 </div>
+                
+                <div class="content-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Arkadaşını Davet Et</h3>
+                            <a href="#" class="view-all" onclick="window.panelSystem.showSection('customerReferral')">Detaylar</a>
+                        </div>
+                        <div class="card-body">
+                            <div class="referral-quick-info">
+                                <div style="text-align: center; margin-bottom: 15px;">
+                                    <i class="fas fa-gift" style="font-size: 48px; color: var(--primary); margin-bottom: 10px;"></i>
+                                    <h4>Bonus Kazanma Fırsatı!</h4>
+                                </div>
+                                <p style="text-align: center; color: #666; margin-bottom: 15px;">
+                                    Arkadaşlarını davet et, her davet için bonus puan kazan!
+                                </p>
+                                <button class="btn btn-primary" style="width: 100%;" onclick="window.panelSystem.showSection('customerReferral')">
+                                    <i class="fas fa-share-alt"></i> Davet Etmeye Başla
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
 
@@ -226,6 +959,7 @@ class CustomerPanel {
         await this.loadRecentCustomerOrders();
     }
 
+    // DİĞER MEVCUT FONKSİYONLAR (Aynen kalacak)
     async loadCustomerStats() {
         try {
             console.log('📊 Müşteri istatistikleri yükleniyor...');
@@ -368,7 +1102,9 @@ class CustomerPanel {
         }
     }
 
-    async loadCustomerProfile() {
+    // Diğer mevcut fonksiyonlar (loadCustomerProfile, loadCustomerOrders, vb.) aynen buraya gelecek
+
+async loadCustomerProfile() {
         const section = document.getElementById('customerProfileSection');
         if (!section) return;
 
@@ -1596,6 +2332,8 @@ async loadPaymentsWithoutJoin() {
         }
     }
 
+
+    // ... kalan fonksiyonlar değişmeden kalacak ...
 
     getStatusText(status) {
         const statusMap = {
