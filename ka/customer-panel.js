@@ -13,6 +13,13 @@ class CustomerPanel {
         this.referralStats = null;
         this.referralEarnings = [];
         this.referralInvites = [];
+
+        // Referral event listener'larını bağla
+        this.copyReferralLink = this.copyReferralLink.bind(this);
+        this.shareOnWhatsApp = this.shareOnWhatsApp.bind(this);
+        this.shareOnTelegram = this.shareOnTelegram.bind(this);
+        this.shareAsSMS = this.shareAsSMS.bind(this);
+        this.attachReferralEventListeners = this.attachReferralEventListeners.bind(this);
         
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
@@ -440,7 +447,7 @@ async createReferralLinkOnDemand() {
                                 <div class="input-group" style="margin-top: 10px;">
                                     <input type="text" id="referralLinkInput" class="form-control" 
                                            value="${referralLink}" readonly style="font-size: 14px;">
-                                    <button class="btn btn-primary" onclick="customerPanel.copyReferralLink()">
+                                    <button class="btn btn-primary" id="copyReferralBtn">
                                         <i class="fas fa-copy"></i> Kopyala
                                     </button>
                                 </div>
@@ -452,13 +459,13 @@ async createReferralLinkOnDemand() {
                             <div class="share-buttons" style="margin-top: 25px;">
                                 <h4>Hızlı Paylaşım:</h4>
                                 <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                                    <button class="btn btn-success" onclick="customerPanel.shareOnWhatsApp()" style="flex: 1;">
+                                    <button class="btn btn-success" id="shareWhatsAppBtn">
                                         <i class="fab fa-whatsapp"></i> WhatsApp
                                     </button>
-                                    <button class="btn btn-primary" onclick="customerPanel.shareOnTelegram()" style="flex: 1;">
+                                    <button class="btn btn-primary" id="shareTelegramBtn">
                                         <i class="fab fa-telegram"></i> Telegram
                                     </button>
-                                    <button class="btn btn-info" onclick="customerPanel.shareAsSMS()" style="flex: 1;">
+                                    <button class="btn btn-info" id="shareSMSBtn">
                                         <i class="fas fa-sms"></i> SMS
                                     </button>
                                 </div>
@@ -508,6 +515,9 @@ async createReferralLinkOnDemand() {
             </div>
         `;
 
+        // EVENT LISTENER'LARI EKLE
+        this.attachReferralEventListeners();
+
     } catch (error) {
         console.error('❌ Referral sayfası yükleme hatası:', error);
         section.innerHTML = `
@@ -518,6 +528,72 @@ async createReferralLinkOnDemand() {
                 <button class="btn btn-primary" onclick="location.reload()">Yenile</button>
             </div>
         `;
+    }
+}
+
+// EVENT LISTENER fonksiyonunu ekle
+attachReferralEventListeners() {
+    // Copy button
+    const copyBtn = document.getElementById('copyReferralBtn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => this.copyReferralLink());
+    }
+
+    // Share buttons
+    const whatsappBtn = document.getElementById('shareWhatsAppBtn');
+    if (whatsappBtn) {
+        whatsappBtn.addEventListener('click', () => this.shareOnWhatsApp());
+    }
+
+    const telegramBtn = document.getElementById('shareTelegramBtn');
+    if (telegramBtn) {
+        telegramBtn.addEventListener('click', () => this.shareOnTelegram());
+    }
+
+    const smsBtn = document.getElementById('shareSMSBtn');
+    if (smsBtn) {
+        smsBtn.addEventListener('click', () => this.shareAsSMS());
+    }
+}
+
+// Paylaşım fonksiyonları
+copyReferralLink() {
+    const input = document.getElementById('referralLinkInput');
+    if (input && this.referralData) {
+        input.select();
+        document.execCommand('copy');
+        window.panelSystem.showAlert('Davet linki kopyalandı!', 'success');
+    }
+}
+
+shareOnWhatsApp() {
+    if (!this.referralData) return;
+    
+    const message = `Seni yemek siparişi uygulamasına davet ediyorum! 🍕 Bu linkten üye ol, ikimiz de bonus kazanalım: ${window.location.origin}?ref=${this.referralData.referral_code}`;
+    
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        window.open(`whatsapp://send?text=${encodeURIComponent(message)}`, '_blank');
+    } else {
+        window.open(`https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
+    }
+}
+
+shareOnTelegram() {
+    if (!this.referralData) return;
+    
+    const message = `Seni yemek siparişi uygulamasına davet ediyorum! 🍕 Bu linkten üye ol, ikimiz de bonus kazanalım: ${window.location.origin}?ref=${this.referralData.referral_code}`;
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(message)}`, '_blank');
+}
+
+shareAsSMS() {
+    if (!this.referralData) return;
+    
+    const message = `Yemek siparişi uygulamasına davetim: ${window.location.origin}?ref=${this.referralData.referral_code}`;
+    
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        window.open(`sms:?body=${encodeURIComponent(message)}`, '_blank');
+    } else {
+        alert(`SMS için mesajı kopyalayın: ${message}`);
     }
 }
     // REFERRAL KAZANÇLAR SAYFASI
