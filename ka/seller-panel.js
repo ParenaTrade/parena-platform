@@ -1129,7 +1129,8 @@ async showCourierAssignmentModal(orderId) {
     }
  }
 
-
+// Global instance
+window.sellerPanel = null;
 
 // Seller event listener
 if (window.panelSystem && typeof window.panelSystem.on === 'function') {
