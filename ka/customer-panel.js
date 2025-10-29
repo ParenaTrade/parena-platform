@@ -1119,8 +1119,11 @@ class CustomerPanel {
         this.renderCustomerOrders(filteredOrders);
     }
 
+
+    
     // DİĞER FONKSİYONLAR (loadCustomerProfile, loadCustomerPayments, vb.) BURAYA GELECEK
-    async loadCustomerProfile() {
+
+        async loadCustomerProfile() {
         const section = document.getElementById('customerProfileSection');
         if (!section) return;
 
@@ -2230,9 +2233,6 @@ class CustomerPanel {
         return statusMap[status] || status;
     }
 }
-
-
-    
     // ... [Önceki kodun geri kalanı aynı şekilde entegre edilecek] ...
 
     // Cleanup fonksiyonu
