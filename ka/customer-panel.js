@@ -2230,7 +2230,7 @@ class CustomerPanel {
         return statusMap[status] || status;
     }
 
-    // Cleanup fonksiyonu - SADECE BIR TANE OLMALI!
+       // Cleanup fonksiyonu
     destroy() {
         if (this.realtimeSubscription) {
             this.realtimeSubscription.unsubscribe();
@@ -2239,12 +2239,19 @@ class CustomerPanel {
             clearInterval(this.updateInterval);
         }
     }
-} // ← BU CLASS SONU - SADECE BIR TANE OLMALI!
+} // CLASS SONU
 
 // Global erişim için
 window.customerPanel = null;
 
-// Panel sistemi başlatıldığında
-window.panelSystem.on('customerSessionStart', (userProfile) => {
-    window.customerPanel = new CustomerPanel(userProfile);
-});
+// ⚠️ HATA KORUMALI VERSİYON - panelSystem kontrolü ekleyin
+if (window.panelSystem && typeof window.panelSystem.on === 'function') {
+    window.panelSystem.on('customerSessionStart', (userProfile) => {
+        console.log('👤 CustomerPanel başlatılıyor...');
+        window.customerPanel = new CustomerPanel(userProfile);
+    });
+} else {
+    console.warn('⚠️ panelSystem bulunamadı veya on metodu yok');
+}
+
+console.log('✅ customer-panel.js yüklendi');
