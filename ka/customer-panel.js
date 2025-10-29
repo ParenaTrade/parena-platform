@@ -1120,8 +1120,6 @@ class CustomerPanel {
     }
 
     // DİĞER FONKSİYONLAR (loadCustomerProfile, loadCustomerPayments, vb.) BURAYA GELECEK
-
-
     async loadCustomerProfile() {
         const section = document.getElementById('customerProfileSection');
         if (!section) return;
@@ -1232,242 +1230,6 @@ class CustomerPanel {
             console.error('Profil güncelleme hatası:', error);
             window.panelSystem.showAlert('Profil güncellenemedi!', 'error');
         }
-    }
-
-    async loadCustomerOrders() {
-        const section = document.getElementById('customerOrdersSection');
-        if (!section) return;
-
-        section.innerHTML = `
-            <div class="section-header">
-                <h2>Siparişlerim</h2>
-                <div class="header-actions">
-                    <select id="orderStatusFilter" class="form-control">
-                        <option value="">Tüm Siparişler</option>
-                        <option value="pending">Bekleyen</option>
-                        <option value="confirmed">Onaylanan</option>
-                        <option value="preparing">Hazırlanan</option>
-                        <option value="ready">Hazır</option>
-                        <option value="on_the_way">Yolda</option>
-                        <option value="delivered">Teslim Edilen</option>
-                        <option value="cancelled">İptal Edilen</option>
-                    </select>
-                    <input type="date" id="orderDateFilter" class="form-control">
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-body">
-                    <div id="customerOrdersList">
-                        <div class="loading-spinner">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <p>Siparişler yükleniyor...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        await this.loadAllCustomerOrders();
-        
-        document.getElementById('orderStatusFilter').addEventListener('change', (e) => {
-            this.filterOrders(e.target.value);
-        });
-
-        document.getElementById('orderDateFilter').addEventListener('change', (e) => {
-            this.filterOrdersByDate(e.target.value);
-        });
-    }
-
-    async loadAllCustomerOrders() {
-        try {
-            console.log('📋 Tüm siparişler yükleniyor...');
-            
-            if (!this.supabase || !this.customerData || !this.customerData.id) {
-                const container = document.getElementById('customerOrdersList');
-                container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
-                return;
-            }
-
-            const { data: orders, error } = await this.supabase
-                .from('orders')
-                .select(`
-                    *,
-                    order_details(*),
-                    seller:seller_profiles(business_name, phone)
-                `)
-                .eq('customer_id', this.customerData.id)
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('❌ Siparişler sorgu hatası:', error);
-                throw error;
-            }
-        
-            this.orders = orders || [];
-            this.renderCustomerOrders(this.orders);
-            console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
-
-        } catch (error) {
-            console.error('❌ Siparişler yükleme hatası:', error);
-            const container = document.getElementById('customerOrdersList');
-            container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
-        }
-    }
-
-    renderCustomerOrders(orders) {
-        const container = document.getElementById('customerOrdersList');
-        
-        if (!orders.length) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: #666;">
-                    <i class="fas fa-shopping-bag" style="font-size: 48px; margin-bottom: 20px;"></i>
-                    <h3>Henüz siparişiniz bulunmuyor</h3>
-                    <p>İlk siparişinizi vermek için alışverişe başlayın!</p>
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = orders.map((order, index) => {
-            const sellerName = order.seller && order.seller.business_name ? order.seller.business_name : 'Satıcı';
-            const deliveryAddress = order.delivery_address || '';
-            const orderDetails = order.order_details || [];
-            
-            return `
-            <div class="order-card" style="border: 1px solid #e1e5e9; border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
-                <div class="order-summary" 
-                     style="padding: 20px; cursor: pointer; background: #f8f9fa;"
-                     data-order-id="${order.id}">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div style="flex: 1;">
-                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                                <strong style="font-size: 16px;">Sipariş #${order.id.slice(-8)}</strong>
-                                <span class="status-badge status-${order.status}">
-                                    ${this.getStatusText(order.status)}
-                                </span>
-                            </div>
-                            
-                            <div style="color: #666; font-size: 14px; margin-bottom: 5px;">
-                                <i class="fas fa-store" style="margin-right: 5px;"></i>
-                                ${sellerName}
-                            </div>
-                            
-                            ${deliveryAddress ? `
-                                <div style="color: #666; font-size: 12px;">
-                                    <i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i> 
-                                    ${deliveryAddress}
-                                </div>
-                            ` : ''}
-                        </div>
-                        
-                        <div style="text-align: right;">
-                            <div style="font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">
-                                ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
-                            </div>
-                            <div style="color: #666; font-size: 12px;">
-                                ${new Date(order.created_at).toLocaleDateString('tr-TR')}
-                            </div>
-                            <div style="margin-top: 8px;">
-                                <i class="fas fa-chevron-down" id="chevron-${order.id}" 
-                                   style="transition: transform 0.3s ease;"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="order-details" id="details-${order.id}" 
-                     style="display: none; padding: 0 20px 20px 20px; background: white;">
-                    
-                    ${orderDetails.length > 0 ? `
-                        <div style="margin: 15px 0;">
-                            <h4 style="margin-bottom: 10px; color: #333; font-size: 14px;">
-                                <i class="fas fa-list" style="margin-right: 8px;"></i>
-                                Sipariş İçeriği
-                            </h4>
-                            <div class="order-items">
-                                ${orderDetails.map(item => {
-                                    const unitPrice = parseFloat(item.unit_price || 0).toFixed(2);
-                                    const discount = parseFloat(item.discount || 0).toFixed(2);
-                                    const totalPrice = parseFloat(item.total_price || 0).toFixed(2);
-                                    const quantity = item.quantity || 0;
-                                    
-                                    return `
-                                    <div style="display: flex; justify-content: space-between; padding: 10px; 
-                                             background: #f8f9fa; border-radius: 6px; margin-bottom: 8px;">
-                                        <div style="flex: 1;">
-                                            <div style="font-weight: 500; margin-bottom: 4px;">${item.product_name || 'Ürün'}</div>
-                                            <div style="font-size: 12px; color: #666;">
-                                                ${quantity} adet × ${unitPrice} ₺
-                                                ${item.discount > 0 ? 
-                                                    `<span style="color: var(--success); margin-left: 8px;">
-                                                        -${discount} ₺ indirim
-                                                    </span>` : ''}
-                                            </div>
-                                        </div>
-                                        <div style="font-weight: bold; color: var(--primary);">
-                                            ${totalPrice} ₺
-                                        </div>
-                                    </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-            `;
-        }).join('');
-
-        // Event listener'ları ekle
-        this.attachOrderEventListeners();
-    }
-
-    attachOrderEventListeners() {
-        const orderSummaries = document.querySelectorAll('.order-summary');
-        
-        orderSummaries.forEach(summary => {
-            summary.addEventListener('click', (e) => {
-                const orderId = e.currentTarget.getAttribute('data-order-id');
-                this.toggleOrderDetails(orderId);
-            });
-        });
-    }
-
-    toggleOrderDetails(orderId) {
-        const detailsElement = document.getElementById(`details-${orderId}`);
-        const chevronElement = document.getElementById(`chevron-${orderId}`);
-        
-        if (detailsElement && chevronElement) {
-            if (detailsElement.style.display === 'none' || !detailsElement.style.display) {
-                detailsElement.style.display = 'block';
-                chevronElement.style.transform = 'rotate(180deg)';
-            } else {
-                detailsElement.style.display = 'none';
-                chevronElement.style.transform = 'rotate(0deg)';
-            }
-        }
-    }
-
-    filterOrders(status) {
-        if (!status) {
-            this.renderCustomerOrders(this.orders);
-            return;
-        }
-        
-        const filteredOrders = this.orders.filter(order => order.status === status);
-        this.renderCustomerOrders(filteredOrders);
-    }
-
-    filterOrdersByDate(date) {
-        if (!date) {
-            this.renderCustomerOrders(this.orders);
-            return;
-        }
-        
-        const filteredOrders = this.orders.filter(order => 
-            order.created_at.startsWith(date)
-        );
-        this.renderCustomerOrders(filteredOrders);
     }
 
     async loadCustomerPayments() {
@@ -1917,52 +1679,7 @@ class CustomerPanel {
         }
     }
 
-    getStatusText(status) {
-        const statusMap = {
-            'pending': 'Bekliyor',
-            'confirmed': 'Onaylandı',
-            'preparing': 'Hazırlanıyor',
-            'ready': 'Hazır',
-            'on_the_way': 'Yolda',
-            'delivered': 'Teslim Edildi',
-            'cancelled': 'İptal Edildi'
-        };
-        return statusMap[status] || status;
-    }
-
-    getPaymentMethodText(method) {
-        const methodMap = {
-            'cash': 'Nakit',
-            'card': 'Kart',
-            'bonus': 'Bonus',
-            'mixed': 'Karma'
-        };
-        return methodMap[method] || method;
-    }
-
-    getPaymentTypeText(type) {
-        const typeMap = {
-            'full': 'Tam Ödeme',
-            'partial': 'Kısmi Ödeme', 
-            'bonus_only': 'Sadece Bonus'
-        };
-        return typeMap[type] || type;
-    }
-
-    getPaymentStatusText(status) {
-        const statusMap = {
-            'completed': 'Tamamlandı',
-            'pending': 'Bekliyor',
-            'failed': 'Başarısız',
-            'refunded': 'İade Edildi'
-        };
-        return statusMap[status] || status;
-    }
-
-    // =============================================
-    // REFERRAL SİSTEMİ - YENİ FONKSİYONLAR (EN SONA)
-    // =============================================
-
+    // REFERRAL SİSTEMİ FONKSİYONLARI
     async loadReferralData() {
         try {
             console.log('📊 Referral verileri yükleniyor...');
@@ -2469,8 +2186,53 @@ class CustomerPanel {
     filterInvites() {
         console.log('Davetler filtreleniyor...');
     }
+
+    // Yardımcı fonksiyonlar
+    getStatusText(status) {
+        const statusMap = {
+            'pending': 'Bekliyor',
+            'confirmed': 'Onaylandı',
+            'preparing': 'Hazırlanıyor',
+            'ready': 'Hazır',
+            'on_the_way': 'Yolda',
+            'delivered': 'Teslim Edildi',
+            'cancelled': 'İptal Edildi'
+        };
+        return statusMap[status] || status;
+    }
+
+    getPaymentMethodText(method) {
+        const methodMap = {
+            'cash': 'Nakit',
+            'card': 'Kart',
+            'bonus': 'Bonus',
+            'mixed': 'Karma'
+        };
+        return methodMap[method] || method;
+    }
+
+    getPaymentTypeText(type) {
+        const typeMap = {
+            'full': 'Tam Ödeme',
+            'partial': 'Kısmi Ödeme', 
+            'bonus_only': 'Sadece Bonus'
+        };
+        return typeMap[type] || type;
+    }
+
+    getPaymentStatusText(status) {
+        const statusMap = {
+            'completed': 'Tamamlandı',
+            'pending': 'Bekliyor',
+            'failed': 'Başarısız',
+            'refunded': 'İade Edildi'
+        };
+        return statusMap[status] || status;
+    }
 }
 
+
+    
     // ... [Önceki kodun geri kalanı aynı şekilde entegre edilecek] ...
 
     // Cleanup fonksiyonu
