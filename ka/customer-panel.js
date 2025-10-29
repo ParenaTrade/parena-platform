@@ -734,7 +734,7 @@ class CustomerPanel {
         this.attachOrderEventListeners();
     }
 
-    // KURYE DURUMU GÖSTERGESİ
+        // KURYE DURUMU GÖSTERGESİ - SADECE HATA DÜZELTİLDİ
     renderDeliveryTracker(order) {
         const status = order.status;
         const hasCourier = order.courier_id || order.courier_name;
@@ -774,7 +774,7 @@ class CustomerPanel {
                             <i class="fas fa-user-check" style="font-size: 16px;"></i>
                             <div>
                                 <div style="font-size: 13px; font-weight: 600;">Kurye Atandı</div>
-                                <div style="font-size: 11px; color: #666;">${courierName} bekleniyor</div>
+                                <div style="font-size: 11px; color: #666;">${courierName} mağazaya geliyor</div>
                             </div>
                         </div>
                     `;
@@ -875,7 +875,7 @@ class CustomerPanel {
         return trackerHTML;
     }
 
-    // KURYE DETAYLARI
+    // KURYE DETAYLARI - SADECE HATA DÜZELTİLDİ
     renderCourierDetails(order) {
         if (!order.courier_id && !order.courier_name) {
             return `
@@ -883,7 +883,7 @@ class CustomerPanel {
                     <i class="fas fa-motorcycle" style="font-size: 32px; color: #6c757d; margin-bottom: 10px;"></i>
                     <div style="color: #666; font-size: 14px;">
                         <strong>Kurye aranıyor...</strong>
-                        <p style="margin: 5px 0 0 0; font-size: 12px;">En kısa sürede kurye atanacaktır</p>
+                        <p style="margin: 5px 0 0 0; font-size: 12px;">Sipariş onaylandıktan sonra kurye atanacak</p>
                     </div>
                 </div>
             `;
@@ -927,7 +927,6 @@ class CustomerPanel {
             </div>
         `;
     }
-
     // GERÇEK ZAMANLI GÜNCELLEME
     startRealTimeUpdates() {
         // Her 30 saniyede bir sipariş durumlarını güncelle
