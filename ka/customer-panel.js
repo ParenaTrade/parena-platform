@@ -419,23 +419,19 @@ async createReferralLinkOnDemand() {
     if (!section) return;
 
     try {
-        // Eğer referralData yoksa, kullanıcı ilk kez bu sayfaya geliyordur
-        if (!this.referralData) {
-            console.log('🔄 İlk kez referral sayfasına giriliyor, link oluşturuluyor...');
-            await this.createReferralLinkOnDemand();
-        }
-
-        const referralLink = this.referralData ? 
-            `${window.location.origin}?ref=${this.referralData.referral_code}` : 
-            'Hata oluştu, lütfen yenileyin';
-
+        // Butonları başlangıçta pasif yap
         section.innerHTML = `
             <div class="section-header">
                 <h2>🎁 Arkadaşını Davet Et</h2>
                 <p class="subtitle">Arkadaşlarını davet et, bonus kazan!</p>
             </div>
 
-            <div class="content-row">
+            <div class="loading-spinner" id="referralLoading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Güvenlik kontrolü yapılıyor... (10 saniye)</p>
+            </div>
+
+            <div class="content-row" id="referralContent" style="display: none;">
                 <div class="content-col">
                     <div class="card">
                         <div class="card-header">
@@ -446,8 +442,8 @@ async createReferralLinkOnDemand() {
                                 <label>Bu linki arkadaşlarınla paylaş:</label>
                                 <div class="input-group" style="margin-top: 10px;">
                                     <input type="text" id="referralLinkInput" class="form-control" 
-                                           value="${referralLink}" readonly style="font-size: 14px;">
-                                    <button class="btn btn-primary" id="copyReferralBtn">
+                                           value="Hazırlanıyor..." readonly style="font-size: 14px;">
+                                    <button class="btn btn-primary" id="copyReferralBtn" disabled>
                                         <i class="fas fa-copy"></i> Kopyala
                                     </button>
                                 </div>
@@ -459,13 +455,13 @@ async createReferralLinkOnDemand() {
                             <div class="share-buttons" style="margin-top: 25px;">
                                 <h4>Hızlı Paylaşım:</h4>
                                 <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                                    <button class="btn btn-success" id="shareWhatsAppBtn">
+                                    <button class="btn btn-success" id="shareWhatsAppBtn" disabled>
                                         <i class="fab fa-whatsapp"></i> WhatsApp
                                     </button>
-                                    <button class="btn btn-primary" id="shareTelegramBtn">
+                                    <button class="btn btn-primary" id="shareTelegramBtn" disabled>
                                         <i class="fab fa-telegram"></i> Telegram
                                     </button>
-                                    <button class="btn btn-info" id="shareSMSBtn">
+                                    <button class="btn btn-info" id="shareSMSBtn" disabled>
                                         <i class="fas fa-sms"></i> SMS
                                     </button>
                                 </div>
@@ -515,8 +511,8 @@ async createReferralLinkOnDemand() {
             </div>
         `;
 
-        // EVENT LISTENER'LARI EKLE
-        this.attachReferralEventListeners();
+        // 10 saniye bekleyip link oluştur
+        await this.startReferralProcess();
 
     } catch (error) {
         console.error('❌ Referral sayfası yükleme hatası:', error);
@@ -531,32 +527,177 @@ async createReferralLinkOnDemand() {
     }
 }
 
-// EVENT LISTENER fonksiyonunu ekle
-attachReferralEventListeners() {
-    // Copy button
-    const copyBtn = document.getElementById('copyReferralBtn');
-    if (copyBtn) {
-        copyBtn.addEventListener('click', () => this.copyReferralLink());
-    }
+// YENİ: 10 saniye bekleyip link oluşturma prosesi
+async startReferralProcess() {
+    try {
+        let countdown = 10;
+        const loadingElement = document.getElementById('referralLoading');
+        const contentElement = document.getElementById('referralContent');
+        
+        // Geri sayım göster
+        const countdownInterval = setInterval(() => {
+            if (loadingElement) {
+                loadingElement.innerHTML = `
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Güvenlik kontrolü yapılıyor... (${countdown} saniye)</p>
+                `;
+            }
+            countdown--;
+            
+            if (countdown < 0) {
+                clearInterval(countdownInterval);
+                this.initializeReferralLink();
+            }
+        }, 1000);
 
-    // Share buttons
-    const whatsappBtn = document.getElementById('shareWhatsAppBtn');
-    if (whatsappBtn) {
-        whatsappBtn.addEventListener('click', () => this.shareOnWhatsApp());
-    }
-
-    const telegramBtn = document.getElementById('shareTelegramBtn');
-    if (telegramBtn) {
-        telegramBtn.addEventListener('click', () => this.shareOnTelegram());
-    }
-
-    const smsBtn = document.getElementById('shareSMSBtn');
-    if (smsBtn) {
-        smsBtn.addEventListener('click', () => this.shareAsSMS());
+    } catch (error) {
+        console.error('❌ Referral proses hatası:', error);
     }
 }
 
-// Paylaşım fonksiyonları
+// YENİ: Link oluşturma ve butonları aktif etme
+async initializeReferralLink() {
+    try {
+        const loadingElement = document.getElementById('referralLoading');
+        const contentElement = document.getElementById('referralContent');
+        
+        // Loading'i gizle, içeriği göster
+        if (loadingElement) loadingElement.style.display = 'none';
+        if (contentElement) contentElement.style.display = 'flex';
+
+        // Mevcut aktif link kontrolü
+        const { data: existingLink, error: checkError } = await this.supabase
+            .from('referral_links')
+            .select('*')
+            .eq('owner_user_id', this.customerData.id)
+            .eq('is_used', false)
+            .single();
+
+        if (!checkError && existingLink) {
+            // Mevcut link varsa onu kullan
+            this.referralData = existingLink;
+            console.log('✅ Mevcut link kullanılıyor:', existingLink.referral_code);
+        } else {
+            // Yeni link oluştur
+            console.log('🔄 Yeni referral link oluşturuluyor...');
+            await this.createNewReferralLink();
+        }
+
+        // Linki göster ve butonları aktif et
+        this.activateReferralButtons();
+
+    } catch (error) {
+        console.error('❌ Link başlatma hatası:', error);
+        this.showReferralError();
+    }
+}
+
+// YENİ: Yeni referral link oluştur
+async createNewReferralLink() {
+    try {
+        let groupCode = 'DEFAULT';
+
+        // Grup kontrolü
+        const { data: userGroup, error: groupError } = await this.supabase
+            .from('referral_groups')
+            .select('*')
+            .eq('leader_user_id', this.customerData.id)
+            .single();
+
+        if (!groupError && userGroup) {
+            groupCode = userGroup.group_code;
+        } else {
+            // Varsayılan grup
+            const { data: defaultGroup, error: defaultError } = await this.supabase
+                .from('referral_groups')
+                .select('*')
+                .eq('is_active', true)
+                .limit(1)
+                .single();
+
+            if (!defaultError && defaultGroup) {
+                groupCode = defaultGroup.group_code;
+            }
+        }
+
+        const referralCode = this.generateReferralCode();
+        
+        const { data: newLink, error } = await this.supabase
+            .from('referral_links')
+            .insert({
+                group_code: groupCode,
+                owner_user_id: this.customerData.id,
+                referral_code: referralCode,
+                is_used: false
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        this.referralData = newLink;
+        console.log('✅ Yeni referral link oluşturuldu:', referralCode);
+
+    } catch (error) {
+        console.error('❌ Yeni link oluşturma hatası:', error);
+        throw error;
+    }
+}
+
+// YENİ: Butonları aktif et ve linki göster
+activateReferralButtons() {
+    const referralLink = this.referralData ? 
+        `${window.location.origin}?ref=${this.referralData.referral_code}` : 
+        'Hata oluştu, lütfen yenileyin';
+
+    // Link input'unu güncelle
+    const linkInput = document.getElementById('referralLinkInput');
+    if (linkInput) {
+        linkInput.value = referralLink;
+    }
+
+    // Butonları aktif et
+    const copyBtn = document.getElementById('copyReferralBtn');
+    const whatsappBtn = document.getElementById('shareWhatsAppBtn');
+    const telegramBtn = document.getElementById('shareTelegramBtn');
+    const smsBtn = document.getElementById('shareSMSBtn');
+
+    if (copyBtn) {
+        copyBtn.disabled = false;
+        copyBtn.addEventListener('click', () => this.copyReferralLink());
+    }
+    if (whatsappBtn) {
+        whatsappBtn.disabled = false;
+        whatsappBtn.addEventListener('click', () => this.shareOnWhatsApp());
+    }
+    if (telegramBtn) {
+        telegramBtn.disabled = false;
+        telegramBtn.addEventListener('click', () => this.shareOnTelegram());
+    }
+    if (smsBtn) {
+        smsBtn.disabled = false;
+        smsBtn.addEventListener('click', () => this.shareAsSMS());
+    }
+
+    console.log('✅ Referral butonları aktif edildi');
+}
+
+// YENİ: Hata durumunda göster
+showReferralError() {
+    const contentElement = document.getElementById('referralContent');
+    if (contentElement) {
+        contentElement.innerHTML = `
+            <div class="error-message" style="text-align: center; padding: 40px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545;"></i>
+                <h3>Link oluşturulamadı</h3>
+                <p>Lütfen sayfayı yenileyip tekrar deneyin.</p>
+                <button class="btn btn-primary" onclick="location.reload()">Sayfayı Yenile</button>
+            </div>
+        `;
+    }
+}
+
+// Paylaşım fonksiyonları (Aynı)
 copyReferralLink() {
     const input = document.getElementById('referralLinkInput');
     if (input && this.referralData) {
