@@ -2106,7 +2106,7 @@ class CustomerPanel {
         return result;
     }
 
-    showReferralError() {
+        showReferralError() {
         const contentElement = document.getElementById('referralContent');
         if (contentElement) {
             contentElement.innerHTML = `
@@ -2232,10 +2232,8 @@ class CustomerPanel {
         };
         return statusMap[status] || status;
     }
-}
-    // ... [Önceki kodun geri kalanı aynı şekilde entegre edilecek] ...
 
-    // Cleanup fonksiyonu
+    // Cleanup fonksiyonu - SADECE BIR TANE OLMALI!
     destroy() {
         if (this.realtimeSubscription) {
             this.realtimeSubscription.unsubscribe();
@@ -2244,7 +2242,7 @@ class CustomerPanel {
             clearInterval(this.updateInterval);
         }
     }
-}
+} // ← BU CLASS SONU - SADECE BIR TANE OLMALI!
 
 // Global erişim için
 window.customerPanel = null;
