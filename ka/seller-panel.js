@@ -633,8 +633,7 @@ async loadSellerOrders() {
             .select(`
                 *,
                 order_details(*),
-                customer:customers(name, phone),
-                courier:couriers(full_name, phone)
+                customer:customers(name, phone)
             `)
             .eq('seller_id', this.sellerData?.id)
             .order('created_at', { ascending: false });
