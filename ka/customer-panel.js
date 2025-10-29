@@ -1,4 +1,3 @@
-// Customer Panel - Müşteri Paneli Yönetimi (Referral Sistemi Entegre)
 class CustomerPanel {
     constructor(userProfile) {
         this.userProfile = userProfile;
@@ -13,24 +12,11 @@ class CustomerPanel {
         this.referralStats = null;
         this.referralEarnings = [];
         this.referralInvites = [];
-
-        // Referral event listener'larını bağla
-        this.copyReferralLink = this.copyReferralLink.bind(this);
-        this.shareOnWhatsApp = this.shareOnWhatsApp.bind(this);
-        this.shareOnTelegram = this.shareOnTelegram.bind(this);
-        this.shareAsSMS = this.shareAsSMS.bind(this);
-        this.attachReferralEventListeners = this.attachReferralEventListeners.bind(this);
         
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
         
-        console.log('👤 CustomerPanel başlatılıyor - Müşteri Oturumu + Referral Sistem');
-        console.log('Müşteri Profili:', {
-            id: userProfile.id,
-            name: userProfile.name,
-            phone: userProfile.phone,
-            role: userProfile.role
-        });
+        console.log('👤 CustomerPanel başlatılıyor - Müşteri Oturumu');
         
         if (!this.supabase) {
             console.error('❌ Supabase client bulunamadı!');
@@ -97,237 +83,6 @@ class CustomerPanel {
         }
     }
 
-    // REFERRAL SİSTEMİ FONKSİYONLARI
-    async loadReferralData() {
-    try {
-        console.log('📊 Referral verileri yükleniyor...');
-        
-        if (!this.supabase || !this.customerData?.id) {
-            console.warn('⚠️ Referral verileri yüklenemedi: Supabase veya müşteri ID yok');
-            return;
-        }
-
-        // SADECE mevcut linki kontrol et, YENİ link OLUŞTURMA!
-        const { data: referralLink, error: linkError } = await this.supabase
-            .from('referral_links')
-            .select(`
-                *,
-                referral_groups(name, group_code, leader_user_id)
-            `)
-            .eq('owner_user_id', this.customerData.id)
-            .eq('is_used', false)
-            .single();
-
-        if (!linkError && referralLink) {
-            // Mevcut link var
-            this.referralData = referralLink;
-            console.log('✅ Mevcut referral link bulundu:', referralLink.referral_code);
-        } else {
-            // Link yoksa, SADECE null yap (createReferralLinkOnDemand çağırma!)
-            this.referralData = null;
-            console.log('ℹ️ Henüz referral link oluşturulmamış');
-        }
-
-        // İstatistikleri her durumda yükle
-        await this.loadReferralStats();
-        await this.loadReferralEarnings();
-        await this.loadReferralInvites();
-
-        console.log('✅ Referral verileri yüklendi');
-
-    } catch (error) {
-        console.error('❌ Referral veri yükleme hatası:', error);
-    }
-}
-    // BU FONKSİYON createReferralLink'in YERİNE GEÇECEK
-async createReferralLinkOnDemand() {
-    try {
-        console.log('🎯 Kullanıcı talebiyle referral link oluşturuluyor...');
-        
-        // Önce mevcut link var mı kontrol et
-        const { data: existingLink, error: checkError } = await this.supabase
-            .from('referral_links')
-            .select('*')
-            .eq('owner_user_id', this.customerData.id)
-            .eq('is_used', false)
-            .single();
-
-        if (!checkError && existingLink) {
-            this.referralData = existingLink;
-            console.log('✅ Zaten mevcut link var:', existingLink.referral_code);
-            return existingLink;
-        }
-
-        // Yeni link oluştur
-        let groupCode = 'DEFAULT';
-
-        // Grup kontrolü
-        const { data: userGroup, error: groupError } = await this.supabase
-            .from('referral_groups')
-            .select('*')
-            .eq('leader_user_id', this.customerData.id)
-            .single();
-
-        if (!groupError && userGroup) {
-            groupCode = userGroup.group_code;
-        } else {
-            // Varsayılan grup
-            const { data: defaultGroup, error: defaultError } = await this.supabase
-                .from('referral_groups')
-                .select('*')
-                .eq('is_active', true)
-                .limit(1)
-                .single();
-
-            if (!defaultError && defaultGroup) {
-                groupCode = defaultGroup.group_code;
-            }
-        }
-
-        const referralCode = this.generateReferralCode();
-        
-        const { data: newLink, error } = await this.supabase
-            .from('referral_links')
-            .insert({
-                group_code: groupCode,
-                owner_user_id: this.customerData.id,
-                referral_code: referralCode,
-                is_used: false
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        this.referralData = newLink;
-        console.log('✅ Yeni referral link oluşturuldu:', referralCode);
-        
-        return newLink;
-
-    } catch (error) {
-        console.error('❌ Referral link oluşturma hatası:', error);
-        throw error;
-    }
-}
-    generateReferralCode() {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let result = '';
-        for (let i = 0; i < 8; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return result;
-    }
-
-    async loadReferralStats() {
-    try {
-        if (!this.customerData?.id) return;
-
-        // Davet edilen kullanıcı sayısı
-        const { data: invites, error: invitesError } = await this.supabase
-            .from('referral_tracking')
-            .select('id, new_user_id, created_at')
-            .eq('referrer_user_id', this.customerData.id);
-
-        // Toplam kazanç - SADECE order_bonus değil, amount da ekle
-        const { data: totalEarnings, error: earningsError } = await this.supabase
-            .from('referral_bonus_usage')
-            .select('order_bonus, amount, bonus_type')
-            .eq('user_id', this.customerData.id);
-
-        let totalEarningsAmount = 0;
-        let pendingEarnings = 0;
-
-        if (totalEarnings) {
-            totalEarnings.forEach(earning => {
-                if (earning.order_bonus) {
-                    totalEarningsAmount += parseFloat(earning.order_bonus);
-                } else if (earning.amount) {
-                    pendingEarnings += parseFloat(earning.amount);
-                }
-            });
-        }
-
-        this.referralStats = {
-            totalInvites: invites?.length || 0,
-            activeUsers: invites?.filter(invite => invite.new_user_id).length || 0,
-            totalEarnings: totalEarningsAmount,
-            pendingEarnings: pendingEarnings
-        };
-
-    } catch (error) {
-        console.error('❌ Referral istatistik yükleme hatası:', error);
-    }
-}
-    async loadReferralEarnings() {
-    try {
-        if (!this.customerData?.id) return;
-
-        const { data: earnings, error } = await this.supabase
-            .from('referral_bonus_usage')
-            .select(`
-                *,
-                orders!inner(total_amount, customer_name, created_at)
-            `)
-            .eq('user_id', this.customerData.id)
-            .order('created_at', { ascending: false });
-
-        if (!error && earnings) {
-            this.referralEarnings = earnings;
-        } else if (error) {
-            console.warn('⚠️ Orders join hatası, basit sorgu deneniyor:', error);
-            // Basit sorgu fallback
-            const { data: simpleEarnings, error: simpleError } = await this.supabase
-                .from('referral_bonus_usage')
-                .select('*')
-                .eq('user_id', this.customerData.id)
-                .order('created_at', { ascending: false });
-            
-            if (!simpleError && simpleEarnings) {
-                this.referralEarnings = simpleEarnings;
-            }
-        }
-
-    } catch (error) {
-        console.error('❌ Referral kazanç geçmişi yükleme hatası:', error);
-    }
-}
-    async loadReferralInvites() {
-    try {
-        if (!this.customerData?.id) return;
-
-        const { data: invites, error } = await this.supabase
-            .from('referral_tracking')
-            .select(`
-                *,
-                new_user:customers(name, phone, created_at),
-                referral_bonus!inner(bonus_amount)
-            `)
-            .eq('referrer_user_id', this.customerData.id)
-            .order('created_at', { ascending: false });
-
-        if (!error && invites) {
-            this.referralInvites = invites;
-        } else if (error) {
-            console.warn('⚠️ Bonus join hatası, basit sorgu deneniyor:', error);
-            // Basit sorgu fallback
-            const { data: simpleInvites, error: simpleError } = await this.supabase
-                .from('referral_tracking')
-                .select(`
-                    *,
-                    new_user:customers(name, phone, created_at)
-                `)
-                .eq('referrer_user_id', this.customerData.id)
-                .order('created_at', { ascending: false });
-            
-            if (!simpleError && simpleInvites) {
-                this.referralInvites = simpleInvites;
-            }
-        }
-
-    } catch (error) {
-        console.error('❌ Davet edilenler yükleme hatası:', error);
-    }
-}
     async loadSectionData(sectionName) {
         this.currentSection = sectionName;
         
@@ -371,7 +126,7 @@ async createReferralLinkOnDemand() {
             case 'customerSupport':
                 await this.loadCustomerSupport();
                 break;
-            // Yeni referral section'ları
+            // YENİ: Referral section'ları
             case 'customerReferral':
                 await this.loadCustomerReferral();
                 break;
@@ -413,667 +168,6 @@ async createReferralLinkOnDemand() {
         }
     }
 
-   // =============================================
-// REFERRAL SİSTEMİ - YENİ FONKSİYONLAR (EN SONA EKLENECEK)
-// =============================================
-
-async loadCustomerReferral() {
-    const section = document.getElementById('customerReferralSection');
-    if (!section) return;
-
-    try {
-        // Butonları başlangıçta pasif yap
-        section.innerHTML = `
-            <div class="section-header">
-                <h2>🎁 Arkadaşını Davet Et</h2>
-                <p class="subtitle">Arkadaşlarını davet et, bonus kazan!</p>
-            </div>
-
-            <div class="loading-spinner" id="referralLoading">
-                <i class="fas fa-spinner fa-spin"></i>
-                <p>Güvenlik kontrolü yapılıyor... (10 saniye)</p>
-            </div>
-
-            <div class="content-row" id="referralContent" style="display: none;">
-                <div class="content-col">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>📬 Davet Linkiniz</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="referral-link-container">
-                                <label>Bu linki arkadaşlarınla paylaş:</label>
-                                <div class="input-group" style="margin-top: 10px;">
-                                    <input type="text" id="referralLinkInput" class="form-control" 
-                                           value="Hazırlanıyor..." readonly style="font-size: 14px;">
-                                    <button class="btn btn-primary" id="copyReferralBtn" disabled>
-                                        <i class="fas fa-copy"></i> Kopyala
-                                    </button>
-                                </div>
-                                <small class="text-muted">
-                                    Bu linki arkadaşlarınla paylaş, hem onlar hem sen kazanın!
-                                </small>
-                            </div>
-
-                            <div class="share-buttons" style="margin-top: 25px;">
-                                <h4>Hızlı Paylaşım:</h4>
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                                    <button class="btn btn-success" id="shareWhatsAppBtn" disabled>
-                                        <i class="fab fa-whatsapp"></i> WhatsApp
-                                    </button>
-                                    <button class="btn btn-primary" id="shareTelegramBtn" disabled>
-                                        <i class="fab fa-telegram"></i> Telegram
-                                    </button>
-                                    <button class="btn btn-info" id="shareSMSBtn" disabled>
-                                        <i class="fas fa-sms"></i> SMS
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="content-col">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>💰 Bonus Sistem</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="bonus-rules">
-                                <div class="rule-item" style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee;">
-                                    <div style="background: #007bff; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
-                                        <i class="fas fa-gift"></i>
-                                    </div>
-                                    <div>
-                                        <strong>Referans Bonusu</strong>
-                                        <p style="margin: 5px 0 0 0; color: #666;">Arkadaşın üye olduğunda sabit bonus kazan</p>
-                                    </div>
-                                </div>
-                                <div class="rule-item" style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee;">
-                                    <div style="background: #28a745; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
-                                        <i class="fas fa-shopping-cart"></i>
-                                    </div>
-                                    <div>
-                                        <strong>Sipariş Bonusu</strong>
-                                        <p style="margin: 5px 0 0 0; color: #666;">Arkadaşın sipariş verdikçe % bazlı bonus kazan</p>
-                                    </div>
-                                </div>
-                                <div class="rule-item" style="display: flex; align-items: center; padding: 15px;">
-                                    <div style="background: #ffc107; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
-                                        <i class="fas fa-calendar-alt"></i>
-                                    </div>
-                                    <div>
-                                        <strong>Ay Sonu Hakediş</strong>
-                                        <p style="margin: 5px 0 0 0; color: #666;">Bonuslar ay sonunda bakiyene eklenecek</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // 10 saniye bekleyip link oluştur
-        await this.startReferralProcess();
-
-    } catch (error) {
-        console.error('❌ Referral sayfası yükleme hatası:', error);
-        section.innerHTML = `
-            <div class="error-message">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>Link oluşturulamadı</h3>
-                <p>Lütfen sayfayı yenileyin ve tekrar deneyin.</p>
-                <button class="btn btn-primary" onclick="location.reload()">Yenile</button>
-            </div>
-        `;
-    }
-}
-
-async startReferralProcess() {
-    try {
-        let countdown = 10;
-        const loadingElement = document.getElementById('referralLoading');
-        const contentElement = document.getElementById('referralContent');
-        
-        // Geri sayım göster
-        const countdownInterval = setInterval(() => {
-            if (loadingElement) {
-                loadingElement.innerHTML = `
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>Güvenlik kontrolü yapılıyor... (${countdown} saniye)</p>
-                `;
-            }
-            countdown--;
-            
-            if (countdown < 0) {
-                clearInterval(countdownInterval);
-                this.initializeReferralLink();
-            }
-        }, 1000);
-
-    } catch (error) {
-        console.error('❌ Referral proses hatası:', error);
-    }
-}
-
-async initializeReferralLink() {
-    try {
-        const loadingElement = document.getElementById('referralLoading');
-        const contentElement = document.getElementById('referralContent');
-        
-        // Loading'i gizle, içeriği göster
-        if (loadingElement) loadingElement.style.display = 'none';
-        if (contentElement) contentElement.style.display = 'flex';
-
-        // Mevcut aktif link kontrolü
-        const { data: existingLink, error: checkError } = await this.supabase
-            .from('referral_links')
-            .select('*')
-            .eq('owner_user_id', this.customerData.id)
-            .eq('is_used', false)
-            .single();
-
-        if (!checkError && existingLink) {
-            // Mevcut link varsa onu kullan
-            this.referralData = existingLink;
-            console.log('✅ Mevcut link kullanılıyor:', existingLink.referral_code);
-        } else {
-            // Yeni link oluştur
-            console.log('🔄 Yeni referral link oluşturuluyor...');
-            await this.createNewReferralLink();
-        }
-
-        // Linki göster ve butonları aktif et
-        this.activateReferralButtons();
-
-    } catch (error) {
-        console.error('❌ Link başlatma hatası:', error);
-        this.showReferralError();
-    }
-}
-
-async createNewReferralLink() {
-    try {
-        let groupCode = 'DEFAULT';
-
-        // Grup kontrolü
-        const { data: userGroup, error: groupError } = await this.supabase
-            .from('referral_groups')
-            .select('*')
-            .eq('leader_user_id', this.customerData.id)
-            .single();
-
-        if (!groupError && userGroup) {
-            groupCode = userGroup.group_code;
-        } else {
-            // Varsayılan grup
-            const { data: defaultGroup, error: defaultError } = await this.supabase
-                .from('referral_groups')
-                .select('*')
-                .eq('is_active', true)
-                .limit(1)
-                .single();
-
-            if (!defaultError && defaultGroup) {
-                groupCode = defaultGroup.group_code;
-            }
-        }
-
-        const referralCode = this.generateReferralCode();
-        
-        const { data: newLink, error } = await this.supabase
-            .from('referral_links')
-            .insert({
-                group_code: groupCode,
-                owner_user_id: this.customerData.id,
-                referral_code: referralCode,
-                is_used: false
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        this.referralData = newLink;
-        console.log('✅ Yeni referral link oluşturuldu:', referralCode);
-
-    } catch (error) {
-        console.error('❌ Yeni link oluşturma hatası:', error);
-        throw error;
-    }
-}
-
-activateReferralButtons() {
-    const referralLink = this.referralData ? 
-        `${window.location.origin}?ref=${this.referralData.referral_code}` : 
-        'Hata oluştu, lütfen yenileyin';
-
-    // Link input'unu güncelle
-    const linkInput = document.getElementById('referralLinkInput');
-    if (linkInput) {
-        linkInput.value = referralLink;
-    }
-
-    // Butonları aktif et ve event listener ekle
-    const copyBtn = document.getElementById('copyReferralBtn');
-    const whatsappBtn = document.getElementById('shareWhatsAppBtn');
-    const telegramBtn = document.getElementById('shareTelegramBtn');
-    const smsBtn = document.getElementById('shareSMSBtn');
-
-    if (copyBtn) {
-        copyBtn.disabled = false;
-        copyBtn.addEventListener('click', () => this.copyReferralLink());
-    }
-    if (whatsappBtn) {
-        whatsappBtn.disabled = false;
-        whatsappBtn.addEventListener('click', () => this.shareOnWhatsApp());
-    }
-    if (telegramBtn) {
-        telegramBtn.disabled = false;
-        telegramBtn.addEventListener('click', () => this.shareOnTelegram());
-    }
-    if (smsBtn) {
-        smsBtn.disabled = false;
-        smsBtn.addEventListener('click', () => this.shareAsSMS());
-    }
-
-    console.log('✅ Referral butonları aktif edildi');
-}
-
-// PAYLAŞIM FONKSİYONLARI
-copyReferralLink() {
-    const input = document.getElementById('referralLinkInput');
-    if (input && this.referralData) {
-        input.select();
-        document.execCommand('copy');
-        window.panelSystem.showAlert('Davet linki kopyalandı!', 'success');
-    }
-}
-
-shareOnWhatsApp() {
-    if (!this.referralData) return;
-    
-    const message = `Seni yemek siparişi uygulamasına davet ediyorum! 🍕 Bu linkten üye ol, ikimiz de bonus kazanalım: ${window.location.origin}?ref=${this.referralData.referral_code}`;
-    
-    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        window.open(`whatsapp://send?text=${encodeURIComponent(message)}`, '_blank');
-    } else {
-        window.open(`https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
-    }
-}
-
-shareOnTelegram() {
-    if (!this.referralData) return;
-    
-    const message = `Seni yemek siparişi uygulamasına davet ediyorum! 🍕 Bu linkten üye ol, ikimiz de bonus kazanalım: ${window.location.origin}?ref=${this.referralData.referral_code}`;
-    window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(message)}`, '_blank');
-}
-
-shareAsSMS() {
-    if (!this.referralData) return;
-    
-    const message = `Yemek siparişi uygulamasına davetim: ${window.location.origin}?ref=${this.referralData.referral_code}`;
-    
-    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        window.open(`sms:?body=${encodeURIComponent(message)}`, '_blank');
-    } else {
-        alert(`SMS için mesajı kopyalayın: ${message}`);
-    }
-}
-
-generateReferralCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 8; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-}
-
-showReferralError() {
-    const contentElement = document.getElementById('referralContent');
-    if (contentElement) {
-        contentElement.innerHTML = `
-            <div class="error-message" style="text-align: center; padding: 40px;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545;"></i>
-                <h3>Link oluşturulamadı</h3>
-                <p>Lütfen sayfayı yenileyip tekrar deneyin.</p>
-                <button class="btn btn-primary" onclick="location.reload()">Sayfayı Yenile</button>
-            </div>
-        `;
-    }
-}
-    // REFERRAL KAZANÇLAR SAYFASI
-    async loadReferralEarningsSection() {
-        const section = document.getElementById('referralEarningsSection');
-        if (!section) return;
-
-        section.innerHTML = `
-            <div class="section-header">
-                <h2>Bonus Kazançlarım</h2>
-                <div class="header-actions">
-                    <select id="earningTypeFilter" class="form-control" onchange="customerPanel.filterEarnings()">
-                        <option value="">Tüm Kazançlar</option>
-                        <option value="referral_bonus">Referans Bonusu</option>
-                        <option value="order_bonus">Sipariş Bonusu</option>
-                    </select>
-                    <input type="date" id="earningDateFilter" class="form-control" onchange="customerPanel.filterEarnings()">
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-body">
-                    <div id="referralEarningsList">
-                        ${this.renderReferralEarnings()}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    renderReferralEarnings() {
-        if (!this.referralEarnings.length) {
-            return `
-                <div style="text-align: center; padding: 40px; color: #666;">
-                    <i class="fas fa-coins" style="font-size: 48px; margin-bottom: 20px;"></i>
-                    <h3>Henüz bonus kazancınız bulunmuyor</h3>
-                    <p>Arkadaşlarını davet ederek bonus kazanmaya başla!</p>
-                </div>
-            `;
-        }
-
-        return `
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Tarih</th>
-                            <th>Açıklama</th>
-                            <th>Bonus Türü</th>
-                            <th>Miktar</th>
-                            <th>Sipariş Bonusu</th>
-                            <th>Durum</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${this.referralEarnings.map(earning => `
-                            <tr>
-                                <td>
-                                    <div>${new Date(earning.created_at).toLocaleDateString('tr-TR')}</div>
-                                    <small style="color: #666;">${new Date(earning.created_at).toLocaleTimeString('tr-TR')}</small>
-                                </td>
-                                <td>${earning.description || 'Bonus Kazanç'}</td>
-                                <td>
-                                    <span class="badge ${earning.bonus_type === 'referral_bonus' ? 'badge-primary' : 'badge-success'}">
-                                        ${earning.bonus_type === 'referral_bonus' ? 'Referans Bonusu' : 'Sipariş Bonusu'}
-                                    </span>
-                                </td>
-                                <td style="font-weight: bold; color: var(--primary);">
-                                    ${parseFloat(earning.amount || 0).toFixed(2)} ₺
-                                </td>
-                                <td style="font-weight: bold; color: var(--success);">
-                                    ${earning.order_bonus ? parseFloat(earning.order_bonus).toFixed(2) + ' ₺' : 'Beklemede'}
-                                </td>
-                                <td>
-                                    <span class="status-badge ${earning.order_bonus ? 'status-delivered' : 'status-pending'}">
-                                        ${earning.order_bonus ? 'Ödendi' : 'Bekliyor'}
-                                    </span>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-
-    // DAVET EDİLENLER SAYFASI
-    async loadReferralInvitesSection() {
-        const section = document.getElementById('referralInvitesSection');
-        if (!section) return;
-
-        section.innerHTML = `
-            <div class="section-header">
-                <h2>Davet Ettiklerim</h2>
-                <div class="header-actions">
-                    <select id="inviteStatusFilter" class="form-control" onchange="customerPanel.filterInvites()">
-                        <option value="">Tüm Davetler</option>
-                        <option value="used">Üye Olanlar</option>
-                        <option value="not_used">Üye Olmayanlar</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-body">
-                    <div id="referralInvitesList">
-                        ${this.renderReferralInvites()}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    renderReferralInvites() {
-        if (!this.referralInvites.length) {
-            return `
-                <div style="text-align: center; padding: 40px; color: #666;">
-                    <i class="fas fa-user-friends" style="font-size: 48px; margin-bottom: 20px;"></i>
-                    <h3>Henüz kimseyi davet etmediniz</h3>
-                    <p>Davet linkinizi paylaşarak arkadaşlarınızı davet edin!</p>
-                </div>
-            `;
-        }
-
-        const usedInvites = this.referralInvites.filter(invite => invite.new_user_id);
-        const notUsedInvites = this.referralInvites.filter(invite => !invite.new_user_id);
-
-        return `
-            <div class="invites-stats" style="margin-bottom: 20px;">
-                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                    <div class="stat-badge">
-                        <strong>${this.referralInvites.length}</strong>
-                        <span>Toplam Davet</span>
-                    </div>
-                    <div class="stat-badge success">
-                        <strong>${usedInvites.length}</strong>
-                        <span>Üye Olan</span>
-                    </div>
-                    <div class="stat-badge warning">
-                        <strong>${notUsedInvites.length}</strong>
-                        <span>Üye Olmayan</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Davet Tarihi</th>
-                            <th>Kullanıcı</th>
-                            <th>Durum</th>
-                            <th>Bonus</th>
-                            <th>Üyelik Tarihi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${this.referralInvites.map(invite => {
-                            const isUsed = !!invite.new_user_id;
-                            const userName = invite.new_user?.name || 'Belirtilmemiş';
-                            const userPhone = invite.new_user?.phone || 'Belirtilmemiş';
-                            const bonusAmount = invite.referral_bonus?.[0]?.bonus_amount || 0;
-                            
-                            return `
-                                <tr>
-                                    <td>
-                                        <div>${new Date(invite.created_at).toLocaleDateString('tr-TR')}</div>
-                                        <small style="color: #666;">${new Date(invite.created_at).toLocaleTimeString('tr-TR')}</small>
-                                    </td>
-                                    <td>
-                                        <div>${userName}</div>
-                                        <small style="color: #666;">${userPhone}</small>
-                                    </td>
-                                    <td>
-                                        <span class="status-badge ${isUsed ? 'status-delivered' : 'status-pending'}">
-                                            ${isUsed ? 'Üye Oldu' : 'Bekliyor'}
-                                        </span>
-                                    </td>
-                                    <td style="font-weight: bold; color: var(--success);">
-                                        ${parseFloat(bonusAmount).toFixed(2)} ₺
-                                    </td>
-                                    <td>
-                                        ${isUsed && invite.new_user?.created_at ? 
-                                            new Date(invite.new_user.created_at).toLocaleDateString('tr-TR') : 
-                                            '-'
-                                        }
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-
-   
-    async refreshReferralData() {
-        await this.loadReferralData();
-        await this.loadCustomerReferral();
-        window.panelSystem.showAlert('Referral verileri yenilendi!', 'success');
-    }
-
-    filterEarnings() {
-        const typeFilter = document.getElementById('earningTypeFilter').value;
-        const dateFilter = document.getElementById('earningDateFilter').value;
-        
-        let filtered = this.referralEarnings;
-        
-        if (typeFilter) {
-            filtered = filtered.filter(earning => earning.bonus_type === typeFilter);
-        }
-        
-        if (dateFilter) {
-            filtered = filtered.filter(earning => 
-                earning.created_at.startsWith(dateFilter)
-            );
-        }
-        
-        document.getElementById('referralEarningsList').innerHTML = this.renderFilteredEarnings(filtered);
-    }
-
-    renderFilteredEarnings(earnings) {
-        if (!earnings.length) {
-            return `<div style="text-align: center; padding: 20px; color: #666;">Filtreye uygun kayıt bulunamadı</div>`;
-        }
-        
-        return `
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Tarih</th>
-                            <th>Açıklama</th>
-                            <th>Bonus Türü</th>
-                            <th>Miktar</th>
-                            <th>Sipariş Bonusu</th>
-                            <th>Durum</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${earnings.map(earning => `
-                            <tr>
-                                <td>${new Date(earning.created_at).toLocaleDateString('tr-TR')}</td>
-                                <td>${earning.description || 'Bonus Kazanç'}</td>
-                                <td>
-                                    <span class="badge ${earning.bonus_type === 'referral_bonus' ? 'badge-primary' : 'badge-success'}">
-                                        ${earning.bonus_type === 'referral_bonus' ? 'Referans Bonusu' : 'Sipariş Bonusu'}
-                                    </span>
-                                </td>
-                                <td>${parseFloat(earning.amount || 0).toFixed(2)} ₺</td>
-                                <td>${earning.order_bonus ? parseFloat(earning.order_bonus).toFixed(2) + ' ₺' : 'Beklemede'}</td>
-                                <td>
-                                    <span class="status-badge ${earning.order_bonus ? 'status-delivered' : 'status-pending'}">
-                                        ${earning.order_bonus ? 'Ödendi' : 'Bekliyor'}
-                                    </span>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-
-    filterInvites() {
-        const statusFilter = document.getElementById('inviteStatusFilter').value;
-        
-        let filtered = this.referralInvites;
-        
-        if (statusFilter === 'used') {
-            filtered = filtered.filter(invite => invite.new_user_id);
-        } else if (statusFilter === 'not_used') {
-            filtered = filtered.filter(invite => !invite.new_user_id);
-        }
-        
-        document.getElementById('referralInvitesList').innerHTML = this.renderFilteredInvites(filtered);
-    }
-
-    renderFilteredInvites(invites) {
-        if (!invites.length) {
-            return `<div style="text-align: center; padding: 20px; color: #666;">Filtreye uygun kayıt bulunamadı</div>`;
-        }
-        
-        return `
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Davet Tarihi</th>
-                            <th>Kullanıcı</th>
-                            <th>Durum</th>
-                            <th>Bonus</th>
-                            <th>Üyelik Tarihi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${invites.map(invite => {
-                            const isUsed = !!invite.new_user_id;
-                            const userName = invite.new_user?.name || 'Belirtilmemiş';
-                            const userPhone = invite.new_user?.phone || 'Belirtilmemiş';
-                            const bonusAmount = invite.referral_bonus?.[0]?.bonus_amount || 0;
-                            
-                            return `
-                                <tr>
-                                    <td>${new Date(invite.created_at).toLocaleDateString('tr-TR')}</td>
-                                    <td>
-                                        <div>${userName}</div>
-                                        <small style="color: #666;">${userPhone}</small>
-                                    </td>
-                                    <td>
-                                        <span class="status-badge ${isUsed ? 'status-delivered' : 'status-pending'}">
-                                            ${isUsed ? 'Üye Oldu' : 'Bekliyor'}
-                                        </span>
-                                    </td>
-                                    <td>${parseFloat(bonusAmount).toFixed(2)} ₺</td>
-                                    <td>
-                                        ${isUsed && invite.new_user?.created_at ? 
-                                            new Date(invite.new_user.created_at).toLocaleDateString('tr-TR') : 
-                                            '-'
-                                        }
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-
-    // ANA DASHBOARD (REFERRAL ENTEGRE)
     async loadCustomerDashboard() {
         const section = document.getElementById('customerDashboardSection');
         if (!section) {
@@ -1173,7 +267,6 @@ showReferralError() {
         await this.loadRecentCustomerOrders();
     }
 
-    // DİĞER MEVCUT FONKSİYONLAR (Aynen kalacak)
     async loadCustomerStats() {
         try {
             console.log('📊 Müşteri istatistikleri yükleniyor...');
@@ -1316,9 +409,7 @@ showReferralError() {
         }
     }
 
-    // Diğer mevcut fonksiyonlar (loadCustomerProfile, loadCustomerOrders, vb.) aynen buraya gelecek
-
-async loadCustomerProfile() {
+    async loadCustomerProfile() {
         const section = document.getElementById('customerProfileSection');
         if (!section) return;
 
@@ -1475,156 +566,41 @@ async loadCustomerProfile() {
     }
 
     async loadAllCustomerOrders() {
-    try {
-        console.log('📋 Tüm siparişler yükleniyor...');
+        try {
+            console.log('📋 Tüm siparişler yükleniyor...');
+            
+            if (!this.supabase || !this.customerData || !this.customerData.id) {
+                const container = document.getElementById('customerOrdersList');
+                container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
+                return;
+            }
+
+            const { data: orders, error } = await this.supabase
+                .from('orders')
+                .select(`
+                    *,
+                    order_details(*),
+                    seller:seller_profiles(business_name, phone)
+                `)
+                .eq('customer_id', this.customerData.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('❌ Siparişler sorgu hatası:', error);
+                throw error;
+            }
         
-        if (!this.supabase || !this.customerData || !this.customerData.id) {
+            this.orders = orders || [];
+            this.renderCustomerOrders(this.orders);
+            console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
+
+        } catch (error) {
+            console.error('❌ Siparişler yükleme hatası:', error);
             const container = document.getElementById('customerOrdersList');
-            container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
-            return;
+            container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
         }
-
-        // Kurye bilgilerini de içeren sorgu
-        const { data: orders, error } = await this.supabase
-            .from('orders')
-            .select(`
-                *,
-                order_details(*),
-                seller:seller_profiles(business_name, phone)
-            `)
-            .eq('customer_id', this.customerData.id)
-            .order('created_at', { ascending: false });
-
-        if (error) {
-            console.error('❌ Siparişler sorgu hatası:', error);
-            throw error;
-        }
-    
-        this.orders = orders || [];
-        this.renderCustomerOrders(this.orders);
-        console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
-
-    } catch (error) {
-        console.error('❌ Siparişler yükleme hatası:', error);
-        const container = document.getElementById('customerOrdersList');
-        container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
     }
-}
-    renderDeliveryTracker(order) {
-    const status = order.status;
-    
-    // Sadece courier_id ve courier_name kullan
-    const hasCourier = order.courier_id || order.courier_name;
-    const courierName = order.courier_name || 'Kurye';
-    
-    let trackerHTML = '';
-    
-    switch(status) {
-        case 'pending':
-        case 'confirmed':
-        case 'preparing':
-            if (hasCourier) {
-                trackerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; color: #0c5460;">
-                        <i class="fas fa-user-check" style="font-size: 16px;"></i>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 600;">Kurye atandı</div>
-                            <div style="font-size: 11px; color: #666;">${courierName} bekleniyor</div>
-                        </div>
-                    </div>
-                `;
-            } else {
-                trackerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
-                        <i class="fas fa-clock" style="font-size: 16px;"></i>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 600;">Kurye aranıyor</div>
-                            <div style="font-size: 11px; color: #666;">Siparişiniz hazırlanıyor</div>
-                        </div>
-                    </div>
-                `;
-            }
-            break;
-            
-        case 'ready':
-            if (hasCourier) {
-                trackerHTML = `
-                    <div style="display: flex; align-items: center; gap: 12px; color: #155724;">
-                        <div class="moto-container" style="position: relative; width: 80px; height: 25px; display: flex; align-items: center;">
-                            <i class="fas fa-store" style="position: absolute; left: 0; font-size: 14px; color: #28a745;"></i>
-                            <i class="fas fa-motorcycle" style="position: absolute; left: 40px; font-size: 16px; color: #007bff;"></i>
-                            <div style="position: absolute; bottom: 8px; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);"></div>
-                        </div>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 600;">Kurye mağazada</div>
-                            <div style="font-size: 11px; color: #666;">${courierName} paketi aldı</div>
-                        </div>
-                    </div>
-                `;
-            } else {
-                trackerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
-                        <i class="fas fa-clock" style="font-size: 16px;"></i>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 600;">Kurye bekleniyor</div>
-                            <div style="font-size: 11px; color: #666;">Siparişiniz hazır</div>
-                        </div>
-                    </div>
-                `;
-            }
-            break;
-            
-        case 'on_the_way':
-            trackerHTML = `
-                <div style="display: flex; align-items: center; gap: 12px; color: #004085;">
-                    <div class="moto-container" style="position: relative; width: 80px; height: 25px; display: flex; align-items: center;">
-                        <i class="fas fa-map-marker-alt" style="position: absolute; right: 0; font-size: 14px; color: #dc3545;"></i>
-                        <i class="fas fa-motorcycle" style="position: absolute; left: 20px; font-size: 16px; color: #007bff;"></i>
-                        <div style="position: absolute; bottom: 8px; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);"></div>
-                    </div>
-                    <div>
-                        <div style="font-size: 13px; font-weight: 600;">Kurye yolda</div>
-                        <div style="font-size: 11px; color: #666;">${courierName} adresinize geliyor</div>
-                    </div>
-                </div>
-            `;
-            break;
-            
-        case 'delivered':
-            const deliveryTime = order.delivered_at ? 
-                `${new Date(order.delivered_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}` : 
-                '';
-                
-            trackerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; color: #155724;">
-                    <i class="fas fa-check-circle" style="font-size: 16px;"></i>
-                    <div>
-                        <div style="font-size: 13px; font-weight: 600;">Teslim edildi</div>
-                        <div style="font-size: 11px; color: #666;">
-                            ${deliveryTime ? `${deliveryTime} • ${courierName}` : `${courierName} teslim etti`}
-                        </div>
-                    </div>
-                </div>
-            `;
-            break;
-            
-        default:
-            trackerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; color: #6c757d;">
-                    <i class="fas fa-info-circle" style="font-size: 16px;"></i>
-                    <div>
-                        <div style="font-size: 13px; font-weight: 600;">${this.getStatusText(status)}</div>
-                        <div style="font-size: 11px; color: #666;">Sipariş durumu</div>
-                    </div>
-                </div>
-            `;
-    }
-    
-    return trackerHTML;
-}
 
-    
-    // Ana Sipariş Render Fonksiyonu
     renderCustomerOrders(orders) {
         const container = document.getElementById('customerOrdersList');
         
@@ -1639,7 +615,6 @@ async loadCustomerProfile() {
             return;
         }
 
-
         container.innerHTML = orders.map((order, index) => {
             const sellerName = order.seller && order.seller.business_name ? order.seller.business_name : 'Satıcı';
             const deliveryAddress = order.delivery_address || '';
@@ -1647,7 +622,6 @@ async loadCustomerProfile() {
             
             return `
             <div class="order-card" style="border: 1px solid #e1e5e9; border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
-                <!-- Sipariş Özeti - Her Zaman Görünür -->
                 <div class="order-summary" 
                      style="padding: 20px; cursor: pointer; background: #f8f9fa;"
                      data-order-id="${order.id}">
@@ -1671,11 +645,6 @@ async loadCustomerProfile() {
                                     ${deliveryAddress}
                                 </div>
                             ` : ''}
-
-                            <!-- Kurye Durumu Göstergesi -->
-                            <div class="delivery-tracker" style="margin-top: 10px; position: relative;">
-                                ${this.renderDeliveryTracker(order)}
-                            </div>
                         </div>
                         
                         <div style="text-align: right;">
@@ -1693,11 +662,9 @@ async loadCustomerProfile() {
                     </div>
                 </div>
                 
-                <!-- Sipariş Detayları - Açılır/Kapanır -->
                 <div class="order-details" id="details-${order.id}" 
                      style="display: none; padding: 0 20px 20px 20px; background: white;">
                     
-                    <!-- Ürünler -->
                     ${orderDetails.length > 0 ? `
                         <div style="margin: 15px 0;">
                             <h4 style="margin-bottom: 10px; color: #333; font-size: 14px;">
@@ -1733,96 +700,6 @@ async loadCustomerProfile() {
                             </div>
                         </div>
                     ` : ''}
-                    
-                    <!-- Sipariş Bilgileri -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0;">
-                        <div>
-                            <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
-                                <i class="fas fa-info-circle" style="margin-right: 8px;"></i>
-                                Sipariş Bilgileri
-                            </h4>
-                            <div style="font-size: 13px; color: #666;">
-                                <div style="margin-bottom: 4px;">
-                                    <strong>Sipariş Tarihi:</strong> 
-                                    ${new Date(order.created_at).toLocaleString('tr-TR')}
-                                </div>
-                                <div style="margin-bottom: 4px;">
-                                    <strong>Ödeme Yöntemi:</strong> 
-                                    ${order.payment_method ? this.getPaymentMethodText(order.payment_method) : 'Belirtilmemiş'}
-                                </div>
-                                ${order.customer_notes ? `
-                                    <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 4px;">
-                                        <strong>Notunuz:</strong> ${order.customer_notes}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                        
-    <div>
-    <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
-        <i class="fas fa-shipping-fast" style="margin-right: 8px;"></i>
-        Teslimat Bilgileri
-    </h4>
-    <div style="font-size: 13px; color: #666;">
-        ${order.courier_id || (order.courier && order.courier.name) ? `
-            <div style="color: var(--success); margin-bottom: 4px;">
-                <i class="fas fa-motorcycle"></i> 
-                <strong>Kurye:</strong> ${order.courier ? order.courier.name : order.courier_name || 'Atandı'}
-            </div>
-        ` : `
-            <div style="color: var(--warning); margin-bottom: 4px;">
-                <i class="fas fa-clock"></i> 
-                <strong>Kurye:</strong> Atanıyor
-            </div>
-        `}
-        
-        ${order.delivery_address ? `
-            <div style="margin-bottom: 4px;">
-                <strong>Adres:</strong> ${order.delivery_address}
-            </div>
-        ` : ''}
-    </div>
-    </div>
-   </div>
-                    <!-- İptal Durumu -->
-                    ${order.cancellation_requested ? `
-                        <div style="margin: 15px 0; padding: 12px; background: #fff3cd; border-radius: 6px;">
-                            <div style="display: flex; align-items: center; gap: 8px; color: var(--warning);">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <strong>İptal Talebiniz İnceleniyor</strong>
-                            </div>
-                            ${order.cancellation_reason ? `
-                                <div style="margin-top: 8px; font-size: 13px;">
-                                    <strong>İptal Nedeni:</strong> ${order.cancellation_reason}
-                                </div>
-                            ` : ''}
-                        </div>
-                    ` : ''}
-                    
-                    <!-- Aksiyon Butonları -->
-                    <div class="order-actions" style="display: flex; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e1e5e9;">
-                        ${order.status === 'delivered' ? `
-                            <button class="btn btn-sm btn-success" data-action="rate" data-order-id="${order.id}">
-                                <i class="fas fa-star"></i> Değerlendir
-                            </button>
-                        ` : ''}
-                        
-                        ${order.status === 'pending' ? `
-                            ${order.cancellation_requested ? `
-                                <button class="btn btn-sm btn-secondary" data-action="view-cancellation" data-order-id="${order.id}">
-                                    <i class="fas fa-info-circle"></i> İptal Durumu
-                                </button>
-                            ` : `
-                                <button class="btn btn-sm btn-warning" data-action="cancel" data-order-id="${order.id}">
-                                    <i class="fas fa-times"></i> İptal Talebi
-                                </button>
-                            `}
-                        ` : ''}
-                        
-                        <button class="btn btn-sm btn-outline-primary" data-action="close" data-order-id="${order.id}">
-                            <i class="fas fa-times"></i> Kapat
-                        </button>
-                    </div>
                 </div>
             </div>
             `;
@@ -1830,48 +707,19 @@ async loadCustomerProfile() {
 
         // Event listener'ları ekle
         this.attachOrderEventListeners();
-        
     }
 
-    // Event Listener Fonksiyonu
     attachOrderEventListeners() {
         const orderSummaries = document.querySelectorAll('.order-summary');
-        const actionButtons = document.querySelectorAll('[data-action]');
         
-        // Sipariş özeti tıklama
         orderSummaries.forEach(summary => {
             summary.addEventListener('click', (e) => {
                 const orderId = e.currentTarget.getAttribute('data-order-id');
                 this.toggleOrderDetails(orderId);
             });
         });
-        
-        // Aksiyon butonları
-        actionButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const action = e.currentTarget.getAttribute('data-action');
-                const orderId = e.currentTarget.getAttribute('data-order-id');
-                
-                switch(action) {
-                    case 'rate':
-                        this.rateOrder(orderId);
-                        break;
-                    case 'view-cancellation':
-                        this.viewCancellationStatus(orderId);
-                        break;
-                    case 'cancel':
-                        this.cancelOrder(orderId);
-                        break;
-                    case 'close':
-                        this.toggleOrderDetails(orderId);
-                        break;
-                }
-            });
-        });
     }
 
-    // Açılır-kapanır fonksiyonu
     toggleOrderDetails(orderId) {
         const detailsElement = document.getElementById(`details-${orderId}`);
         const chevronElement = document.getElementById(`chevron-${orderId}`);
@@ -1909,121 +757,7 @@ async loadCustomerProfile() {
         this.renderCustomerOrders(filteredOrders);
     }
 
-    async cancelOrder(orderId) {
-        try {
-            const { data: order, error } = await this.supabase
-                .from('orders')
-                .select('status, cancellation_requested')
-                .eq('id', orderId)
-                .single();
-
-            if (error) throw error;
-
-            if (order.status === 'pending' && !order.cancellation_requested) {
-                await this.requestCancellation(orderId);
-            } 
-            else if (order.cancellation_requested) {
-                await this.viewCancellationStatus(orderId);
-            }
-            else if (order.status !== 'pending') {
-                window.panelSystem.showAlert('Bu sipariş artık iptal edilemez. Lütfen satıcı ile iletişime geçin.', 'warning');
-            }
-
-        } catch (error) {
-            console.error('❌ Sipariş durumu sorgulama hatası:', error);
-            window.panelSystem.showAlert('Sipariş bilgileri alınamadı!', 'error');
-        }
-    }
-
-    async requestCancellation(orderId) {
-        try {
-            const reason = prompt('İptal talebiniz için neden belirtin:');
-            if (!reason || reason.trim() === '') {
-                alert('İptal nedeni boş olamaz.');
-                return;
-            }
-
-            console.log('📝 İptal talebi oluşturuluyor:', orderId, reason);
-
-            const { error } = await this.supabase
-                .from('orders')
-                .update({
-                    cancellation_requested: true,
-                    cancellation_reason: reason,
-                    cancellation_requested_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', orderId);
-
-            if (error) throw error;
-
-            window.panelSystem.showAlert('İptal talebiniz alındı. Satıcı onayı bekleniyor.', 'success');
-            await this.loadAllCustomerOrders();
-
-        } catch (error) {
-            console.error('❌ İptal talebi hatası:', error);
-            window.panelSystem.showAlert('İptal talebi oluşturulamadı!', 'error');
-        }
-    }
-
-    async viewCancellationStatus(orderId) {
-        try {
-            const { data: order, error } = await this.supabase
-                .from('orders')
-                .select('cancellation_reason, cancellation_requested_at, status')
-                .eq('id', orderId)
-                .single();
-
-            if (error) throw error;
-
-            let message = `İptal Talebi Durumu:\n\n`;
-            message += `Talep Tarihi: ${new Date(order.cancellation_requested_at).toLocaleString('tr-TR')}\n`;
-            message += `İptal Nedeni: ${order.cancellation_reason}\n`;
-            message += `Mevcut Durum: ${this.getStatusText(order.status)}\n\n`;
-            message += `İptal talebiniz satıcı tarafından inceleniyor.`;
-
-            alert(message);
-
-        } catch (error) {
-            console.error('❌ İptal durumu sorgulama hatası:', error);
-            window.panelSystem.showAlert('İptal durumu görüntülenemedi!', 'error');
-        }
-    }
-
-    async rateOrder(orderId) {
-        const rating = prompt('Siparişi 1-5 arasında değerlendirin:');
-        if (!rating || rating < 1 || rating > 5) {
-            alert('Lütfen 1-5 arasında bir değer girin.');
-            return;
-        }
-
-        try {
-            const { error } = await this.supabase
-                .from('orders')
-                .update({
-                    performance_rating: parseFloat(rating),
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', orderId);
-
-            if (error) throw error;
-
-            window.panelSystem.showAlert('Değerlendirmeniz kaydedildi!', 'success');
-            await this.loadAllCustomerOrders();
-
-        } catch (error) {
-            console.error('Değerlendirme hatası:', error);
-            window.panelSystem.showAlert('Değerlendirme kaydedilemedi!', 'error');
-        }
-    }
-
-  
-    
-    
-    // Diğer fonksiyonlar (loadCustomerPayments, loadCustomerAddresses, vb.) buraya gelecek
-    // ... kalan fonksiyonlar aynı kalacak ...
-
-async loadCustomerPayments() {
+    async loadCustomerPayments() {
         const section = document.getElementById('customerPaymentsSection');
         if (!section) return;
 
@@ -2071,216 +805,140 @@ async loadCustomerPayments() {
     }
 
     async loadCustomerPaymentsData() {
-    try {
-        console.log('💳 Müşteri ödemeleri yükleniyor...');
+        try {
+            console.log('💳 Müşteri ödemeleri yükleniyor...');
+            
+            if (!this.supabase || !this.customerData || !this.customerData.id) {
+                this.showNoPaymentsMessage('Sistem hazır değil.');
+                return;
+            }
+
+            const { data: payments, error } = await this.supabase
+                .from('customer_payments')
+                .select('*')
+                .eq('customer_id', this.customerData.id)
+                .order('payment_date', { ascending: false });
+
+            if (error) {
+                console.error('❌ Ödemeler sorgu hatası:', error);
+                this.showNoPaymentsMessage('Ödemeler yüklenirken hata oluştu.');
+                return;
+            }
+
+            this.payments = payments || [];
+            this.renderCustomerPayments(this.payments);
+            console.log('✅ Ödemeler yüklendi:', this.payments.length);
+
+        } catch (error) {
+            console.error('❌ Ödemeler yükleme hatası:', error);
+            this.showNoPaymentsMessage('Ödemeler yüklenirken hata oluştu.');
+        }
+    }
+
+    renderCustomerPayments(payments) {
+        const container = document.getElementById('customerPaymentsContent');
         
-        if (!this.supabase || !this.customerData || !this.customerData.id) {
-            this.showNoPaymentsMessage('Sistem hazır değil.');
+        if (!payments || !payments.length) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <i class="fas fa-credit-card" style="font-size: 48px; margin-bottom: 20px;"></i>
+                    <h3>Henüz ödeme kaydınız bulunmuyor</h3>
+                    <p>Ödeme geçmişiniz burada görünecek.</p>
+                </div>
+            `;
             return;
         }
 
-        // Doğru kolon isimleriyle join sorgusu
-        const { data: payments, error } = await this.supabase
-            .from('customer_payments')
-            .select(`
-                *,
-                order:orders(
-                    id,
-                    total_amount,
-                    created_at,
-                    status,
-                    customer_name,
-                    delivery_address
-                )
-            `)
-            .eq('customer_id', this.customerData.id)
-            .order('payment_date', { ascending: false });
+        const totalAmount = payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
+        const completedPayments = payments.filter(p => p.status === 'completed').length;
 
-        if (error) {
-            console.error('❌ Ödemeler sorgu hatası:', error);
-            
-            // Eğer join hatası verirse, basit sorgu yap
-            if (error.code === '42703' || error.code === 'PGRST200') {
-                console.log('🔄 Basit sorgu yöntemi kullanılıyor...');
-                return await this.loadPaymentsWithoutJoin();
-            }
-            throw error;
-        }
-
-        this.payments = payments || [];
-        this.renderCustomerPayments(this.payments);
-        console.log('✅ Ödemeler yüklendi:', this.payments.length);
-
-    } catch (error) {
-        console.error('❌ Ödemeler yükleme hatası:', error);
-        this.showNoPaymentsMessage('Ödemeler yüklenirken hata oluştu.');
-    }
-}
-
-async loadPaymentsWithoutJoin() {
-    try {
-        const { data: payments, error } = await this.supabase
-            .from('customer_payments')
-            .select('*')
-            .eq('customer_id', this.customerData.id)
-            .order('payment_date', { ascending: false });
-
-        if (error) throw error;
-
-        // Sipariş bilgilerini manuel olarak ekle
-        if (payments && payments.length > 0) {
-            const orderIds = payments
-                .map(p => p.order_id)
-                .filter(id => id)
-                .filter((id, index, array) => array.indexOf(id) === index);
-
-            if (orderIds.length > 0) {
-                const { data: orders, error: ordersError } = await this.supabase
-                    .from('orders')
-                    .select('id, total_amount, created_at, status, customer_name, delivery_address')
-                    .in('id', orderIds);
-
-                if (!ordersError && orders) {
-                    const ordersMap = {};
-                    orders.forEach(order => {
-                        ordersMap[order.id] = order;
-                    });
-
-                    payments.forEach(payment => {
-                        payment.order = ordersMap[payment.order_id] || {
-                            id: payment.order_id,
-                            total_amount: payment.amount,
-                            created_at: payment.payment_date
-                        };
-                    });
-                }
-            } else {
-                // Order ID yoksa temel bilgileri ekle
-                payments.forEach(payment => {
-                    payment.order = {
-                        id: payment.id,
-                        total_amount: payment.amount,
-                        created_at: payment.payment_date
-                    };
-                });
-            }
-        }
-
-        this.payments = payments || [];
-        this.renderCustomerPayments(this.payments);
-        console.log('✅ Ödemeler (basit sorgu) yüklendi:', this.payments.length);
-
-    } catch (error) {
-        console.error('❌ Basit ödeme sorgu hatası:', error);
-        throw error;
-    }
-}
-
-    renderCustomerPayments(payments) {
-    const container = document.getElementById('customerPaymentsContent');
-    
-    if (!payments || !payments.length) {
         container.innerHTML = `
-            <div style="text-align: center; padding: 40px; color: #666;">
-                <i class="fas fa-credit-card" style="font-size: 48px; margin-bottom: 20px;"></i>
-                <h3>Henüz ödeme kaydınız bulunmuyor</h3>
-                <p>Ödeme geçmişiniz burada görünecek.</p>
+            <div class="stats-grid" style="margin-bottom: 25px;">
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-receipt"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${payments.length}</h3>
+                        <p>Toplam Ödeme</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${completedPayments}</h3>
+                        <p>Tamamlanan</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-money-bill-wave"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>${totalAmount.toFixed(2)} ₺</h3>
+                        <p>Toplam Tutar</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tarih</th>
+                            <th>Sipariş No</th>
+                            <th>Yöntem</th>
+                            <th>Tür</th>
+                            <th>Toplam</th>
+                            <th>Bonus</th>
+                            <th>Nakit</th>
+                            <th>Kart</th>
+                            <th>Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${payments.map(payment => {
+                            const orderNumber = payment.order_id ? 
+                                `Sipariş #${payment.order_id.slice(-8)}` : 
+                                `Ödeme #${payment.id.slice(-8)}`;
+                            
+                            const totalAmount = payment.order?.total_amount || payment.amount || 0;
+                            
+                            return `
+                            <tr>
+                                <td>
+                                    <div>${new Date(payment.payment_date).toLocaleDateString('tr-TR')}</div>
+                                    <small style="color: #666;">${new Date(payment.payment_date).toLocaleTimeString('tr-TR')}</small>
+                                </td>
+                                <td>${orderNumber}</td>
+                                <td>
+                                    <span class="payment-method-badge method-${payment.payment_method}">
+                                        ${this.getPaymentMethodText(payment.payment_method)}
+                                    </span>
+                                </td>
+                                <td>${this.getPaymentTypeText(payment.payment_type)}</td>
+                                <td style="font-weight: bold; color: var(--primary);">
+                                    ${parseFloat(totalAmount).toFixed(2)} ₺
+                                </td>
+                                <td>${parseFloat(payment.bonus_used || 0).toFixed(2)} ₺</td>
+                                <td>${parseFloat(payment.cash_amount || 0).toFixed(2)} ₺</td>
+                                <td>${parseFloat(payment.card_amount || 0).toFixed(2)} ₺</td>
+                                <td>
+                                    <span class="status-badge status-${payment.status}">
+                                        ${this.getPaymentStatusText(payment.status)}
+                                    </span>
+                                </td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
             </div>
         `;
-        return;
     }
 
-    const totalAmount = payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
-    const completedPayments = payments.filter(p => p.status === 'completed').length;
-
-    container.innerHTML = `
-        <div class="stats-grid" style="margin-bottom: 25px;">
-            <div class="stat-card">
-                <div class="stat-icon primary">
-                    <i class="fas fa-receipt"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>${payments.length}</h3>
-                    <p>Toplam Ödeme</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon success">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>${completedPayments}</h3>
-                    <p>Tamamlanan</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon warning">
-                    <i class="fas fa-money-bill-wave"></i>
-                </div>
-                <div class="stat-info">
-                    <h3>${totalAmount.toFixed(2)} ₺</h3>
-                    <p>Toplam Tutar</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Tarih</th>
-                        <th>Sipariş No</th>
-                        <th>Yöntem</th>
-                        <th>Tür</th>
-                        <th>Toplam</th>
-                        <th>Bonus</th>
-                        <th>Nakit</th>
-                        <th>Kart</th>
-                        <th>Durum</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${payments.map(payment => {
-                        // Sipariş numarasını oluştur
-                        const orderNumber = payment.order_id ? 
-                            `Sipariş #${payment.order_id.slice(-8)}` : 
-                            `Ödeme #${payment.id.slice(-8)}`;
-                        
-                        // Toplam tutarı belirle
-                        const totalAmount = payment.order?.total_amount || payment.amount || 0;
-                        
-                        return `
-                        <tr>
-                            <td>
-                                <div>${new Date(payment.payment_date).toLocaleDateString('tr-TR')}</div>
-                                <small style="color: #666;">${new Date(payment.payment_date).toLocaleTimeString('tr-TR')}</small>
-                            </td>
-                            <td>${orderNumber}</td>
-                            <td>
-                                <span class="payment-method-badge method-${payment.payment_method}">
-                                    ${this.getPaymentMethodText(payment.payment_method)}
-                                </span>
-                            </td>
-                            <td>${this.getPaymentTypeText(payment.payment_type)}</td>
-                            <td style="font-weight: bold; color: var(--primary);">
-                                ${parseFloat(totalAmount).toFixed(2)} ₺
-                            </td>
-                            <td>${parseFloat(payment.bonus_used || 0).toFixed(2)} ₺</td>
-                            <td>${parseFloat(payment.cash_amount || 0).toFixed(2)} ₺</td>
-                            <td>${parseFloat(payment.card_amount || 0).toFixed(2)} ₺</td>
-                            <td>
-                                <span class="status-badge status-${payment.status}">
-                                    ${this.getPaymentStatusText(payment.status)}
-                                </span>
-                            </td>
-                        </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
-        </div>
-    `;
-}
     filterPaymentsByStatus(status) {
         if (!status) {
             this.renderCustomerPayments(this.payments);
@@ -2546,9 +1204,6 @@ async loadPaymentsWithoutJoin() {
         }
     }
 
-
-    // ... kalan fonksiyonlar değişmeden kalacak ...
-
     getStatusText(status) {
         const statusMap = {
             'pending': 'Bekliyor',
@@ -2590,9 +1245,515 @@ async loadPaymentsWithoutJoin() {
         };
         return statusMap[status] || status;
     }
-}
 
-// Global instance
-if (typeof window.customerPanel === 'undefined') {
-    window.customerPanel = null;
+    // =============================================
+    // REFERRAL SİSTEMİ - YENİ FONKSİYONLAR (EN SONA)
+    // =============================================
+
+    async loadReferralData() {
+        try {
+            console.log('📊 Referral verileri yükleniyor...');
+            
+            if (!this.supabase || !this.customerData?.id) {
+                console.warn('⚠️ Referral verileri yüklenemedi: Supabase veya müşteri ID yok');
+                return;
+            }
+
+            // SADECE mevcut linki kontrol et
+            const { data: referralLink, error: linkError } = await this.supabase
+                .from('referral_links')
+                .select('*')
+                .eq('owner_user_id', this.customerData.id)
+                .eq('is_used', false)
+                .single();
+
+            if (!linkError && referralLink) {
+                this.referralData = referralLink;
+                console.log('✅ Mevcut referral link bulundu:', referralLink.referral_code);
+            } else {
+                this.referralData = null;
+                console.log('ℹ️ Henüz referral link oluşturulmamış');
+            }
+
+            // İstatistikleri yükle
+            await this.loadReferralStats();
+            await this.loadReferralEarnings();
+            await this.loadReferralInvites();
+
+        } catch (error) {
+            console.error('❌ Referral veri yükleme hatası:', error);
+        }
+    }
+
+    async loadReferralStats() {
+        try {
+            if (!this.customerData?.id) return;
+
+            // Basit istatistikler
+            const { data: invites, error: invitesError } = await this.supabase
+                .from('referral_tracking')
+                .select('id, new_user_id, created_at')
+                .eq('referrer_user_id', this.customerData.id);
+
+            const { data: earnings, error: earningsError } = await this.supabase
+                .from('referral_bonus_usage')
+                .select('order_bonus, amount')
+                .eq('user_id', this.customerData.id);
+
+            let totalEarnings = 0;
+            if (earnings) {
+                earnings.forEach(earning => {
+                    if (earning.order_bonus) {
+                        totalEarnings += parseFloat(earning.order_bonus);
+                    }
+                });
+            }
+
+            this.referralStats = {
+                totalInvites: invites?.length || 0,
+                activeUsers: invites?.filter(invite => invite.new_user_id).length || 0,
+                totalEarnings: totalEarnings,
+                pendingEarnings: 0
+            };
+
+        } catch (error) {
+            console.error('❌ Referral istatistik yükleme hatası:', error);
+        }
+    }
+
+    async loadReferralEarnings() {
+        try {
+            if (!this.customerData?.id) return;
+
+            const { data: earnings, error } = await this.supabase
+                .from('referral_bonus_usage')
+                .select('*')
+                .eq('user_id', this.customerData.id)
+                .order('created_at', { ascending: false });
+
+            if (!error && earnings) {
+                this.referralEarnings = earnings;
+            }
+
+        } catch (error) {
+            console.error('❌ Referral kazanç geçmişi yükleme hatası:', error);
+        }
+    }
+
+    async loadReferralInvites() {
+        try {
+            if (!this.customerData?.id) return;
+
+            const { data: invites, error } = await this.supabase
+                .from('referral_tracking')
+                .select('*')
+                .eq('referrer_user_id', this.customerData.id)
+                .order('created_at', { ascending: false });
+
+            if (!error && invites) {
+                this.referralInvites = invites;
+            }
+
+        } catch (error) {
+            console.error('❌ Davet edilenler yükleme hatası:', error);
+        }
+    }
+
+    async loadCustomerReferral() {
+        const section = document.getElementById('customerReferralSection');
+        if (!section) return;
+
+        try {
+            // Butonları başlangıçta pasif yap
+            section.innerHTML = `
+                <div class="section-header">
+                    <h2>🎁 Arkadaşını Davet Et</h2>
+                    <p class="subtitle">Arkadaşlarını davet et, bonus kazan!</p>
+                </div>
+
+                <div class="loading-spinner" id="referralLoading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Güvenlik kontrolü yapılıyor... (10 saniye)</p>
+                </div>
+
+                <div class="content-row" id="referralContent" style="display: none;">
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>📬 Davet Linkiniz</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="referral-link-container">
+                                    <label>Bu linki arkadaşlarınla paylaş:</label>
+                                    <div class="input-group" style="margin-top: 10px;">
+                                        <input type="text" id="referralLinkInput" class="form-control" 
+                                               value="Hazırlanıyor..." readonly style="font-size: 14px;">
+                                        <button class="btn btn-primary" id="copyReferralBtn" disabled>
+                                            <i class="fas fa-copy"></i> Kopyala
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">
+                                        Bu linki arkadaşlarınla paylaş, hem onlar hem sen kazanın!
+                                    </small>
+                                </div>
+
+                                <div class="share-buttons" style="margin-top: 25px;">
+                                    <h4>Hızlı Paylaşım:</h4>
+                                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                                        <button class="btn btn-success" id="shareWhatsAppBtn" disabled>
+                                            <i class="fab fa-whatsapp"></i> WhatsApp
+                                        </button>
+                                        <button class="btn btn-primary" id="shareTelegramBtn" disabled>
+                                            <i class="fab fa-telegram"></i> Telegram
+                                        </button>
+                                        <button class="btn btn-info" id="shareSMSBtn" disabled>
+                                            <i class="fas fa-sms"></i> SMS
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>💰 Bonus Sistem</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="bonus-rules">
+                                    <div class="rule-item" style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee;">
+                                        <div style="background: #007bff; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
+                                            <i class="fas fa-gift"></i>
+                                        </div>
+                                        <div>
+                                            <strong>Referans Bonusu</strong>
+                                            <p style="margin: 5px 0 0 0; color: #666;">Arkadaşın üye olduğunda sabit bonus kazan</p>
+                                        </div>
+                                    </div>
+                                    <div class="rule-item" style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee;">
+                                        <div style="background: #28a745; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
+                                            <i class="fas fa-shopping-cart"></i>
+                                        </div>
+                                        <div>
+                                            <strong>Sipariş Bonusu</strong>
+                                            <p style="margin: 5px 0 0 0; color: #666;">Arkadaşın sipariş verdikçe % bazlı bonus kazan</p>
+                                        </div>
+                                    </div>
+                                    <div class="rule-item" style="display: flex; align-items: center; padding: 15px;">
+                                        <div style="background: #ffc107; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
+                                            <i class="fas fa-calendar-alt"></i>
+                                        </div>
+                                        <div>
+                                            <strong>Ay Sonu Hakediş</strong>
+                                            <p style="margin: 5px 0 0 0; color: #666;">Bonuslar ay sonunda bakiyene eklenecek</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 10 saniye bekleyip link oluştur
+            await this.startReferralProcess();
+
+        } catch (error) {
+            console.error('❌ Referral sayfası yükleme hatası:', error);
+            section.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Link oluşturulamadı</h3>
+                    <p>Lütfen sayfayı yenileyin ve tekrar deneyin.</p>
+                    <button class="btn btn-primary" onclick="location.reload()">Yenile</button>
+                </div>
+            `;
+        }
+    }
+
+    async startReferralProcess() {
+        try {
+            let countdown = 10;
+            const loadingElement = document.getElementById('referralLoading');
+            const contentElement = document.getElementById('referralContent');
+            
+            // Geri sayım göster
+            const countdownInterval = setInterval(() => {
+                if (loadingElement) {
+                    loadingElement.innerHTML = `
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Güvenlik kontrolü yapılıyor... (${countdown} saniye)</p>
+                    `;
+                }
+                countdown--;
+                
+                if (countdown < 0) {
+                    clearInterval(countdownInterval);
+                    this.initializeReferralLink();
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('❌ Referral proses hatası:', error);
+        }
+    }
+
+    async initializeReferralLink() {
+        try {
+            const loadingElement = document.getElementById('referralLoading');
+            const contentElement = document.getElementById('referralContent');
+            
+            // Loading'i gizle, içeriği göster
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (contentElement) contentElement.style.display = 'flex';
+
+            // Mevcut aktif link kontrolü
+            const { data: existingLink, error: checkError } = await this.supabase
+                .from('referral_links')
+                .select('*')
+                .eq('owner_user_id', this.customerData.id)
+                .eq('is_used', false)
+                .single();
+
+            if (!checkError && existingLink) {
+                // Mevcut link varsa onu kullan
+                this.referralData = existingLink;
+                console.log('✅ Mevcut link kullanılıyor:', existingLink.referral_code);
+            } else {
+                // Yeni link oluştur
+                console.log('🔄 Yeni referral link oluşturuluyor...');
+                await this.createNewReferralLink();
+            }
+
+            // Linki göster ve butonları aktif et
+            this.activateReferralButtons();
+
+        } catch (error) {
+            console.error('❌ Link başlatma hatası:', error);
+            this.showReferralError();
+        }
+    }
+
+    async createNewReferralLink() {
+        try {
+            let groupCode = 'DEFAULT';
+
+            // Grup kontrolü
+            const { data: userGroup, error: groupError } = await this.supabase
+                .from('referral_groups')
+                .select('*')
+                .eq('leader_user_id', this.customerData.id)
+                .single();
+
+            if (!groupError && userGroup) {
+                groupCode = userGroup.group_code;
+            } else {
+                // Varsayılan grup
+                const { data: defaultGroup, error: defaultError } = await this.supabase
+                    .from('referral_groups')
+                    .select('*')
+                    .eq('is_active', true)
+                    .limit(1)
+                    .single();
+
+                if (!defaultError && defaultGroup) {
+                    groupCode = defaultGroup.group_code;
+                }
+            }
+
+            const referralCode = this.generateReferralCode();
+            
+            const { data: newLink, error } = await this.supabase
+                .from('referral_links')
+                .insert({
+                    group_code: groupCode,
+                    owner_user_id: this.customerData.id,
+                    referral_code: referralCode,
+                    is_used: false
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            this.referralData = newLink;
+            console.log('✅ Yeni referral link oluşturuldu:', referralCode);
+
+        } catch (error) {
+            console.error('❌ Yeni link oluşturma hatası:', error);
+            throw error;
+        }
+    }
+
+    activateReferralButtons() {
+        const referralLink = this.referralData ? 
+            `${window.location.origin}?ref=${this.referralData.referral_code}` : 
+            'Hata oluştu, lütfen yenileyin';
+
+        // Link input'unu güncelle
+        const linkInput = document.getElementById('referralLinkInput');
+        if (linkInput) {
+            linkInput.value = referralLink;
+        }
+
+        // Butonları aktif et ve event listener ekle
+        const copyBtn = document.getElementById('copyReferralBtn');
+        const whatsappBtn = document.getElementById('shareWhatsAppBtn');
+        const telegramBtn = document.getElementById('shareTelegramBtn');
+        const smsBtn = document.getElementById('shareSMSBtn');
+
+        if (copyBtn) {
+            copyBtn.disabled = false;
+            copyBtn.addEventListener('click', () => this.copyReferralLink());
+        }
+        if (whatsappBtn) {
+            whatsappBtn.disabled = false;
+            whatsappBtn.addEventListener('click', () => this.shareOnWhatsApp());
+        }
+        if (telegramBtn) {
+            telegramBtn.disabled = false;
+            telegramBtn.addEventListener('click', () => this.shareOnTelegram());
+        }
+        if (smsBtn) {
+            smsBtn.disabled = false;
+            smsBtn.addEventListener('click', () => this.shareAsSMS());
+        }
+
+        console.log('✅ Referral butonları aktif edildi');
+    }
+
+    // PAYLAŞIM FONKSİYONLARI
+    copyReferralLink() {
+        const input = document.getElementById('referralLinkInput');
+        if (input && this.referralData) {
+            input.select();
+            document.execCommand('copy');
+            window.panelSystem.showAlert('Davet linki kopyalandı!', 'success');
+        }
+    }
+
+    shareOnWhatsApp() {
+        if (!this.referralData) return;
+        
+        const message = `Seni yemek siparişi uygulamasına davet ediyorum! 🍕 Bu linkten üye ol, ikimiz de bonus kazanalım: ${window.location.origin}?ref=${this.referralData.referral_code}`;
+        
+        if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            window.open(`whatsapp://send?text=${encodeURIComponent(message)}`, '_blank');
+        } else {
+            window.open(`https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
+        }
+    }
+
+    shareOnTelegram() {
+        if (!this.referralData) return;
+        
+        const message = `Seni yemek siparişi uygulamasına davet ediyorum! 🍕 Bu linkten üye ol, ikimiz de bonus kazanalım: ${window.location.origin}?ref=${this.referralData.referral_code}`;
+        window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(message)}`, '_blank');
+    }
+
+    shareAsSMS() {
+        if (!this.referralData) return;
+        
+        const message = `Yemek siparişi uygulamasına davetim: ${window.location.origin}?ref=${this.referralData.referral_code}`;
+        
+        if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            window.open(`sms:?body=${encodeURIComponent(message)}`, '_blank');
+        } else {
+            alert(`SMS için mesajı kopyalayın: ${message}`);
+        }
+    }
+
+    generateReferralCode() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 8; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    }
+
+    showReferralError() {
+        const contentElement = document.getElementById('referralContent');
+        if (contentElement) {
+            contentElement.innerHTML = `
+                <div class="error-message" style="text-align: center; padding: 40px;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545;"></i>
+                    <h3>Link oluşturulamadı</h3>
+                    <p>Lütfen sayfayı yenileyip tekrar deneyin.</p>
+                    <button class="btn btn-primary" onclick="location.reload()">Sayfayı Yenile</button>
+                </div>
+            `;
+        }
+    }
+
+    async loadReferralEarningsSection() {
+        const section = document.getElementById('referralEarningsSection');
+        if (!section) return;
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Bonus Kazançlarım</h2>
+                <div class="header-actions">
+                    <select id="earningTypeFilter" class="form-control" onchange="customerPanel.filterEarnings()">
+                        <option value="">Tüm Kazançlar</option>
+                        <option value="referral_bonus">Referans Bonusu</option>
+                        <option value="order_bonus">Sipariş Bonusu</option>
+                    </select>
+                    <input type="date" id="earningDateFilter" class="form-control" onchange="customerPanel.filterEarnings()">
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div id="referralEarningsList">
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <i class="fas fa-coins" style="font-size: 48px; margin-bottom: 20px;"></i>
+                            <h3>Henüz bonus kazancınız bulunmuyor</h3>
+                            <p>Arkadaşlarını davet ederek bonus kazanmaya başla!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadReferralInvitesSection() {
+        const section = document.getElementById('referralInvitesSection');
+        if (!section) return;
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Davet Ettiklerim</h2>
+                <div class="header-actions">
+                    <select id="inviteStatusFilter" class="form-control" onchange="customerPanel.filterInvites()">
+                        <option value="">Tüm Davetler</option>
+                        <option value="used">Üye Olanlar</option>
+                        <option value="not_used">Üye Olmayanlar</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div id="referralInvitesList">
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <i class="fas fa-user-friends" style="font-size: 48px; margin-bottom: 20px;"></i>
+                            <h3>Henüz kimseyi davet etmediniz</h3>
+                            <p>Davet linkinizi paylaşarak arkadaşlarınızı davet edin!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Filtreleme fonksiyonları
+    filterEarnings() {
+        console.log('Kazançlar filtreleniyor...');
+    }
+
+    filterInvites() {
+        console.log('Davetler filtreleniyor...');
+    }
 }
