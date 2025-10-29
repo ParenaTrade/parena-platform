@@ -317,6 +317,11 @@ class PanelSystem {
             'customerProfile': 'Profilim',
             'customerOrders': 'Siparişlerim',
             'customerPayments': 'Ödemelerim',
+            'customerAddresses': 'Adreslerim',
+            'customerSupport': 'Destek',
+            'customerReferral': 'Arkadaşını Davet Et',
+            'referralEarnings': 'Bonus Kazançlarım',
+            'referralInvites': 'Davet Ettiklerim',
             'courierInfo': 'Profilim',
             'courierDeliveries': 'Teslimatlarım',
             'courierEarnings': 'Kazançlarım',
@@ -326,8 +331,7 @@ class PanelSystem {
             'reports': 'Raporlar',
             'systemSettings': 'Sistem Ayarları',
             'deliveryAreas': 'Teslimat Bölgeleri',
-            'sellerReports': 'Satış Raporları',
-            'referral': 'Arkadaşını Davet Et'
+            'sellerReports': 'Satış Raporları'
         };
         
         const pageTitleElement = document.getElementById('pageTitle');
@@ -387,3 +391,61 @@ class PanelSystem {
         }, 5000);
     }
 }
+
+// Customer menü öğelerini tanımla (HTML'de olmalı)
+const customerMenuItems = [
+    {
+        id: 'customerDashboard',
+        title: '🏠 Dashboard',
+        icon: 'fa-home',
+        section: 'customerDashboard'
+    },
+    {
+        id: 'customerProfile',
+        title: '👤 Profilim',
+        icon: 'fa-user',
+        section: 'customerProfile'
+    },
+    {
+        id: 'customerOrders',
+        title: '📦 Siparişlerim',
+        icon: 'fa-shopping-bag',
+        section: 'customerOrders'
+    },
+    {
+        id: 'customerPayments',
+        title: '💳 Ödemelerim',
+        icon: 'fa-credit-card',
+        section: 'customerPayments'
+    },
+    {
+        id: 'customerAddresses',
+        title: '📍 Adreslerim',
+        icon: 'fa-map-marker-alt',
+        section: 'customerAddresses'
+    },
+    {
+        id: 'customerReferral',
+        title: '🎁 Arkadaşını Davet Et',
+        icon: 'fa-user-plus',
+        section: 'customerReferral'
+    },
+    {
+        id: 'referralEarnings',
+        title: '💰 Bonus Kazançlarım',
+        icon: 'fa-coins',
+        section: 'referralEarnings'
+    },
+    {
+        id: 'referralInvites',
+        title: '👥 Davet Ettiklerim',
+        icon: 'fa-users',
+        section: 'referralInvites'
+    },
+    {
+        id: 'customerSupport',
+        title: '📞 Destek',
+        icon: 'fa-headset',
+        section: 'customerSupport'
+    }
+];
