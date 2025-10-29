@@ -931,41 +931,7 @@ shareAsSMS() {
         `;
     }
 
-    // REFERRAL UTILITY FONKSİYONLARI
-    copyReferralLink() {
-        const input = document.getElementById('referralLinkInput');
-        if (input) {
-            input.select();
-            document.execCommand('copy');
-            window.panelSystem.showAlert('Davet linki kopyalandı!', 'success');
-        }
-    }
-
-    shareOnWhatsApp() {
-        const message = `Seni yemek siparişi uygulamasına davet ediyorum! Bu linkten üye ol, ikimiz de bonus kazanalım: ${this.referralData ? window.location.origin + '?ref=' + this.referralData.referral_code : ''}`;
-        const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
-    }
-
-    shareOnTelegram() {
-        const message = `Seni yemek siparişi uygulamasına davet ediyorum! Bu linkten üye ol, ikimiz de bonus kazanalım: ${this.referralData ? window.location.origin + '?ref=' + this.referralData.referral_code : ''}`;
-        const url = `https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
-    }
-
-    shareAsMessage() {
-        const message = `Seni yemek siparişi uygulamasına davet ediyorum! Link: ${this.referralData ? window.location.origin + '?ref=' + this.referralData.referral_code : ''}`;
-        if (navigator.share) {
-            navigator.share({
-                title: 'Davet Linkim',
-                text: message,
-                url: window.location.origin
-            });
-        } else {
-            alert(`Mesajı kopyalayın: ${message}`);
-        }
-    }
-
+   
     async refreshReferralData() {
         await this.loadReferralData();
         await this.loadCustomerReferral();
