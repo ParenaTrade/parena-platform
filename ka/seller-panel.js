@@ -1128,8 +1128,12 @@ async showCourierAssignmentModal(orderId) {
         return true;
     }
  }
-   
-    // Global instance - CLASS DIŞINDA
-    if (typeof window.sellerPanel === 'undefined') {
-        window.sellerPanel = null;
-    }
+
+
+
+// Seller event listener
+if (window.panelSystem && typeof window.panelSystem.on === 'function') {
+    window.panelSystem.on('sellerSessionStart', (userProfile) => {
+        window.sellerPanel = new SellerPanel(userProfile);
+    });
+}
