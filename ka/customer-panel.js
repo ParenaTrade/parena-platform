@@ -413,8 +413,11 @@ async createReferralLinkOnDemand() {
         }
     }
 
-    // REFERRAL DASHBOARD
-    async loadCustomerReferral() {
+   // =============================================
+// REFERRAL SİSTEMİ - YENİ FONKSİYONLAR (EN SONA EKLENECEK)
+// =============================================
+
+async loadCustomerReferral() {
     const section = document.getElementById('customerReferralSection');
     if (!section) return;
 
@@ -527,7 +530,6 @@ async createReferralLinkOnDemand() {
     }
 }
 
-// YENİ: 10 saniye bekleyip link oluşturma prosesi
 async startReferralProcess() {
     try {
         let countdown = 10;
@@ -555,7 +557,6 @@ async startReferralProcess() {
     }
 }
 
-// YENİ: Link oluşturma ve butonları aktif etme
 async initializeReferralLink() {
     try {
         const loadingElement = document.getElementById('referralLoading');
@@ -592,7 +593,6 @@ async initializeReferralLink() {
     }
 }
 
-// YENİ: Yeni referral link oluştur
 async createNewReferralLink() {
     try {
         let groupCode = 'DEFAULT';
@@ -644,7 +644,6 @@ async createNewReferralLink() {
     }
 }
 
-// YENİ: Butonları aktif et ve linki göster
 activateReferralButtons() {
     const referralLink = this.referralData ? 
         `${window.location.origin}?ref=${this.referralData.referral_code}` : 
@@ -656,7 +655,7 @@ activateReferralButtons() {
         linkInput.value = referralLink;
     }
 
-    // Butonları aktif et
+    // Butonları aktif et ve event listener ekle
     const copyBtn = document.getElementById('copyReferralBtn');
     const whatsappBtn = document.getElementById('shareWhatsAppBtn');
     const telegramBtn = document.getElementById('shareTelegramBtn');
@@ -682,22 +681,7 @@ activateReferralButtons() {
     console.log('✅ Referral butonları aktif edildi');
 }
 
-// YENİ: Hata durumunda göster
-showReferralError() {
-    const contentElement = document.getElementById('referralContent');
-    if (contentElement) {
-        contentElement.innerHTML = `
-            <div class="error-message" style="text-align: center; padding: 40px;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545;"></i>
-                <h3>Link oluşturulamadı</h3>
-                <p>Lütfen sayfayı yenileyip tekrar deneyin.</p>
-                <button class="btn btn-primary" onclick="location.reload()">Sayfayı Yenile</button>
-            </div>
-        `;
-    }
-}
-
-// Paylaşım fonksiyonları (Aynı)
+// PAYLAŞIM FONKSİYONLARI
 copyReferralLink() {
     const input = document.getElementById('referralLinkInput');
     if (input && this.referralData) {
@@ -735,6 +719,29 @@ shareAsSMS() {
         window.open(`sms:?body=${encodeURIComponent(message)}`, '_blank');
     } else {
         alert(`SMS için mesajı kopyalayın: ${message}`);
+    }
+}
+
+generateReferralCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+showReferralError() {
+    const contentElement = document.getElementById('referralContent');
+    if (contentElement) {
+        contentElement.innerHTML = `
+            <div class="error-message" style="text-align: center; padding: 40px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #dc3545;"></i>
+                <h3>Link oluşturulamadı</h3>
+                <p>Lütfen sayfayı yenileyip tekrar deneyin.</p>
+                <button class="btn btn-primary" onclick="location.reload()">Sayfayı Yenile</button>
+            </div>
+        `;
     }
 }
     // REFERRAL KAZANÇLAR SAYFASI
