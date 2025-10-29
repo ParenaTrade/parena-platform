@@ -486,8 +486,7 @@ class CustomerPanel {
                 .select(`
                     *,
                     order_details(*),
-                    seller:seller_profiles(business_name, phone),
-                    courier:couriers(name, phone, vehicle_type)
+                    seller:seller_profiles(business_name, phone)   
                 `)
                 .eq('customer_id', this.customerData.id)
                 .order('created_at', { ascending: false });
@@ -950,8 +949,7 @@ class CustomerPanel {
                 .select(`
                     *,
                     order_details(*),
-                    seller:seller_profiles(business_name, phone),
-                    courier:couriers(name, phone, vehicle_type)
+                    seller:seller_profiles(business_name, phone)
                 `)
                 .eq('id', orderId)
                 .single();
