@@ -13,6 +13,10 @@ class CustomerPanel {
         this.referralEarnings = [];
         this.referralInvites = [];
         
+        // Real-time özellikleri
+        this.realtimeSubscription = null;
+        this.updateInterval = null;
+        
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
         
@@ -30,6 +34,9 @@ class CustomerPanel {
         await this.loadCustomerData();
         await this.loadReferralData();
         this.isDataLoaded = true;
+        
+        // Real-time güncellemeleri başlat
+        this.startRealTimeUpdates();
         console.log('✅ CustomerPanel başlatma tamamlandı');
     }
 
@@ -346,7 +353,10 @@ class CustomerPanel {
                     created_at,
                     delivery_address,
                     customer_name,
-                    customer_phone
+                    customer_phone,
+                    courier_id,
+                    estimated_delivery_time,
+                    delivered_at
                 `)
                 .eq('customer_id', this.customerData.id)
                 .order('created_at', { ascending: false })
@@ -383,6 +393,12 @@ class CustomerPanel {
                             <i class="fas fa-map-marker-alt"></i> ${order.delivery_address}
                         </div>
                     ` : ''}
+                    
+                    <!-- KURYE DURUMU -->
+                    <div style="margin-top: 8px;">
+                        ${this.renderDeliveryTracker(order)}
+                    </div>
+                    
                     <div class="order-footer" style="display: flex; justify-content: space-between; margin-top: 8px;">
                         <span style="font-weight: bold; color: var(--primary);">
                             ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
@@ -408,6 +424,703 @@ class CustomerPanel {
             container.innerHTML = `<p class="text-muted">${message}</p>`;
         }
     }
+
+    // KURYE TAKİP SİSTEMİ - ENTEGRE FONKSİYONLAR
+
+    async loadCustomerOrders() {
+        const section = document.getElementById('customerOrdersSection');
+        if (!section) return;
+
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Siparişlerim</h2>
+                <div class="header-actions">
+                    <select id="orderStatusFilter" class="form-control">
+                        <option value="">Tüm Siparişler</option>
+                        <option value="pending">Bekleyen</option>
+                        <option value="confirmed">Onaylanan</option>
+                        <option value="preparing">Hazırlanan</option>
+                        <option value="ready">Hazır</option>
+                        <option value="on_the_way">Yolda</option>
+                        <option value="delivered">Teslim Edilen</option>
+                        <option value="cancelled">İptal Edilen</option>
+                    </select>
+                    <input type="date" id="orderDateFilter" class="form-control">
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <div id="customerOrdersList">
+                        <div class="loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Siparişler yükleniyor...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        await this.loadAllCustomerOrders();
+        
+        document.getElementById('orderStatusFilter').addEventListener('change', (e) => {
+            this.filterOrders(e.target.value);
+        });
+
+        document.getElementById('orderDateFilter').addEventListener('change', (e) => {
+            this.filterOrdersByDate(e.target.value);
+        });
+    }
+
+    async loadAllCustomerOrders() {
+        try {
+            console.log('📋 Tüm siparişler yükleniyor...');
+            
+            if (!this.supabase || !this.customerData || !this.customerData.id) {
+                const container = document.getElementById('customerOrdersList');
+                container.innerHTML = '<p class="text-muted">Sistem hazır değil.</p>';
+                return;
+            }
+
+            const { data: orders, error } = await this.supabase
+                .from('orders')
+                .select(`
+                    *,
+                    order_details(*),
+                    seller:seller_profiles(business_name, phone),
+                    courier:courier_profiles(name, phone, vehicle_type)
+                `)
+                .eq('customer_id', this.customerData.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('❌ Siparişler sorgu hatası:', error);
+                throw error;
+            }
+        
+            // Courier bilgilerini order'a ekle
+            this.orders = (orders || []).map(order => ({
+                ...order,
+                courier_name: order.courier?.name,
+                courier_phone: order.courier?.phone,
+                courier_vehicle_type: order.courier?.vehicle_type
+            }));
+            
+            this.renderCustomerOrders(this.orders);
+            console.log('✅ Tüm siparişler yüklendi:', this.orders.length);
+
+        } catch (error) {
+            console.error('❌ Siparişler yükleme hatası:', error);
+            const container = document.getElementById('customerOrdersList');
+            container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+        }
+    }
+
+    renderCustomerOrders(orders) {
+        const container = document.getElementById('customerOrdersList');
+        
+        if (!orders.length) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <i class="fas fa-shopping-bag" style="font-size: 48px; margin-bottom: 20px;"></i>
+                    <h3>Henüz siparişiniz bulunmuyor</h3>
+                    <p>İlk siparişinizi vermek için alışverişe başlayın!</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = orders.map((order, index) => {
+            const sellerName = order.seller && order.seller.business_name ? order.seller.business_name : 'Satıcı';
+            const deliveryAddress = order.delivery_address || '';
+            const orderDetails = order.order_details || [];
+            
+            return `
+            <div class="order-card" style="border: 1px solid #e1e5e9; border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+                <div class="order-summary" 
+                     style="padding: 20px; cursor: pointer; background: #f8f9fa;"
+                     data-order-id="${order.id}">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                <strong style="font-size: 16px;">Sipariş #${order.id.slice(-8)}</strong>
+                                <span class="status-badge status-${order.status}">
+                                    ${this.getStatusText(order.status)}
+                                </span>
+                            </div>
+                            
+                            <div style="color: #666; font-size: 14px; margin-bottom: 5px;">
+                                <i class="fas fa-store" style="margin-right: 5px;"></i>
+                                ${sellerName}
+                            </div>
+                            
+                            ${deliveryAddress ? `
+                                <div style="color: #666; font-size: 12px;">
+                                    <i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i> 
+                                    ${deliveryAddress}
+                                </div>
+                            ` : ''}
+
+                            <!-- KURYE DURUMU GÖSTERGESİ -->
+                            <div class="delivery-tracker" style="margin-top: 10px;">
+                                ${this.renderDeliveryTracker(order)}
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: right;">
+                            <div style="font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 5px;">
+                                ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
+                            </div>
+                            <div style="color: #666; font-size: 12px;">
+                                ${new Date(order.created_at).toLocaleDateString('tr-TR')}
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <i class="fas fa-chevron-down" id="chevron-${order.id}" 
+                                   style="transition: transform 0.3s ease;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="order-details" id="details-${order.id}" 
+                     style="display: none; padding: 0 20px 20px 20px; background: white;">
+                    
+                    ${orderDetails.length > 0 ? `
+                        <div style="margin: 15px 0;">
+                            <h4 style="margin-bottom: 10px; color: #333; font-size: 14px;">
+                                <i class="fas fa-list" style="margin-right: 8px;"></i>
+                                Sipariş İçeriği
+                            </h4>
+                            <div class="order-items">
+                                ${orderDetails.map(item => {
+                                    const unitPrice = parseFloat(item.unit_price || 0).toFixed(2);
+                                    const discount = parseFloat(item.discount || 0).toFixed(2);
+                                    const totalPrice = parseFloat(item.total_price || 0).toFixed(2);
+                                    const quantity = item.quantity || 0;
+                                    
+                                    return `
+                                    <div style="display: flex; justify-content: space-between; padding: 10px; 
+                                             background: #f8f9fa; border-radius: 6px; margin-bottom: 8px;">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 500; margin-bottom: 4px;">${item.product_name || 'Ürün'}</div>
+                                            <div style="font-size: 12px; color: #666;">
+                                                ${quantity} adet × ${unitPrice} ₺
+                                                ${item.discount > 0 ? 
+                                                    `<span style="color: var(--success); margin-left: 8px;">
+                                                        -${discount} ₺ indirim
+                                                    </span>` : ''}
+                                            </div>
+                                        </div>
+                                        <div style="font-weight: bold; color: var(--primary);">
+                                            ${totalPrice} ₺
+                                        </div>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- KURYE TAKİP DETAYLARI -->
+                    <div style="margin: 15px 0;">
+                        <h4 style="margin-bottom: 10px; color: #333; font-size: 14px;">
+                            <i class="fas fa-motorcycle" style="margin-right: 8px;"></i>
+                            Kurye Takibi
+                        </h4>
+                        ${this.renderCourierDetails(order)}
+                    </div>
+                    
+                    <!-- SİPARİŞ BİLGİLERİ -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0;">
+                        <div>
+                            <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
+                                <i class="fas fa-info-circle" style="margin-right: 8px;"></i>
+                                Sipariş Bilgileri
+                            </h4>
+                            <div style="font-size: 13px; color: #666;">
+                                <div style="margin-bottom: 4px;">
+                                    <strong>Sipariş Tarihi:</strong> 
+                                    ${new Date(order.created_at).toLocaleString('tr-TR')}
+                                </div>
+                                <div style="margin-bottom: 4px;">
+                                    <strong>Ödeme Yöntemi:</strong> 
+                                    ${order.payment_method ? this.getPaymentMethodText(order.payment_method) : 'Belirtilmemiş'}
+                                </div>
+                                ${order.customer_notes ? `
+                                    <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 4px;">
+                                        <strong>Notunuz:</strong> ${order.customer_notes}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 style="margin-bottom: 8px; color: #333; font-size: 14px;">
+                                <i class="fas fa-shipping-fast" style="margin-right: 8px;"></i>
+                                Teslimat Bilgileri
+                            </h4>
+                            <div style="font-size: 13px; color: #666;">
+                                ${order.courier_id || order.courier_name ? `
+                                    <div style="color: var(--success); margin-bottom: 4px;">
+                                        <i class="fas fa-motorcycle"></i> 
+                                        <strong>Kurye:</strong> ${order.courier_name || 'Atandı'}
+                                    </div>
+                                ` : `
+                                    <div style="color: var(--warning); margin-bottom: 4px;">
+                                        <i class="fas fa-clock"></i> 
+                                        <strong>Kurye:</strong> Aranıyor
+                                    </div>
+                                `}
+                                
+                                ${order.delivery_address ? `
+                                    <div style="margin-bottom: 4px;">
+                                        <strong>Adres:</strong> ${order.delivery_address}
+                                    </div>
+                                ` : ''}
+                                
+                                ${order.estimated_delivery_time ? `
+                                    <div style="margin-bottom: 4px;">
+                                        <strong>Tahmini Teslimat:</strong> 
+                                        ${new Date(order.estimated_delivery_time).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- İPTAL DURUMU -->
+                    ${order.cancellation_requested ? `
+                        <div style="margin: 15px 0; padding: 12px; background: #fff3cd; border-radius: 6px;">
+                            <div style="display: flex; align-items: center; gap: 8px; color: var(--warning);">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>İptal Talebiniz İnceleniyor</strong>
+                            </div>
+                            ${order.cancellation_reason ? `
+                                <div style="margin-top: 8px; font-size: 13px;">
+                                    <strong>İptal Nedeni:</strong> ${order.cancellation_reason}
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+                    
+                    <!-- GERÇEK ZAMANLI GÜNCELLEME BUTONU -->
+                    <div style="display: flex; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e1e5e9;">
+                        <button class="btn btn-sm btn-outline-primary" onclick="customerPanel.refreshOrderStatus('${order.id}')">
+                            <i class="fas fa-sync-alt"></i> Durumu Güncelle
+                        </button>
+                        
+                        ${order.status === 'delivered' ? `
+                            <button class="btn btn-sm btn-success" onclick="customerPanel.rateOrder('${order.id}')">
+                                <i class="fas fa-star"></i> Değerlendir
+                            </button>
+                        ` : ''}
+                        
+                        ${order.status === 'pending' ? `
+                            ${order.cancellation_requested ? `
+                                <button class="btn btn-sm btn-secondary" onclick="customerPanel.viewCancellationStatus('${order.id}')">
+                                    <i class="fas fa-info-circle"></i> İptal Durumu
+                                </button>
+                            ` : `
+                                <button class="btn btn-sm btn-warning" onclick="customerPanel.cancelOrder('${order.id}')">
+                                    <i class="fas fa-times"></i> İptal Talebi
+                                </button>
+                            `}
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+            `;
+        }).join('');
+
+        // Event listener'ları ekle
+        this.attachOrderEventListeners();
+    }
+
+    // KURYE DURUMU GÖSTERGESİ
+    renderDeliveryTracker(order) {
+        const status = order.status;
+        const hasCourier = order.courier_id || order.courier_name;
+        const courierName = order.courier_name || 'Kurye';
+        
+        let trackerHTML = '';
+        
+        switch(status) {
+            case 'pending':
+                trackerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
+                        <i class="fas fa-clock" style="font-size: 16px;"></i>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600;">Sipariş Alındı</div>
+                            <div style="font-size: 11px; color: #666;">Satıcı onay bekleniyor</div>
+                        </div>
+                    </div>
+                `;
+                break;
+                
+            case 'confirmed':
+                trackerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px; color: #0c5460;">
+                        <i class="fas fa-check-circle" style="font-size: 16px;"></i>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600;">Sipariş Onaylandı</div>
+                            <div style="font-size: 11px; color: #666;">Hazırlanmaya başlandı</div>
+                        </div>
+                    </div>
+                `;
+                break;
+                
+            case 'preparing':
+                if (hasCourier) {
+                    trackerHTML = `
+                        <div style="display: flex; align-items: center; gap: 10px; color: #0c5460;">
+                            <i class="fas fa-user-check" style="font-size: 16px;"></i>
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600;">Kurye Atandı</div>
+                                <div style="font-size: 11px; color: #666;">${courierName} bekleniyor</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    trackerHTML = `
+                        <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
+                            <i class="fas fa-utensils" style="font-size: 16px;"></i>
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600;">Hazırlanıyor</div>
+                                <div style="font-size: 11px; color: #666;">Kurye aranıyor</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                break;
+                
+            case 'ready':
+                if (hasCourier) {
+                    trackerHTML = `
+                        <div style="display: flex; align-items: center; gap: 12px; color: #155724;">
+                            <div class="moto-container" style="position: relative; width: 80px; height: 25px; display: flex; align-items: center;">
+                                <i class="fas fa-store" style="position: absolute; left: 0; font-size: 14px; color: #28a745;"></i>
+                                <i class="fas fa-motorcycle" style="position: absolute; left: 40px; font-size: 16px; color: #007bff;"></i>
+                                <div style="position: absolute; bottom: 8px; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);"></div>
+                            </div>
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600;">Kurye Mağazada</div>
+                                <div style="font-size: 11px; color: #666;">${courierName} paketi aldı</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    trackerHTML = `
+                        <div style="display: flex; align-items: center; gap: 10px; color: #856404;">
+                            <i class="fas fa-clock" style="font-size: 16px;"></i>
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600;">Kurye Bekleniyor</div>
+                                <div style="font-size: 11px; color: #666;">Siparişiniz hazır</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                break;
+                
+            case 'on_the_way':
+                trackerHTML = `
+                    <div style="display: flex; align-items: center; gap: 12px; color: #004085;">
+                        <div class="moto-container" style="position: relative; width: 80px; height: 25px; display: flex; align-items: center;">
+                            <i class="fas fa-map-marker-alt" style="position: absolute; right: 0; font-size: 14px; color: #dc3545;"></i>
+                            <i class="fas fa-motorcycle" style="position: absolute; left: 20px; font-size: 16px; color: #007bff; animation: moveMoto 2s infinite;"></i>
+                            <div style="position: absolute; bottom: 8px; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);"></div>
+                        </div>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600;">Kurye Yolda</div>
+                            <div style="font-size: 11px; color: #666;">${courierName} adresinize geliyor</div>
+                        </div>
+                    </div>
+                    <style>
+                        @keyframes moveMoto {
+                            0% { left: 20px; }
+                            50% { left: 40px; }
+                            100% { left: 20px; }
+                        }
+                    </style>
+                `;
+                break;
+                
+            case 'delivered':
+                const deliveryTime = order.delivered_at ? 
+                    `${new Date(order.delivered_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}` : 
+                    '';
+                    
+                trackerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px; color: #155724;">
+                        <i class="fas fa-check-circle" style="font-size: 16px;"></i>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600;">Teslim Edildi</div>
+                            <div style="font-size: 11px; color: #666;">
+                                ${deliveryTime ? `${deliveryTime} • ${courierName}` : `${courierName} teslim etti`}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                break;
+                
+            default:
+                trackerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px; color: #6c757d;">
+                        <i class="fas fa-info-circle" style="font-size: 16px;"></i>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600;">${this.getStatusText(status)}</div>
+                            <div style="font-size: 11px; color: #666;">Sipariş durumu</div>
+                        </div>
+                    </div>
+                `;
+        }
+        
+        return trackerHTML;
+    }
+
+    // KURYE DETAYLARI
+    renderCourierDetails(order) {
+        if (!order.courier_id && !order.courier_name) {
+            return `
+                <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 6px;">
+                    <i class="fas fa-motorcycle" style="font-size: 32px; color: #6c757d; margin-bottom: 10px;"></i>
+                    <div style="color: #666; font-size: 14px;">
+                        <strong>Kurye aranıyor...</strong>
+                        <p style="margin: 5px 0 0 0; font-size: 12px;">En kısa sürede kurye atanacaktır</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        const courierName = order.courier_name || 'Kurye';
+        const courierPhone = order.courier_phone || 'Belirtilmemiş';
+        const vehicleType = order.courier_vehicle_type || 'Motor';
+        
+        return `
+            <div style="background: #f8f9fa; border-radius: 6px; padding: 15px;">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                    <div style="width: 40px; height: 40px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white;">
+                        <i class="fas fa-motorcycle"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; font-size: 14px;">${courierName}</div>
+                        <div style="color: #666; font-size: 12px;">${vehicleType}</div>
+                    </div>
+                    ${courierPhone !== 'Belirtilmemiş' ? `
+                        <a href="tel:${courierPhone}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-phone"></i> Ara
+                        </a>
+                    ` : ''}
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">
+                    <div>
+                        <strong>Durum:</strong> ${this.getStatusText(order.status)}
+                    </div>
+                    <div>
+                        <strong>Araç:</strong> ${vehicleType}
+                    </div>
+                    ${order.estimated_delivery_time ? `
+                        <div style="grid-column: 1 / -1;">
+                            <strong>Tahmini Varış:</strong> 
+                            ${new Date(order.estimated_delivery_time).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    // GERÇEK ZAMANLI GÜNCELLEME
+    startRealTimeUpdates() {
+        // Her 30 saniyede bir sipariş durumlarını güncelle
+        this.updateInterval = setInterval(async () => {
+            if (this.currentSection === 'customerOrders') {
+                await this.loadAllCustomerOrders();
+                console.log('🔄 Sipariş durumları güncellendi');
+            }
+        }, 30000);
+    }
+
+    // SİPARİŞ DURUMU GÜNCELLE
+    async refreshOrderStatus(orderId) {
+        try {
+            console.log('🔄 Sipariş durumu güncelleniyor:', orderId);
+            
+            const { data: order, error } = await this.supabase
+                .from('orders')
+                .select(`
+                    *,
+                    order_details(*),
+                    seller:seller_profiles(business_name, phone),
+                    courier:courier_profiles(name, phone, vehicle_type)
+                `)
+                .eq('id', orderId)
+                .single();
+
+            if (error) throw error;
+
+            // Siparişi güncelle
+            const updatedOrder = {
+                ...order,
+                courier_name: order.courier?.name,
+                courier_phone: order.courier?.phone,
+                courier_vehicle_type: order.courier?.vehicle_type
+            };
+
+            const orderIndex = this.orders.findIndex(o => o.id === orderId);
+            if (orderIndex !== -1) {
+                this.orders[orderIndex] = updatedOrder;
+            }
+
+            // UI'ı güncelle
+            this.renderCustomerOrders(this.orders);
+            
+            window.panelSystem.showAlert('Sipariş durumu güncellendi!', 'success');
+
+        } catch (error) {
+            console.error('❌ Sipariş durumu güncelleme hatası:', error);
+            window.panelSystem.showAlert('Durum güncellenemedi!', 'error');
+        }
+    }
+
+    // SİPARİŞ İPTAL
+    async cancelOrder(orderId) {
+        try {
+            const reason = prompt('İptal talebiniz için neden belirtin:');
+            if (!reason || reason.trim() === '') {
+                alert('İptal nedeni boş olamaz.');
+                return;
+            }
+
+            console.log('📝 İptal talebi oluşturuluyor:', orderId, reason);
+
+            const { error } = await this.supabase
+                .from('orders')
+                .update({
+                    cancellation_requested: true,
+                    cancellation_reason: reason,
+                    cancellation_requested_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', orderId);
+
+            if (error) throw error;
+
+            window.panelSystem.showAlert('İptal talebiniz alındı. Satıcı onayı bekleniyor.', 'success');
+            await this.loadAllCustomerOrders();
+
+        } catch (error) {
+            console.error('❌ İptal talebi hatası:', error);
+            window.panelSystem.showAlert('İptal talebi oluşturulamadı!', 'error');
+        }
+    }
+
+    // İPTAL DURUMU GÖRÜNTÜLE
+    async viewCancellationStatus(orderId) {
+        try {
+            const { data: order, error } = await this.supabase
+                .from('orders')
+                .select('cancellation_reason, cancellation_requested_at, status')
+                .eq('id', orderId)
+                .single();
+
+            if (error) throw error;
+
+            let message = `İptal Talebi Durumu:\n\n`;
+            message += `Talep Tarihi: ${new Date(order.cancellation_requested_at).toLocaleString('tr-TR')}\n`;
+            message += `İptal Nedeni: ${order.cancellation_reason}\n`;
+            message += `Mevcut Durum: ${this.getStatusText(order.status)}\n\n`;
+            message += `İptal talebiniz satıcı tarafından inceleniyor.`;
+
+            alert(message);
+
+        } catch (error) {
+            console.error('❌ İptal durumu sorgulama hatası:', error);
+            window.panelSystem.showAlert('İptal durumu görüntülenemedi!', 'error');
+        }
+    }
+
+    // SİPARİŞ DEĞERLENDİR
+    async rateOrder(orderId) {
+        const rating = prompt('Siparişi 1-5 arasında değerlendirin:');
+        if (!rating || rating < 1 || rating > 5) {
+            alert('Lütfen 1-5 arasında bir değer girin.');
+            return;
+        }
+
+        const comment = prompt('Değerlendirme yorumunuz (isteğe bağlı):');
+
+        try {
+            const { error } = await this.supabase
+                .from('orders')
+                .update({
+                    performance_rating: parseFloat(rating),
+                    rating_comment: comment,
+                    rated_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', orderId);
+
+            if (error) throw error;
+
+            window.panelSystem.showAlert('Değerlendirmeniz kaydedildi!', 'success');
+            await this.loadAllCustomerOrders();
+
+        } catch (error) {
+            console.error('Değerlendirme hatası:', error);
+            window.panelSystem.showAlert('Değerlendirme kaydedilemedi!', 'error');
+        }
+    }
+
+    attachOrderEventListeners() {
+        const orderSummaries = document.querySelectorAll('.order-summary');
+        
+        orderSummaries.forEach(summary => {
+            summary.addEventListener('click', (e) => {
+                const orderId = e.currentTarget.getAttribute('data-order-id');
+                this.toggleOrderDetails(orderId);
+            });
+        });
+    }
+
+    toggleOrderDetails(orderId) {
+        const detailsElement = document.getElementById(`details-${orderId}`);
+        const chevronElement = document.getElementById(`chevron-${orderId}`);
+        
+        if (detailsElement && chevronElement) {
+            if (detailsElement.style.display === 'none' || !detailsElement.style.display) {
+                detailsElement.style.display = 'block';
+                chevronElement.style.transform = 'rotate(180deg)';
+            } else {
+                detailsElement.style.display = 'none';
+                chevronElement.style.transform = 'rotate(0deg)';
+            }
+        }
+    }
+
+    filterOrders(status) {
+        if (!status) {
+            this.renderCustomerOrders(this.orders);
+            return;
+        }
+        
+        const filteredOrders = this.orders.filter(order => order.status === status);
+        this.renderCustomerOrders(filteredOrders);
+    }
+
+    filterOrdersByDate(date) {
+        if (!date) {
+            this.renderCustomerOrders(this.orders);
+            return;
+        }
+        
+        const filteredOrders = this.orders.filter(order => 
+            order.created_at.startsWith(date)
+        );
+        this.renderCustomerOrders(filteredOrders);
+    }
+
+    // DİĞER FONKSİYONLAR (loadCustomerProfile, loadCustomerPayments, vb.) BURAYA GELECEK
+
 
     async loadCustomerProfile() {
         const section = document.getElementById('customerProfileSection');
@@ -1757,3 +2470,24 @@ class CustomerPanel {
         console.log('Davetler filtreleniyor...');
     }
 }
+
+    // ... [Önceki kodun geri kalanı aynı şekilde entegre edilecek] ...
+
+    // Cleanup fonksiyonu
+    destroy() {
+        if (this.realtimeSubscription) {
+            this.realtimeSubscription.unsubscribe();
+        }
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+        }
+    }
+}
+
+// Global erişim için
+window.customerPanel = null;
+
+// Panel sistemi başlatıldığında
+window.panelSystem.on('customerSessionStart', (userProfile) => {
+    window.customerPanel = new CustomerPanel(userProfile);
+});
