@@ -187,7 +187,7 @@ class SellerPanel {
         await this.loadSellerStats();
         await this.loadRecentSellerOrders();
         await this.loadStockAlerts();
-    }
+
 
 
 async loadRecentSellerOrders() {
