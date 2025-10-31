@@ -1,17 +1,17 @@
 class SellerPanel {
     constructor(userProfile) {
-    this.userProfile = userProfile;
-    this.sellerData = null;
-    this.products = [];
-    this.orders = [];
-    this.allSellerOrders = [];
-    this.currentSection = '';
-    this.realtimeSubscription = null;
-    this.pollingInterval = null;
-    this.isInitialized = false;
-    this.categories = [];
-    this.processedOrders = new Set(); // İşlenen siparişleri takip et
-    this.lastProcessedOrderId = null; // Son işlenen sipariş
+        this.userProfile = userProfile;
+        this.sellerData = null;
+        this.products = [];
+        this.orders = [];
+        this.allSellerOrders = [];
+        this.currentSection = '';
+        this.realtimeSubscription = null;
+        this.pollingInterval = null;
+        this.isInitialized = false;
+        this.categories = [];
+        this.processedOrders = new Set();
+        this.lastProcessedOrderId = null;
         
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
@@ -30,7 +30,7 @@ class SellerPanel {
     async init() {
         try {
             await this.loadSellerData();
-            await this.loadCategories(); // Kategorileri yükle
+            await this.loadCategories();
             this.setupRealTimeListeners();
             this.isInitialized = true;
             console.log('✅ SellerPanel başlatıldı', this.sellerData);
@@ -39,6 +39,289 @@ class SellerPanel {
         }
     }
 
+    // ✅ REAL-TIME LISTENER METODU - EKSİK OLAN
+    setupRealTimeListeners() {
+        if (!this.sellerData?.id) {
+            console.log('⚠️ Seller ID yok, real-time listener kurulamıyor');
+            setTimeout(() => this.setupRealTimeListeners(), 1000);
+            return;
+        }
+
+        console.log('🔔 Real-time sipariş listenerları kuruluyor...', this.sellerData.id);
+
+        try {
+            // Basit polling sistemi ile başlayalım
+            this.setupPollingSystem();
+            
+        } catch (error) {
+            console.error('❌ Real-time listener kurulum hatası:', error);
+            setTimeout(() => {
+                console.log('🔄 Real-time yeniden deneniyor...');
+                this.setupRealTimeListeners();
+            }, 5000);
+        }
+    }
+
+    // ✅ POLLING SİSTEMİ
+    setupPollingSystem() {
+        console.log('🔄 Polling sistemi başlatılıyor...');
+        
+        // Önceki interval'ı temizle
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+        }
+
+        this.pollingInterval = setInterval(async () => {
+            try {
+                await this.checkForNewOrders();
+            } catch (error) {
+                console.error('❌ Polling hatası:', error);
+            }
+        }, 10000); // 10 saniyede bir kontrol
+
+        console.log('✅ Polling sistemi başlatıldı');
+    }
+
+    // ✅ YENİ SİPARİŞ KONTROLÜ
+    async checkForNewOrders() {
+        if (!this.sellerData?.id) return;
+
+        try {
+            const { data: newOrders, error } = await this.supabase
+                .from('orders')
+                .select('*')
+                .eq('seller_id', this.sellerData.id)
+                .eq('status', 'pending')
+                .gt('created_at', new Date(Date.now() - 60000).toISOString()) // Son 1 dakika
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('❌ Yeni sipariş kontrol hatası:', error);
+                return;
+            }
+
+            if (newOrders && newOrders.length > 0) {
+                console.log('🆕 Yeni siparişler bulundu:', newOrders.length);
+                
+                // Yeni siparişleri işle
+                newOrders.forEach(order => {
+                    if (!this.processedOrders.has(order.id)) {
+                        this.processedOrders.add(order.id);
+                        this.handleNewOrder(order);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('❌ Yeni sipariş işleme hatası:', error);
+        }
+    }
+
+    // ✅ YENİ SİPARİŞ İŞLEME
+    async handleNewOrder(order) {
+        console.log('🎯 Yeni sipariş işleniyor:', order);
+        
+        // Aynı siparişi tekrar işleme
+        if (this.lastProcessedOrderId === order.id) {
+            console.log('⏭️ Bu sipariş zaten işlendi, atlanıyor...');
+            return;
+        }
+        
+        this.lastProcessedOrderId = order.id;
+
+        // Push bildirimi göster
+        this.showOrderNotification(order);
+        
+        // Sesli alarm çal
+        this.playOrderSound();
+        
+        // Sayfaları güncelle
+        await this.refreshCurrentSections();
+    }
+
+    // ✅ PUSH BİLDİRİMİ
+    showOrderNotification(order) {
+        console.log('📢 Push bildirimi gösteriliyor:', order);
+        
+        const notificationHtml = `
+            <div class="order-notification" style="
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 20px;
+                border-radius: 12px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                z-index: 10000;
+                max-width: 400px;
+                animation: slideIn 0.5s ease-out;
+            ">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="font-size: 24px;">🆕</div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;">
+                            Yeni Sipariş!
+                        </div>
+                        <div style="font-size: 14px; opacity: 0.9;">
+                            Sipariş #${order.id?.slice(-8) || 'N/A'} • ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
+                        </div>
+                        <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">
+                            ${order.customer_name || 'Müşteri'} • ${order.customer_phone || 'Telefon yok'}
+                        </div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" 
+                            style="background: none; border: none; color: white; font-size: 18px; cursor: pointer;">
+                        ✕
+                    </button>
+                </div>
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button class="btn btn-success btn-sm accept-order-btn" 
+                            data-order-id="${order.id}"
+                            style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer;">
+                        ✅ Kabul Et
+                    </button>
+                    <button class="btn btn-danger btn-sm reject-order-btn" 
+                            data-order-id="${order.id}"
+                            style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer;">
+                        ❌ Reddet
+                    </button>
+                </div>
+            </div>
+            <style>
+                @keyframes slideIn {
+                    from { transform: translateX(400px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(400px); opacity: 0; }
+                }
+                .order-notification {
+                    animation: slideIn 0.5s ease-out;
+                }
+            </style>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', notificationHtml);
+
+        // Event listener'ları ekle
+        setTimeout(() => {
+            const acceptBtn = document.querySelector('.accept-order-btn');
+            const rejectBtn = document.querySelector('.reject-order-btn');
+            
+            if (acceptBtn) {
+                acceptBtn.addEventListener('click', (e) => {
+                    const orderId = e.target.getAttribute('data-order-id');
+                    this.acceptOrder(orderId);
+                });
+            }
+            
+            if (rejectBtn) {
+                rejectBtn.addEventListener('click', (e) => {
+                    const orderId = e.target.getAttribute('data-order-id');
+                    this.rejectOrder(orderId);
+                });
+            }
+        }, 100);
+
+        // 30 saniye sonra otomatik kapan
+        setTimeout(() => {
+            const notification = document.querySelector('.order-notification');
+            if (notification) {
+                notification.style.animation = 'slideOut 0.5s ease-in';
+                setTimeout(() => notification.remove(), 500);
+            }
+        }, 30000);
+    }
+
+    // ✅ SESLİ BİLDİRİM
+    playOrderSound() {
+        console.log('🔊 Sesli bildirim çalınıyor...');
+        try {
+            // Tarayıcı bildirimi
+            if ('Notification' in window) {
+                if (Notification.permission === 'granted') {
+                    new Notification('Yeni Sipariş!', {
+                        body: 'Yeni bir siparişiniz var, hemen kontrol edin.',
+                        icon: '/favicon.ico',
+                        tag: 'new-order'
+                    });
+                } else if (Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            new Notification('Yeni Sipariş!', {
+                                body: 'Yeni bir siparişiniz var, hemen kontrol edin.',
+                                icon: '/favicon.ico'
+                            });
+                        }
+                    });
+                }
+            }
+
+            // Ses efekti
+            this.playBeepSound(800, 200);
+            setTimeout(() => this.playBeepSound(600, 200), 100);
+            setTimeout(() => this.playBeepSound(800, 200), 200);
+
+        } catch (e) {
+            console.log('🔇 Ses/bildirim hatası:', e);
+            this.playBeepSound(800, 300);
+        }
+    }
+
+    playBeepSound(frequency, duration) {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.value = frequency;
+            gainNode.gain.value = 0.1;
+            
+            oscillator.start();
+            setTimeout(() => {
+                oscillator.stop();
+            }, duration);
+            
+        } catch (e) {
+            console.log('🔇 AudioContext hatası:', e);
+        }
+    }
+
+    // ✅ SAYFALARI YENİLE
+    async refreshCurrentSections() {
+        if (this.currentSection === 'orders') {
+            await this.loadOrders();
+        }
+        
+        if (this.currentSection === 'sellerDashboard') {
+            await this.loadSellerDashboard();
+        }
+    }
+
+    // ✅ TEMİZLİK
+    destroy() {
+        console.log('🧹 SellerPanel temizleniyor...');
+        
+        if (this.realtimeSubscription) {
+            this.supabase.removeChannel(this.realtimeSubscription);
+            this.realtimeSubscription = null;
+        }
+        
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+        
+        this.processedOrders.clear();
+        this.lastProcessedOrderId = null;
+        
+        console.log('✅ SellerPanel temizlendi');
+    }
     async loadSellerData() {
         try {
             console.log('📥 Seller verisi yükleniyor...', this.userProfile);
@@ -340,284 +623,7 @@ async loadStockAlerts() {
         }
     }
 }
-    
-     // ✅ YENİ SİPARİŞ BİLDİRİM SİSTEMİ - DÜZELTİLMİŞ
-// ✅ ALTERNATİF: BASİT REAL-TIME SİSTEM (Eğer yukarısı çalışmazsa)
-setupRealTimeListenersSimple() {
-    if (!this.sellerData?.id) {
-        console.log('⚠️ Seller ID yok, real-time listener kurulamıyor');
-        setTimeout(() => this.setupRealTimeListenersSimple(), 1000);
-        return;
-    }
-
-    console.log('🔔 Basit real-time sistem kuruluyor...');
-
-    // Polling yöntemi ile real-time benzeri sistem
-    this.pollingInterval = setInterval(async () => {
-        try {
-            const { data: newOrders, error } = await this.supabase
-                .from('orders')
-                .select('*')
-                .eq('seller_id', this.sellerData.id)
-                .eq('status', 'pending')
-                .gt('created_at', new Date(Date.now() - 30000).toISOString()) // Son 30 saniye
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('❌ Polling hatası:', error);
-                return;
-            }
-
-            if (newOrders && newOrders.length > 0) {
-                console.log('🆕 Yeni siparişler (polling):', newOrders.length);
-                
-                // Yeni siparişleri işle
-                newOrders.forEach(order => {
-                    if (!this.processedOrders.has(order.id)) {
-                        this.processedOrders.add(order.id);
-                        this.handleNewOrder(order);
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('❌ Polling işleme hatası:', error);
-        }
-    }, 10000); // 10 saniyede bir kontrol et
-
-    console.log('✅ Polling sistemi başlatıldı');
-}
-
-// ✅ YENİ SİPARİŞ İŞLEME - GÜNCELLENMİŞ
-async handleNewOrder(order) {
-    console.log('🎯 Yeni sipariş işleniyor:', order);
-    
-    // Aynı siparişi tekrar işleme
-    if (this.lastProcessedOrderId === order.id) {
-        console.log('⏭️ Bu sipariş zaten işlendi, atlanıyor...');
-        return;
-    }
-    
-    this.lastProcessedOrderId = order.id;
-
-    // Push bildirimi göster
-    this.showOrderNotification(order);
-    
-    // Sesli alarm çal
-    this.playOrderSound();
-    
-    // Sayfaları güncelle
-    await this.refreshCurrentSections();
-}
-
-// ✅ SAYFALARI YENİLE
-async refreshCurrentSections() {
-    // Mevcut sayfayı güncelle
-    if (this.currentSection === 'orders') {
-        await this.loadOrders();
-    }
-    
-    // Dashboard'u güncelle
-    if (this.currentSection === 'sellerDashboard') {
-        await this.loadSellerDashboard();
-    }
-    
-    // Her durumda dashboard'u güncelle (arka planda)
-    try {
-        await this.loadSellerStats();
-    } catch (error) {
-        console.log('⚠️ Dashboard güncelleme hatası:', error);
-    }
-}
-
-// ✅ SİPARİŞ GÜNCELLEME İŞLEME
-async handleOrderUpdate(updatedOrder) {
-    console.log('📝 Sipariş güncellendi işleniyor:', updatedOrder);
-    
-    // Mevcut sayfayı güncelle
-    await this.refreshCurrentSections();
-}
-
-// ✅ TEMİZLİK METODU - GÜNCELLENMİŞ
-destroy() {
-    console.log('🧹 SellerPanel temizleniyor...');
-    
-    // Real-time subscription'ı temizle
-    if (this.realtimeSubscription) {
-        console.log('🔴 Real-time subscription kapatılıyor...');
-        this.supabase.removeChannel(this.realtimeSubscription);
-        this.realtimeSubscription = null;
-    }
-    
-    // Polling interval'ı temizle
-    if (this.pollingInterval) {
-        console.log('🔴 Polling interval temizleniyor...');
-        clearInterval(this.pollingInterval);
-        this.pollingInterval = null;
-    }
-    
-    // İşlenen siparişleri temizle
-    this.processedOrders.clear();
-    this.lastProcessedOrderId = null;
-    
-    console.log('✅ SellerPanel temizlendi');
-}
-    
-        
-    // ✅ PUSH BİLDİRİMİ
-    showOrderNotification(order) {
-        console.log('📢 Push bildirimi gösteriliyor:', order);
-        
-        const notificationHtml = `
-            <div class="order-notification" style="
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 20px;
-                border-radius: 12px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-                z-index: 10000;
-                max-width: 400px;
-                animation: slideIn 0.5s ease-out;
-            ">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <div style="font-size: 24px;">🆕</div>
-                    <div style="flex: 1;">
-                        <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;">
-                            Yeni Sipariş!
-                        </div>
-                        <div style="font-size: 14px; opacity: 0.9;">
-                            Sipariş #${order.id?.slice(-8) || 'N/A'} • ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
-                        </div>
-                        <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">
-                            ${order.customer_name || 'Müşteri'} • ${order.customer_phone || 'Telefon yok'}
-                        </div>
-                    </div>
-                    <button onclick="this.parentElement.parentElement.remove()" 
-                            style="background: none; border: none; color: white; font-size: 18px; cursor: pointer;">
-                        ✕
-                    </button>
-                </div>
-                <div style="margin-top: 15px; display: flex; gap: 10px;">
-                    <button class="btn btn-success btn-sm accept-order-btn" 
-                            data-order-id="${order.id}"
-                            style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer;">
-                        ✅ Kabul Et
-                    </button>
-                    <button class="btn btn-danger btn-sm reject-order-btn" 
-                            data-order-id="${order.id}"
-                            style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer;">
-                        ❌ Reddet
-                    </button>
-                </div>
-            </div>
-            <style>
-                @keyframes slideIn {
-                    from { transform: translateX(400px); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                }
-                @keyframes slideOut {
-                    from { transform: translateX(0); opacity: 1; }
-                    to { transform: translateX(400px); opacity: 0; }
-                }
-                .order-notification {
-                    animation: slideIn 0.5s ease-out;
-                }
-            </style>
-        `;
-
-        document.body.insertAdjacentHTML('beforeend', notificationHtml);
-
-        // Event listener'ları ekle
-        setTimeout(() => {
-            const acceptBtn = document.querySelector('.accept-order-btn');
-            const rejectBtn = document.querySelector('.reject-order-btn');
-            
-            if (acceptBtn) {
-                acceptBtn.addEventListener('click', (e) => {
-                    const orderId = e.target.getAttribute('data-order-id');
-                    this.acceptOrder(orderId);
-                });
-            }
-            
-            if (rejectBtn) {
-                rejectBtn.addEventListener('click', (e) => {
-                    const orderId = e.target.getAttribute('data-order-id');
-                    this.rejectOrder(orderId);
-                });
-            }
-        }, 100);
-
-        // 30 saniye sonra otomatik kapan
-        setTimeout(() => {
-            const notification = document.querySelector('.order-notification');
-            if (notification) {
-                notification.style.animation = 'slideOut 0.5s ease-in';
-                setTimeout(() => notification.remove(), 500);
-            }
-        }, 30000);
-    }
-
-    // ✅ SESLİ BİLDİRİM - GELİŞTİRİLMİŞ
-    playOrderSound() {
-        console.log('🔊 Sesli bildirim çalınıyor...');
-        try {
-            // 1. Tarayıcı bildirimi
-            if ('Notification' in window) {
-                if (Notification.permission === 'granted') {
-                    new Notification('Yeni Sipariş!', {
-                        body: 'Yeni bir siparişiniz var, hemen kontrol edin.',
-                        icon: '/favicon.ico',
-                        tag: 'new-order'
-                    });
-                } else if (Notification.permission !== 'denied') {
-                    Notification.requestPermission().then(permission => {
-                        if (permission === 'granted') {
-                            new Notification('Yeni Sipariş!', {
-                                body: 'Yeni bir siparişiniz var, hemen kontrol edin.',
-                                icon: '/favicon.ico'
-                            });
-                        }
-                    });
-                }
-            }
-
-            // 2. Ses efekti - basit bip sesi
-            this.playBeepSound(800, 200);
-            setTimeout(() => this.playBeepSound(600, 200), 100);
-            setTimeout(() => this.playBeepSound(800, 200), 200);
-
-        } catch (e) {
-            console.log('🔇 Ses/bildirim hatası:', e);
-            // Fallback: Sadece bip sesi
-            this.playBeepSound(800, 300);
-        }
-    }
-
-    playBeepSound(frequency, duration) {
-        try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.type = 'sine';
-            oscillator.frequency.value = frequency;
-            gainNode.gain.value = 0.1;
-            
-            oscillator.start();
-            setTimeout(() => {
-                oscillator.stop();
-            }, duration);
-            
-        } catch (e) {
-            console.log('🔇 AudioContext hatası:', e);
-        }
-    }
-    // ✅ SİPARİŞ KABUL/RED - DÜZELTİLMİŞ
+        // ✅ SİPARİŞ KABUL/RED - DÜZELTİLMİŞ
     async acceptOrder(orderId) {
         if (!orderId) {
             console.error('❌ Order ID yok');
