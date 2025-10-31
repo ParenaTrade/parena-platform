@@ -117,27 +117,91 @@ class SellerPanel {
     }
 
     // ✅ YENİ SİPARİŞ İŞLEME
-    async handleNewOrder(order) {
-        console.log('🎯 Yeni sipariş işleniyor:', order);
-        
-        // Aynı siparişi tekrar işleme
-        if (this.lastProcessedOrderId === order.id) {
-            console.log('⏭️ Bu sipariş zaten işlendi, atlanıyor...');
-            return;
-        }
-        
-        this.lastProcessedOrderId = order.id;
+    // ✅ YENİ SİPARİŞ İŞLEME - SES İLE
+async handleNewOrder(order) {
+    console.log('🎯 Yeni sipariş işleniyor:', order);
+    
+    // Aynı siparişi tekrar işleme
+    if (this.lastProcessedOrderId === order.id) {
+        console.log('⏭️ Bu sipariş zaten işlendi, atlanıyor...');
+        return;
+    }
+    
+    this.lastProcessedOrderId = order.id;
 
-        // Push bildirimi göster
-        this.showOrderNotification(order);
+    // Push bildirimi göster
+    this.showOrderNotification(order);
+    
+    // Sipariş sesini çal (tekrarlı)
+    this.playOrderSound('order');
+    
+    // Sayfaları güncelle
+    await this.refreshCurrentSections();
+}
+
+// ✅ KURYE ATANDIĞINDA SES
+async assignCourierToOrder(orderId, courierId) {
+    try {
+        const { error } = await this.supabase
+            .from('orders')
+            .update({
+                courier_id: courierId,
+                status: 'on_the_way',
+                assigned_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', orderId);
+
+        if (error) throw error;
+
+        // Kurye atama sesi
+        this.playOrderSound('courier');
         
-        // Sesli alarm çal
-        this.playOrderSound();
-        
-        // Sayfaları güncelle
-        await this.refreshCurrentSections();
+        this.showAlert('✅ Kurye başarıyla atandı!', 'success');
+        await this.loadOrders();
+
+    } catch (error) {
+        console.error('Kurye atama hatası:', error);
+        this.showAlert('❌ Kurye atanamadı!', 'error');
+    }
+}
+
+// ✅ SİPARİŞ İPTAL SESİ
+async rejectOrder(orderId) {
+    if (!orderId) {
+        console.error('❌ Order ID yok');
+        return;
     }
 
+    const reason = prompt('Reddetme nedeniniz:');
+    if (!reason) return;
+
+    try {
+        console.log('❌ Sipariş reddediliyor:', orderId);
+        const { error } = await this.supabase
+            .from('orders')
+            .update({
+                status: 'cancelled',
+                cancellation_reason: `Satıcı tarafından reddedildi: ${reason}`,
+                cancelled_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', orderId);
+
+        if (error) throw error;
+
+        // İptal sesi
+        this.playOrderSound('cancel');
+        
+        this.showAlert('❌ Sipariş reddedildi!', 'success');
+        this.removeNotification();
+        await this.loadOrders();
+
+    } catch (error) {
+        console.error('Sipariş reddetme hatası:', error);
+        this.showAlert('❌ Sipariş reddedilemedi!', 'error');
+    }
+}
     // ✅ PUSH BİLDİRİMİ
     showOrderNotification(order) {
         console.log('📢 Push bildirimi gösteriliyor:', order);
@@ -234,64 +298,86 @@ class SellerPanel {
         }, 30000);
     }
 
-    // ✅ SESLİ BİLDİRİM
-    playOrderSound() {
-        console.log('🔊 Sesli bildirim çalınıyor...');
-        try {
-            // Tarayıcı bildirimi
-            if ('Notification' in window) {
-                if (Notification.permission === 'granted') {
-                    new Notification('Yeni Sipariş!', {
-                        body: 'Yeni bir siparişiniz var, hemen kontrol edin.',
-                        icon: '/favicon.ico',
-                        tag: 'new-order'
-                    });
-                } else if (Notification.permission !== 'denied') {
-                    Notification.requestPermission().then(permission => {
-                        if (permission === 'granted') {
-                            new Notification('Yeni Sipariş!', {
-                                body: 'Yeni bir siparişiniz var, hemen kontrol edin.',
-                                icon: '/favicon.ico'
-                            });
-                        }
-                    });
-                }
-            }
+    // ✅ SES SİSTEMİ - FARKLI WAV DOSYALARI
+playOrderSound(type = 'order') {
+    console.log('🔊 Ses çalınıyor:', type);
+    
+    const soundFiles = {
+        order: 'wav_order.wav',
+        courier: 'wav_courier.wav', 
+        cancel: 'wav_cancel.wav'
+    };
 
-            // Ses efekti
-            this.playBeepSound(800, 200);
-            setTimeout(() => this.playBeepSound(600, 200), 100);
-            setTimeout(() => this.playBeepSound(800, 200), 200);
-
-        } catch (e) {
-            console.log('🔇 Ses/bildirim hatası:', e);
-            this.playBeepSound(800, 300);
-        }
-    }
-
-    playBeepSound(frequency, duration) {
-        try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
+    const soundFile = soundFiles[type] || soundFiles.order;
+    
+    try {
+        // Audio element oluştur
+        const audio = new Audio(`/panel/${soundFile}`);
+        audio.volume = 0.7;
+        
+        // Sipariş bildiriminde kabul/red diyene kadar tekrarla
+        if (type === 'order') {
+            audio.loop = true;
             
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.type = 'sine';
-            oscillator.frequency.value = frequency;
-            gainNode.gain.value = 0.1;
-            
-            oscillator.start();
+            // Kabul/red butonlarına event listener ekle
             setTimeout(() => {
-                oscillator.stop();
-            }, duration);
-            
-        } catch (e) {
-            console.log('🔇 AudioContext hatası:', e);
+                const acceptBtns = document.querySelectorAll('.accept-order-btn');
+                const rejectBtns = document.querySelectorAll('.reject-order-btn');
+                
+                const stopSound = () => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                };
+                
+                acceptBtns.forEach(btn => {
+                    btn.addEventListener('click', stopSound);
+                });
+                
+                rejectBtns.forEach(btn => {
+                    btn.addEventListener('click', stopSound);
+                });
+                
+                // 2 dakika sonra otomatik durdur
+                setTimeout(stopSound, 120000);
+            }, 100);
         }
+        
+        audio.play().catch(e => {
+            console.log('🔇 Ses çalınamadı:', e);
+            this.playFallbackSound();
+        });
+        
+    } catch (error) {
+        console.log('🔇 Ses hatası:', error);
+        this.playFallbackSound();
     }
+}
 
+// ✅ FALLBACK SES SİSTEMİ
+playFallbackSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.value = 800;
+        gainNode.gain.value = 0.1;
+        
+        oscillator.start();
+        setTimeout(() => {
+            oscillator.stop();
+        }, 300);
+        
+    } catch (e) {
+        console.log('🔇 Fallback ses de çalınamadı');
+    }
+}
+
+    
     // ✅ SAYFALARI YENİLE
     async refreshCurrentSections() {
         if (this.currentSection === 'orders') {
@@ -931,97 +1017,95 @@ async loadStockAlerts() {
         this.renderOrders(filteredOrders);
     }
 
-    // ✅ ÜRÜN YÖNETİMİ - KATEGORİ FİLTRELEME İLE
-    async loadProducts() {
-        const section = document.getElementById('productsSection');
-        if (!section) return;
-        
-        section.innerHTML = `
-            <div class="section-header">
-                <h2>Ürün Yönetimi</h2>
-                <button class="btn btn-primary" id="addProductBtn">
-                    <i class="fas fa-plus"></i> Yeni Ürün
-                </button>
-            </div>
-            <div class="card">
-                <div class="card-body">
-                    <div class="filters" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-                        <select id="categoryFilter" class="form-control" style="min-width: 200px;">
-                            <option value="">Tüm Kategoriler</option>
-                            ${this.categories.map(cat => 
-                                `<option value="${cat.id}">${cat.name}</option>`
-                            ).join('')}
-                        </select>
-                        <select id="productStatusFilter" class="form-control">
-                            <option value="">Tüm Durumlar</option>
-                            <option value="active">Aktif</option>
-                            <option value="inactive">Pasif</option>
-                        </select>
-                        <input type="text" id="productSearch" placeholder="Ürün ara..." class="form-control" style="min-width: 250px;">
-                    </div>
-                    <div class="table-responsive">
-                        <table class="data-table" id="productsTable">
-                            <thead>
-                                <tr>
-                                    <th>Ürün Adı</th>
-                                    <th>Barkod</th>
-                                    <th>Kategori</th>
-                                    <th>Fiyat</th>
-                                    <th>Stok</th>
-                                    <th>Durum</th>
-                                    <th>İşlemler</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td colspan="7" class="text-center">
-                                        <div class="loading-spinner">
-                                            <i class="fas fa-spinner fa-spin"></i>
-                                            <p>Ürünler yükleniyor...</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+    // ✅ ÜRÜN YÖNETİMİ SAYFASI - GÜNCELLENMİŞ
+async loadProducts() {
+    const section = document.getElementById('productsSection');
+    if (!section) return;
+    
+    section.innerHTML = `
+        <div class="section-header">
+            <h2>Ürün Yönetimi</h2>
+            <button class="btn btn-primary" id="addProductBtn">
+                <i class="fas fa-plus"></i> Yeni Ürün
+            </button>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="filters" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <select id="categoryFilter" class="form-control" style="min-width: 200px;">
+                        <option value="">Tüm Kategoriler</option>
+                        ${this.categories.map(cat => 
+                            `<option value="${cat.id}">${cat.name}</option>`
+                        ).join('')}
+                    </select>
+                    <select id="productStatusFilter" class="form-control">
+                        <option value="">Tüm Durumlar</option>
+                        <option value="active">Aktif</option>
+                        <option value="inactive">Pasif</option>
+                    </select>
+                    <input type="text" id="productSearch" placeholder="Ürün ara..." class="form-control" style="min-width: 250px;">
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table" id="productsTable">
+                        <thead>
+                            <tr>
+                                <th>Ürün Adı</th>
+                                <th>Barkod</th>
+                                <th>Kategori</th>
+                                <th>Fiyat</th>
+                                <th>Stok</th>
+                                <th>Durum</th>
+                                <th>Tip</th>
+                                <th>İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="8" class="text-center">
+                                    <div class="loading-spinner">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <p>Ürünler yükleniyor...</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        `;
+        </div>
+    `;
 
-        // Event listener'ları ekle
-        setTimeout(() => {
-            const addProductBtn = document.getElementById('addProductBtn');
-            const productSearch = document.getElementById('productSearch');
-            const categoryFilter = document.getElementById('categoryFilter');
-            const statusFilter = document.getElementById('productStatusFilter');
-
-            if (addProductBtn) {
-                addProductBtn.addEventListener('click', () => {
-                    this.showAddProductModal();
-                });
-            }
-
-            if (productSearch) {
-                productSearch.addEventListener('input', (e) => {
-                    this.searchProducts(e.target.value);
-                });
-            }
-
-            if (categoryFilter) {
-                categoryFilter.addEventListener('change', (e) => {
-                    this.filterProductsByCategory(e.target.value);
-                });
-            }
-
-            if (statusFilter) {
-                statusFilter.addEventListener('change', (e) => {
-                    this.filterProductsByStatus(e.target.value);
-                });
-            }
-        }, 100);
-
-        await this.loadProductsData();
+    // Event listener'ları ekle - DÜZELTİLMİŞ
+    const addProductBtn = document.getElementById('addProductBtn');
+    if (addProductBtn) {
+        addProductBtn.addEventListener('click', () => {
+            this.showAddProductModal();
+        });
     }
+
+    const productSearch = document.getElementById('productSearch');
+    if (productSearch) {
+        productSearch.addEventListener('input', (e) => {
+            this.searchProducts(e.target.value);
+        });
+    }
+
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', (e) => {
+            this.filterProductsByCategory(e.target.value);
+        });
+    }
+
+    const statusFilter = document.getElementById('productStatusFilter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', (e) => {
+            this.filterProductsByStatus(e.target.value);
+        });
+    }
+
+    await this.loadProductsData();
+}
     
     // ✅ ÜRÜN YÖNETİMİ - PRODUCT_PRICES ENTEGRASYONLU
 async loadProductsData() {
@@ -1259,6 +1343,9 @@ renderProductsTable(products) {
         });
     }
 
+
+    
+
     // ✅ ÜRÜN FİLTRELEME
     searchProducts(query) {
         if (!query) {
@@ -1298,103 +1385,226 @@ renderProductsTable(products) {
         this.renderProductsTable(filteredProducts);
     }
 
-    // ✅ ÜRÜN DÜZENLEME - GERÇEK İŞLEV
-    async editProduct(productId) {
-        try {
-            // Ürün bilgilerini getir
-            const { data: product, error } = await this.supabase
-                .from('products')
-                .select('*')
-                .eq('id', productId)
-                .single();
-
-            if (error) throw error;
-
-            // Düzenleme modalını göster
-            this.showEditProductModal(product);
-
-        } catch (error) {
-            console.error('❌ Ürün bilgileri yüklenemedi:', error);
-            this.showAlert('❌ Ürün bilgileri yüklenemedi!', 'error');
-        }
-    }
-
-showEditProductModal(product) {
-        const modalHtml = `
-            <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
-                <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
-                    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="margin: 0;">Ürünü Düzenle</h3>
-                        <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <form id="editProductForm">
-                        <input type="hidden" id="editProductId" value="${product.id}">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="editProductName">Ürün Adı *</label>
-                                <input type="text" id="editProductName" class="form-control" value="${product.name}" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="editProductBarcode">Barkod</label>
-                                <input type="text" id="editProductBarcode" class="form-control" value="${product.barcode || ''}">
-                            </div>
+    
+    // ✅ YENİ ÜRÜN EKLEME MODALI - ÇALIŞIR DURUMDA
+showAddProductModal() {
+    const modalHtml = `
+        <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
+            <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">Yeni Ürün Ekle</h3>
+                    <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="addProductForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="productName">Ürün Adı *</label>
+                            <input type="text" id="productName" class="form-control" required>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="editProductPrice">Fiyat (₺) *</label>
-                                <input type="number" id="editProductPrice" class="form-control" step="0.01" min="0" value="${product.price}" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="editProductStock">Stok *</label>
-                                <input type="number" id="editProductStock" class="form-control" min="0" value="${product.stock}" required>
-                            </div>
+                        <div class="form-group">
+                            <label for="productBarcode">Barkod</label>
+                            <input type="text" id="productBarcode" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="productPrice">Fiyat (₺) *</label>
+                            <input type="number" id="productPrice" class="form-control" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="productDiscountPrice">İndirimli Fiyat (₺)</label>
+                            <input type="number" id="productDiscountPrice" class="form-control" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="productStock">Stok *</label>
+                            <input type="number" id="productStock" class="form-control" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="productCategory">Kategori</label>
+                            <select id="productCategory" class="form-control">
+                                <option value="">Kategori Seçin</option>
+                                ${this.categories.map(cat => 
+                                    `<option value="${cat.id}">${cat.name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="productDescription">Açıklama</label>
+                        <textarea id="productDescription" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="form-actions" style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                        <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
+                        <button type="submit" class="btn btn-primary">Ürünü Ekle</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Form submit event'ini ekle
+    document.getElementById('addProductForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await this.addNewProduct();
+    });
+}
+
+// ✅ YENİ ÜRÜN EKLEME - PRODUCT_PRICES ODAKLI
+async addNewProduct() {
+    const productData = {
+        name: document.getElementById('productName').value,
+        barcode: document.getElementById('productBarcode').value || null,
+        description: document.getElementById('productDescription').value || null,
+        seller_id: this.sellerData.id,
+        currency: 'TRY',
+        is_active: true,
+        category_name: document.getElementById('productCategory').value ? 
+            this.categories.find(cat => cat.id === document.getElementById('productCategory').value)?.name : null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+    };
+
+    const priceData = {
+        price: parseFloat(document.getElementById('productPrice').value),
+        discount_price: document.getElementById('productDiscountPrice').value ? 
+            parseFloat(document.getElementById('productDiscountPrice').value) : null,
+        stock: parseInt(document.getElementById('productStock').value),
+        currency: 'TRY',
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    };
+
+    try {
+        // Önce products tablosuna ekle
+        const { data: newProduct, error: productError } = await this.supabase
+            .from('products')
+            .insert([productData])
+            .select()
+            .single();
+
+        if (productError) throw productError;
+
+        // Sonra product_prices tablosuna ekle
+        const fullPriceData = {
+            product_id: newProduct.id,
+            seller_id: this.sellerData.id,
+            ...priceData
+        };
+
+        // Eğer centre_id varsa ekle
+        if (this.sellerData.centre_id) {
+            fullPriceData.centre_id = this.sellerData.centre_id;
+        }
+
+        const { error: priceError } = await this.supabase
+            .from('product_prices')
+            .insert([fullPriceData]);
+
+        if (priceError) throw priceError;
+
+        this.showAlert('✅ Ürün başarıyla eklendi!', 'success');
+        document.querySelector('.modal-overlay').remove();
+        await this.loadProductsData();
+
+    } catch (error) {
+        console.error('Ürün ekleme hatası:', error);
+        this.showAlert('❌ Ürün eklenemedi!', 'error');
+    }
+}
+
+// ✅ ÜRÜN DÜZENLEME MODALI - PRODUCT_PRICES ODAKLI
+showEditProductModal(product) {
+    const modalHtml = `
+        <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
+            <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">Ürünü Düzenle</h3>
+                    <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="editProductForm">
+                    <input type="hidden" id="editProductId" value="${product.id}">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editProductName">Ürün Adı *</label>
+                            <input type="text" id="editProductName" class="form-control" value="${product.name}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editProductBarcode">Barkod</label>
+                            <input type="text" id="editProductBarcode" class="form-control" value="${product.barcode || ''}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editProductPrice">Fiyat (₺) *</label>
+                            <input type="number" id="editProductPrice" class="form-control" step="0.01" min="0" 
+                                   value="${product.current_price || product.price}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editProductDiscountPrice">İndirimli Fiyat (₺)</label>
+                            <input type="number" id="editProductDiscountPrice" class="form-control" step="0.01" min="0" 
+                                   value="${product.discount_price || ''}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editProductStock">Stok *</label>
+                            <input type="number" id="editProductStock" class="form-control" min="0" 
+                                   value="${product.current_stock || product.stock}" required>
                         </div>
                         <div class="form-group">
                             <label for="editProductCategory">Kategori</label>
                             <select id="editProductCategory" class="form-control">
                                 <option value="">Kategori Seçin</option>
                                 ${this.categories.map(cat => 
-                                    `<option value="${cat.id}" ${cat.id === product.category_id ? 'selected' : ''}>${cat.name}</option>`
+                                    `<option value="${cat.id}" ${cat.name === product.category_name ? 'selected' : ''}>${cat.name}</option>`
                                 ).join('')}
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="editProductDescription">Açıklama</label>
-                            <textarea id="editProductDescription" class="form-control" rows="3">${product.description || ''}</textarea>
-                        </div>
-                        <div class="form-actions" style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
-                            <button type="submit" class="btn btn-primary">Güncelle</button>
-                        </div>
-                    </form>
-                </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editProductDescription">Açıklama</label>
+                        <textarea id="editProductDescription" class="form-control" rows="3">${product.description || ''}</textarea>
+                    </div>
+                    <div class="form-actions" style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                        <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
+                        <button type="submit" class="btn btn-primary">Güncelle</button>
+                    </div>
+                </form>
             </div>
-        `;
+        </div>
+    `;
 
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-        document.getElementById('editProductForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await this.updateProduct(product.id);
-        });
-    }
-    
-// ✅ ÜRÜN DÜZENLEME - PRODUCT_PRICES ENTEGRASYONLU
+    document.getElementById('editProductForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await this.updateProduct(product.id);
+    });
+}
+
+// ✅ ÜRÜN GÜNCELLEME - PRODUCT_PRICES ODAKLI
 async updateProduct(productId) {
-    const form = document.getElementById('editProductForm');
-    
     const productData = {
         name: document.getElementById('editProductName').value,
-        barcode: document.getElementById('editProductBarcode').value,
-        description: document.getElementById('editProductDescription').value,
-        category_id: document.getElementById('editProductCategory').value || null,
+        barcode: document.getElementById('editProductBarcode').value || null,
+        description: document.getElementById('editProductDescription').value || null,
+        category_name: document.getElementById('editProductCategory').value ? 
+            this.categories.find(cat => cat.id === document.getElementById('editProductCategory').value)?.name : null,
         updated_at: new Date().toISOString()
     };
 
     const priceData = {
         price: parseFloat(document.getElementById('editProductPrice').value),
+        discount_price: document.getElementById('editProductDiscountPrice').value ? 
+            parseFloat(document.getElementById('editProductDiscountPrice').value) : null,
         stock: parseInt(document.getElementById('editProductStock').value),
         updated: new Date().toISOString()
     };
@@ -1414,11 +1624,7 @@ async updateProduct(productId) {
             .select('id')
             .eq('product_id', productId)
             .eq('seller_id', this.sellerData.id)
-            .single();
-
-        if (priceCheckError && priceCheckError.code !== 'PGRST116') {
-            throw priceCheckError;
-        }
+            .maybeSingle();
 
         if (existingPrice) {
             // Mevcut price kaydını güncelle
