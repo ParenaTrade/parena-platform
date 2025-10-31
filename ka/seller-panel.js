@@ -1250,32 +1250,41 @@ async loadStockAlerts() {
     // Diğer metodlar...
     async loadSellerInfo() {
         const section = document.getElementById('sellerInfoSection');
-        if (!section) return;
-        
         section.innerHTML = `
             <div class="section-header">
                 <h2>İşletme Bilgileri</h2>
             </div>
             <div class="card">
                 <div class="card-body">
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <label>İşletme Adı:</label>
-                            <span>${this.sellerData?.business_name || ''}</span>
+                    <form id="sellerInfoForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="businessName">İşletme Adı</label>
+                                <input type="text" id="businessName" class="form-control" value="${this.sellerData?.business_name || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label for="sellerPhone">Telefon</label>
+                                <input type="text" id="sellerPhone" class="form-control" value="${this.sellerData?.phone || ''}">
+                            </div>
                         </div>
-                        <div class="info-item">
-                            <label>Telefon:</label>
-                            <span>${this.sellerData?.phone || ''}</span>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="sellerEmail">E-posta</label>
+                                <input type="email" id="sellerEmail" class="form-control" value="${this.sellerData?.email || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label for="sellerCity">Şehir</label>
+                                <input type="text" id="sellerCity" class="form-control" value="${this.sellerData?.city || ''}">
+                            </div>
                         </div>
-                        <div class="info-item">
-                            <label>E-posta:</label>
-                            <span>${this.sellerData?.email || ''}</span>
+                        <div class="form-group">
+                            <label for="sellerAddress">Adres</label>
+                            <textarea id="sellerAddress" class="form-control" rows="3">${this.sellerData?.address || ''}</textarea>
                         </div>
-                        <div class="info-item">
-                            <label>Adres:</label>
-                            <span>${this.sellerData?.address || 'Belirtilmemiş'}</span>
-                        </div>
-                    </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Bilgileri Güncelle
+                        </button>
+                    </form>
                 </div>
             </div>
         `;
