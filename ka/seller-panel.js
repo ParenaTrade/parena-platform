@@ -1345,24 +1345,7 @@ renderProductsTable(products) {
         this.attachProductEventListeners();
     }, 100);
 }    
-    attachProductEventListeners() {
-        // Düzenle butonları
-        document.querySelectorAll('.edit-product-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const productId = e.target.closest('button').getAttribute('data-product-id');
-                this.editProduct(productId);
-            });
-        });
 
-        // Aktif/Pasif butonları
-        document.querySelectorAll('.toggle-product-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const productId = e.target.closest('button').getAttribute('data-product-id');
-                const currentStatus = e.target.closest('button').getAttribute('data-current-status') === 'true';
-                this.toggleProductStatus(productId, currentStatus);
-            });
-        });
-    }
 
 
     
