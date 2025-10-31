@@ -31,7 +31,7 @@ class SellerPanel {
         const { data, error } = await this.supabase
             .from('seller_profiles')
             .select('*')
-            .eq('seller_id', this.userProfile.id)
+            .eq('id', this.userProfile.id)
             .single();
 
         if (data) {
