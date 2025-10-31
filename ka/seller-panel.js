@@ -9,7 +9,6 @@ class SellerPanel {
         this.realtimeSubscription = null;
         this.isInitialized = false;
         
-        // Supabase client'ını config'den al
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
         
@@ -17,12 +16,10 @@ class SellerPanel {
         
         if (!this.supabase) {
             console.error('❌ Supabase client bulunamadı!');
-            this.supabase = window.supabase; // Fallback
+            this.supabase = window.supabase;
         }
         
-        // Global erişim
         window.sellerPanel = this;
-        
         this.init();
     }
 
@@ -38,34 +35,52 @@ class SellerPanel {
     }
 
     async loadSellerData() {
-        try {
-            console.log('📥 Seller verisi yükleniyor...', this.userProfile);
-            
-            let { data, error } = await this.supabase
-                .from('seller_profiles')
-                .select('*')
-                .eq('id', this.userProfile.id)
-                .single();
+    try {
+        console.log('📥 Seller verisi yükleniyor...', this.userProfile);
+        
+        // SADECE: seller_profiles.id ile userProfile.id eşleştir
+        const { data, error } = await this.supabase
+            .from('seller_profiles')
+            .select('*')
+            .eq('id', this.userProfile.id)
+            .single();
 
-            if (error) {
-                console.log('🔍 User_id ile deneyelim...');
-                ({ data, error } = await this.supabase
-                    .from('seller_profiles')
-                    .select('*')
-                    .eq('user_id', this.userProfile.id)
-                    .single());
-            }
+        if (error) {
+            console.error('❌ Seller profili bulunamadı:', error);
+            // Seller profili yoksa, mevcut userProfile'ı kullan
+            this.sellerData = {
+                id: this.userProfile.id,
+                business_name: this.userProfile.name,
+                phone: this.userProfile.phone
+            };
+            console.log('⚠️ Seller profili yok, geçici data kullanılıyor:', this.sellerData);
+        } else {
+            this.sellerData = data;
+            console.log('✅ Seller verisi yüklendi:', data);
+        }
 
-            if (error) {
-                console.error('❌ Seller profili bulunamadı:', error);
-                this.sellerData = {
-                    id: this.userProfile.id,
-                    user_id: this.userProfile.id,
-                    business_name: this.userProfile.name,
-                    phone: this.userProfile.phone
-                };
+    } catch (error) {
+        console.error('❌ Seller veri hatası:', error);
+        // Hata durumunda geçici data
+        this.sellerData = {
+            id: this.userProfile.id,
+            business_name: this.userProfile.name,
+            phone: this.userProfile.phone
+        };
+    }
+}
+            if (!data) {
+                console.log('🆕 Yeni seller profili oluşturuluyor...');
                 
                 // Yeni seller profili oluştur
+                this.sellerData = {
+                    business_name: this.userProfile.name,
+                    phone: this.userProfile.phone,
+                    email: this.userProfile.email || '',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                
                 try {
                     const { data: newSeller, error: createError } = await this.supabase
                         .from('seller_profiles')
@@ -76,9 +91,17 @@ class SellerPanel {
                     if (!createError && newSeller) {
                         this.sellerData = newSeller;
                         console.log('✅ Yeni seller profili oluşturuldu:', newSeller);
+                    } else {
+                        throw createError;
                     }
                 } catch (createError) {
                     console.error('❌ Seller profili oluşturulamadı:', createError);
+                    // Fallback: Geçici seller data
+                    this.sellerData = {
+                        id: 'temp-' + Date.now(),
+                        business_name: this.userProfile.name,
+                        phone: this.userProfile.phone
+                    };
                 }
             } else {
                 this.sellerData = data;
@@ -87,16 +110,220 @@ class SellerPanel {
 
         } catch (error) {
             console.error('❌ Seller veri hatası:', error);
+            // Fallback: Geçici seller data
             this.sellerData = {
-                id: this.userProfile.id,
-                user_id: this.userProfile.id,
+                id: 'temp-' + Date.now(),
                 business_name: this.userProfile.name,
                 phone: this.userProfile.phone
             };
         }
     }
 
-    // ✅ YENİ SİPARİŞ BİLDİRİM SİSTEMİ
+// ✅ DASHBOARD METODLARI - EKSİK OLANLAR EKLENDİ
+   // ✅ DASHBOARD METODLARI
+    async loadSellerDashboard() {
+        const section = document.getElementById('sellerDashboardSection');
+        if (!section) return;
+        
+        section.innerHTML = `
+            <h1>İşletme Paneli</h1>
+            <p class="subtitle">${this.sellerData?.business_name || ''}</p>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="todayOrders">0</h3>
+                        <p>Bugünkü Sipariş</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="fas fa-money-bill-wave"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="todayRevenue">0 ₺</h3>
+                        <p>Bugünkü Ciro</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="pendingOrders">0</h3>
+                        <p>Bekleyen Sipariş</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon danger">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="sellerRating">0.0</h3>
+                        <p>Ortalama Puan</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-row">
+                <div class="content-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Son Siparişler</h3>
+                            <a href="#" class="view-all" id="viewAllOrders">Tümünü Gör</a>
+                        </div>
+                        <div class="card-body">
+                            <div id="recentSellerOrders">
+                                <div class="loading-spinner">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <p>Siparişler yükleniyor...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="content-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Stok Uyarıları</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="stockAlerts">
+                                <div class="loading-spinner">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <p>Stok kontrol ediliyor...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Event listener ekle
+        setTimeout(() => {
+            const viewAllBtn = document.getElementById('viewAllOrders');
+            if (viewAllBtn) {
+                viewAllBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (window.panelSystem) {
+                        window.panelSystem.showSection('orders');
+                    }
+                });
+            }
+        }, 100);
+
+        await this.loadSellerStats();
+        await this.loadRecentSellerOrders();
+        await this.loadStockAlerts();
+    }
+
+
+async loadRecentSellerOrders() {
+        if (!this.sellerData?.id) return;
+
+        try {
+            const { data: orders, error } = await this.supabase
+                .from('orders')
+                .select(`
+                    id,
+                    total_amount,
+                    status,
+                    created_at,
+                    customer_name,
+                    customer_phone,
+                    delivery_address,
+                    order_details!inner(quantity, product_name)
+                `)
+                .eq('seller_id', this.sellerData.id)
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            const container = document.getElementById('recentSellerOrders');
+            if (!container) return;
+            
+            if (error || !orders?.length) {
+                container.innerHTML = '<p class="text-muted">Henüz siparişiniz bulunmuyor.</p>';
+                return;
+            }
+
+            container.innerHTML = orders.map(order => `
+                <div class="order-item" style="border-bottom: 1px solid #eee; padding: 15px 0;">
+                    <div class="order-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div>
+                            <strong>Sipariş #${order.id?.slice(-8) || 'N/A'}</strong>
+                            <div style="color: #666; font-size: 12px; margin-top: 2px;">
+                                ${order.customer_name || 'Müşteri'} • ${order.customer_phone || 'Telefon yok'}
+                            </div>
+                        </div>
+                        <span class="status-badge status-${order.status}">${this.getStatusText(order.status)}</span>
+                    </div>
+                    <div class="order-details" style="color: #666; font-size: 14px;">
+                        ${order.order_details[0]?.product_name || 'Ürün'} 
+                        ${order.order_details.length > 1 ? `ve ${order.order_details.length - 1} ürün daha` : ''}
+                    </div>
+                    <div class="order-footer" style="display: flex; justify-content: space-between; margin-top: 8px;">
+                        <span style="font-weight: bold; color: var(--primary);">
+                            ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
+                        </span>
+                        <small style="color: #999;">
+                            ${new Date(order.created_at).toLocaleDateString('tr-TR')}
+                        </small>
+                    </div>
+                </div>
+            `).join('');
+
+        } catch (error) {
+            console.error('❌ Son siparişler yükleme hatası:', error);
+            const container = document.getElementById('recentSellerOrders');
+            if (container) {
+                container.innerHTML = '<p class="text-muted">Siparişler yüklenirken hata oluştu.</p>';
+            }
+        }
+    }
+
+
+async loadStockAlerts() {
+        if (!this.sellerData?.id) return;
+
+        try {
+            const { data: products, error } = await this.supabase
+                .from('products')
+                .select('name, stock')
+                .eq('seller_id', this.sellerData.id)
+                .lt('stock', 10);
+
+            const container = document.getElementById('stockAlerts');
+            if (!container) return;
+            
+            if (error || !products?.length) {
+                container.innerHTML = '<p class="text-muted">Stok uyarısı bulunmuyor.</p>';
+                return;
+            }
+
+            container.innerHTML = products.map(product => `
+                <div class="stock-alert" style="border-bottom: 1px solid #eee; padding: 10px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 500;">${product.name}</span>
+                        <span style="color: var(--danger); font-weight: bold;">
+                            ${product.stock} adet
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+
+        } catch (error) {
+            console.error('❌ Stok uyarıları yükleme hatası:', error);
+            const container = document.getElementById('stockAlerts');
+            if (container) {
+                container.innerHTML = '<p class="text-muted">Stok bilgileri yüklenirken hata oluştu.</p>';
+            }
+        }
+    }
+     // ✅ YENİ SİPARİŞ BİLDİRİM SİSTEMİ
     setupRealTimeListeners() {
         if (!this.sellerData?.id) {
             console.log('⚠️ Seller ID yok, real-time listener kurulamıyor');
@@ -384,7 +611,7 @@ class SellerPanel {
         }
     }
 
-    // ✅ SİPARİŞ YÖNETİMİ SAYFASI - DÜZELTİLMİŞ
+    // ✅ SİPARİŞ YÖNETİMİ
     async loadOrders() {
         const section = document.getElementById('ordersSection');
         if (!section) return;
@@ -417,7 +644,7 @@ class SellerPanel {
             </div>
         `;
 
-        // Event listener'ı ekle
+        // Event listener ekle
         setTimeout(() => {
             const filterSelect = document.getElementById('orderStatusFilter');
             if (filterSelect) {
@@ -433,11 +660,11 @@ class SellerPanel {
     async loadOrdersData() {
         if (!this.sellerData?.id) {
             console.error('❌ Seller ID yok, siparişler yüklenemiyor');
-            await this.loadSellerData(); // Seller verisini tekrar yükle
+            return;
         }
 
         try {
-            console.log('📥 Siparişler yükleniyor, seller_id:', this.sellerData?.id);
+            console.log('📥 Siparişler yükleniyor, seller_id:', this.sellerData.id);
             const { data: orders, error } = await this.supabase
                 .from('orders')
                 .select(`
@@ -455,11 +682,14 @@ class SellerPanel {
 
         } catch (error) {
             console.error('❌ Siparişler yükleme hatası:', error);
-            document.getElementById('ordersList').innerHTML = `
-                <div class="error-message">
-                    <p>Siparişler yüklenirken hata oluştu: ${error.message}</p>
-                </div>
-            `;
+            const container = document.getElementById('ordersList');
+            if (container) {
+                container.innerHTML = `
+                    <div class="error-message">
+                        <p>Siparişler yüklenirken hata oluştu: ${error.message}</p>
+                    </div>
+                `;
+            }
         }
     }
 
@@ -878,13 +1108,19 @@ class SellerPanel {
         const today = new Date().toISOString().split('T')[0];
         
         try {
+            console.log('📊 İstatistikler yükleniyor, seller_id:', this.sellerData.id);
             const { data: orders, error } = await this.supabase
                 .from('orders')
                 .select('id, total_amount, status, created_at')
                 .eq('seller_id', this.sellerData.id)
                 .gte('created_at', today);
 
-            if (!error && orders) {
+            if (error) {
+                console.error('❌ İstatistik sorgu hatası:', error);
+                return;
+            }
+
+            if (orders) {
                 document.getElementById('todayOrders').textContent = orders.length;
                 
                 const todayRevenue = orders
@@ -899,7 +1135,7 @@ class SellerPanel {
                 document.getElementById('pendingOrders').textContent = pendingOrders;
             }
 
-            // Calculate average rating from orders
+            // Average rating
             const { data: ratedOrders } = await this.supabase
                 .from('orders')
                 .select('performance_rating')
@@ -920,7 +1156,7 @@ class SellerPanel {
     }
 
     // Diğer metodlar aynı kalacak...
-    async loadSectionData(sectionName) {
+   async loadSectionData(sectionName) {
         this.currentSection = sectionName;
         console.log(`📂 Section yükleniyor: ${sectionName}`);
         
@@ -949,6 +1185,8 @@ class SellerPanel {
                 case 'sellerReports':
                     await this.loadSellerReports();
                     break;
+                default:
+                    console.warn('⚠️ Bilinmeyen section:', sectionName);
             }
         } catch (error) {
             console.error(`❌ ${sectionName} hatası:`, error);
@@ -1059,48 +1297,39 @@ class SellerPanel {
         }
     }
  
+    // Diğer metodlar...
     async loadSellerInfo() {
         const section = document.getElementById('sellerInfoSection');
+        if (!section) return;
+        
         section.innerHTML = `
             <div class="section-header">
                 <h2>İşletme Bilgileri</h2>
             </div>
             <div class="card">
                 <div class="card-body">
-                    <form id="sellerInfoForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="businessName">İşletme Adı</label>
-                                <input type="text" id="businessName" class="form-control" value="${this.sellerData?.business_name || ''}">
-                            </div>
-                            <div class="form-group">
-                                <label for="sellerPhone">Telefon</label>
-                                <input type="text" id="sellerPhone" class="form-control" value="${this.sellerData?.phone || ''}">
-                            </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>İşletme Adı:</label>
+                            <span>${this.sellerData?.business_name || ''}</span>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="sellerEmail">E-posta</label>
-                                <input type="email" id="sellerEmail" class="form-control" value="${this.sellerData?.email || ''}">
-                            </div>
-                            <div class="form-group">
-                                <label for="sellerCity">Şehir</label>
-                                <input type="text" id="sellerCity" class="form-control" value="${this.sellerData?.city || ''}">
-                            </div>
+                        <div class="info-item">
+                            <label>Telefon:</label>
+                            <span>${this.sellerData?.phone || ''}</span>
                         </div>
-                        <div class="form-group">
-                            <label for="sellerAddress">Adres</label>
-                            <textarea id="sellerAddress" class="form-control" rows="3">${this.sellerData?.address || ''}</textarea>
+                        <div class="info-item">
+                            <label>E-posta:</label>
+                            <span>${this.sellerData?.email || ''}</span>
                         </div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Bilgileri Güncelle
-                        </button>
-                    </form>
+                        <div class="info-item">
+                            <label>Adres:</label>
+                            <span>${this.sellerData?.address || 'Belirtilmemiş'}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
     }
-
     async loadDeliveryAreas() {
         const section = document.getElementById('deliveryAreasSection');
         section.innerHTML = `
@@ -1340,12 +1569,10 @@ class SellerPanel {
         }, 3000);
     }
 
-    // Cleanup
     destroy() {
         if (this.realtimeSubscription) {
             this.supabase.removeChannel(this.realtimeSubscription);
         }
-        console.log('🧹 SellerPanel temizlendi');
     }
 }
 
@@ -1353,20 +1580,11 @@ class SellerPanel {
 window.SellerPanel = SellerPanel;
 
 // Event listener
-if (window.panelSystem && typeof window.panelSystem.on === 'function') {
-    window.panelSystem.on('sellerSessionStart', (userProfile) => {
-        console.log('🛍️ SellerPanel başlatılıyor...');
-        window.sellerPanel = new SellerPanel(userProfile);
-    });
-} else {
-    console.log('⚠️ panelSystem bulunamadı, doğrudan başlatılıyor...');
-    // Fallback: Sayfa yüklendiğinde kontrol et
-    document.addEventListener('DOMContentLoaded', function() {
-        if (window.userProfile?.role === 'seller' && !window.sellerPanel) {
-            console.log('🔄 SellerPanel doğrudan başlatılıyor...');
-            window.sellerPanel = new SellerPanel(window.userProfile);
-        }
-    });
-}
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.userProfile?.role === 'seller' && !window.sellerPanel) {
+        console.log('🔄 SellerPanel doğrudan başlatılıyor...');
+        window.sellerPanel = new SellerPanel(window.userProfile);
+    }
+});
 
-console.log('✅ seller-panel.js yüklendi - TÜM HATALAR DÜZELTİLDİ');
+console.log('✅ seller-panel.js yüklendi - SELLER_ID SORUNU ÇÖZÜLDÜ');
