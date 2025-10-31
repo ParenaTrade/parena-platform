@@ -1569,11 +1569,10 @@ async loadStockAlerts() {
         }, 3000);
     }
 
-        destroy() {
+destroy() {
         if (this.realtimeSubscription) {
             this.supabase.removeChannel(this.realtimeSubscription);
         }
-        console.log('🧹 SellerPanel temizlendi');
     }
 }
 
@@ -1581,20 +1580,11 @@ async loadStockAlerts() {
 window.SellerPanel = SellerPanel;
 
 // Event listener
-if (window.panelSystem && typeof window.panelSystem.on === 'function') {
-    window.panelSystem.on('sellerSessionStart', (userProfile) => {
-        console.log('🛍️ SellerPanel başlatılıyor...');
-        window.sellerPanel = new SellerPanel(userProfile);
-    });
-} else {
-    console.log('⚠️ panelSystem bulunamadı, doğrudan başlatılıyor...');
-    // Fallback: Sayfa yüklendiğinde kontrol et
-    document.addEventListener('DOMContentLoaded', function() {
-        if (window.userProfile?.role === 'seller' && !window.sellerPanel) {
-            console.log('🔄 SellerPanel doğrudan başlatılıyor...');
-            window.sellerPanel = new SellerPanel(window.userProfile);
-        }
-    });
-}
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.userProfile?.role === 'seller' && !window.sellerPanel) {
+        console.log('🔄 SellerPanel doğrudan başlatılıyor...');
+        window.sellerPanel = new SellerPanel(window.userProfile);
+    }
+});
 
-console.log('✅ seller-panel.js yüklendi - TÜM HATALAR DÜZELTİLDİ');
+console.log('✅ seller-panel.js yüklendi - SELLER_ID SORUNU ÇÖZÜLDÜ');
