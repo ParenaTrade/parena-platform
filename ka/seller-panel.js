@@ -1176,6 +1176,18 @@ async addNewProduct() {
         const priceInput = document.getElementById('productPrice').value;
         const stockInput = document.getElementById('productStock').value;
         const description = document.getElementById('productDescription').value;
+
+        // Tüm inputları kontrol et
+console.log('🔍 Tüm input elementleri:');
+console.log('productName:', document.getElementById('productName'));
+console.log('productPrice:', document.getElementById('productPrice'));
+console.log('productStock:', document.getElementById('productStock'));
+console.log('productBarcode:', document.getElementById('productBarcode'));
+console.log('productDescription:', document.getElementById('productDescription'));
+console.log('productDiscountPrice:', document.getElementById('productDiscountPrice'));
+console.log('productCategory:', document.getElementById('productCategory'));
+
+// Eğer elementler null ise, farklı ID'ler kullanılıyor olabilir
         
         console.log('🔍 DEBUG - Form değerleri:');
         console.log('name:', name);
@@ -1280,17 +1292,7 @@ async addNewProduct() {
     }
 }
 
-// Tüm inputları kontrol et
-console.log('🔍 Tüm input elementleri:');
-console.log('productName:', document.getElementById('productName'));
-console.log('productPrice:', document.getElementById('productPrice'));
-console.log('productStock:', document.getElementById('productStock'));
-console.log('productBarcode:', document.getElementById('productBarcode'));
-console.log('productDescription:', document.getElementById('productDescription'));
-console.log('productDiscountPrice:', document.getElementById('productDiscountPrice'));
-console.log('productCategory:', document.getElementById('productCategory'));
 
-// Eğer elementler null ise, farklı ID'ler kullanılıyor olabilir
 
 
 // TEST için manuel değerler
