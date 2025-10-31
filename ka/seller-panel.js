@@ -1278,6 +1278,7 @@ async updateProduct(productId) {
             price: parseFloat(document.getElementById('editProductPrice').value),
             stock: parseInt(document.getElementById('editProductStock').value),
             category_id: document.getElementById('editProductCategory').value || null,
+            category_name: document.getElementById('editProductCategory.cat.name').value || null,
             description: document.getElementById('editProductDescription').value,
             updated_at: new Date().toISOString()
         };
