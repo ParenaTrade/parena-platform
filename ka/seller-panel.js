@@ -338,51 +338,99 @@ async loadStockAlerts() {
     }
 }
     
-     // ✅ YENİ SİPARİŞ BİLDİRİM SİSTEMİ
-    setupRealTimeListeners() {
-        if (!this.sellerData?.id) {
-            console.log('⚠️ Seller ID yok, real-time listener kurulamıyor');
-            setTimeout(() => this.setupRealTimeListeners(), 1000);
-            return;
-        }
+     // ✅ YENİ SİPARİŞ BİLDİRİM SİSTEMİ - DÜZELTİLMİŞ
+setupRealTimeListeners() {
+    if (!this.sellerData?.id) {
+        console.log('⚠️ Seller ID yok, real-time listener kurulamıyor');
+        setTimeout(() => this.setupRealTimeListeners(), 1000);
+        return;
+    }
 
-        console.log('🔔 Real-time sipariş listenerları kuruluyor...', this.sellerData.id);
+    console.log('🔔 Real-time sipariş listenerları kuruluyor...', this.sellerData.id);
 
-        // Yeni siparişleri dinle
-        this.realtimeSubscription = this.supabase
+    try {
+        // Channel oluştur
+        const channel = this.supabase
             .channel('seller-orders')
             .on('postgres_changes', 
                 { 
                     event: 'INSERT', 
                     schema: 'public', 
-                    table: 'orders',
-                    filter: `seller_id=eq.${this.sellerData.id}`
+                    table: 'orders'
                 }, 
                 (payload) => {
-                    console.log('🆕 Yeni sipariş geldi:', payload.new);
-                    this.handleNewOrder(payload.new);
+                    // Filtreyi client tarafında yap
+                    if (payload.new.seller_id === this.sellerData.id) {
+                        console.log('🆕 Yeni sipariş geldi:', payload.new);
+                        this.handleNewOrder(payload.new);
+                    }
                 }
             )
             .on('postgres_changes',
                 {
                     event: 'UPDATE',
                     schema: 'public',
-                    table: 'orders',
-                    filter: `seller_id=eq.${this.sellerData.id}`
+                    table: 'orders'
                 },
                 (payload) => {
-                    console.log('📝 Sipariş güncellendi:', payload.new);
-                    this.handleOrderUpdate(payload.new);
+                    // Filtreyi client tarafında yap
+                    if (payload.new.seller_id === this.sellerData.id) {
+                        console.log('📝 Sipariş güncellendi:', payload.new);
+                        this.handleOrderUpdate(payload.new);
+                    }
                 }
             )
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('✅ Real-time bağlantısı kuruldu');
-                } else if (status === 'CHANNEL_ERROR') {
-                    console.error('❌ Real-time bağlantı hatası');
+            .on('postgres_changes',
+                {
+                    event: 'DELETE',
+                    schema: 'public',
+                    table: 'orders'
+                },
+                (payload) => {
+                    console.log('🗑️ Sipariş silindi:', payload.old);
+                    // Gerekirse silinen siparişleri de işle
                 }
-            });
+            );
+
+        // Subscribe ol
+        this.realtimeSubscription = channel.subscribe((status) => {
+            console.log('📡 Real-time status:', status);
+            
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Real-time bağlantısı kuruldu');
+            } else if (status === 'CHANNEL_ERROR') {
+                console.error('❌ Real-time bağlantı hatası');
+                // Hata durumunda yeniden bağlanmayı dene
+                setTimeout(() => {
+                    console.log('🔄 Real-time yeniden bağlanılıyor...');
+                    this.setupRealTimeListeners();
+                }, 5000);
+            } else if (status === 'TIMED_OUT') {
+                console.warn('⏰ Real-time zaman aşımı');
+                setTimeout(() => {
+                    console.log('🔄 Real-time yeniden bağlanılıyor...');
+                    this.setupRealTimeListeners();
+                }, 3000);
+            }
+        });
+
+        // Bağlantı hatası kontrolü
+        setTimeout(() => {
+            if (!this.realtimeSubscription) {
+                console.error('❌ Real-time subscription oluşturulamadı');
+                this.setupRealTimeListeners();
+            }
+        }, 3000);
+
+    } catch (error) {
+        console.error('❌ Real-time listener kurulum hatası:', error);
+        // Hata durumunda yeniden dene
+        setTimeout(() => {
+            console.log('🔄 Real-time yeniden deneniyor...');
+            this.setupRealTimeListeners();
+        }, 5000);
     }
+}
 
     // ✅ YENİ SİPARİŞ BİLDİRİMİ
     async handleNewOrder(order) {
