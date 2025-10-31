@@ -846,7 +846,7 @@ setupRealTimeListeners() {
                             <div>
                                 <span style="font-weight: 500;">${item.product_name}</span>
                                 <div style="font-size: 12px; color: #666;">
-                                    ${item.quantity} adet × ${parseFloat(item.unit_price || 0).toFixed(2)} ₺
+                                 ${item.quantity} ${item.unit_type} × ${parseFloat(item.unit_price || 0).toFixed(2)} ₺
                                 </div>
                             </div>
                             <div style="font-weight: bold;">
