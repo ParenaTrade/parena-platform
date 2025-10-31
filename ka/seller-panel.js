@@ -1175,11 +1175,16 @@ async addNewProduct() {
         ? parseFloat(discountPriceInput.value) 
         : null;
 
+    // Price değerini al
+    const price = parseFloat(document.getElementById('productPrice').value);
+    const stock = parseInt(document.getElementById('productStock').value);
+
+    // products tablosu için temel veri
     const productData = {
         name: document.getElementById('productName').value,
         barcode: document.getElementById('productBarcode').value,
-        price: parseFloat(document.getElementById('productPrice').value),
-        stock: parseInt(document.getElementById('productStock').value),
+        price: price, // ✅ products tablosu için price zorunlu
+        stock: stock, // ✅ products tablosu için stock zorunlu
         description: document.getElementById('productDescription').value,
         seller_id: this.sellerData.id,
         currency: 'TRY',
@@ -1187,6 +1192,12 @@ async addNewProduct() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
     };
+
+    // Eğer kategori seçimi varsa ekle
+    const categorySelect = document.getElementById('productCategory');
+    if (categorySelect && categorySelect.value) {
+        productData.category_id = categorySelect.value;
+    }
 
     try {
         // Önce products tablosuna ekle
@@ -1202,9 +1213,9 @@ async addNewProduct() {
         const priceData = {
             product_id: newProduct.id,
             seller_id: this.sellerData.id,
-            price: productData.price,
-            discount_price: discountPrice, // ✅ Discount price eklendi
-            stock: productData.stock,
+            price: price,
+            discount_price: discountPrice,
+            stock: stock,
             currency: 'TRY',
             created: new Date().toISOString(),
             updated: new Date().toISOString()
