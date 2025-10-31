@@ -1292,23 +1292,6 @@ console.log('productCategory:', document.getElementById('productCategory'));
     }
 }
 
-
-
-
-// TEST için manuel değerler
-const productData = {
-    name: "Test Ürün",
-    barcode: "123456789",
-    price: 99.99, // ✅ Manuel değer
-    stock: 10,    // ✅ Manuel değer
-    description: "Test açıklama",
-    seller_id: this.sellerData.id,
-    currency: 'TRY',
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-};
-
     
     // ✅ ÜRÜN TABLOSU RENDER - İNDİRİMLİ FİYAT GÖSTERİMİ
 renderProductsTable(products) {
