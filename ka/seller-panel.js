@@ -23,7 +23,7 @@ class SellerPanel {
         this.init();
     }
 
-   async init() {
+    async init() {
         await this.loadSellerData();
         this.setupRealTimeListeners();
         console.log('✅ SellerPanel başlatıldı');
@@ -167,12 +167,12 @@ class SellerPanel {
                 </div>
                 <div style="margin-top: 15px; display: flex; gap: 10px;">
                     <button class="btn btn-success btn-sm" 
-                            onclick="sellerPanel.acceptOrder('${order.id}')"
+                            onclick="window.sellerPanel.acceptOrder('${order.id}')"
                             style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer;">
                         ✅ Kabul Et
                     </button>
                     <button class="btn btn-danger btn-sm" 
-                            onclick="sellerPanel.rejectOrder('${order.id}')"
+                            onclick="window.sellerPanel.rejectOrder('${order.id}')"
                             style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer;">
                         ❌ Reddet
                     </button>
@@ -249,13 +249,13 @@ class SellerPanel {
 
             if (error) throw error;
 
-            window.panelSystem.showAlert('✅ Sipariş kabul edildi!', 'success');
+            this.showAlert('✅ Sipariş kabul edildi!', 'success');
             this.removeNotification();
             await this.loadOrders();
 
         } catch (error) {
             console.error('Sipariş kabul hatası:', error);
-            window.panelSystem.showAlert('❌ Sipariş kabul edilemedi!', 'error');
+            this.showAlert('❌ Sipariş kabul edilemedi!', 'error');
         }
     }
 
@@ -276,13 +276,13 @@ class SellerPanel {
 
             if (error) throw error;
 
-            window.panelSystem.showAlert('❌ Sipariş reddedildi!', 'success');
+            this.showAlert('❌ Sipariş reddedildi!', 'success');
             this.removeNotification();
             await this.loadOrders();
 
         } catch (error) {
             console.error('Sipariş reddetme hatası:', error);
-            window.panelSystem.showAlert('❌ Sipariş reddedilemedi!', 'error');
+            this.showAlert('❌ Sipariş reddedilemedi!', 'error');
         }
     }
 
@@ -301,7 +301,7 @@ class SellerPanel {
             <div class="section-header">
                 <h2>Sipariş Yönetimi</h2>
                 <div class="header-actions">
-                    <select id="orderStatusFilter" class="form-control" onchange="sellerPanel.filterOrders()">
+                    <select id="orderStatusFilter" class="form-control" onchange="window.sellerPanel.filterOrders()">
                         <option value="">Tüm Siparişler</option>
                         <option value="pending">Bekleyen</option>
                         <option value="confirmed">Onaylanan</option>
@@ -446,7 +446,7 @@ class SellerPanel {
                                 dakika
                             </div>
                             <button class="btn btn-sm btn-primary" 
-                                    onclick="sellerPanel.setPreparationTime('${order.id}')">
+                                    onclick="window.sellerPanel.setPreparationTime('${order.id}')">
                                 Süreyi Ayarla
                             </button>
                         </div>
@@ -493,6 +493,7 @@ class SellerPanel {
             section.innerHTML = `<div class="error-message"><p>Yükleme hatası</p></div>`;
         }
     }
+
     async loadSellerDashboard() {
         const section = document.getElementById('sellerDashboardSection');
         section.innerHTML = `
@@ -775,7 +776,7 @@ class SellerPanel {
                 <tr>
                     <td colspan="7" class="text-center">
                         <p class="text-muted">Henüz ürün eklenmemiş.</p>
-                        <button class="btn btn-primary mt-2" onclick="sellerPanel.showAddProductModal()">
+                        <button class="btn btn-primary mt-2" onclick="window.sellerPanel.showAddProductModal()">
                             <i class="fas fa-plus"></i> İlk Ürünü Ekle
                         </button>
                     </td>
@@ -813,10 +814,10 @@ class SellerPanel {
                 </td>
                 <td>
                     <div style="display: flex; gap: 5px;">
-                        <button class="btn btn-sm btn-primary" onclick="sellerPanel.editProduct('${product.id}')">
+                        <button class="btn btn-sm btn-primary" onclick="window.sellerPanel.editProduct('${product.id}')">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button class="btn btn-sm btn-danger" onclick="sellerPanel.deleteProduct('${product.id}')">
+                        <button class="btn btn-sm btn-danger" onclick="window.sellerPanel.deleteProduct('${product.id}')">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -911,13 +912,13 @@ class SellerPanel {
                     created: new Date().toISOString()
                 }]);
 
-            window.panelSystem.showAlert('Ürün başarıyla eklendi!', 'success');
+            this.showAlert('Ürün başarıyla eklendi!', 'success');
             document.querySelector('.modal-overlay').remove();
             await this.loadProductsData();
 
         } catch (error) {
             console.error('Ürün ekleme hatası:', error);
-            window.panelSystem.showAlert('Ürün eklenemedi!', 'error');
+            this.showAlert('Ürün eklenemedi!', 'error');
         }
     }
 
@@ -936,7 +937,7 @@ class SellerPanel {
     }
 
     async editProduct(productId) {
-        window.panelSystem.showAlert('Ürün düzenleme özelliği yakında eklenecek!', 'info');
+        this.showAlert('Ürün düzenleme özelliği yakında eklenecek!', 'info');
     }
 
     async deleteProduct(productId) {
@@ -949,60 +950,61 @@ class SellerPanel {
 
                 if (error) throw error;
 
-                window.panelSystem.showAlert('Ürün başarıyla silindi!', 'success');
+                this.showAlert('Ürün başarıyla silindi!', 'success');
                 await this.loadProductsData();
 
             } catch (error) {
                 console.error('Ürün silme hatası:', error);
-                window.panelSystem.showAlert('Ürün silinemedi!', 'error');
+                this.showAlert('Ürün silinemedi!', 'error');
             }
         }
     }
 
     // Seller Panel'e yeni metodlar ekle:
 
-async loadSellerOrders() {
-    const section = document.getElementById('ordersSection');
-    section.innerHTML = `
-        <div class="section-header">
-            <h2>Siparişler</h2>
-            <div class="header-actions">
-                <select id="sellerOrderStatusFilter" class="form-control">
-                    <option value="">Tüm Siparişler</option>
-                    <option value="pending">Bekleyen</option>
-                    <option value="confirmed">Onaylanan</option>
-                    <option value="preparing">Hazırlanan</option>
-                    <option value="ready">Hazır</option>
-                    <option value="on_the_way">Yolda</option>
-                    <option value="delivered">Teslim Edilen</option>
-                    <option value="cancelled">İptal Edilen</option>
-                </select>
-                <input type="date" id="sellerOrderDate" class="form-control">
+    async loadSellerOrders() {
+        const section = document.getElementById('ordersSection');
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>Siparişler</h2>
+                <div class="header-actions">
+                    <select id="sellerOrderStatusFilter" class="form-control">
+                        <option value="">Tüm Siparişler</option>
+                        <option value="pending">Bekleyen</option>
+                        <option value="confirmed">Onaylanan</option>
+                        <option value="preparing">Hazırlanan</option>
+                        <option value="ready">Hazır</option>
+                        <option value="on_the_way">Yolda</option>
+                        <option value="delivered">Teslim Edilen</option>
+                        <option value="cancelled">İptal Edilen</option>
+                    </select>
+                    <input type="date" id="sellerOrderDate" class="form-control">
+                </div>
             </div>
-        </div>
-        <div class="card">
-            <div class="card-body">
-                <div id="sellerOrdersList">
-                    <div class="loading-spinner">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <p>Siparişler yükleniyor...</p>
+            <div class="card">
+                <div class="card-body">
+                    <div id="sellerOrdersList">
+                        <div class="loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Siparişler yükleniyor...</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
+        `;
 
-    await this.loadAllSellerOrders();
-    
-    // Setup filters
-    document.getElementById('sellerOrderStatusFilter').addEventListener('change', (e) => {
-        this.filterSellerOrders(e.target.value);
-    });
+        await this.loadAllSellerOrders();
+        
+        // Setup filters
+        document.getElementById('sellerOrderStatusFilter').addEventListener('change', (e) => {
+            this.filterSellerOrders(e.target.value);
+        });
 
-    document.getElementById('sellerOrderDate').addEventListener('change', (e) => {
-        this.filterSellerOrdersByDate(e.target.value);
-    });
-}
+        document.getElementById('sellerOrderDate').addEventListener('change', (e) => {
+            this.filterSellerOrdersByDate(e.target.value);
+        });
+    }
+
     async loadAllSellerOrders() {
         const { data: orders, error } = await this.supabase
             .from('orders')
@@ -1097,10 +1099,10 @@ async loadSellerOrders() {
         
         if (order.status === 'pending') {
             actions.push(`
-                <button class="btn btn-success btn-sm" onclick="sellerPanel.acceptOrder('${order.id}')">
+                <button class="btn btn-success btn-sm" onclick="window.sellerPanel.acceptOrder('${order.id}')">
                     <i class="fas fa-check"></i> Kabul Et
                 </button>
-                <button class="btn btn-danger btn-sm" onclick="sellerPanel.rejectOrder('${order.id}')">
+                <button class="btn btn-danger btn-sm" onclick="window.sellerPanel.rejectOrder('${order.id}')">
                     <i class="fas fa-times"></i> Reddet
                 </button>
             `);
@@ -1108,7 +1110,7 @@ async loadSellerOrders() {
         
         if (order.status === 'confirmed') {
             actions.push(`
-                <button class="btn btn-warning btn-sm" onclick="sellerPanel.updateOrderStatus('${order.id}', 'preparing')">
+                <button class="btn btn-warning btn-sm" onclick="window.sellerPanel.updateOrderStatus('${order.id}', 'preparing')">
                     <i class="fas fa-utensils"></i> Hazırlanıyor
                 </button>
             `);
@@ -1116,7 +1118,7 @@ async loadSellerOrders() {
         
         if (order.status === 'preparing') {
             actions.push(`
-                <button class="btn btn-info btn-sm" onclick="sellerPanel.updateOrderStatus('${order.id}', 'ready')">
+                <button class="btn btn-info btn-sm" onclick="window.sellerPanel.updateOrderStatus('${order.id}', 'ready')">
                     <i class="fas fa-check-double"></i> Hazır
                 </button>
             `);
@@ -1147,12 +1149,12 @@ async loadSellerOrders() {
 
             if (error) throw error;
 
-            window.panelSystem.showAlert(`✅ Sipariş durumu: ${this.getStatusText(newStatus)}`, 'success');
+            this.showAlert(`✅ Sipariş durumu: ${this.getStatusText(newStatus)}`, 'success');
             await this.loadOrders();
 
         } catch (error) {
             console.error('Sipariş durumu güncelleme hatası:', error);
-            window.panelSystem.showAlert('❌ Durum güncellenemedi!', 'error');
+            this.showAlert('❌ Durum güncellenemedi!', 'error');
         }
     }
 
@@ -1162,7 +1164,7 @@ async loadSellerOrders() {
         const prepTime = prepTimeInput?.value;
 
         if (!prepTime || prepTime < 5) {
-            window.panelSystem.showAlert('❌ Geçerli bir süre girin (en az 5 dakika)', 'error');
+            this.showAlert('❌ Geçerli bir süre girin (en az 5 dakika)', 'error');
             return;
         }
 
@@ -1177,11 +1179,11 @@ async loadSellerOrders() {
 
             if (error) throw error;
 
-            window.panelSystem.showAlert(`✅ Hazırlık süresi ${prepTime} dakika olarak ayarlandı`, 'success');
+            this.showAlert(`✅ Hazırlık süresi ${prepTime} dakika olarak ayarlandı`, 'success');
 
         } catch (error) {
             console.error('Hazırlık süresi ayarlama hatası:', error);
-            window.panelSystem.showAlert('❌ Süre ayarlanamadı!', 'error');
+            this.showAlert('❌ Süre ayarlanamadı!', 'error');
         }
     }
 
@@ -1243,12 +1245,12 @@ async loadSellerOrders() {
 
             if (error) throw error;
 
-            window.panelSystem.showAlert('Sipariş iptal edildi', 'success');
+            this.showAlert('Sipariş iptal edildi', 'success');
             await this.loadAllSellerOrders();
 
         } catch (error) {
             console.error('Sipariş iptal hatası:', error);
-            window.panelSystem.showAlert('Sipariş iptal edilemedi!', 'error');
+            this.showAlert('Sipariş iptal edilemedi!', 'error');
         }
     }
 
@@ -1267,12 +1269,12 @@ async loadSellerOrders() {
 
             if (error) throw error;
 
-            window.panelSystem.showAlert('Not eklendi', 'success');
+            this.showAlert('Not eklendi', 'success');
             await this.loadAllSellerOrders();
 
         } catch (error) {
             console.error('Not ekleme hatası:', error);
-            window.panelSystem.showAlert('Not eklenemedi!', 'error');
+            this.showAlert('Not eklenemedi!', 'error');
         }
     }
 
@@ -1371,83 +1373,47 @@ async loadSellerOrders() {
         `;
     }
 
-     getStatusText(status) {
-        const statusMap = {
-            'pending': '⏳ Bekliyor',
-            'confirmed': '✅ Onaylandı',
-            'preparing': '👨‍🍳 Hazırlanıyor',
-            'ready': '📦 Hazır',
-            'on_the_way': '🚗 Yolda',
-            'delivered': '🎉 Teslim Edildi',
-            'cancelled': '❌ İptal Edildi'
-        };
-        return statusMap[status] || status;
-    }
-    
-       
-     // Manuel kurye atama modalı
-async showCourierAssignmentModal(orderId) {
-    const availableCouriers = await window.orderSystem.getAvailableCouriers();
-    
-    const modalHtml = `
-        <div class="modal-overlay">
-            <div class="modal">
-                <div class="modal-header">
-                    <h3>Kurye Atama</h3>
-                    <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="courierSelect">Kurye Seçin</label>
-                        <select id="courierSelect" class="form-control">
-                            <option value="">Kurye seçin...</option>
-                            ${availableCouriers.map(courier => `
-                                <option value="${courier.id}">
-                                    ${courier.full_name} - ${courier.vehicle_type} 
-                                    (${courier.current_deliveries || 0}/5 teslimat)
-                                </option>
-                            `).join('')}
-                        </select>
+    // ✅ KURYE ATAMA SİSTEMİ - TÜM ÖZELLİKLER KORUNDU
+    async showCourierAssignmentModal(orderId) {
+        const availableCouriers = await this.getAvailableCouriers();
+        
+        const modalHtml = `
+            <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
+                <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 500px;">
+                    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0;">Kurye Atama</h3>
+                        <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="courierSelect">Kurye Seçin</label>
+                            <select id="courierSelect" class="form-control">
+                                <option value="">Kurye seçin...</option>
+                                ${availableCouriers.map(courier => `
+                                    <option value="${courier.id}">
+                                        ${courier.full_name} - ${courier.vehicle_type} 
+                                        (${courier.current_deliveries || 0}/5 teslimat)
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                        <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
+                        <button type="button" class="btn btn-primary" onclick="window.sellerPanel.assignCourierManually('${orderId}')">
+                            Kurye Ata
+                        </button>
                     </div>
                 </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
-                    <button type="button" class="btn btn-primary" onclick="sellerPanel.assignCourierManually('${orderId}')">
-                        Kurye Ata
-                    </button>
-                </div>
             </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    // Event listeners - MODAL AÇILDIKTAN SONRA EKLENMELİ
-    setTimeout(() => {
-        const autoAssignBtn = document.getElementById('autoAssignBtn');
-        const manualAssignBtn = document.getElementById('manualAssignBtn');
+        `;
         
-        if (autoAssignBtn) {
-            autoAssignBtn.addEventListener('click', async () => {
-                await this.assignCourierAutomatically(orderId);
-            });
-        }
-        
-        if (manualAssignBtn) {
-            manualAssignBtn.addEventListener('click', () => {
-                const manualSection = document.getElementById('manualAssignmentSection');
-                const autoResult = document.getElementById('autoAssignmentResult');
-                
-                if (manualSection) manualSection.style.display = 'block';
-                if (autoResult) autoResult.style.display = 'none';
-            });
-        }
-    }, 100);
-}
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
     
     async getAvailableCouriers() {
         const { data: couriers, error } = await this.supabase
@@ -1467,19 +1433,19 @@ async showCourierAssignmentModal(orderId) {
             const sellerLocation = await this.getSellerLocation();
             
             // Otomatik kurye ata
-            const assignedCourier = await this.window.courierAssignmentSystem.assignBestCourier(orderId, sellerLocation);
+            const assignedCourier = await this.assignBestCourier(orderId, sellerLocation);
             
             if (assignedCourier) {
-                window.panelSystem.showAlert(`Otomatik kurye atandı: ${assignedCourier.full_name}`, 'success');
+                this.showAlert(`Otomatik kurye atandı: ${assignedCourier.full_name}`, 'success');
                 document.querySelector('.modal-overlay').remove();
                 await this.loadAllSellerOrders();
             } else {
-                window.panelSystem.showAlert('Müsait kurye bulunamadı!', 'error');
+                this.showAlert('Müsait kurye bulunamadı!', 'error');
             }
     
         } catch (error) {
             console.error('Otomatik kurye atama hatası:', error);
-            window.panelSystem.showAlert('Kurye atanamadı!', 'error');
+            this.showAlert('Kurye atanamadı!', 'error');
         }
     }
     
@@ -1489,19 +1455,19 @@ async showCourierAssignmentModal(orderId) {
         const courierId = courierSelect.value;
 
         if (!courierId) {
-            window.panelSystem.showAlert('Lütfen bir kurye seçin!', 'error');
+            this.showAlert('Lütfen bir kurye seçin!', 'error');
             return;
         }
 
         try {
-            await window.orderSystem.assignCourierToOrder(orderId, courierId);
-            window.panelSystem.showAlert('Kurye başarıyla atandı!', 'success');
+            await this.assignCourierToOrder(orderId, courierId);
+            this.showAlert('Kurye başarıyla atandı!', 'success');
             document.querySelector('.modal-overlay').remove();
             await this.loadAllSellerOrders();
 
         } catch (error) {
             console.error('Manuel kurye atama hatası:', error);
-            window.panelSystem.showAlert('Kurye atanamadı!', 'error');
+            this.showAlert('Kurye atanamadı!', 'error');
         }
     }
    
@@ -1514,6 +1480,35 @@ async showCourierAssignmentModal(orderId) {
             };
         }
         return null;
+    }
+    
+    async assignBestCourier(orderId, sellerLocation) {
+        // Basit kurye atama algoritması
+        const availableCouriers = await this.getAvailableCouriers();
+        
+        if (availableCouriers.length === 0) return null;
+        
+        // En az teslimatı olan kuryeyi seç
+        const bestCourier = availableCouriers[0];
+        
+        // Kuryeyi siparişe ata
+        await this.assignCourierToOrder(orderId, bestCourier.id);
+        
+        return bestCourier;
+    }
+    
+    async assignCourierToOrder(orderId, courierId) {
+        const { error } = await this.supabase
+            .from('orders')
+            .update({
+                courier_id: courierId,
+                status: 'on_the_way',
+                assigned_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', orderId);
+
+        if (error) throw error;
     }
     
     async showCourierInfo(orderId) {
@@ -1543,9 +1538,50 @@ async showCourierAssignmentModal(orderId) {
         // Varsayılan olarak true döndür
         return true;
     }
- }
 
-  // ✅ TEMİZLİK METODU
+    getStatusText(status) {
+        const statusMap = {
+            'pending': '⏳ Bekliyor',
+            'confirmed': '✅ Onaylandı',
+            'preparing': '👨‍🍳 Hazırlanıyor',
+            'ready': '📦 Hazır',
+            'on_the_way': '🚗 Yolda',
+            'delivered': '🎉 Teslim Edildi',
+            'cancelled': '❌ İptal Edildi'
+        };
+        return statusMap[status] || status;
+    }
+
+    showAlert(message, type = 'info') {
+        // Basit alert sistemi
+        const alert = document.createElement('div');
+        alert.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            z-index: 10000;
+            font-weight: 500;
+            animation: slideInRight 0.3s ease-out;
+        `;
+        
+        if (type === 'success') alert.style.background = '#28a745';
+        else if (type === 'error') alert.style.background = '#dc3545';
+        else if (type === 'warning') alert.style.background = '#ffc107';
+        else alert.style.background = '#17a2b8';
+        
+        alert.textContent = message;
+        document.body.appendChild(alert);
+        
+        setTimeout(() => {
+            alert.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => alert.remove(), 300);
+        }, 3000);
+    }
+
+    // ✅ TEMİZLİK METODU
     destroy() {
         if (this.realtimeSubscription) {
             this.supabase.removeChannel(this.realtimeSubscription);
@@ -1554,22 +1590,21 @@ async showCourierAssignmentModal(orderId) {
     }
 }
 
-// ✅ GLOBAL ERİŞİM
+// Global
 window.SellerPanel = SellerPanel;
 
 // ✅ EVENT LISTENER - panelSystem event'ini dinle
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔄 SellerPanel event listener kuruluyor...');
     
-    document.addEventListener('panelSystemInitialized', function(e) {
-        console.log('🎯 panelSystem event yakalandı:', e.detail);
-        
-        if (e.detail.role === 'seller' && e.detail.userProfile) {
-            console.log('🏪 SellerPanel başlatılıyor...');
-            window.sellerPanel = new SellerPanel(e.detail.userProfile);
+    // Panel system event'ini dinle
+    if (window.panelSystem && typeof window.panelSystem.on === 'function') {
+        window.panelSystem.on('sellerSessionStart', (userProfile) => {
+            console.log('🛍️ SellerPanel başlatılıyor...');
+            window.sellerPanel = new SellerPanel(userProfile);
             window.currentPanel = window.sellerPanel;
-        }
-    });
+        });
+    }
 });
 
 // ✅ FALLBACK: Eğer event gelmezse, doğrudan başlat
@@ -1581,3 +1616,4 @@ setTimeout(() => {
     }
 }, 1000);
 
+console.log('✅ seller-panel.js yüklendi - TÜM ÖZELLİKLER AKTİF');
