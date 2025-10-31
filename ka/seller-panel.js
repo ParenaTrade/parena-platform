@@ -69,57 +69,7 @@ class SellerPanel {
         };
     }
 }
-            if (!data) {
-                console.log('🆕 Yeni seller profili oluşturuluyor...');
-                
-                // Yeni seller profili oluştur
-                this.sellerData = {
-                    business_name: this.userProfile.name,
-                    phone: this.userProfile.phone,
-                    email: this.userProfile.email || '',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                };
-                
-                try {
-                    const { data: newSeller, error: createError } = await this.supabase
-                        .from('seller_profiles')
-                        .insert([this.sellerData])
-                        .select()
-                        .single();
-                    
-                    if (!createError && newSeller) {
-                        this.sellerData = newSeller;
-                        console.log('✅ Yeni seller profili oluşturuldu:', newSeller);
-                    } else {
-                        throw createError;
-                    }
-                } catch (createError) {
-                    console.error('❌ Seller profili oluşturulamadı:', createError);
-                    // Fallback: Geçici seller data
-                    this.sellerData = {
-                        id: 'temp-' + Date.now(),
-                        business_name: this.userProfile.name,
-                        phone: this.userProfile.phone
-                    };
-                }
-            } else {
-                this.sellerData = data;
-                console.log('✅ Seller verisi yüklendi:', data);
-            }
 
-        } catch (error) {
-            console.error('❌ Seller veri hatası:', error);
-            // Fallback: Geçici seller data
-            this.sellerData = {
-                id: 'temp-' + Date.now(),
-                business_name: this.userProfile.name,
-                phone: this.userProfile.phone
-            };
-        }
-    }
-
-// ✅ DASHBOARD METODLARI - EKSİK OLANLAR EKLENDİ
    // ✅ DASHBOARD METODLARI
     async loadSellerDashboard() {
         const section = document.getElementById('sellerDashboardSection');
