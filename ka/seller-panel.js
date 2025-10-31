@@ -177,19 +177,6 @@ class SellerPanel {
     }
 
 
-        // Event listener ekle
-        setTimeout(() => {
-            const viewAllBtn = document.getElementById('viewAllOrders');
-            if (viewAllBtn) {
-                viewAllBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    if (window.panelSystem) {
-                        window.panelSystem.showSection('orders');
-                    }
-                });
-            }
-        }, 100);
-
 async loadRecentSellerOrders() {
         if (!this.sellerData?.id) return;
 
