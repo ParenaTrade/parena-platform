@@ -323,7 +323,7 @@ async loadStockAlerts() {
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: 500;">${product.name}</span>
                     <span style="color: var(--danger); font-weight: bold;">
-                        ${product.stock} adet
+                        ${product.stock} ${product.unit_type || 'adet'}
                     </span>
                 </div>
             </div>
