@@ -93,13 +93,9 @@ class SellerPanel {
     // ✅ DASHBOARD - GELİŞMİŞ VERSİYON
     async loadSellerDashboard() {
         const section = document.getElementById('sellerDashboardSection');
-        if (!section) return;
-        
         section.innerHTML = `
-            <div class="section-header">
-                <h1>İşletme Paneli</h1>
-                <p class="subtitle">${this.sellerData?.business_name || ''}</p>
-            </div>
+            <h1>İşletme Paneli</h1>
+            <p class="subtitle">${this.sellerData?.business_name || ''}</p>
             
             <div class="stats-grid">
                 <div class="stat-card">
@@ -145,7 +141,7 @@ class SellerPanel {
                     <div class="card">
                         <div class="card-header">
                             <h3>Son Siparişler</h3>
-                            <a href="#" class="view-all" id="viewAllOrders">Tümünü Gör</a>
+                            <a href="#" class="view-all" onclick="window.panelSystem.showSection('orders')">Tümünü Gör</a>
                         </div>
                         <div class="card-body">
                             <div id="recentSellerOrders">
@@ -175,6 +171,12 @@ class SellerPanel {
             </div>
         `;
 
+        await this.loadSellerStats();
+        await this.loadRecentSellerOrders();
+        await this.loadStockAlerts();
+    }
+
+
         // Event listener ekle
         setTimeout(() => {
             const viewAllBtn = document.getElementById('viewAllOrders');
@@ -188,10 +190,6 @@ class SellerPanel {
             }
         }, 100);
 
-        await this.loadSellerStats();
-        await this.loadRecentSellerOrders();
-        await this.loadStockAlerts();
-    }
 async loadRecentSellerOrders() {
         if (!this.sellerData?.id) return;
 
