@@ -1545,22 +1545,39 @@ async showCourierAssignmentModal(orderId) {
     }
  }
 
-  // Cleanup
+  // ✅ TEMİZLİK METODU
     destroy() {
         if (this.realtimeSubscription) {
-            this.realtimeSubscription.unsubscribe();
+            this.supabase.removeChannel(this.realtimeSubscription);
         }
+        console.log('🧹 SellerPanel temizlendi');
     }
 }
 
-// Global
+// ✅ GLOBAL ERİŞİM
 window.SellerPanel = SellerPanel;
 
-if (window.panelSystem && typeof window.panelSystem.on === 'function') {
-    window.panelSystem.on('sellerSessionStart', (userProfile) => {
-        console.log('🛍️ SellerPanel başlatılıyor...');
-        window.sellerPanel = new SellerPanel(userProfile);
+// ✅ EVENT LISTENER - panelSystem event'ini dinle
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔄 SellerPanel event listener kuruluyor...');
+    
+    document.addEventListener('panelSystemInitialized', function(e) {
+        console.log('🎯 panelSystem event yakalandı:', e.detail);
+        
+        if (e.detail.role === 'seller' && e.detail.userProfile) {
+            console.log('🏪 SellerPanel başlatılıyor...');
+            window.sellerPanel = new SellerPanel(e.detail.userProfile);
+            window.currentPanel = window.sellerPanel;
+        }
     });
-}
+});
 
-console.log('✅ seller-panel.js yüklendi - SİPARİŞ SİSTEMİ AKTİF');
+// ✅ FALLBACK: Eğer event gelmezse, doğrudan başlat
+setTimeout(() => {
+    if (!window.sellerPanel && window.userProfile?.role === 'seller') {
+        console.log('🔄 Fallback: SellerPanel doğrudan başlatılıyor...');
+        window.sellerPanel = new SellerPanel(window.userProfile);
+        window.currentPanel = window.sellerPanel;
+    }
+}, 1000);
+
