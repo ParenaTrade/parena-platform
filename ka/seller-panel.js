@@ -1553,8 +1553,8 @@ async showCourierAssignmentModal(orderId) {
     }
 }
 
-// Global instance
-window.sellerPanel = null;
+// Global
+window.SellerPanel = SellerPanel;
 
 if (window.panelSystem && typeof window.panelSystem.on === 'function') {
     window.panelSystem.on('sellerSessionStart', (userProfile) => {
