@@ -1220,69 +1220,44 @@ async updateProduct(productId) {
     }
 
     // ✅ DASHBOARD - DÜZELTİLMİŞ
-    async loadSellerStats() {
-        if (!this.sellerData?.id) {
-            console.error('❌ Seller ID yok, istatistikler yüklenemiyor');
-            return;
-        }
-
+async loadSellerStats() {
         const today = new Date().toISOString().split('T')[0];
         
-        try {
-            console.log('📊 İstatistikler yükleniyor, seller_id:', this.sellerData.id);
-            const { data: orders, error } = await this.supabase
-                .from('orders')
-                .select('id, total_amount, status, created_at')
-                .eq('seller_id', this.sellerData.id)
-                .gte('created_at', today);
+        const { data: orders, error } = await this.supabase
+            .from('orders')
+            .select('id, total_amount, status, created_at')
+            .eq('seller_id', this.sellerData?.id)
+            .gte('created_at', today);
 
-            if (error) {
-                console.error('❌ İstatistik sorgu hatası:', error);
-                return;
-            }
+        if (!error && orders) {
+            document.getElementById('todayOrders').textContent = orders.length;
+            
+            const todayRevenue = orders
+                .filter(order => order.status !== 'cancelled')
+                .reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
+            document.getElementById('todayRevenue').textContent = 
+                todayRevenue.toFixed(2) + ' ₺';
 
-            // Default değerleri sıfırla
-            document.getElementById('todayOrders').textContent = '0';
-            document.getElementById('todayRevenue').textContent = '0 ₺';
-            document.getElementById('pendingOrders').textContent = '0';
-            document.getElementById('sellerRating').textContent = '0.0';
+            const pendingOrders = orders.filter(order => 
+                ['pending', 'confirmed', 'preparing'].includes(order.status)
+            ).length;
+            document.getElementById('pendingOrders').textContent = pendingOrders;
+        }
 
-            if (orders && orders.length > 0) {
-                document.getElementById('todayOrders').textContent = orders.length;
-                
-                const todayRevenue = orders
-                    .filter(order => order.status !== 'cancelled')
-                    .reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
-                document.getElementById('todayRevenue').textContent = 
-                    todayRevenue.toFixed(2) + ' ₺';
+        // Calculate average rating from orders
+        const { data: ratedOrders } = await this.supabase
+            .from('orders')
+            .select('performance_rating')
+            .eq('seller_id', this.sellerData?.id)
+            .not('performance_rating', 'is', null);
 
-                const pendingOrders = orders.filter(order => 
-                    ['pending', 'confirmed', 'preparing'].includes(order.status)
-                ).length;
-                document.getElementById('pendingOrders').textContent = pendingOrders;
-            }
-
-            // Average rating - orders tablosunda performance_rating yoksa geçici çözüm
-            try {
-                const { data: ratedOrders } = await this.supabase
-                    .from('orders')
-                    .select('seller_rating')
-                    .eq('seller_id', this.sellerData.id)
-                    .not('seller_rating', 'is', null);
-
-                if (ratedOrders && ratedOrders.length > 0) {
-                    const avgRating = ratedOrders.reduce((sum, order) => 
-                        sum + parseFloat(order.seller_rating || 0), 0) / ratedOrders.length;
-                    document.getElementById('sellerRating').textContent = avgRating.toFixed(1);
-                }
-            } catch (ratingError) {
-                console.log('⭐ Rating hesaplanamadı, varsayılan kullanılıyor');
-            }
-
-        } catch (error) {
-            console.error('❌ İstatistik yükleme hatası:', error);
+        if (ratedOrders && ratedOrders.length > 0) {
+            const avgRating = ratedOrders.reduce((sum, order) => 
+                sum + parseFloat(order.performance_rating || 0), 0) / ratedOrders.length;
+            document.getElementById('sellerRating').textContent = avgRating.toFixed(1);
         }
     }
+
     // Diğer metodlar aynı kalacak...
     async loadSectionData(sectionName) {
         this.currentSection = sectionName;
