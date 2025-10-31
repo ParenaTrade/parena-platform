@@ -569,6 +569,7 @@ async loadRecentSellerOrders() {
 }
 
 // ✅ STOK UYARILARI - GÜNCELLENMİŞ VERSİYON
+// ✅ STOK UYARILARI - PRODUCT_PRICES STOK BİLGİSİ İLE
 async loadStockAlerts() {
     if (!this.sellerData?.id) {
         console.log('⏳ Seller ID bekleniyor...');
@@ -581,11 +582,19 @@ async loadStockAlerts() {
     }
 
     try {
-        const { data: products, error } = await this.supabase
-            .from('products')
-            .select('name, stock')
+        // Product_prices tablosundan stok bilgilerini çek
+        const { data: lowStockProducts, error } = await this.supabase
+            .from('product_prices')
+            .select(`
+                stock,
+                product:products!inner(
+                    name,
+                    unit_type
+                )
+            `)
             .eq('seller_id', this.sellerData.id)
-            .lt('stock', 10);
+            .lt('stock', 10)
+            .order('stock', { ascending: true });
 
         const container = document.getElementById('stockAlerts');
         if (!container) {
@@ -599,17 +608,17 @@ async loadStockAlerts() {
             return;
         }
 
-        if (!products || products.length === 0) {
+        if (!lowStockProducts || lowStockProducts.length === 0) {
             container.innerHTML = '<p class="text-muted">Stok uyarısı bulunmuyor.</p>';
             return;
         }
 
-        container.innerHTML = products.map(product => `
+        container.innerHTML = lowStockProducts.map(item => `
             <div class="stock-alert" style="border-bottom: 1px solid #eee; padding: 10px 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 500;">${product.name}</span>
+                    <span style="font-weight: 500;">${item.product.name}</span>
                     <span style="color: var(--danger); font-weight: bold;">
-                        ${product.stock} ${product.unit_type || 'adet'}
+                        ${item.stock} ${item.product.unit_type || 'adet'}
                     </span>
                 </div>
             </div>
@@ -623,7 +632,8 @@ async loadStockAlerts() {
         }
     }
 }
-        // ✅ SİPARİŞ KABUL/RED - DÜZELTİLMİŞ
+    
+    // ✅ SİPARİŞ KABUL/RED - DÜZELTİLMİŞ
     async acceptOrder(orderId) {
         if (!orderId) {
             console.error('❌ Order ID yok');
@@ -1013,120 +1023,223 @@ async loadStockAlerts() {
         await this.loadProductsData();
     }
     
-    async loadProductsData() {
-        if (!this.sellerData?.id) {
-            console.error('❌ Seller ID yok, ürünler yüklenemiyor');
-            return;
-        }
-
-        try {
-            const { data: products, error } = await this.supabase
-                .from('products')
-                .select('*')
-                .eq('seller_id', this.sellerData.id)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-
-            this.products = products || [];
-            this.renderProductsTable(this.products);
-
-        } catch (error) {
-            console.error('❌ Ürünler yükleme hatası:', error);
-            const tbody = document.querySelector('#productsTable tbody');
-            if (tbody) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="7" class="text-center">
-                            <div class="error-message">
-                                <p>Ürünler yüklenirken hata oluştu</p>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }
-        }
+    // ✅ ÜRÜN YÖNETİMİ - PRODUCT_PRICES ENTEGRASYONLU
+async loadProductsData() {
+    if (!this.sellerData?.id) {
+        console.error('❌ Seller ID yok, ürünler yüklenemiyor');
+        return;
     }
 
-    renderProductsTable(products) {
+    try {
+        // Products ve product_prices join ile birlikte çek
+        const { data: products, error } = await this.supabase
+            .from('products')
+            .select(`
+                *,
+                product_prices!inner(
+                    price,
+                    discount_price,
+                    stock,
+                    currency,
+                    centre_id
+                )
+            `)
+            .eq('seller_id', this.sellerData.id)
+            .eq('product_prices.seller_id', this.sellerData.id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Product_prices verilerini ana ürün objesine merge et
+        this.products = (products || []).map(product => {
+            const priceData = product.product_prices[0]; // İlk price kaydını al
+            return {
+                ...product,
+                current_price: priceData?.price || product.price,
+                discount_price: priceData?.discount_price,
+                current_stock: priceData?.stock || product.stock,
+                currency: priceData?.currency || product.currency,
+                centre_id: priceData?.centre_id
+            };
+        });
+
+        console.log('✅ Ürünler yüklendi:', this.products.length);
+        this.renderProductsTable(this.products);
+
+    } catch (error) {
+        console.error('❌ Ürünler yükleme hatası:', error);
         const tbody = document.querySelector('#productsTable tbody');
-        if (!tbody) return;
-        
-        if (!products.length) {
+        if (tbody) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="7" class="text-center">
-                        <p class="text-muted">Henüz ürün eklenmemiş.</p>
-                        <button class="btn btn-primary mt-2" id="addFirstProduct">
-                            <i class="fas fa-plus"></i> İlk Ürünü Ekle
-                        </button>
+                        <div class="error-message">
+                            <p>Ürünler yüklenirken hata oluştu</p>
+                        </div>
                     </td>
                 </tr>
             `;
-            
-            setTimeout(() => {
-                const addFirstBtn = document.getElementById('addFirstProduct');
-                if (addFirstBtn) {
-                    addFirstBtn.addEventListener('click', () => {
-                        this.showAddProductModal();
-                    });
-                }
-            }, 100);
-            
-            return;
+        }
+    }
+}
+
+    // ✅ YENİ ÜRÜN EKLEME - PRODUCT_PRICES ENTEGRASYONLU
+async addNewProduct() {
+    const productData = {
+        name: document.getElementById('productName').value,
+        barcode: document.getElementById('productBarcode').value,
+        price: parseFloat(document.getElementById('productPrice').value),
+        stock: parseInt(document.getElementById('productStock').value),
+        description: document.getElementById('productDescription').value,
+        seller_id: this.sellerData.id,
+        currency: 'TRY',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+    };
+
+    try {
+        // Önce products tablosuna ekle
+        const { data: newProduct, error: productError } = await this.supabase
+            .from('products')
+            .insert([productData])
+            .select()
+            .single();
+
+        if (productError) throw productError;
+
+        // Sonra product_prices tablosuna ekle
+        const priceData = {
+            product_id: newProduct.id,
+            seller_id: this.sellerData.id,
+            price: productData.price,
+            stock: productData.stock,
+            currency: 'TRY',
+            created: new Date().toISOString(),
+            updated: new Date().toISOString()
+        };
+
+        // Eğer centre_id varsa ekle
+        if (this.sellerData.centre_id) {
+            priceData.centre_id = this.sellerData.centre_id;
         }
 
-        tbody.innerHTML = products.map(product => {
-            // Kategori ismini bul
-            const category = this.categories.find(cat => cat.id === product.category_id);
-            const categoryName = category ? category.name : (product.category || '-');
+        const { error: priceError } = await this.supabase
+            .from('product_prices')
+            .insert([priceData]);
 
-            return `
+        if (priceError) throw priceError;
+
+        this.showAlert('✅ Ürün başarıyla eklendi!', 'success');
+        document.querySelector('.modal-overlay').remove();
+        await this.loadProductsData();
+
+    } catch (error) {
+        console.error('Ürün ekleme hatası:', error);
+        this.showAlert('❌ Ürün eklenemedi!', 'error');
+    }
+}
+    
+    // ✅ ÜRÜN TABLOSU RENDER - PRODUCT_PRICES BİLGİLERİ İLE
+renderProductsTable(products) {
+    const tbody = document.querySelector('#productsTable tbody');
+    if (!tbody) return;
+    
+    if (!products.length) {
+        tbody.innerHTML = `
             <tr>
-                <td>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        ${product.imgurl ? `<img src="${product.imgurl}" alt="${product.name}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">` : ''}
-                        <div>
-                            <div style="font-weight: 500;">${product.name}</div>
-                            ${product.description ? `<div style="font-size: 12px; color: #666;">${product.description.substring(0, 50)}...</div>` : ''}
-                        </div>
-                    </div>
-                </td>
-                <td>${product.barcode || '-'}</td>
-                <td>${categoryName}</td>
-                <td>
-                    <div style="font-weight: bold;">${parseFloat(product.price || 0).toFixed(2)} ₺</div>
-                    ${product.tax_rate ? `<div style="font-size: 12px; color: #666;">KDV: %${product.tax_rate}</div>` : ''}
-                </td>
-                <td>
-                    <span class="${product.stock < 10 ? 'text-danger' : 'text-success'}" style="font-weight: 500;">
-                        ${product.stock} ${product.unit_type || 'adet'}
-                    </span>
-                </td>
-                <td>
-                    <span class="status-badge status-${product.is_active ? 'active' : 'inactive'}">
-                        ${product.is_active ? 'Aktif' : 'Pasif'}
-                    </span>
-                </td>
-                <td>
-                    <div style="display: flex; gap: 5px;">
-                        <button class="btn btn-sm btn-warning edit-product-btn" data-product-id="${product.id}">
-                            <i class="fas fa-edit"></i> Düzenle
-                        </button>
-                        <button class="btn btn-sm btn-secondary toggle-product-btn" data-product-id="${product.id}" data-current-status="${product.is_active}">
-                            <i class="fas fa-power-off"></i> ${product.is_active ? 'Pasif Et' : 'Aktif Et'}
-                        </button>
-                    </div>
+                <td colspan="8" class="text-center">
+                    <p class="text-muted">Henüz ürün eklenmemiş.</p>
+                    <button class="btn btn-primary mt-2" id="addFirstProduct">
+                        <i class="fas fa-plus"></i> İlk Ürünü Ekle
+                    </button>
                 </td>
             </tr>
-            `;
-        }).join('');
-
-        // Event listener'ları ekle
+        `;
+        
         setTimeout(() => {
-            this.attachProductEventListeners();
+            const addFirstBtn = document.getElementById('addFirstProduct');
+            if (addFirstBtn) {
+                addFirstBtn.addEventListener('click', () => {
+                    this.showAddProductModal();
+                });
+            }
         }, 100);
+        
+        return;
     }
+
+    tbody.innerHTML = products.map(product => {
+        // Kategori ismini bul
+        const category = this.categories.find(cat => cat.id === product.category_id);
+        const categoryName = category ? category.name : (product.category_name || '-');
+
+        // Fiyat bilgilerini product_prices'tan al
+        const displayPrice = product.current_price || product.price;
+        const displayStock = product.current_stock || product.stock;
+        const hasDiscount = product.discount_price && product.discount_price < displayPrice;
+
+        return `
+        <tr>
+            <td>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    ${product.imgurl ? `<img src="${product.imgurl}" alt="${product.name}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">` : ''}
+                    <div>
+                        <div style="font-weight: 500;">${product.name}</div>
+                        ${product.description ? `<div style="font-size: 12px; color: #666;">${product.description.substring(0, 50)}...</div>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td>${product.barcode || '-'}</td>
+            <td>${categoryName}</td>
+            <td>
+                <div style="font-weight: bold;">
+                    ${hasDiscount ? `
+                        <div style="color: #dc3545; text-decoration: line-through; font-size: 12px;">
+                            ${parseFloat(displayPrice).toFixed(2)} ₺
+                        </div>
+                        <div style="color: #28a745;">
+                            ${parseFloat(product.discount_price).toFixed(2)} ₺
+                        </div>
+                    ` : `
+                        ${parseFloat(displayPrice).toFixed(2)} ₺
+                    `}
+                </div>
+                ${product.tax_rate ? `<div style="font-size: 12px; color: #666;">KDV: %${product.tax_rate}</div>` : ''}
+            </td>
+            <td>
+                <span class="${displayStock < 10 ? 'text-danger' : 'text-success'}" style="font-weight: 500;">
+                    ${displayStock} ${product.unit_type || 'adet'}
+                </span>
+            </td>
+            <td>
+                <span class="status-badge status-${product.is_active ? 'active' : 'inactive'}">
+                    ${product.is_active ? 'Aktif' : 'Pasif'}
+                </span>
+            </td>
+            <td>
+                ${product.centre_id ? `<span class="badge badge-info">Şube</span>` : '<span class="badge badge-primary">Merkez</span>'}
+            </td>
+            <td>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn btn-sm btn-warning edit-product-btn" data-product-id="${product.id}">
+                        <i class="fas fa-edit"></i> Düzenle
+                    </button>
+                    <button class="btn btn-sm btn-secondary toggle-product-btn" data-product-id="${product.id}" data-current-status="${product.is_active}">
+                        <i class="fas fa-power-off"></i> ${product.is_active ? 'Pasif Et' : 'Aktif Et'}
+                    </button>
+                </div>
+            </td>
+        </tr>
+        `;
+    }).join('');
+
+    // Event listener'ları ekle
+    setTimeout(() => {
+        this.attachProductEventListeners();
+    }, 100);
+}
+    
     attachProductEventListeners() {
         // Düzenle butonları
         document.querySelectorAll('.edit-product-btn').forEach(btn => {
@@ -1268,38 +1381,85 @@ showEditProductModal(product) {
         });
     }
     
+// ✅ ÜRÜN DÜZENLEME - PRODUCT_PRICES ENTEGRASYONLU
 async updateProduct(productId) {
-        const form = document.getElementById('editProductForm');
-        const formData = new FormData(form);
-        
-        const productData = {
-            name: document.getElementById('editProductName').value,
-            barcode: document.getElementById('editProductBarcode').value,
-            price: parseFloat(document.getElementById('editProductPrice').value),
-            stock: parseInt(document.getElementById('editProductStock').value),
-            category_id: document.getElementById('editProductCategory').value || null,
-            category_name: document.getElementById('editProductCategory.cat.name').value || null,
-            description: document.getElementById('editProductDescription').value,
-            updated_at: new Date().toISOString()
-        };
+    const form = document.getElementById('editProductForm');
+    
+    const productData = {
+        name: document.getElementById('editProductName').value,
+        barcode: document.getElementById('editProductBarcode').value,
+        description: document.getElementById('editProductDescription').value,
+        category_id: document.getElementById('editProductCategory').value || null,
+        updated_at: new Date().toISOString()
+    };
 
-        try {
-            const { error } = await this.supabase
-                .from('products')
-                .update(productData)
-                .eq('id', productId);
+    const priceData = {
+        price: parseFloat(document.getElementById('editProductPrice').value),
+        stock: parseInt(document.getElementById('editProductStock').value),
+        updated: new Date().toISOString()
+    };
 
-            if (error) throw error;
+    try {
+        // Products tablosunu güncelle
+        const { error: productError } = await this.supabase
+            .from('products')
+            .update(productData)
+            .eq('id', productId);
 
-            this.showAlert('✅ Ürün başarıyla güncellendi!', 'success');
-            document.querySelector('.modal-overlay').remove();
-            await this.loadProductsData();
+        if (productError) throw productError;
 
-        } catch (error) {
-            console.error('Ürün güncelleme hatası:', error);
-            this.showAlert('❌ Ürün güncellenemedi!', 'error');
+        // Product_prices tablosunu güncelle veya oluştur
+        const { data: existingPrice, error: priceCheckError } = await this.supabase
+            .from('product_prices')
+            .select('id')
+            .eq('product_id', productId)
+            .eq('seller_id', this.sellerData.id)
+            .single();
+
+        if (priceCheckError && priceCheckError.code !== 'PGRST116') {
+            throw priceCheckError;
         }
+
+        if (existingPrice) {
+            // Mevcut price kaydını güncelle
+            const { error: priceUpdateError } = await this.supabase
+                .from('product_prices')
+                .update(priceData)
+                .eq('id', existingPrice.id);
+
+            if (priceUpdateError) throw priceUpdateError;
+        } else {
+            // Yeni price kaydı oluştur
+            const newPriceData = {
+                product_id: productId,
+                seller_id: this.sellerData.id,
+                ...priceData,
+                currency: 'TRY',
+                created: new Date().toISOString()
+            };
+
+            // Eğer centre_id varsa ekle
+            if (this.sellerData.centre_id) {
+                newPriceData.centre_id = this.sellerData.centre_id;
+            }
+
+            const { error: priceInsertError } = await this.supabase
+                .from('product_prices')
+                .insert([newPriceData]);
+
+            if (priceInsertError) throw priceInsertError;
+        }
+
+        this.showAlert('✅ Ürün başarıyla güncellendi!', 'success');
+        document.querySelector('.modal-overlay').remove();
+        await this.loadProductsData();
+
+    } catch (error) {
+        console.error('Ürün güncelleme hatası:', error);
+        this.showAlert('❌ Ürün güncellenemedi!', 'error');
     }
+}
+    
     // ✅ ÜRÜN PASİF ETME (SİLME YERİNE)
     async toggleProductStatus(productId, currentStatus) {
         const newStatus = !currentStatus;
