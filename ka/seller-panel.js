@@ -1107,7 +1107,7 @@ async loadProducts() {
     await this.loadProductsData();
 }
     
-    // ✅ ÜRÜN YÖNETİMİ - PRODUCT_PRICES ENTEGRASYONLU
+// ✅ ÜRÜN VERİLERİNİ YÜKLE - PRODUCT_PRICES JOIN DÜZELTMESİ
 async loadProductsData() {
     if (!this.sellerData?.id) {
         console.error('❌ Seller ID yok, ürünler yüklenemiyor');
@@ -1115,12 +1115,12 @@ async loadProductsData() {
     }
 
     try {
-        // Products ve product_prices join ile birlikte çek
+        // Products ve product_prices join ile birlikte çek - DÜZELTİLMİŞ
         const { data: products, error } = await this.supabase
             .from('products')
             .select(`
                 *,
-                product_prices!inner(
+                product_prices(
                     price,
                     discount_price,
                     stock,
@@ -1129,25 +1129,25 @@ async loadProductsData() {
                 )
             `)
             .eq('seller_id', this.sellerData.id)
-            .eq('product_prices.seller_id', this.sellerData.id)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        // Product_prices verilerini ana ürün objesine merge et
+        // Product_prices verilerini ana ürün objesine merge et - DÜZELTİLMİŞ
         this.products = (products || []).map(product => {
-            const priceData = product.product_prices[0]; // İlk price kaydını al
+            const priceData = product.product_prices && product.product_prices.length > 0 ? product.product_prices[0] : null;
             return {
                 ...product,
                 current_price: priceData?.price || product.price,
-                discount_price: priceData?.discount_price,
+                discount_price: priceData?.discount_price || null,
                 current_stock: priceData?.stock || product.stock,
                 currency: priceData?.currency || product.currency,
-                centre_id: priceData?.centre_id
+                centre_id: priceData?.centre_id || null
             };
         });
 
         console.log('✅ Ürünler yüklendi:', this.products.length);
+        console.log('📊 İndirimli ürünler:', this.products.filter(p => p.discount_price).length);
         this.renderProductsTable(this.products);
 
     } catch (error) {
@@ -1156,9 +1156,9 @@ async loadProductsData() {
         if (tbody) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center">
+                    <td colspan="8" class="text-center">
                         <div class="error-message">
-                            <p>Ürünler yüklenirken hata oluştu</p>
+                            <p>Ürünler yüklenirken hata oluştu: ${error.message}</p>
                         </div>
                     </td>
                 </tr>
@@ -1166,7 +1166,7 @@ async loadProductsData() {
         }
     }
 }
-
+    
     // ✅ YENİ ÜRÜN EKLEME - PRODUCT_PRICES ENTEGRASYONLU
 async addNewProduct() {
     const productData = {
@@ -1340,12 +1340,40 @@ renderProductsTable(products) {
         `;
     }).join('');
 
-    // Event listener'ları ekle
-    setTimeout(() => {
-        this.attachProductEventListeners();
-    }, 100);
-}    
+   // ✅ EVENT LISTENER'LARI EKLE - DÜZELTİLMİŞ
+attachProductEventListeners() {
+    console.log('🔗 Ürün event listenerları ekleniyor...');
+    
+    // Düzenle butonları - DÜZELTİLMİŞ
+    document.querySelectorAll('.edit-product-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            console.log('✏️ Düzenle butonuna tıklandı');
+            const productId = btn.getAttribute('data-product-id');
+            console.log('🆔 Product ID:', productId);
+            if (productId) {
+                this.editProduct(productId);
+            } else {
+                console.error('❌ Product ID bulunamadı');
+            }
+        });
+    });
 
+    // Aktif/Pasif butonları - DÜZELTİLMİŞ
+    document.querySelectorAll('.toggle-product-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            console.log('🔘 Durum butonuna tıklandı');
+            const productId = btn.getAttribute('data-product-id');
+            const currentStatus = btn.getAttribute('data-current-status') === 'true';
+            if (productId) {
+                this.toggleProductStatus(productId, currentStatus);
+            } else {
+                console.error('❌ Product ID bulunamadı');
+            }
+        });
+    });
+
+    console.log('✅ Event listenerlar eklendi');
+}
 
 
     
@@ -1522,8 +1550,54 @@ async addNewProduct() {
     }
 }
 
-// ✅ ÜRÜN DÜZENLEME MODALI - PRODUCT_PRICES ODAKLI
+
+// ✅ ÜRÜN DÜZENLEME - DEBUG EKLİ
+async editProduct(productId) {
+    console.log('🎯 Ürün düzenleniyor:', productId);
+    
+    try {
+        // Ürün bilgilerini getir - PRODUCT_PRICES İLE BİRLİKTE
+        const { data: product, error } = await this.supabase
+            .from('products')
+            .select(`
+                *,
+                product_prices(
+                    price,
+                    discount_price,
+                    stock,
+                    currency,
+                    centre_id
+                )
+            `)
+            .eq('id', productId)
+            .single();
+
+        if (error) throw error;
+
+        console.log('📦 Ürün verisi:', product);
+
+        // Product_prices verilerini merge et
+        const priceData = product.product_prices && product.product_prices.length > 0 ? product.product_prices[0] : null;
+        const mergedProduct = {
+            ...product,
+            current_price: priceData?.price || product.price,
+            discount_price: priceData?.discount_price || null,
+            current_stock: priceData?.stock || product.stock
+        };
+
+        // Düzenleme modalını göster
+        this.showEditProductModal(mergedProduct);
+
+    } catch (error) {
+        console.error('❌ Ürün bilgileri yüklenemedi:', error);
+        this.showAlert('❌ Ürün bilgileri yüklenemedi!', 'error');
+    }
+}
+
+// ✅ ÜRÜN DÜZENLEME MODALI - DEBUG EKLİ
 showEditProductModal(product) {
+    console.log('📝 Düzenleme modalı açılıyor:', product);
+    
     const modalHtml = `
         <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
             <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
@@ -1588,12 +1662,19 @@ showEditProductModal(product) {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    document.getElementById('editProductForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await this.updateProduct(product.id);
-    });
+    // Form submit event'ini ekle - DÜZELTİLMİŞ
+    const form = document.getElementById('editProductForm');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            console.log('📤 Form gönderiliyor...');
+            await this.updateProduct(product.id);
+        });
+    } else {
+        console.error('❌ Edit form bulunamadı');
+    }
 }
-
+    
 // ✅ ÜRÜN GÜNCELLEME - PRODUCT_PRICES ODAKLI
 async updateProduct(productId) {
     const productData = {
