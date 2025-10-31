@@ -8,6 +8,7 @@ class SellerPanel {
         this.currentSection = '';
         this.realtimeSubscription = null;
         this.isInitialized = false;
+        this.categories = [];
         
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
@@ -26,6 +27,7 @@ class SellerPanel {
     async init() {
         try {
             await this.loadSellerData();
+            await this.loadCategories(); // Kategorileri yükle
             this.setupRealTimeListeners();
             this.isInitialized = true;
             console.log('✅ SellerPanel başlatıldı', this.sellerData);
@@ -35,49 +37,69 @@ class SellerPanel {
     }
 
     async loadSellerData() {
-    try {
-        console.log('📥 Seller verisi yükleniyor...', this.userProfile);
-        
-        // SADECE: seller_profiles.id ile userProfile.id eşleştir
-        const { data, error } = await this.supabase
-            .from('seller_profiles')
-            .select('*')
-            .eq('id', this.userProfile.id)
-            .single();
+        try {
+            console.log('📥 Seller verisi yükleniyor...', this.userProfile);
+            
+            const { data, error } = await this.supabase
+                .from('seller_profiles')
+                .select('*')
+                .eq('id', this.userProfile.id)
+                .single();
 
-        if (error) {
-            console.error('❌ Seller profili bulunamadı:', error);
-            // Seller profili yoksa, mevcut userProfile'ı kullan
+            if (error) {
+                console.error('❌ Seller profili bulunamadı:', error);
+                this.sellerData = {
+                    id: this.userProfile.id,
+                    business_name: this.userProfile.name,
+                    phone: this.userProfile.phone
+                };
+            } else {
+                this.sellerData = data;
+                console.log('✅ Seller verisi yüklendi:', data);
+            }
+
+        } catch (error) {
+            console.error('❌ Seller veri hatası:', error);
             this.sellerData = {
                 id: this.userProfile.id,
                 business_name: this.userProfile.name,
                 phone: this.userProfile.phone
             };
-            console.log('⚠️ Seller profili yok, geçici data kullanılıyor:', this.sellerData);
-        } else {
-            this.sellerData = data;
-            console.log('✅ Seller verisi yüklendi:', data);
         }
-
-    } catch (error) {
-        console.error('❌ Seller veri hatası:', error);
-        // Hata durumunda geçici data
-        this.sellerData = {
-            id: this.userProfile.id,
-            business_name: this.userProfile.name,
-            phone: this.userProfile.phone
-        };
     }
-}
 
-   // ✅ DASHBOARD METODLARI
+    
+      // ✅ KATEGORİLERİ YÜKLE
+    async loadCategories() {
+        try {
+            const { data, error } = await this.supabase
+                .from('reyon')
+                .select('id, name')
+                .order('name');
+
+            if (!error && data) {
+                this.categories = data;
+                console.log('✅ Kategoriler yüklendi:', this.categories);
+            } else {
+                console.error('❌ Kategoriler yüklenemedi:', error);
+                this.categories = [];
+            }
+        } catch (error) {
+            console.error('❌ Kategori yükleme hatası:', error);
+            this.categories = [];
+        }
+    }
+
+    // ✅ DASHBOARD - GELİŞMİŞ VERSİYON
     async loadSellerDashboard() {
         const section = document.getElementById('sellerDashboardSection');
         if (!section) return;
         
         section.innerHTML = `
-            <h1>İşletme Paneli</h1>
-            <p class="subtitle">${this.sellerData?.business_name || ''}</p>
+            <div class="section-header">
+                <h1>İşletme Paneli</h1>
+                <p class="subtitle">${this.sellerData?.business_name || ''}</p>
+            </div>
             
             <div class="stats-grid">
                 <div class="stat-card">
@@ -170,8 +192,6 @@ class SellerPanel {
         await this.loadRecentSellerOrders();
         await this.loadStockAlerts();
     }
-
-
 async loadRecentSellerOrders() {
         if (!this.sellerData?.id) return;
 
@@ -436,40 +456,44 @@ async loadStockAlerts() {
         }, 30000);
     }
 
-    // ✅ SESLİ ALARM - DÜZELTİLMİŞ VERSİYON
+    // ✅ SESLİ BİLDİRİM - GELİŞTİRİLMİŞ
     playOrderSound() {
-        console.log('🔊 Sesli alarm çalınıyor...');
+        console.log('🔊 Sesli bildirim çalınıyor...');
         try {
-            // Tarayıcı bildirimi
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('Yeni Sipariş!', {
-                    body: 'Yeni bir siparişiniz var',
-                    icon: '/favicon.ico',
-                    tag: 'new-order'
-                });
-            } else if ('Notification' in window && Notification.permission !== 'denied') {
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                        new Notification('Yeni Sipariş!', {
-                            body: 'Yeni bir siparişiniz var',
-                            icon: '/favicon.ico'
-                        });
-                    }
-                });
+            // 1. Tarayıcı bildirimi
+            if ('Notification' in window) {
+                if (Notification.permission === 'granted') {
+                    new Notification('Yeni Sipariş!', {
+                        body: 'Yeni bir siparişiniz var, hemen kontrol edin.',
+                        icon: '/favicon.ico',
+                        tag: 'new-order'
+                    });
+                } else if (Notification.permission !== 'denied') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            new Notification('Yeni Sipariş!', {
+                                body: 'Yeni bir siparişiniz var, hemen kontrol edin.',
+                                icon: '/favicon.ico'
+                            });
+                        }
+                    });
+                }
             }
 
-            // Ses çalma (basit yöntem)
-            this.playBeepSound();
-            
+            // 2. Ses efekti - basit bip sesi
+            this.playBeepSound(800, 200);
+            setTimeout(() => this.playBeepSound(600, 200), 100);
+            setTimeout(() => this.playBeepSound(800, 200), 200);
+
         } catch (e) {
             console.log('🔇 Ses/bildirim hatası:', e);
-            this.playBeepSound(); // Fallback
+            // Fallback: Sadece bip sesi
+            this.playBeepSound(800, 300);
         }
     }
 
-    playBeepSound() {
+    playBeepSound(frequency, duration) {
         try {
-            // Basit bip sesi için audio element kullan
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
@@ -478,42 +502,55 @@ async loadStockAlerts() {
             gainNode.connect(audioContext.destination);
             
             oscillator.type = 'sine';
-            oscillator.frequency.value = 800;
+            oscillator.frequency.value = frequency;
             gainNode.gain.value = 0.1;
             
             oscillator.start();
             setTimeout(() => {
                 oscillator.stop();
-            }, 200);
+            }, duration);
             
         } catch (e) {
             console.log('🔇 AudioContext hatası:', e);
         }
     }
-
-    // ✅ SİPARİŞ KABUL/RED
+    // ✅ SİPARİŞ KABUL/RED - DÜZELTİLMİŞ
     async acceptOrder(orderId) {
         if (!orderId) {
             console.error('❌ Order ID yok');
+            this.showAlert('❌ Sipariş ID bulunamadı!', 'error');
             return;
         }
 
         try {
             console.log('✅ Sipariş kabul ediliyor:', orderId);
+            
+            const updateData = {
+                status: 'confirmed',
+                accepted_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
             const { error } = await this.supabase
                 .from('orders')
-                .update({
-                    status: 'confirmed',
-                    accepted_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
+                .update(updateData)
                 .eq('id', orderId);
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Sipariş güncelleme hatası:', error);
+                throw error;
+            }
 
             this.showAlert('✅ Sipariş kabul edildi!', 'success');
             this.removeNotification();
-            await this.loadOrders();
+            
+            // Sayfayı yenile
+            if (this.currentSection === 'orders') {
+                await this.loadOrders();
+            }
+            if (this.currentSection === 'sellerDashboard') {
+                await this.loadSellerDashboard();
+            }
 
         } catch (error) {
             console.error('Sipariş kabul hatası:', error);
@@ -521,9 +558,10 @@ async loadStockAlerts() {
         }
     }
 
-    async rejectOrder(orderId) {
+     async rejectOrder(orderId) {
         if (!orderId) {
             console.error('❌ Order ID yok');
+            this.showAlert('❌ Sipariş ID bulunamadı!', 'error');
             return;
         }
 
@@ -532,28 +570,38 @@ async loadStockAlerts() {
 
         try {
             console.log('❌ Sipariş reddediliyor:', orderId);
+            
+            const updateData = {
+                status: 'cancelled',
+                cancellation_reason: `Satıcı tarafından reddedildi: ${reason}`,
+                cancelled_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
             const { error } = await this.supabase
                 .from('orders')
-                .update({
-                    status: 'cancelled',
-                    cancellation_reason: `Satıcı tarafından reddedildi: ${reason}`,
-                    cancelled_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
+                .update(updateData)
                 .eq('id', orderId);
 
             if (error) throw error;
 
             this.showAlert('❌ Sipariş reddedildi!', 'success');
             this.removeNotification();
-            await this.loadOrders();
+            
+            // Sayfayı yenile
+            if (this.currentSection === 'orders') {
+                await this.loadOrders();
+            }
+            if (this.currentSection === 'sellerDashboard') {
+                await this.loadSellerDashboard();
+            }
 
         } catch (error) {
             console.error('Sipariş reddetme hatası:', error);
             this.showAlert('❌ Sipariş reddedilemedi!', 'error');
         }
     }
-
+    
     removeNotification() {
         const notification = document.querySelector('.order-notification');
         if (notification) {
@@ -764,7 +812,7 @@ async loadStockAlerts() {
         this.renderOrders(filteredOrders);
     }
 
-    // ✅ ÜRÜN YÖNETİMİ - DÜZELTİLMİŞ
+    // ✅ ÜRÜN YÖNETİMİ - KATEGORİ FİLTRELEME İLE
     async loadProducts() {
         const section = document.getElementById('productsSection');
         if (!section) return;
@@ -778,20 +826,19 @@ async loadStockAlerts() {
             </div>
             <div class="card">
                 <div class="card-body">
-                    <div class="filters" style="display: flex; gap: 10px; margin-bottom: 20px;">
-                        <select id="categoryFilter" class="form-control">
+                    <div class="filters" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                        <select id="categoryFilter" class="form-control" style="min-width: 200px;">
                             <option value="">Tüm Kategoriler</option>
-                            <option value="gida">Gıda</option>
-                            <option value="icecek">İçecek</option>
-                            <option value="temizlik">Temizlik</option>
-                            <option value="kirtasiye">Kırtasiye</option>
+                            ${this.categories.map(cat => 
+                                `<option value="${cat.id}">${cat.name}</option>`
+                            ).join('')}
                         </select>
                         <select id="productStatusFilter" class="form-control">
                             <option value="">Tüm Durumlar</option>
                             <option value="active">Aktif</option>
                             <option value="inactive">Pasif</option>
                         </select>
-                        <input type="text" id="productSearch" placeholder="Ürün ara..." class="form-control">
+                        <input type="text" id="productSearch" placeholder="Ürün ara..." class="form-control" style="min-width: 250px;">
                     </div>
                     <div class="table-responsive">
                         <table class="data-table" id="productsTable">
@@ -856,7 +903,7 @@ async loadStockAlerts() {
 
         await this.loadProductsData();
     }
-
+    
     async loadProductsData() {
         if (!this.sellerData?.id) {
             console.error('❌ Seller ID yok, ürünler yüklenemiyor');
@@ -901,16 +948,31 @@ async loadStockAlerts() {
                 <tr>
                     <td colspan="7" class="text-center">
                         <p class="text-muted">Henüz ürün eklenmemiş.</p>
-                        <button class="btn btn-primary mt-2" onclick="window.sellerPanel.showAddProductModal()">
+                        <button class="btn btn-primary mt-2" id="addFirstProduct">
                             <i class="fas fa-plus"></i> İlk Ürünü Ekle
                         </button>
                     </td>
                 </tr>
             `;
+            
+            setTimeout(() => {
+                const addFirstBtn = document.getElementById('addFirstProduct');
+                if (addFirstBtn) {
+                    addFirstBtn.addEventListener('click', () => {
+                        this.showAddProductModal();
+                    });
+                }
+            }, 100);
+            
             return;
         }
 
-        tbody.innerHTML = products.map(product => `
+        tbody.innerHTML = products.map(product => {
+            // Kategori ismini bul
+            const category = this.categories.find(cat => cat.id === product.category_id);
+            const categoryName = category ? category.name : (product.category || '-');
+
+            return `
             <tr>
                 <td>
                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -922,7 +984,7 @@ async loadStockAlerts() {
                     </div>
                 </td>
                 <td>${product.barcode || '-'}</td>
-                <td>${product.category || '-'}</td>
+                <td>${categoryName}</td>
                 <td>
                     <div style="font-weight: bold;">${parseFloat(product.price || 0).toFixed(2)} ₺</div>
                     ${product.tax_rate ? `<div style="font-size: 12px; color: #666;">KDV: %${product.tax_rate}</div>` : ''}
@@ -948,14 +1010,14 @@ async loadStockAlerts() {
                     </div>
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
 
         // Event listener'ları ekle
         setTimeout(() => {
             this.attachProductEventListeners();
         }, 100);
     }
-
     attachProductEventListeners() {
         // Düzenle butonları
         document.querySelectorAll('.edit-product-btn').forEach(btn => {
@@ -1014,11 +1076,120 @@ async loadStockAlerts() {
         this.renderProductsTable(filteredProducts);
     }
 
-    // ✅ ÜRÜN DÜZENLEME
+    // ✅ ÜRÜN DÜZENLEME - GERÇEK İŞLEV
     async editProduct(productId) {
-        this.showAlert('Ürün düzenleme özelliği yakında eklenecek!', 'info');
+        try {
+            // Ürün bilgilerini getir
+            const { data: product, error } = await this.supabase
+                .from('products')
+                .select('*')
+                .eq('id', productId)
+                .single();
+
+            if (error) throw error;
+
+            // Düzenleme modalını göster
+            this.showEditProductModal(product);
+
+        } catch (error) {
+            console.error('❌ Ürün bilgileri yüklenemedi:', error);
+            this.showAlert('❌ Ürün bilgileri yüklenemedi!', 'error');
+        }
     }
 
+showEditProductModal(product) {
+        const modalHtml = `
+            <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
+                <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0;">Ürünü Düzenle</h3>
+                        <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <form id="editProductForm">
+                        <input type="hidden" id="editProductId" value="${product.id}">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="editProductName">Ürün Adı *</label>
+                                <input type="text" id="editProductName" class="form-control" value="${product.name}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductBarcode">Barkod</label>
+                                <input type="text" id="editProductBarcode" class="form-control" value="${product.barcode || ''}">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="editProductPrice">Fiyat (₺) *</label>
+                                <input type="number" id="editProductPrice" class="form-control" step="0.01" min="0" value="${product.price}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductStock">Stok *</label>
+                                <input type="number" id="editProductStock" class="form-control" min="0" value="${product.stock}" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="editProductCategory">Kategori</label>
+                            <select id="editProductCategory" class="form-control">
+                                <option value="">Kategori Seçin</option>
+                                ${this.categories.map(cat => 
+                                    `<option value="${cat.id}" ${cat.id === product.category_id ? 'selected' : ''}>${cat.name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editProductDescription">Açıklama</label>
+                            <textarea id="editProductDescription" class="form-control" rows="3">${product.description || ''}</textarea>
+                        </div>
+                        <div class="form-actions" style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
+                            <button type="submit" class="btn btn-primary">Güncelle</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        document.getElementById('editProductForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.updateProduct(product.id);
+        });
+    }
+    
+async updateProduct(productId) {
+        const form = document.getElementById('editProductForm');
+        const formData = new FormData(form);
+        
+        const productData = {
+            name: document.getElementById('editProductName').value,
+            barcode: document.getElementById('editProductBarcode').value,
+            price: parseFloat(document.getElementById('editProductPrice').value),
+            stock: parseInt(document.getElementById('editProductStock').value),
+            category_id: document.getElementById('editProductCategory').value || null,
+            description: document.getElementById('editProductDescription').value,
+            updated_at: new Date().toISOString()
+        };
+
+        try {
+            const { error } = await this.supabase
+                .from('products')
+                .update(productData)
+                .eq('id', productId);
+
+            if (error) throw error;
+
+            this.showAlert('✅ Ürün başarıyla güncellendi!', 'success');
+            document.querySelector('.modal-overlay').remove();
+            await this.loadProductsData();
+
+        } catch (error) {
+            console.error('Ürün güncelleme hatası:', error);
+            this.showAlert('❌ Ürün güncellenemedi!', 'error');
+        }
+    }
     // ✅ ÜRÜN PASİF ETME (SİLME YERİNE)
     async toggleProductStatus(productId, currentStatus) {
         const newStatus = !currentStatus;
@@ -1070,7 +1241,13 @@ async loadStockAlerts() {
                 return;
             }
 
-            if (orders) {
+            // Default değerleri sıfırla
+            document.getElementById('todayOrders').textContent = '0';
+            document.getElementById('todayRevenue').textContent = '0 ₺';
+            document.getElementById('pendingOrders').textContent = '0';
+            document.getElementById('sellerRating').textContent = '0.0';
+
+            if (orders && orders.length > 0) {
                 document.getElementById('todayOrders').textContent = orders.length;
                 
                 const todayRevenue = orders
@@ -1085,34 +1262,36 @@ async loadStockAlerts() {
                 document.getElementById('pendingOrders').textContent = pendingOrders;
             }
 
-            // Average rating
-            const { data: ratedOrders } = await this.supabase
-                .from('orders')
-                .select('performance_rating')
-                .eq('seller_id', this.sellerData.id)
-                .not('performance_rating', 'is', null);
+            // Average rating - orders tablosunda performance_rating yoksa geçici çözüm
+            try {
+                const { data: ratedOrders } = await this.supabase
+                    .from('orders')
+                    .select('seller_rating')
+                    .eq('seller_id', this.sellerData.id)
+                    .not('seller_rating', 'is', null);
 
-            if (ratedOrders && ratedOrders.length > 0) {
-                const avgRating = ratedOrders.reduce((sum, order) => 
-                    sum + parseFloat(order.performance_rating || 0), 0) / ratedOrders.length;
-                document.getElementById('sellerRating').textContent = avgRating.toFixed(1);
-            } else {
-                document.getElementById('sellerRating').textContent = '0.0';
+                if (ratedOrders && ratedOrders.length > 0) {
+                    const avgRating = ratedOrders.reduce((sum, order) => 
+                        sum + parseFloat(order.seller_rating || 0), 0) / ratedOrders.length;
+                    document.getElementById('sellerRating').textContent = avgRating.toFixed(1);
+                }
+            } catch (ratingError) {
+                console.log('⭐ Rating hesaplanamadı, varsayılan kullanılıyor');
             }
 
         } catch (error) {
             console.error('❌ İstatistik yükleme hatası:', error);
         }
     }
-
     // Diğer metodlar aynı kalacak...
-   async loadSectionData(sectionName) {
+    async loadSectionData(sectionName) {
         this.currentSection = sectionName;
         console.log(`📂 Section yükleniyor: ${sectionName}`);
         
         const section = document.getElementById(`${sectionName}Section`);
         if (!section) return;
 
+        // Önce loading göster
         section.innerHTML = `<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i><p>Yükleniyor...</p></div>`;
 
         try {
@@ -1143,7 +1322,7 @@ async loadStockAlerts() {
             section.innerHTML = `<div class="error-message"><p>Yükleme hatası: ${error.message}</p></div>`;
         }
     }
-
+    
     // Yardımcı metodlar
     getStatusText(status) {
         const statusMap = {
