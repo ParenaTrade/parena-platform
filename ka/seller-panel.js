@@ -1224,7 +1224,7 @@ async addNewProduct() {
     }
 }
     
-    // ✅ ÜRÜN TABLOSU RENDER - PRODUCT_PRICES BİLGİLERİ İLE
+// ✅ ÜRÜN TABLOSU RENDER - İNDİRİMLİ FİYAT GÖSTERİMİ
 renderProductsTable(products) {
     const tbody = document.querySelector('#productsTable tbody');
     if (!tbody) return;
@@ -1262,6 +1262,8 @@ renderProductsTable(products) {
         const displayPrice = product.current_price || product.price;
         const displayStock = product.current_stock || product.stock;
         const hasDiscount = product.discount_price && product.discount_price < displayPrice;
+        const discountPercentage = hasDiscount ? 
+            Math.round(((displayPrice - product.discount_price) / displayPrice) * 100) : 0;
 
         return `
         <tr>
@@ -1277,24 +1279,32 @@ renderProductsTable(products) {
             <td>${product.barcode || '-'}</td>
             <td>${categoryName}</td>
             <td>
-                <div style="font-weight: bold;">
+                <div style="min-width: 120px;">
                     ${hasDiscount ? `
-                        <div style="color: #dc3545; text-decoration: line-through; font-size: 12px;">
-                            ${parseFloat(displayPrice).toFixed(2)} ₺
-                        </div>
-                        <div style="color: #28a745;">
-                            ${parseFloat(product.discount_price).toFixed(2)} ₺
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <div style="color: #dc3545; text-decoration: line-through; font-size: 12px;">
+                                ${parseFloat(displayPrice).toFixed(2)} ₺
+                            </div>
+                            <div style="color: #28a745; font-weight: bold; font-size: 14px;">
+                                ${parseFloat(product.discount_price).toFixed(2)} ₺
+                            </div>
+                            <div style="background: #ffc107; color: #000; padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: bold; text-align: center;">
+                                %${discountPercentage} İNDİRİM
+                            </div>
                         </div>
                     ` : `
-                        ${parseFloat(displayPrice).toFixed(2)} ₺
+                        <div style="font-weight: bold; color: #333;">
+                            ${parseFloat(displayPrice).toFixed(2)} ₺
+                        </div>
                     `}
                 </div>
-                ${product.tax_rate ? `<div style="font-size: 12px; color: #666;">KDV: %${product.tax_rate}</div>` : ''}
+                ${product.tax_rate ? `<div style="font-size: 11px; color: #666; margin-top: 2px;">KDV: %${product.tax_rate}</div>` : ''}
             </td>
             <td>
                 <span class="${displayStock < 10 ? 'text-danger' : 'text-success'}" style="font-weight: 500;">
                     ${displayStock} ${product.unit_type || 'adet'}
                 </span>
+                ${displayStock < 5 ? `<div style="font-size: 11px; color: #dc3545;">⏳ Az Stok</div>` : ''}
             </td>
             <td>
                 <span class="status-badge status-${product.is_active ? 'active' : 'inactive'}">
@@ -1302,15 +1312,27 @@ renderProductsTable(products) {
                 </span>
             </td>
             <td>
-                ${product.centre_id ? `<span class="badge badge-info">Şube</span>` : '<span class="badge badge-primary">Merkez</span>'}
+                ${product.centre_id ? `
+                    <span class="badge badge-info" style="background: #17a2b8; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px;">
+                        Şube
+                    </span>
+                ` : `
+                    <span class="badge badge-primary" style="background: #007bff; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px;">
+                        Merkez
+                    </span>
+                `}
             </td>
             <td>
-                <div style="display: flex; gap: 5px;">
-                    <button class="btn btn-sm btn-warning edit-product-btn" data-product-id="${product.id}">
+                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    <button class="btn btn-sm btn-warning edit-product-btn" data-product-id="${product.id}" 
+                            style="padding: 4px 8px; font-size: 12px;">
                         <i class="fas fa-edit"></i> Düzenle
                     </button>
-                    <button class="btn btn-sm btn-secondary toggle-product-btn" data-product-id="${product.id}" data-current-status="${product.is_active}">
-                        <i class="fas fa-power-off"></i> ${product.is_active ? 'Pasif Et' : 'Aktif Et'}
+                    <button class="btn btn-sm btn-secondary toggle-product-btn" 
+                            data-product-id="${product.id}" 
+                            data-current-status="${product.is_active}"
+                            style="padding: 4px 8px; font-size: 12px;">
+                        <i class="fas fa-power-off"></i> ${product.is_active ? 'Pasif' : 'Aktif'}
                     </button>
                 </div>
             </td>
@@ -1322,8 +1344,7 @@ renderProductsTable(products) {
     setTimeout(() => {
         this.attachProductEventListeners();
     }, 100);
-}
-    
+}    
     attachProductEventListeners() {
         // Düzenle butonları
         document.querySelectorAll('.edit-product-btn').forEach(btn => {
