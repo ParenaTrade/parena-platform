@@ -170,7 +170,20 @@ class SellerPanel {
                 </div>
             </div>
         `;
+        // Event listener ekle
+        setTimeout(() => {
+            const viewAllBtn = document.getElementById('viewAllOrders');
+            if (viewAllBtn) {
+                viewAllBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (window.panelSystem) {
+                        window.panelSystem.showSection('orders');
+                    }
+                });
+            }
+        }, 100);
 
+        
         await this.loadSellerStats();
         await this.loadRecentSellerOrders();
         await this.loadStockAlerts();
