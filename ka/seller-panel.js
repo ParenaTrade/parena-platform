@@ -1167,72 +1167,82 @@ async loadProductsData() {
     }
 }
     
-// ✅ YENİ ÜRÜN EKLEME - PRODUCT_PRICES ENTEGRASYONLU
+// ✅ YENİ ÜRÜN EKLEME - GÜVENLİ FLOAT DÖNÜŞÜMÜ
 async addNewProduct() {
     try {
-        // Form değerlerini al ve DEBUG ekle
-        const name = document.getElementById('productName').value;
-        const barcode = document.getElementById('productBarcode').value;
-        const priceInput = document.getElementById('productPrice').value;
-        const stockInput = document.getElementById('productStock').value;
-        const description = document.getElementById('productDescription').value;
-
-        // Tüm inputları kontrol et
-console.log('🔍 Tüm input elementleri:');
-console.log('productName:', document.getElementById('productName'));
-console.log('productPrice:', document.getElementById('productPrice'));
-console.log('productStock:', document.getElementById('productStock'));
-console.log('productBarcode:', document.getElementById('productBarcode'));
-console.log('productDescription:', document.getElementById('productDescription'));
-console.log('productDiscountPrice:', document.getElementById('productDiscountPrice'));
-console.log('productCategory:', document.getElementById('productCategory'));
-
-// Eğer elementler null ise, farklı ID'ler kullanılıyor olabilir
+        console.log('🔍 DEBUG - Modal form kontrolü başlıyor...');
         
-        console.log('🔍 DEBUG - Form değerleri:');
-        console.log('name:', name);
-        console.log('priceInput:', priceInput, 'type:', typeof priceInput);
-        console.log('stockInput:', stockInput, 'type:', typeof stockInput);
+        // Input elementlerini ve değerlerini al
+        const priceInput = document.getElementById('productPrice');
+        const priceValue = priceInput?.value;
         
-        // Sayısal değerlere dönüştür
-        const price = parseFloat(priceInput);
-        const stock = parseInt(stockInput);
+        console.log('priceInput value:', priceValue, 'type:', typeof priceValue);
         
-        console.log('price parsed:', price, 'isNaN:', isNaN(price));
-        console.log('stock parsed:', stock, 'isNaN:', isNaN(stock));
+        // GÜVENLİ float dönüşümü
+        let price;
+        if (priceValue && priceValue.trim() !== '') {
+            price = parseFloat(priceValue);
+            // Ondalık kontrolü
+            if (isNaN(price)) {
+                this.showAlert('❌ Geçerli bir fiyat giriniz!', 'error');
+                return;
+            }
+        } else {
+            this.showAlert('❌ Fiyat alanı boş olamaz!', 'error');
+            return;
+        }
 
-        // Discount price değerini al
+        // Stock için de aynı kontrol
+        const stockInput = document.getElementById('productStock');
+        const stockValue = stockInput?.value;
+        let stock;
+        
+        if (stockValue && stockValue.trim() !== '') {
+            stock = parseInt(stockValue);
+            if (isNaN(stock)) {
+                this.showAlert('❌ Geçerli bir stok miktarı giriniz!', 'error');
+                return;
+            }
+        } else {
+            this.showAlert('❌ Stok alanı boş olamaz!', 'error');
+            return;
+        }
+
+        // Diğer değerler
+        const name = document.getElementById('productName')?.value?.trim();
+        if (!name) {
+            this.showAlert('❌ Ürün adı boş olamaz!', 'error');
+            return;
+        }
+
+        const barcode = document.getElementById('productBarcode')?.value?.trim() || '';
+        const description = document.getElementById('productDescription')?.value?.trim() || '';
+        
+        // Discount price - opsiyonel
         const discountPriceInput = document.getElementById('productDiscountPrice');
-        const discountPrice = discountPriceInput && discountPriceInput.value !== '' 
-            ? parseFloat(discountPriceInput.value) 
-            : null;
+        let discountPrice = null;
+        if (discountPriceInput?.value && discountPriceInput.value.trim() !== '') {
+            discountPrice = parseFloat(discountPriceInput.value);
+            if (isNaN(discountPrice)) {
+                this.showAlert('❌ Geçersiz indirimli fiyat!', 'error');
+                return;
+            }
+        }
 
-        // Kategori değerini al
+        // Kategori
         const categorySelect = document.getElementById('productCategory');
-        const categoryId = categorySelect && categorySelect.value ? categorySelect.value : null;
+        const categoryId = categorySelect?.value || null;
 
-        // Validation - daha detaylı
-        if (!name || name.trim() === '') {
-            this.showAlert('❌ Ürün adı zorunludur!', 'error');
-            return;
-        }
-        
-        if (!priceInput || priceInput.trim() === '' || isNaN(price)) {
-            this.showAlert('❌ Geçerli bir fiyat giriniz!', 'error');
-            return;
-        }
-        
-        if (!stockInput || stockInput.trim() === '' || isNaN(stock)) {
-            this.showAlert('❌ Geçerli bir stok miktarı giriniz!', 'error');
-            return;
-        }
+        console.log('🔍 Dönüştürülmüş değerler:');
+        console.log('price:', price, 'type:', typeof price);
+        console.log('stock:', stock, 'type:', typeof stock);
 
         // products tablosu için temel veri
         const productData = {
             name: name,
             barcode: barcode,
-            price: price, // ✅ Bu değerin null olmaması gerekiyor
-            stock: stock,
+            price: price, // ✅ Kesinlikle number
+            stock: stock, // ✅ Kesinlikle number
             description: description,
             seller_id: this.sellerData.id,
             currency: 'TRY',
@@ -1246,7 +1256,7 @@ console.log('productCategory:', document.getElementById('productCategory'));
             productData.category_id = categoryId;
         }
 
-        console.log('🔍 DEBUG - Gönderilecek productData:', productData);
+        console.log('🔍 Son productData:', productData);
 
         // Önce products tablosuna ekle
         const { data: newProduct, error: productError } = await this.supabase
@@ -1256,8 +1266,6 @@ console.log('productCategory:', document.getElementById('productCategory'));
             .single();
 
         if (productError) throw productError;
-
-        console.log('✅ products tablosuna eklendi:', newProduct);
 
         // Sonra product_prices tablosuna ekle
         const priceData = {
@@ -1271,7 +1279,6 @@ console.log('productCategory:', document.getElementById('productCategory'));
             updated: new Date().toISOString()
         };
 
-        // Eğer centre_id varsa ekle
         if (this.sellerData.centre_id) {
             priceData.centre_id = this.sellerData.centre_id;
         }
@@ -1290,9 +1297,7 @@ console.log('productCategory:', document.getElementById('productCategory'));
         console.error('Ürün ekleme hatası:', error);
         this.showAlert('❌ Ürün eklenemedi!', 'error');
     }
-}
-
-    
+}    
     // ✅ ÜRÜN TABLOSU RENDER - İNDİRİMLİ FİYAT GÖSTERİMİ
 renderProductsTable(products) {
     const tbody = document.querySelector('#productsTable tbody');
