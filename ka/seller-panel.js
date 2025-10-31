@@ -1167,8 +1167,14 @@ async loadProductsData() {
     }
 }
     
-    // ✅ YENİ ÜRÜN EKLEME - PRODUCT_PRICES ENTEGRASYONLU
+// ✅ YENİ ÜRÜN EKLEME - PRODUCT_PRICES ENTEGRASYONLU
 async addNewProduct() {
+    // Discount price değerini al (eğer varsa ve boş değilse)
+    const discountPriceInput = document.getElementById('productDiscountPrice');
+    const discountPrice = discountPriceInput && discountPriceInput.value !== '' 
+        ? parseFloat(discountPriceInput.value) 
+        : null;
+
     const productData = {
         name: document.getElementById('productName').value,
         barcode: document.getElementById('productBarcode').value,
@@ -1197,6 +1203,7 @@ async addNewProduct() {
             product_id: newProduct.id,
             seller_id: this.sellerData.id,
             price: productData.price,
+            discount_price: discountPrice, // ✅ Discount price eklendi
             stock: productData.stock,
             currency: 'TRY',
             created: new Date().toISOString(),
