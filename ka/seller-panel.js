@@ -1,14 +1,17 @@
 class SellerPanel {
     constructor(userProfile) {
-        this.userProfile = userProfile;
-        this.sellerData = null;
-        this.products = [];
-        this.orders = [];
-        this.allSellerOrders = [];
-        this.currentSection = '';
-        this.realtimeSubscription = null;
-        this.isInitialized = false;
-        this.categories = [];
+    this.userProfile = userProfile;
+    this.sellerData = null;
+    this.products = [];
+    this.orders = [];
+    this.allSellerOrders = [];
+    this.currentSection = '';
+    this.realtimeSubscription = null;
+    this.pollingInterval = null;
+    this.isInitialized = false;
+    this.categories = [];
+    this.processedOrders = new Set(); // İşlenen siparişleri takip et
+    this.lastProcessedOrderId = null; // Son işlenen sipariş
         
         this.supabase = window.SUPABASE_CLIENT;
         this.config = window.CONFIG;
@@ -339,119 +342,146 @@ async loadStockAlerts() {
 }
     
      // ✅ YENİ SİPARİŞ BİLDİRİM SİSTEMİ - DÜZELTİLMİŞ
-setupRealTimeListeners() {
+// ✅ ALTERNATİF: BASİT REAL-TIME SİSTEM (Eğer yukarısı çalışmazsa)
+setupRealTimeListenersSimple() {
     if (!this.sellerData?.id) {
         console.log('⚠️ Seller ID yok, real-time listener kurulamıyor');
-        setTimeout(() => this.setupRealTimeListeners(), 1000);
+        setTimeout(() => this.setupRealTimeListenersSimple(), 1000);
         return;
     }
 
-    console.log('🔔 Real-time sipariş listenerları kuruluyor...', this.sellerData.id);
+    console.log('🔔 Basit real-time sistem kuruluyor...');
 
+    // Polling yöntemi ile real-time benzeri sistem
+    this.pollingInterval = setInterval(async () => {
+        try {
+            const { data: newOrders, error } = await this.supabase
+                .from('orders')
+                .select('*')
+                .eq('seller_id', this.sellerData.id)
+                .eq('status', 'pending')
+                .gt('created_at', new Date(Date.now() - 30000).toISOString()) // Son 30 saniye
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('❌ Polling hatası:', error);
+                return;
+            }
+
+            if (newOrders && newOrders.length > 0) {
+                console.log('🆕 Yeni siparişler (polling):', newOrders.length);
+                
+                // Yeni siparişleri işle
+                newOrders.forEach(order => {
+                    if (!this.processedOrders.has(order.id)) {
+                        this.processedOrders.add(order.id);
+                        this.handleNewOrder(order);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('❌ Polling işleme hatası:', error);
+        }
+    }, 10000); // 10 saniyede bir kontrol et
+
+    console.log('✅ Polling sistemi başlatıldı');
+}
+
+// ✅ YENİ SİPARİŞ İŞLEME - GÜNCELLENMİŞ
+async handleNewOrder(order) {
+    console.log('🎯 Yeni sipariş işleniyor:', order);
+    
+    // Aynı siparişi tekrar işleme
+    if (this.lastProcessedOrderId === order.id) {
+        console.log('⏭️ Bu sipariş zaten işlendi, atlanıyor...');
+        return;
+    }
+    
+    this.lastProcessedOrderId = order.id;
+
+    // Push bildirimi göster
+    this.showOrderNotification(order);
+    
+    // Sesli alarm çal
+    this.playOrderSound();
+    
+    // Sayfaları güncelle
+    await this.refreshCurrentSections();
+}
+
+// ✅ SAYFALARI YENİLE
+async refreshCurrentSections() {
+    // Mevcut sayfayı güncelle
+    if (this.currentSection === 'orders') {
+        await this.loadOrders();
+    }
+    
+    // Dashboard'u güncelle
+    if (this.currentSection === 'sellerDashboard') {
+        await this.loadSellerDashboard();
+    }
+    
+    // Her durumda dashboard'u güncelle (arka planda)
     try {
-        // Channel oluştur
-        const channel = this.supabase
-            .channel('seller-orders')
-            .on('postgres_changes', 
-                { 
-                    event: 'INSERT', 
-                    schema: 'public', 
-                    table: 'orders'
-                }, 
-                (payload) => {
-                    // Filtreyi client tarafında yap
-                    if (payload.new.seller_id === this.sellerData.id) {
-                        console.log('🆕 Yeni sipariş geldi:', payload.new);
-                        this.handleNewOrder(payload.new);
-                    }
-                }
-            )
-            .on('postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'orders'
-                },
-                (payload) => {
-                    // Filtreyi client tarafında yap
-                    if (payload.new.seller_id === this.sellerData.id) {
-                        console.log('📝 Sipariş güncellendi:', payload.new);
-                        this.handleOrderUpdate(payload.new);
-                    }
-                }
-            )
-            .on('postgres_changes',
-                {
-                    event: 'DELETE',
-                    schema: 'public',
-                    table: 'orders'
-                },
-                (payload) => {
-                    console.log('🗑️ Sipariş silindi:', payload.old);
-                    // Gerekirse silinen siparişleri de işle
-                }
-            );
-
-        // Subscribe ol
-        this.realtimeSubscription = channel.subscribe((status) => {
-            console.log('📡 Real-time status:', status);
-            
-            if (status === 'SUBSCRIBED') {
-                console.log('✅ Real-time bağlantısı kuruldu');
-            } else if (status === 'CHANNEL_ERROR') {
-                console.error('❌ Real-time bağlantı hatası');
-                // Hata durumunda yeniden bağlanmayı dene
-                setTimeout(() => {
-                    console.log('🔄 Real-time yeniden bağlanılıyor...');
-                    this.setupRealTimeListeners();
-                }, 5000);
-            } else if (status === 'TIMED_OUT') {
-                console.warn('⏰ Real-time zaman aşımı');
-                setTimeout(() => {
-                    console.log('🔄 Real-time yeniden bağlanılıyor...');
-                    this.setupRealTimeListeners();
-                }, 3000);
-            }
-        });
-
-        // Bağlantı hatası kontrolü
-        setTimeout(() => {
-            if (!this.realtimeSubscription) {
-                console.error('❌ Real-time subscription oluşturulamadı');
-                this.setupRealTimeListeners();
-            }
-        }, 3000);
-
+        await this.loadSellerStats();
     } catch (error) {
-        console.error('❌ Real-time listener kurulum hatası:', error);
-        // Hata durumunda yeniden dene
-        setTimeout(() => {
-            console.log('🔄 Real-time yeniden deneniyor...');
-            this.setupRealTimeListeners();
-        }, 5000);
+        console.log('⚠️ Dashboard güncelleme hatası:', error);
     }
 }
 
-    // ✅ YENİ SİPARİŞ BİLDİRİMİ
-    async handleNewOrder(order) {
-        console.log('🎯 Yeni sipariş işleniyor:', order);
-        
-        // Push bildirimi göster
-        this.showOrderNotification(order);
-        
-        // Sesli alarm çal
-        this.playOrderSound();
-        
-        // Sayfayı güncelle (eğer orders sayfasındaysa)
-        if (this.currentSection === 'orders') {
-            await this.loadOrders();
-        }
-        
-        // Dashboard'u güncelle
-        if (this.currentSection === 'sellerDashboard') {
-            await this.loadSellerDashboard();
-        }
+// ✅ SİPARİŞ GÜNCELLEME İŞLEME
+async handleOrderUpdate(updatedOrder) {
+    console.log('📝 Sipariş güncellendi işleniyor:', updatedOrder);
+    
+    // Mevcut sayfayı güncelle
+    await this.refreshCurrentSections();
+}
+
+// ✅ TEMİZLİK METODU - GÜNCELLENMİŞ
+destroy() {
+    console.log('🧹 SellerPanel temizleniyor...');
+    
+    // Real-time subscription'ı temizle
+    if (this.realtimeSubscription) {
+        console.log('🔴 Real-time subscription kapatılıyor...');
+        this.supabase.removeChannel(this.realtimeSubscription);
+        this.realtimeSubscription = null;
     }
+    
+    // Polling interval'ı temizle
+    if (this.pollingInterval) {
+        console.log('🔴 Polling interval temizleniyor...');
+        clearInterval(this.pollingInterval);
+        this.pollingInterval = null;
+    }
+    
+    // İşlenen siparişleri temizle
+    this.processedOrders.clear();
+    this.lastProcessedOrderId = null;
+    
+    console.log('✅ SellerPanel temizlendi');
+}
+    
+        // ✅ YENİ SİPARİŞ BİLDİRİMİ
+        async handleNewOrder(order) {
+            console.log('🎯 Yeni sipariş işleniyor:', order);
+            
+            // Push bildirimi göster
+            this.showOrderNotification(order);
+            
+            // Sesli alarm çal
+            this.playOrderSound();
+            
+            // Sayfayı güncelle (eğer orders sayfasındaysa)
+            if (this.currentSection === 'orders') {
+                await this.loadOrders();
+            }
+            
+            // Dashboard'u güncelle
+            if (this.currentSection === 'sellerDashboard') {
+                await this.loadSellerDashboard();
+            }
+        }
 
     // ✅ PUSH BİLDİRİMİ
     showOrderNotification(order) {
