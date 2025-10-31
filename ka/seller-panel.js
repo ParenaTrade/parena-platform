@@ -1340,8 +1340,12 @@ renderProductsTable(products) {
         `;
     }).join('');
 
-   // ✅ EVENT LISTENER'LARI EKLE - DÜZELTİLMİŞ
-   attachProductEventListeners() {
+    // ✅ EVENT LISTENER'LARI EKLE - DÜZELTİLMİŞ
+    this.attachProductEventListeners();
+},
+
+// ✅ EVENT LISTENER FONKSİYONU - AYRI BİR FONKSİYON OLARAK
+attachProductEventListeners() {
     console.log('🔗 Ürün event listenerları ekleniyor...');
     
     // Düzenle butonları - DÜZELTİLMİŞ
@@ -1374,7 +1378,6 @@ renderProductsTable(products) {
 
     console.log('✅ Event listenerlar eklendi');
 }
-
 
     
 
