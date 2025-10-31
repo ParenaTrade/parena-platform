@@ -1340,8 +1340,14 @@ renderProductsTable(products) {
         `;
     }).join('');
 
+          // Event listener'ları ekle
+        setTimeout(() => {
+            this.attachProductEventListeners();
+        }, 100);
+    }
+
    // ✅ EVENT LISTENER'LARI EKLE - DÜZELTİLMİŞ
-attachProductEventListeners() {
+   attachProductEventListeners() {
     console.log('🔗 Ürün event listenerları ekleniyor...');
     
     // Düzenle butonları - DÜZELTİLMİŞ
