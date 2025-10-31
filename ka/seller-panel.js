@@ -462,27 +462,7 @@ destroy() {
     console.log('✅ SellerPanel temizlendi');
 }
     
-        // ✅ YENİ SİPARİŞ BİLDİRİMİ
-        async handleNewOrder(order) {
-            console.log('🎯 Yeni sipariş işleniyor:', order);
-            
-            // Push bildirimi göster
-            this.showOrderNotification(order);
-            
-            // Sesli alarm çal
-            this.playOrderSound();
-            
-            // Sayfayı güncelle (eğer orders sayfasındaysa)
-            if (this.currentSection === 'orders') {
-                await this.loadOrders();
-            }
-            
-            // Dashboard'u güncelle
-            if (this.currentSection === 'sellerDashboard') {
-                await this.loadSellerDashboard();
-            }
-        }
-
+        
     // ✅ PUSH BİLDİRİMİ
     showOrderNotification(order) {
         console.log('📢 Push bildirimi gösteriliyor:', order);
