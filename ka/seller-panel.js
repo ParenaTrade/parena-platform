@@ -1342,7 +1342,7 @@ renderProductsTable(products) {
 
     // ✅ EVENT LISTENER'LARI EKLE - DÜZELTİLMİŞ
     this.attachProductEventListeners();
-},
+}
 
 // ✅ EVENT LISTENER FONKSİYONU - AYRI BİR FONKSİYON OLARAK
 attachProductEventListeners() {
