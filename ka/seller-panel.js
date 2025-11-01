@@ -1534,11 +1534,7 @@ attachProductEventListeners() {
 
 // ✅ MODAL FORM AÇMA
 showAddProductModal() {
-    const modalHTML = `
-    <div class="modal-overlay">
-        <div class="modal-content">
-            <h3>Yeni Ürün Ekle</h3>
-            <form id="productForm">
+    const modalHTML = ` 
 <div class="modal-overlay">
     <div class="modal-content">
         <h3>Yeni Ürün Ekle</h3>
