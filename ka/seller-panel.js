@@ -1372,87 +1372,93 @@ showAddProductModal() {
         <div class="modal-content" style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px;">
             <h3>Yeni Ürün Ekle</h3>
             <form id="productForm">
-                <!-- Temel Bilgiler -->
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="productName">Ürün Adı *</label>
-                        <input type="text" id="productName" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="productBarcode">Barkod</label>
-                        <input type="text" id="productBarcode" class="form-control">
-                    </div>
-                </div>
-
-                <!-- Mağaza Türü ve Kategori -->
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="productStoreType">Mağaza Türü *</label>
-                        <select id="productStoreType" class="form-control" required>
-                            <option value="">Mağaza Türü Seçin</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="productCategory">Kategori *</label>
-                        <select id="productCategory" class="form-control" required>
-                            <option value="">Kategori Seçin</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Reyon ve Marka -->
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="productReyon">Reyon *</label>
-                        <select id="productReyon" class="form-control" required>
-                            <option value="">Reyon Seçin</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="productBrand">Marka</label>
-                        <select id="productBrand" class="form-control">
-                            <option value="">Marka Seçin</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Fiyat ve Stok -->
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="productPrice">Fiyat (₺) *</label>
-                        <input type="number" id="productPrice" class="form-control" step="0.01" min="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="productDiscountPrice">İndirimli Fiyat (₺)</label>
-                        <input type="number" id="productDiscountPrice" class="form-control" step="0.01" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label for="productStock">Stok *</label>
-                        <input type="number" id="productStock" class="form-control" min="0" required>
-                    </div>
-                </div>
-
-                <!-- Açıklama -->
+            <!-- Temel Bilgiler -->
+            <div class="form-row">
                 <div class="form-group">
-                    <label for="productDescription">Açıklama</label>
-                    <textarea id="productDescription" class="form-control" rows="3"></textarea>
+                    <label for="productName">Ürün Adı *</label>
+                    <input type="text" id="productName" class="form-control" required>
                 </div>
+                <div class="form-group">
+                    <label for="productBarcode">Barkod</label>
+                    <input type="text" id="productBarcode" class="form-control">
+                </div>
+            </div>
 
-                <!-- Otomatik doldurulan bilgiler (sadece gösterim için) -->
-                <div class="auto-fill-info" style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none;" id="autoFillInfo">
-                    <small><strong>Otomatik doldurulacak:</strong> 
-                        <span id="unitTypeDisplay"></span>, 
-                        <span id="taxRateDisplay"></span>
-                    </small>
+            <!-- Mağaza Türü -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="productStoreType">Mağaza Türü *</label>
+                    <select id="productStoreType" class="form-control" required>
+                        <option value="">Mağaza Türü Seçin</option>
+                        <!-- Dinamik olarak doldurulacak -->
+                    </select>
                 </div>
+                <div class="form-group">
+                    <label for="productBrand">Marka</label>
+                    <select id="productBrand" class="form-control">
+                        <option value="">Marka Seçin</option>
+                        <!-- Dinamik olarak doldurulacak -->
+                    </select>
+                </div>
+            </div>
 
-                <!-- Butonlar -->
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" id="cancelProductModal">İptal</button>
-                    <button type="submit" class="btn btn-primary">Ürünü Ekle</button>
+            <!-- Reyon ve Kategori -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="productReyon">Reyon *</label>
+                    <select id="productReyon" class="form-control" required>
+                        <option value="">Reyon Seçin</option>
+                        <!-- Dinamik olarak doldurulacak -->
+                    </select>
                 </div>
-            </form>
-        </div>
+                <div class="form-group">
+                    <label for="productCategory">Kategori *</label>
+                    <select id="productCategory" class="form-control" required>
+                        <option value="">Kategori Seçin</option>
+                        <!-- Dinamik olarak doldurulacak -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Fiyat ve Stok -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="productPrice">Fiyat (₺) *</label>
+                    <input type="number" id="productPrice" class="form-control" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="productDiscountPrice">İndirimli Fiyat (₺)</label>
+                    <input type="number" id="productDiscountPrice" class="form-control" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="productStock">Stok *</label>
+                    <input type="number" id="productStock" class="form-control" min="0" required>
+                </div>
+            </div>
+
+            <!-- Açıklama -->
+            <div class="form-group">
+                <label for="productDescription">Açıklama</label>
+                <textarea id="productDescription" class="form-control" rows="3"></textarea>
+            </div>
+
+            <!-- Otomatik doldurulan bilgiler -->
+            <div class="auto-fill-info" style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none;" id="autoFillInfo">
+                <small><strong>Otomatik doldurulacak:</strong> 
+                    <span id="unitTypeDisplay"></span>, 
+                    <span id="taxRateDisplay"></span>,
+                    <span id="storeNameDisplay"></span>
+                </small>
+            </div>
+
+            <!-- Butonlar -->
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="cancelProductModal">İptal</button>
+                <button type="submit" class="btn btn-primary">Ürünü Ekle</button>
+            </div>
+        </form>
+    </div>
+    
     </div>`;
     
     // Eski modal varsa temizle
@@ -1608,8 +1614,11 @@ showEditProductModal(product) {
 }
 
 // ✅ MODAL FORM SELECTLERİNİ DOLDUR
+// ✅ MODAL FORM SELECTLERİNİ DOLDUR
 async loadModalSelects() {
     try {
+        console.log('🔍 Modal selectler dolduruluyor...');
+
         // Mağaza türlerini yükle
         const { data: storeTypes, error: storeError } = await this.supabase
             .from('store_type')
@@ -1622,45 +1631,46 @@ async loadModalSelects() {
                 storeTypes.map(store => 
                     `<option value="${store.id}">${store.name}</option>`
                 ).join('');
+
+            // ✅ MAĞAZA TÜRÜ DEĞİŞİNCE REYONLARI FİLTRELE
+            storeSelect.addEventListener('change', (e) => {
+                this.filterReyonsByStoreType(e.target.value);
+            });
         }
 
-        // Kategorileri yükle
-        const { data: categories, error: catError } = await this.supabase
-            .from('categories')
-            .select('*');
-        
-        if (!catError && categories) {
-            this.categories = categories;
-            const catSelect = document.getElementById('productCategory');
-            catSelect.innerHTML = '<option value="">Kategori Seçin</option>' +
-                categories.map(cat => 
-                    `<option value="${cat.id}">${cat.name}</option>`
-                ).join('');
-        }
-
-        // Reyondları yükle
-        const { data: reyons, error: reyonError } = await this.supabase
+        // Tüm reyonları yükle (filtrelenmek üzere)
+        const { data: allReyons, error: reyonError } = await this.supabase
             .from('reyon')
             .select('*');
         
-        if (!reyonError && reyons) {
-            this.reyons = reyons;
+        if (!reyonError && allReyons) {
+            this.allReyons = allReyons; // Tüm reyonları sakla
             const reyonSelect = document.getElementById('productReyon');
-            reyonSelect.innerHTML = '<option value="">Reyon Seçin</option>' +
-                reyons.map(reyon => 
-                    `<option value="${reyon.id}" data-unit-type="${reyon.unit_type_name}" data-tax-rate="${reyon.tax_rate}">${reyon.name} (${reyon.unit_type_name})</option>`
-                ).join('');
+            reyonSelect.innerHTML = '<option value="">Reyon Seçin</option>';
 
-            // ✅ REYON SEÇİLDİĞİNDE OTOMATİK DOLDURMA
+            // ✅ REYON SEÇİLDİĞİNDE KATEGORİLERİ FİLTRELE VE OTOMATİK DOLDUR
             reyonSelect.addEventListener('change', (e) => {
                 this.handleReyonChange(e.target.value);
             });
         }
 
+        // Tüm kategorileri yükle (filtrelenmek üzere)
+        const { data: allCategories, error: catError } = await this.supabase
+            .from('categories')
+            .select('*');
+        
+        if (!catError && allCategories) {
+            this.allCategories = allCategories; // Tüm kategorileri sakla
+            const catSelect = document.getElementById('productCategory');
+            catSelect.innerHTML = '<option value="">Kategori Seçin</option>';
+        }
+
         // Markaları yükle
         const { data: brands, error: brandError } = await this.supabase
             .from('brands')
-            .select('*');
+            .select('id, name')
+            .not('name', 'is', null) // NULL isimleri filtrele
+            .order('name');
         
         if (!brandError && brands) {
             this.brands = brands;
@@ -1669,6 +1679,11 @@ async loadModalSelects() {
                 brands.map(brand => 
                     `<option value="${brand.id}">${brand.name}</option>`
                 ).join('');
+            console.log('✅ Markalar yüklendi:', brands.length, 'adet');
+        } else {
+            console.error('❌ Marka yükleme hatası:', brandError);
+            const brandSelect = document.getElementById('productBrand');
+            brandSelect.innerHTML = '<option value="">Marka bulunamadı</option>';
         }
 
     } catch (error) {
@@ -1676,30 +1691,96 @@ async loadModalSelects() {
     }
 }
 
-// ✅ REYON DEĞİŞİMİNDE OTOMATİK BİLGİLERİ GÖSTER
-handleReyonChange(reyonId) {
-    const reyon = this.reyons.find(r => r.id === reyonId);
+// ✅ MAĞAZA TÜRÜNE GÖRE REYONLARI FİLTRELE
+filterReyonsByStoreType(storeTypeId) {
+    const reyonSelect = document.getElementById('productReyon');
+    
+    if (!storeTypeId) {
+        reyonSelect.innerHTML = '<option value="">Reyon Seçin</option>';
+        return;
+    }
+
+    // Mağaza türüne göre reyonları filtrele
+    const filteredReyons = this.allReyons.filter(reyon => 
+        reyon.store_type_id === storeTypeId
+    );
+
+    reyonSelect.innerHTML = '<option value="">Reyon Seçin</option>' +
+        filteredReyons.map(reyon => 
+            `<option value="${reyon.id}" 
+                      data-unit-type="${reyon.unit_type_name}" 
+                      data-tax-rate="${reyon.tax_rate}"
+                      data-store-type-id="${reyon.store_type_id}">
+                ${reyon.name} (${reyon.unit_type_name})
+            </option>`
+        ).join('');
+
+    console.log('🔍 Filtrelenmiş reyonlar:', filteredReyons.length, 'adet');
+}
+
+// ✅ REYON DEĞİŞİMİNDE KATEGORİLERİ FİLTRELE VE OTOMATİK DOLDUR
+async handleReyonChange(reyonId) {
+    const reyon = this.allReyons.find(r => r.id === reyonId);
     const autoFillInfo = document.getElementById('autoFillInfo');
     const unitTypeDisplay = document.getElementById('unitTypeDisplay');
     const taxRateDisplay = document.getElementById('taxRateDisplay');
+    const storeNameDisplay = document.getElementById('storeNameDisplay');
 
     if (reyon) {
-        // Bilgileri göster
+        // 1. Otomatik bilgileri göster
         unitTypeDisplay.textContent = `Birim: ${reyon.unit_type_name}`;
         taxRateDisplay.textContent = `KDV: %${reyon.tax_rate}`;
+        
+        // Mağaza adını bul ve göster
+        const storeType = this.storeTypes.find(st => st.id === reyon.store_type_id);
+        storeNameDisplay.textContent = storeType ? `Mağaza: ${storeType.name}` : '';
+        
         autoFillInfo.style.display = 'block';
         
         console.log('🔍 Reyon seçildi:', {
             reyon_name: reyon.name,
             unit_type: reyon.unit_type_name,
-            tax_rate: reyon.tax_rate
+            tax_rate: reyon.tax_rate,
+            store_type_id: reyon.store_type_id
         });
+
+        // 2. Kategorileri reyon_id'ye göre filtrele
+        await this.filterCategoriesByReyon(reyonId);
     } else {
         autoFillInfo.style.display = 'none';
+        // Kategorileri temizle
+        const catSelect = document.getElementById('productCategory');
+        catSelect.innerHTML = '<option value="">Kategori Seçin</option>';
     }
 }
 
-// ✅ YENİ ÜRÜN EKLEME - TÜM İLİŞKİLİ ALANLARLA
+// ✅ REYON'A GÖRE KATEGORİLERİ FİLTRELE
+async filterCategoriesByReyon(reyonId) {
+    const catSelect = document.getElementById('productCategory');
+    
+    if (!reyonId) {
+        catSelect.innerHTML = '<option value="">Kategori Seçin</option>';
+        return;
+    }
+
+    // Kategorileri reyon_id'ye göre filtrele
+    const filteredCategories = this.allCategories.filter(category => 
+        category.reyon_id === reyonId
+    );
+
+    catSelect.innerHTML = '<option value="">Kategori Seçin</option>' +
+        filteredCategories.map(category => 
+            `<option value="${category.id}">${category.name}</option>`
+        ).join('');
+
+    console.log('🔍 Filtrelenmiş kategoriler:', filteredCategories.length, 'adet');
+    
+    if (filteredCategories.length === 0) {
+        console.warn('⚠️ Bu reyon için kategori bulunamadı');
+    }
+}
+
+// ✅ YENİ ÜRÜN EKLEME - GÜNCELLENMİŞ
 async addNewProduct() {
     try {
         console.log('🔍 DEBUG - Form değerleri alınıyor...');
@@ -1738,20 +1819,10 @@ async addNewProduct() {
             }
         }
 
-        if (isNaN(formData.price) || formData.price < 0) {
-            this.showAlert('❌ Geçerli bir fiyat giriniz!', 'error');
-            return;
-        }
-
-        if (isNaN(formData.stock) || formData.stock < 0) {
-            this.showAlert('❌ Geçerli bir stok miktarı giriniz!', 'error');
-            return;
-        }
-
         // İlişkili tablo verilerini al
         const storeType = this.storeTypes.find(st => st.id === formData.storeTypeId);
-        const category = this.categories.find(cat => cat.id === formData.categoryId);
-        const reyon = this.reyons.find(rey => rey.id === formData.reyonId);
+        const category = this.allCategories.find(cat => cat.id === formData.categoryId);
+        const reyon = this.allReyons.find(rey => rey.id === formData.reyonId);
         const brand = formData.brandId ? this.brands.find(br => br.id === formData.brandId) : null;
 
         if (!storeType || !category || !reyon) {
@@ -1779,11 +1850,11 @@ async addNewProduct() {
             category_id: formData.categoryId,
             category_name: category.name,
             
-            // ✅ REYON İLİŞKİSİ - OTOMATİK DOLDURULACAK
+            // Reyon ilişkisi
             reyon_id: formData.reyonId,
             reyon_name: reyon.name,
-            unit_type: reyon.unit_type_name, // ✅ Reyondan otomatik
-            tax_rate: reyon.tax_rate,        // ✅ Reyondan otomatik
+            unit_type: reyon.unit_type_name,
+            tax_rate: reyon.tax_rate,
             
             // Marka ilişkisi
             brand_id: formData.brandId,
@@ -1845,6 +1916,7 @@ async addNewProduct() {
         this.showAlert('❌ Ürün eklenemedi!', 'error');
     }
 }
+    
     
 // ✅ ÜRÜN GÜNCELLEME - PRODUCT_PRICES ODAKLI
 async updateProduct(productId) {
