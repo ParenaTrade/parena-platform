@@ -1367,20 +1367,9 @@ attachProductEventListeners() {
 // ✅ MODAL FORM AÇMA - DÜZELTİLMİŞ
 showAddProductModal() {
     // Modal HTML'ini oluştur - TEMİZ VERSİYON
-    const modalHTML = `
-
-
-        <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
-            <div class="modal" style="background: white; border-radius: 12px; padding: 30px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
-                <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0;">Yeni Ürün Ekle</h3>
-                    <button class="btn btn-sm btn-secondary" onclick="this.closest('.modal-overlay').remove()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-    
-    <div class="modal-overlay">
-        <div class="modal-content">
+            const modalHTML = `
+    <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
+        <div class="modal-content" style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px;">
             <h3>Yeni Ürün Ekle</h3>
             <form id="productForm">
                 <!-- Temel Bilgiler -->
