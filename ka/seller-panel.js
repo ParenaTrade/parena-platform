@@ -1557,7 +1557,7 @@ attachProductEventListeners() {
 
 
     
-// ✅ GÜNCELLEME İÇİN ÜRÜN VERİLERİNİ YÜKLE
+// ✅ GÜNCELLEME İÇİN ÜRÜN VERİLERİNİ YÜKLE - DÜZELTİLMİŞ
 async loadProductDataForEdit(productId) {
     try {
         console.log('🔍 Ürün verileri yükleniyor:', productId);
@@ -1585,11 +1585,16 @@ async loadProductDataForEdit(productId) {
         if (product) {
             console.log('✅ Ürün verileri yüklendi:', product);
             
-            // Formu doldur
+            // Temel bilgileri doldur
             document.getElementById('productName').value = product.name || '';
             document.getElementById('productBarcode').value = product.barcode || '';
             document.getElementById('productDescription').value = product.description || '';
-            document.getElementById('productStatus').value = product.is_active.toString();
+            
+            // Durum select'ini doldur (sadece güncelleme modunda varsa)
+            const statusSelect = document.getElementById('productStatus');
+            if (statusSelect) {
+                statusSelect.value = product.is_active.toString();
+            }
             
             // Fiyat ve stok bilgilerini product_prices'tan al
             const productPrice = product.product_prices && product.product_prices.length > 0 
@@ -1600,22 +1605,35 @@ async loadProductDataForEdit(productId) {
             document.getElementById('productDiscountPrice').value = productPrice?.discount_price || '';
             document.getElementById('productStock').value = productPrice?.stock || product.stock || '';
             
-            // Select'leri doldur
-            if (product.reyon_id) {
-                document.getElementById('productReyon').value = product.reyon_id;
+            // ✅ REYON SELECT'İNİ DOLDUR
+            const reyonSelect = document.getElementById('productReyon');
+            if (product.reyon_id && reyonSelect) {
+                // Önce reyon select'ini doldurmayı bekle
+                await this.waitForElementOptions(reyonSelect);
+                
+                reyonSelect.value = product.reyon_id;
+                console.log('✅ Reyon select dolduruldu:', product.reyon_id);
+                
                 // Reyon değişimini tetikle (kategorileri filtrelemek için)
                 this.handleReyonChange(product.reyon_id);
                 
-                // Kategori select'ini doldur (reyon değişiminden sonra)
-                setTimeout(() => {
-                    if (product.category_id) {
-                        document.getElementById('productCategory').value = product.category_id;
+                // ✅ KATEGORİ SELECT'İNİ DOLDUR (reyon değişiminden sonra)
+                setTimeout(async () => {
+                    const categorySelect = document.getElementById('productCategory');
+                    if (product.category_id && categorySelect) {
+                        await this.waitForElementOptions(categorySelect);
+                        categorySelect.value = product.category_id;
+                        console.log('✅ Kategori select dolduruldu:', product.category_id);
                     }
-                }, 500);
+                }, 800);
             }
             
-            if (product.brand_id) {
-                document.getElementById('productBrand').value = product.brand_id;
+            // ✅ MARKA SELECT'İNİ DOLDUR
+            const brandSelect = document.getElementById('productBrand');
+            if (product.brand_id && brandSelect) {
+                await this.waitForElementOptions(brandSelect);
+                brandSelect.value = product.brand_id;
+                console.log('✅ Marka select dolduruldu:', product.brand_id);
             }
             
             console.log('✅ Form başarıyla dolduruldu');
@@ -1627,6 +1645,28 @@ async loadProductDataForEdit(productId) {
     }
 }
 
+// ✅ ELEMENT OPTION'LARININ YÜKLENMESİNİ BEKLE
+waitForElementOptions(selectElement, maxWaitTime = 5000) {
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        
+        const checkOptions = () => {
+            // Select'te option'lar var mı kontrol et (en az 1 tane boş olmayan)
+            const hasOptions = selectElement.options.length > 1 || 
+                              (selectElement.options.length === 1 && selectElement.options[0].value !== '');
+            
+            if (hasOptions) {
+                resolve(true);
+            } else if (Date.now() - startTime > maxWaitTime) {
+                reject(new Error('Select options timeout'));
+            } else {
+                setTimeout(checkOptions, 100);
+            }
+        };
+        
+        checkOptions();
+    });
+}
     
 // ✅ ÜRÜN DÜZENLEME - DEBUG EKLİ
 async editProduct(productId) {
@@ -1932,8 +1972,7 @@ filterReyonsByStoreType(storeTypeId) {
 }
 
 // ✅ REYON DEĞİŞİMİNDE KATEGORİLERİ FİLTRELE VE OTOMATİK DOLDUR
-async // ✅ REYON DEĞİŞİMİNDE KATEGORİLERİ FİLTRELE
-handleReyonChange(reyonId) {
+async handleReyonChange(reyonId) {
     try {
         console.log('🔍 Reyon değişti:', reyonId);
         
