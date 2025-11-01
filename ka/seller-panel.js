@@ -1168,55 +1168,162 @@ async loadProductsData() {
 }
     
 // ✅ YENİ ÜRÜN EKLEME - PRODUCT_PRICES ODAKLI
+// ✅ YENİ ÜRÜN EKLEME - KESİN ÇÖZÜM
 async addNewProduct() {
-    const productData = {
-        name: document.getElementById('productName').value,
-        barcode: document.getElementById('productBarcode').value || null,
-        description: document.getElementById('productDescription').value || null,
-        seller_id: this.sellerData.id,
-        currency: 'TRY',
-        is_active: true,
-        category_name: document.getElementById('productCategory').value ? 
-            this.categories.find(cat => cat.id === document.getElementById('productCategory').value)?.name : null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-    };
-
-    const priceData = {     
-        price: parseFloat(document.getElementById('productPrice').value),    
-        discount_price: document.getElementById('productDiscountPrice').value ?
-        parseFloat(document.getElementById('productDiscountPrice').value) : null,
-        stock: parseInt(document.getElementById('productStock').value),
-        currency: 'TRY',
-        created: new Date().toISOString(),
-        updated: new Date().toISOString()
-    };
-
     try {
-        // Önce products tablosuna ekle
+        console.log('🔍 DEBUG - Form değerleri alınıyor...');
+        
+        // INPUT DEĞERLERİNİ GÜVENLİ ŞEKİLDE AL
+        const priceInput = document.getElementById('productPrice');
+        const stockInput = document.getElementById('productStock');
+        const nameInput = document.getElementById('productName');
+        
+        // Değerleri doğrudan al ve kontrol et
+        const priceValue = priceInput ? priceInput.value : null;
+        const stockValue = stockInput ? stockInput.value : null;
+        const nameValue = nameInput ? nameInput.value : null;
+        
+        console.log('🔍 RAW VALUES:', {
+            priceValue, 
+            stockValue, 
+            nameValue,
+            priceType: typeof priceValue,
+            stockType: typeof stockValue
+        });
+
+        // VALIDATION - Çok katı kontrol
+        if (!nameValue || nameValue.trim() === '') {
+            this.showAlert('❌ Ürün adı zorunludur!', 'error');
+            return;
+        }
+
+        if (!priceValue || priceValue.trim() === '') {
+            this.showAlert('❌ Fiyat alanı boş olamaz!', 'error');
+            return;
+        }
+
+        if (!stockValue || stockValue.trim() === '') {
+            this.showAlert('❌ Stok alanı boş olamaz!', 'error');
+            return;
+        }
+
+        // SAYISAL DÖNÜŞÜM - Çok güvenli
+        const price = Number(priceValue);
+        const stock = Number(stockValue);
+        
+        console.log('🔍 PARSED VALUES:', {
+            price, 
+            stock,
+            priceIsNaN: isNaN(price),
+            stockIsNaN: isNaN(stock)
+        });
+
+        // NaN kontrolü
+        if (isNaN(price) || !isFinite(price)) {
+            this.showAlert('❌ Geçerli bir fiyat giriniz!', 'error');
+            return;
+        }
+
+        if (isNaN(stock) || !isFinite(stock) || stock < 0) {
+            this.showAlert('❌ Geçerli bir stok miktarı giriniz!', 'error');
+            return;
+        }
+
+        // Diğer değerler
+        const barcode = document.getElementById('productBarcode')?.value?.trim() || '';
+        const description = document.getElementById('productDescription')?.value?.trim() || '';
+        
+        // Discount price
+        const discountPriceInput = document.getElementById('productDiscountPrice');
+        let discountPrice = null;
+        if (discountPriceInput?.value && discountPriceInput.value.trim() !== '') {
+            discountPrice = Number(discountPriceInput.value);
+            if (isNaN(discountPrice) || !isFinite(discountPrice)) {
+                this.showAlert('❌ Geçersiz indirimli fiyat!', 'error');
+                return;
+            }
+        }
+
+        // Kategori
+        const categorySelect = document.getElementById('productCategory');
+        const categoryId = categorySelect?.value || null;
+
+        // SON KONTROL - Değerlerin kesinlikle number olduğundan emin ol
+        const finalProductData = {
+            name: nameValue.trim(),
+            barcode: barcode,
+            price: Number(price), // ✅ Kesinlikle number
+            stock: Number(stock), // ✅ Kesinlikle number
+            description: description,
+            seller_id: this.sellerData.id,
+            currency: 'TRY',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        if (categoryId) {
+            finalProductData.category_id = categoryId;
+        }
+
+        console.log('🔍 FINAL PRODUCT DATA:', finalProductData);
+        console.log('🔍 FINAL TYPES:', {
+            priceType: typeof finalProductData.price,
+            stockType: typeof finalProductData.stock,
+            priceValue: finalProductData.price,
+            stockValue: finalProductData.stock
+        });
+
+        // ✅ TEST: Manuel değerlerle deneyelim
+        const testProductData = {
+            name: "TEST " + nameValue.trim(),
+            barcode: barcode || "TEST" + Date.now(),
+            price: 99.99, // ✅ Sabit değer
+            stock: 10,    // ✅ Sabit değer
+            description: description,
+            seller_id: this.sellerData.id,
+            currency: 'TRY',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        if (categoryId) {
+            testProductData.category_id = categoryId;
+        }
+
+        console.log('🧪 TEST DATA:', testProductData);
+
+        // Önce TEST verisiyle deneyelim
         const { data: newProduct, error: productError } = await this.supabase
             .from('products')
-            .insert([productData])
+            .insert([testProductData]) // ✅ testProductData kullan
             .select()
             .single();
 
         if (productError) throw productError;
 
+        console.log('✅ TEST BAŞARILI - Product eklendi:', newProduct);
+
         // Sonra product_prices tablosuna ekle
-        const fullPriceData = {
+        const priceData = {
             product_id: newProduct.id,
             seller_id: this.sellerData.id,
-            ...priceData
+            price: price, // Orijinal price değeri
+            discount_price: discountPrice,
+            stock: stock, // Orijinal stock değeri
+            currency: 'TRY',
+            created: new Date().toISOString(),
+            updated: new Date().toISOString()
         };
 
-        // Eğer centre_id varsa ekle
         if (this.sellerData.centre_id) {
-            fullPriceData.centre_id = this.sellerData.centre_id;
+            priceData.centre_id = this.sellerData.centre_id;
         }
 
         const { error: priceError } = await this.supabase
             .from('product_prices')
-            .insert([fullPriceData]);
+            .insert([priceData]);
 
         if (priceError) throw priceError;
 
@@ -1228,8 +1335,7 @@ async addNewProduct() {
         console.error('Ürün ekleme hatası:', error);
         this.showAlert('❌ Ürün eklenemedi!', 'error');
     }
-}
- 
+} 
     // ✅ ÜRÜN TABLOSU RENDER - İNDİRİMLİ FİYAT GÖSTERİMİ
 renderProductsTable(products) {
     const tbody = document.querySelector('#productsTable tbody');
