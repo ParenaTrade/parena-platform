@@ -1616,6 +1616,7 @@ showEditProductModal(product) {
 
 // ✅ MODAL FORM SELECTLERİNİ DOLDUR
 // ✅ MODAL FORM SELECTLERİNİ DOLDUR - TAM ÇALIŞAN
+// ✅ MODAL FORM SELECTLERİNİ DOLDUR - BASİT
 async loadModalSelects() {
     try {
         console.log('🔍 Modal selectler dolduruluyor...');
@@ -1623,10 +1624,10 @@ async loadModalSelects() {
         // 1. Satıcının mağaza türünü al
         await this.loadSellerStoreType();
 
-        // 2. Reyondları yükle (satıcının mağaza türüne göre otomatik filtrelenecek)
+        // 2. Reyondları yükle (satıcının mağaza türüne göre)
         await this.loadReyons();
 
-        // 3. Tüm kategorileri yükle (filtrelenmek üzere)
+        // 3. Tüm kategorileri yükle
         await this.loadCategories();
 
         // 4. Markaları yükle
@@ -1638,47 +1639,49 @@ async loadModalSelects() {
         console.error('Modal select yükleme hatası:', error);
     }
 }
-// ✅ SATICININ MAĞAZA TÜRÜNÜ AL
+    
+// ✅ SATICININ MAĞAZA TÜRÜNÜ AL - DİREKT
 async loadSellerStoreType() {
     try {
         console.log('🔍 Satıcı mağaza türü yükleniyor...');
         
-        const { data: sellerProfile, error } = await this.supabase
+        // seller_profiles ve store_type tablolarını JOIN yap
+        const { data: sellerData, error } = await this.supabase
             .from('seller_profiles')
-            .select('store_type_id')
+            .select(`
+                store_type_id,
+                store_type:store_type_id (
+                    id,
+                    name
+                )
+            `)
             .eq('id', this.userProfile.id)
             .single();
 
         if (error) {
-            console.error('❌ Satıcı profili yükleme hatası:', error);
+            console.error('❌ Satıcı mağaza türü yükleme hatası:', error);
+            // Varsayılan değer
+            this.sellerStoreTypeId = '3b6d27de-3f30-4113-82f2-d71e9b1cf89f';
+            this.sellerStoreTypeName = 'Market';
             return;
         }
 
-        if (sellerProfile && sellerProfile.store_type_id) {
-            this.sellerStoreTypeId = sellerProfile.store_type_id;
-            console.log('🔍 Satıcı mağaza türü ID:', this.sellerStoreTypeId);
-            
-            // Mağaza türü adını al
-            const { data: storeType, error: storeError } = await this.supabase
-                .from('store_type')
-                .select('name')
-                .eq('id', this.sellerStoreTypeId)
-                .single();
-
-            if (!storeError && storeType) {
-                this.sellerStoreTypeName = storeType.name;
-                console.log('✅ Satıcı mağaza türü:', this.sellerStoreTypeName);
-            } else {
-                console.error('❌ Mağaza türü adı yükleme hatası:', storeError);
-            }
+        if (sellerData && sellerData.store_type) {
+            this.sellerStoreTypeId = sellerData.store_type_id;
+            this.sellerStoreTypeName = sellerData.store_type.name;
+            console.log('✅ Satıcı mağaza türü:', this.sellerStoreTypeName);
         } else {
-            console.warn('⚠️ Satıcı mağaza türü bulunamadı');
+            console.warn('⚠️ Mağaza türü bulunamadı, varsayılan kullanılıyor');
+            this.sellerStoreTypeId = '3b6d27de-3f30-4113-82f2-d71e9b1cf89f';
+            this.sellerStoreTypeName = 'Market';
         }
+
     } catch (error) {
         console.error('Satıcı mağaza türü yükleme hatası:', error);
+        this.sellerStoreTypeId = '3b6d27de-3f30-4113-82f2-d71e9b1cf89f';
+        this.sellerStoreTypeName = 'Market';
     }
-}
-    
+}    
 // ✅ REYONLARI YÜKLE (SATICI MAĞAZA TÜRÜNE GÖRE OTOMATİK FİLTRELİ)
 async loadReyons() {
     try {
