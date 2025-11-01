@@ -1534,7 +1534,6 @@ attachProductEventListeners() {
 
 // ✅ MODAL FORM AÇMA
 showAddProductModal() {
-    // Modal HTML'ini oluştur
     const modalHTML = `
     <div class="modal-overlay">
         <div class="modal-content">
@@ -1628,9 +1627,6 @@ showAddProductModal() {
                 <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
                 <button type="submit" class="btn btn-primary">Ürünü Ekle</button>
             </div>
-        </form>
-    </div>
-</div>
             </form>
         </div>
     </div>`;
