@@ -1971,10 +1971,11 @@ filterReyonsByStoreType(storeTypeId) {
     console.log('🔍 Filtrelenmiş reyonlar:', filteredReyons.length, 'adet');
 }
 
-// ✅ REYON DEĞİŞİMİNDE KATEGORİLERİ FİLTRELE VE OTOMATİK DOLDUR
+// ✅ REYON DEĞİŞİMİNDE KATEGORİLERİ FİLTRELE - DEBUG'LI
 async handleReyonChange(reyonId) {
     try {
         console.log('🔍 Reyon değişti:', reyonId);
+        console.log('🔍 Mevcut kategoriler:', this.categories?.length);
         
         if (!this.categories) {
             console.error('❌ Kategoriler yüklenmemiş');
@@ -1988,13 +1989,15 @@ async handleReyonChange(reyonId) {
         const categorySelect = document.getElementById('productCategory');
 
         if (reyon) {
-            // 1. Otomatik bilgileri göster
+            // Otomatik bilgileri göster
             unitTypeDisplay.textContent = `Birim: ${reyon.unit_type_name}`;
             taxRateDisplay.textContent = `KDV: %${reyon.tax_rate}`;
             autoFillInfo.style.display = 'block';
 
-            // 2. Kategorileri reyon_id'ye göre filtrele
+            // Kategorileri reyon_id'ye göre filtrele
             const filteredCategories = this.categories.filter(cat => cat.reyon_id === reyonId);
+            
+            console.log('🔍 Filtrelenmiş kategoriler:', filteredCategories);
             
             categorySelect.innerHTML = '<option value="">Kategori Seçin</option>' +
                 (filteredCategories.length > 0 
@@ -2012,8 +2015,7 @@ async handleReyonChange(reyonId) {
     } catch (error) {
         console.error('Reyon değişim hatası:', error);
     }
-}
-    
+}    
 // ✅ REYON'A GÖRE KATEGORİLERİ FİLTRELE
 async filterCategoriesByReyon(reyonId) {
     const catSelect = document.getElementById('productCategory');
