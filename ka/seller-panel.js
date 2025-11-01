@@ -1289,7 +1289,7 @@ async addNewProduct() {
         };
 
         if (categoryId) {
-            testProductData.category_id = categoryId;
+            testProductData.reyon_id = categoryId;
         }
 
         console.log('🧪 TEST DATA:', testProductData);
@@ -1318,7 +1318,7 @@ async addNewProduct() {
         };
 
         if (this.sellerData.centre_id) {
-            priceData.centre_id = this.sellerData.centre_id;
+            priceData.reyon_id = this.sellerData.centre_id;
         }
 
         const { error: priceError } = await this.supabase
