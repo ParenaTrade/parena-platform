@@ -1579,10 +1579,11 @@ async addNewProduct() {
         updated_at: new Date().toISOString()
     };
 
-    const priceData = {
-        price: parseFloat(document.getElementById('productPrice').value),
-        discount_price: document.getElementById('productDiscountPrice').value ? 
-            parseFloat(document.getElementById('productDiscountPrice').value) : null,
+    const priceData = {     
+        price: document.getElementById('productPrice').value ?
+        parseFloat(document.getElementById('producPrice').value) : null,
+        discount_price: document.getElementById('productDiscountPrice').value ?
+        parseFloat(document.getElementById('productDiscountPrice').value) : null,
         stock: parseInt(document.getElementById('productStock').value),
         currency: 'TRY',
         created: new Date().toISOString(),
