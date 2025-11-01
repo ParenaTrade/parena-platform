@@ -1263,7 +1263,7 @@ async addNewProduct() {
         };
 
         if (categoryId) {
-            finalProductData.category_id = categoryId;
+            finalProductData.reyon_id = categoryId;
         }
 
         console.log('🔍 FINAL PRODUCT DATA:', finalProductData);
@@ -1318,7 +1318,7 @@ async addNewProduct() {
         };
 
         if (this.sellerData.centre_id) {
-            priceData.reyon_id = this.sellerData.centre_id;
+            priceData.centre_id = this.sellerData.centre_id;
         }
 
         const { error: priceError } = await this.supabase
