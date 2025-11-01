@@ -1564,69 +1564,6 @@ showAddProductModal() {
     });
 }
 
-// ✅ YENİ ÜRÜN EKLEME - PRODUCT_PRICES ODAKLI
-async addNewProduct() {
-    const productData = {
-        name: document.getElementById('productName').value,
-        barcode: document.getElementById('productBarcode').value || null,
-        description: document.getElementById('productDescription').value || null,
-        seller_id: this.sellerData.id,
-        currency: 'TRY',
-        is_active: true,
-        category_name: document.getElementById('productCategory').value ? 
-            this.categories.find(cat => cat.id === document.getElementById('productCategory').value)?.name : null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-    };
-
-    const priceData = {     
-        price: document.getElementById('productPrice').value ?
-        parseFloat(document.getElementById('producPrice').value) : null,
-        discount_price: document.getElementById('productDiscountPrice').value ?
-        parseFloat(document.getElementById('productDiscountPrice').value) : null,
-        stock: parseInt(document.getElementById('productStock').value),
-        currency: 'TRY',
-        created: new Date().toISOString(),
-        updated: new Date().toISOString()
-    };
-
-    try {
-        // Önce products tablosuna ekle
-        const { data: newProduct, error: productError } = await this.supabase
-            .from('products')
-            .insert([productData])
-            .select()
-            .single();
-
-        if (productError) throw productError;
-
-        // Sonra product_prices tablosuna ekle
-        const fullPriceData = {
-            product_id: newProduct.id,
-            seller_id: this.sellerData.id,
-            ...priceData
-        };
-
-        // Eğer centre_id varsa ekle
-        if (this.sellerData.centre_id) {
-            fullPriceData.centre_id = this.sellerData.centre_id;
-        }
-
-        const { error: priceError } = await this.supabase
-            .from('product_prices')
-            .insert([fullPriceData]);
-
-        if (priceError) throw priceError;
-
-        this.showAlert('✅ Ürün başarıyla eklendi!', 'success');
-        document.querySelector('.modal-overlay').remove();
-        await this.loadProductsData();
-
-    } catch (error) {
-        console.error('Ürün ekleme hatası:', error);
-        this.showAlert('❌ Ürün eklenemedi!', 'error');
-    }
-}
 
 
 // ✅ ÜRÜN DÜZENLEME - DEBUG EKLİ
