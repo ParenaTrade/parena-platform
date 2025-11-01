@@ -1369,10 +1369,10 @@ attachProductEventListeners() {
     }
 
 
-// ✅ MODAL FORM AÇMA - GÜVENLİ
-showAddProductModal() {
+// ✅ MODAL FORM AÇMA - TEK FORM (Ekleme ve Güncelleme)
+showProductModal(productId = null) {
     try {
-        console.log('🔍 Modal açılıyor...');
+        console.log('🔍 Ürün modalı açılıyor...', productId ? 'Güncelleme' : 'Ekleme');
         
         // Eski modal varsa temizle
         const existingModal = document.querySelector('.modal-overlay');
@@ -1380,12 +1380,18 @@ showAddProductModal() {
             existingModal.remove();
         }
 
+        const isEditMode = !!productId;
+        const modalTitle = isEditMode ? 'Ürünü Düzenle' : 'Yeni Ürün Ekle';
+        const buttonText = isEditMode ? 'Ürünü Güncelle' : 'Ürünü Ekle';
+
         // Modal HTML'ini oluştur
         const modalHTML = `
         <div class="modal-overlay">
             <div class="modal-content">
-                <h3>Yeni Ürün Ekle</h3>
+                <h3>${modalTitle}</h3>
                 <form id="productForm">
+                    <input type="hidden" id="productId" value="${productId || ''}">
+                    
                     <!-- Temel Bilgiler -->
                     <div class="form-row">
                         <div class="form-group">
@@ -1398,7 +1404,7 @@ showAddProductModal() {
                         </div>
                     </div>
 
-                    <!-- Reyon (3. sırada) -->
+                    <!-- Reyon -->
                     <div class="form-row">
                         <div class="form-group">
                             <label for="productReyon">Reyon *</label>
@@ -1446,6 +1452,19 @@ showAddProductModal() {
                         <textarea id="productDescription" class="form-control" rows="3"></textarea>
                     </div>
 
+                    <!-- Durum (Sadece güncelleme modunda) -->
+                    ${isEditMode ? `
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="productStatus">Durum</label>
+                            <select id="productStatus" class="form-control">
+                                <option value="true">Aktif</option>
+                                <option value="false">Pasif</option>
+                            </select>
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <!-- Otomatik bilgiler -->
                     <div class="auto-fill-info" style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none;" id="autoFillInfo">
                         <small><strong>Otomatik doldurulacak:</strong> 
@@ -1457,39 +1476,158 @@ showAddProductModal() {
                     <!-- Butonlar -->
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" id="cancelProductModal">İptal</button>
-                        <button type="submit" class="btn btn-primary">Ürünü Ekle</button>
+                        <button type="submit" class="btn btn-primary">${buttonText}</button>
                     </div>
                 </form>
             </div>
         </div>`;
         
-        // Yeni modalı ekle
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         
-        // İptal butonu eventini ekle
+        // Event listener'ları ekle
         document.getElementById('cancelProductModal').addEventListener('click', () => {
             document.querySelector('.modal-overlay').remove();
         });
         
-        // Form submit eventini ekle
         document.getElementById('productForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.addNewProduct();
+            if (isEditMode) {
+                this.updateProduct(productId);
+            } else {
+                this.addNewProduct();
+            }
         });
 
         // Selectleri doldur
         this.loadModalSelects();
 
-        console.log('✅ Ürün ekleme modalı başarıyla açıldı');
+        // Eğer güncelleme modundaysa formu doldur
+        if (isEditMode) {
+            this.loadProductDataForEdit(productId);
+        }
+
+        console.log('✅ Ürün modalı başarıyla açıldı:', isEditMode ? 'Güncelleme' : 'Ekleme');
 
     } catch (error) {
         console.error('❌ Modal açma hatası:', error);
         this.showAlert('❌ Modal açılamadı!', 'error');
     }
-}   
+}
+
+// ✅ YENİ ÜRÜN EKLEME MODALI (Eski fonksiyon - geriye uyumluluk için)
+showAddProductModal() {
+    this.showProductModal();
+}
+// ✅ EVENT LISTENER'LARI EKLE - GÜNCELLENMİŞ
+attachProductEventListeners() {
+    console.log('🔗 Ürün event listenerları ekleniyor...');
+    
+    // Düzenle butonları
+    document.querySelectorAll('.edit-product-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            console.log('✏️ Düzenle butonuna tıklandı');
+            const productId = btn.getAttribute('data-product-id');
+            console.log('🆔 Product ID:', productId);
+            if (productId) {
+                this.showProductModal(productId); // ✅ Tek modal fonksiyonu
+            } else {
+                console.error('❌ Product ID bulunamadı');
+            }
+        });
+    });
+
+    // Aktif/Pasif butonları
+    document.querySelectorAll('.toggle-product-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            console.log('🔘 Durum butonuna tıklandı');
+            const productId = btn.getAttribute('data-product-id');
+            const currentStatus = btn.getAttribute('data-current-status') === 'true';
+            if (productId) {
+                this.toggleProductStatus(productId, currentStatus);
+            } else {
+                console.error('❌ Product ID bulunamadı');
+            }
+        });
+    });
+
+    console.log('✅ Event listenerlar eklendi');
+}
 
 
 
+
+    
+// ✅ GÜNCELLEME İÇİN ÜRÜN VERİLERİNİ YÜKLE
+async loadProductDataForEdit(productId) {
+    try {
+        console.log('🔍 Ürün verileri yükleniyor:', productId);
+        
+        // Products ve product_prices tablolarını JOIN yaparak al
+        const { data: product, error } = await this.supabase
+            .from('products')
+            .select(`
+                *,
+                product_prices (
+                    price,
+                    discount_price,
+                    stock
+                )
+            `)
+            .eq('id', productId)
+            .single();
+
+        if (error) {
+            console.error('❌ Ürün verisi yükleme hatası:', error);
+            this.showAlert('❌ Ürün verileri yüklenemedi!', 'error');
+            return;
+        }
+
+        if (product) {
+            console.log('✅ Ürün verileri yüklendi:', product);
+            
+            // Formu doldur
+            document.getElementById('productName').value = product.name || '';
+            document.getElementById('productBarcode').value = product.barcode || '';
+            document.getElementById('productDescription').value = product.description || '';
+            document.getElementById('productStatus').value = product.is_active.toString();
+            
+            // Fiyat ve stok bilgilerini product_prices'tan al
+            const productPrice = product.product_prices && product.product_prices.length > 0 
+                ? product.product_prices[0] 
+                : null;
+            
+            document.getElementById('productPrice').value = productPrice?.price || product.price || '';
+            document.getElementById('productDiscountPrice').value = productPrice?.discount_price || '';
+            document.getElementById('productStock').value = productPrice?.stock || product.stock || '';
+            
+            // Select'leri doldur
+            if (product.reyon_id) {
+                document.getElementById('productReyon').value = product.reyon_id;
+                // Reyon değişimini tetikle (kategorileri filtrelemek için)
+                this.handleReyonChange(product.reyon_id);
+                
+                // Kategori select'ini doldur (reyon değişiminden sonra)
+                setTimeout(() => {
+                    if (product.category_id) {
+                        document.getElementById('productCategory').value = product.category_id;
+                    }
+                }, 500);
+            }
+            
+            if (product.brand_id) {
+                document.getElementById('productBrand').value = product.brand_id;
+            }
+            
+            console.log('✅ Form başarıyla dolduruldu');
+        }
+
+    } catch (error) {
+        console.error('❌ Ürün verisi yükleme hatası:', error);
+        this.showAlert('❌ Ürün verileri yüklenemedi!', 'error');
+    }
+}
+
+    
 // ✅ ÜRÜN DÜZENLEME - DEBUG EKLİ
 async editProduct(productId) {
     console.log('🎯 Ürün düzenleniyor:', productId);
@@ -2043,62 +2181,164 @@ async addNewProduct() {
     }
 }    
     
-// ✅ ÜRÜN GÜNCELLEME - PRODUCT_PRICES ODAKLI
+// ✅ ÜRÜN GÜNCELLEME - TEK FORM
 async updateProduct(productId) {
-    const productData = {
-        name: document.getElementById('editProductName').value,
-        barcode: document.getElementById('editProductBarcode').value || null,
-        description: document.getElementById('editProductDescription').value || null,
-        reyon_name: document.getElementById('editProductCategory').value ? 
-            this.categories.find(cat => cat.id === document.getElementById('editProductCategory').value)?.name : null,
-        updated_at: new Date().toISOString()
-    };
-
-    const priceData = {
-        price: parseFloat(document.getElementById('editProductPrice').value),
-        discount_price: document.getElementById('editProductDiscountPrice').value ? 
-            parseFloat(document.getElementById('editProductDiscountPrice').value) : null,
-        stock: parseInt(document.getElementById('editProductStock').value),
-        updated: new Date().toISOString()
-    };
-
     try {
-        // Products tablosunu güncelle
+        console.log('🔍 Ürün güncelleniyor:', productId);
+        
+        // Form değerlerini güvenli şekilde al
+        const getValue = (id) => {
+            const element = document.getElementById(id);
+            return element ? element.value.trim() : '';
+        };
+
+        const getNumber = (id) => {
+            const element = document.getElementById(id);
+            const value = element ? element.value : '';
+            return value !== '' ? Number(value) : null;
+        };
+
+        const getBoolean = (id) => {
+            const element = document.getElementById(id);
+            return element ? element.value === 'true' : true;
+        };
+
+        // Tüm form değerlerini al
+        const formData = {
+            name: getValue('productName'),
+            barcode: getValue('productBarcode') || null,
+            price: getNumber('productPrice'),
+            discountPrice: getNumber('productDiscountPrice'),
+            stock: getNumber('productStock'),
+            description: getValue('productDescription') || '',
+            reyonId: getValue('productReyon'),
+            categoryId: getValue('productCategory'),
+            brandId: getValue('productBrand') || null,
+            isActive: getBoolean('productStatus')
+        };
+
+        console.log('🔍 GÜNCELLEME FORM DATA:', formData);
+
+        // Validation (aynı ekleme ile)
+        if (!formData.name) {
+            this.showAlert('❌ Ürün adı zorunludur!', 'error');
+            return;
+        }
+
+        if (formData.price === null || isNaN(formData.price) || formData.price < 0) {
+            this.showAlert('❌ Geçerli bir fiyat giriniz!', 'error');
+            return;
+        }
+
+        if (formData.stock === null || isNaN(formData.stock) || formData.stock < 0) {
+            this.showAlert('❌ Geçerli bir stok miktarı giriniz!', 'error');
+            return;
+        }
+
+        if (!formData.reyonId) {
+            this.showAlert('❌ Reyon seçimi zorunludur!', 'error');
+            return;
+        }
+
+        if (!formData.categoryId) {
+            this.showAlert('❌ Kategori seçimi zorunludur!', 'error');
+            return;
+        }
+
+        // İlişkili tablo verilerini al
+        const reyon = this.reyons.find(r => r.id === formData.reyonId);
+        const category = this.categories.find(c => c.id === formData.categoryId);
+        const brand = formData.brandId ? this.brands.find(b => b.id === formData.brandId) : null;
+
+        if (!reyon || !category) {
+            this.showAlert('❌ Geçersiz kategori veya reyon seçimi!', 'error');
+            return;
+        }
+
+        // ✅ PRODUCTS TABLOSU İÇİN GÜNCELLEME VERİSİ
+        const productUpdateData = {
+            // Temel bilgiler
+            name: formData.name,
+            barcode: formData.barcode,
+            price: formData.price,
+            stock: formData.stock,
+            description: formData.description,
+            is_active: formData.isActive,
+            
+            // Kategori ve reyon
+            category_id: formData.categoryId,
+            category_name: category.name,
+            reyon_id: formData.reyonId,
+            reyon_name: reyon.name,
+            unit_type: reyon.unit_type_name,
+            tax_rate: reyon.tax_rate,
+            
+            // Marka
+            brand_id: formData.brandId,
+            brand_name: brand ? brand.name : null,
+            
+            updated_at: new Date().toISOString()
+        };
+
+        console.log('🔍 PRODUCT UPDATE DATA:', productUpdateData);
+
+        // 1. Products tablosunu güncelle
+        console.log('📦 Products tablosu güncelleniyor...');
         const { error: productError } = await this.supabase
             .from('products')
-            .update(productData)
+            .update(productUpdateData)
             .eq('id', productId);
 
-        if (productError) throw productError;
+        if (productError) {
+            console.error('❌ Products update hatası:', productError);
+            throw productError;
+        }
 
-        // Product_prices tablosunu güncelle veya oluştur
+        console.log('✅ Products tablosu güncellendi');
+
+        // 2. Product_prices tablosunu güncelle veya oluştur
+        console.log('💰 Product prices güncelleniyor...');
+        const priceUpdateData = {
+            price: formData.price,
+            discount_price: formData.discountPrice,
+            stock: formData.stock,
+            updated: new Date().toISOString()
+        };
+
+        // Mevcut price kaydını kontrol et
         const { data: existingPrice, error: priceCheckError } = await this.supabase
             .from('product_prices')
             .select('id')
             .eq('product_id', productId)
-            .eq('seller_id', this.sellerData.id)
+            .eq('seller_id', this.userProfile.id)
             .maybeSingle();
+
+        if (priceCheckError) {
+            console.error('❌ Price check hatası:', priceCheckError);
+            throw priceCheckError;
+        }
 
         if (existingPrice) {
             // Mevcut price kaydını güncelle
             const { error: priceUpdateError } = await this.supabase
                 .from('product_prices')
-                .update(priceData)
+                .update(priceUpdateData)
                 .eq('id', existingPrice.id);
 
             if (priceUpdateError) throw priceUpdateError;
+            console.log('✅ Mevcut price kaydı güncellendi');
         } else {
             // Yeni price kaydı oluştur
             const newPriceData = {
                 product_id: productId,
-                seller_id: this.sellerData.id,
-                ...priceData,
+                seller_id: this.userProfile.id,
+                ...priceUpdateData,
                 currency: 'TRY',
                 created: new Date().toISOString()
             };
 
             // Eğer centre_id varsa ekle
-            if (this.sellerData.centre_id) {
+            if (this.sellerData?.centre_id) {
                 newPriceData.centre_id = this.sellerData.centre_id;
             }
 
@@ -2107,15 +2347,24 @@ async updateProduct(productId) {
                 .insert([newPriceData]);
 
             if (priceInsertError) throw priceInsertError;
+            console.log('✅ Yeni price kaydı oluşturuldu');
         }
 
+        // Başarı mesajı ve temizlik
         this.showAlert('✅ Ürün başarıyla güncellendi!', 'success');
-        document.querySelector('.modal-overlay').remove();
+        
+        // Modalı kapat
+        const modal = document.querySelector('.modal-overlay');
+        if (modal) {
+            modal.remove();
+        }
+        
+        // Ürün listesini yenile
         await this.loadProductsData();
 
     } catch (error) {
-        console.error('Ürün güncelleme hatası:', error);
-        this.showAlert('❌ Ürün güncellenemedi!', 'error');
+        console.error('❌ Ürün güncelleme hatası:', error);
+        this.showAlert('❌ Ürün güncellenemedi: ' + error.message, 'error');
     }
 }
     
