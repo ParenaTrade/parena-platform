@@ -1183,8 +1183,7 @@ async addNewProduct() {
     };
 
     const priceData = {     
-        price: document.getElementById('productPrice').value ?
-        parseFloat(document.getElementById('producPrice').value) : null,
+        price: parseFloat(document.getElementById('productPrice').value,    
         discount_price: document.getElementById('productDiscountPrice').value ?
         parseFloat(document.getElementById('productDiscountPrice').value) : null,
         stock: parseInt(document.getElementById('productStock').value),
