@@ -1532,102 +1532,110 @@ attachProductEventListeners() {
     }
 
 
-// ✅ MODAL FORM AÇMA
+// ✅ MODAL FORM AÇMA - DÜZELTİLMİŞ
 showAddProductModal() {
-    const modalHTML = ` 
-<div class="modal-overlay">
-    <div class="modal-content">
-        <h3>Yeni Ürün Ekle</h3>
-        
-        <form id="productForm">
-            <!-- Temel Bilgiler -->
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="productName">Ürün Adı *</label>
-                    <input type="text" id="productName" class="form-control" required>
+    // Modal HTML'ini oluştur - TEMİZ VERSİYON
+    const modalHTML = `
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <h3>Yeni Ürün Ekle</h3>
+            <form id="productForm">
+                <!-- Temel Bilgiler -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productName">Ürün Adı *</label>
+                        <input type="text" id="productName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="productBarcode">Barkod</label>
+                        <input type="text" id="productBarcode" class="form-control">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="productBarcode">Barkod</label>
-                    <input type="text" id="productBarcode" class="form-control">
-                </div>
-            </div>
 
-            <!-- Mağaza Türü ve Kategori -->
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="productStoreType">Mağaza Türü *</label>
-                    <select id="productStoreType" class="form-control" required>
-                        <option value="">Mağaza Türü Seçin</option>
-                        <!-- Dinamik olarak doldurulacak -->
-                    </select>
+                <!-- Mağaza Türü ve Kategori -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productStoreType">Mağaza Türü *</label>
+                        <select id="productStoreType" class="form-control" required>
+                            <option value="">Mağaza Türü Seçin</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="productCategory">Kategori *</label>
+                        <select id="productCategory" class="form-control" required>
+                            <option value="">Kategori Seçin</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="productCategory">Kategori *</label>
-                    <select id="productCategory" class="form-control" required>
-                        <option value="">Kategori Seçin</option>
-                        <!-- Dinamik olarak doldurulacak -->
-                    </select>
-                </div>
-            </div>
 
-            <!-- Reyon ve Marka -->
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="productReyon">Reyon *</label>
-                    <select id="productReyon" class="form-control" required>
-                        <option value="">Reyon Seçin</option>
-                        <!-- Dinamik olarak doldurulacak -->
-                    </select>
+                <!-- Reyon ve Marka -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productReyon">Reyon *</label>
+                        <select id="productReyon" class="form-control" required>
+                            <option value="">Reyon Seçin</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="productBrand">Marka</label>
+                        <select id="productBrand" class="form-control">
+                            <option value="">Marka Seçin</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="productBrand">Marka</label>
-                    <select id="productBrand" class="form-control">
-                        <option value="">Marka Seçin</option>
-                        <!-- Dinamik olarak doldurulacak -->
-                    </select>
-                </div>
-            </div>
 
-            <!-- Fiyat ve Stok -->
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="productPrice">Fiyat (₺) *</label>
-                    <input type="number" id="productPrice" class="form-control" step="0.01" min="0" required>
+                <!-- Fiyat ve Stok -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productPrice">Fiyat (₺) *</label>
+                        <input type="number" id="productPrice" class="form-control" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="productDiscountPrice">İndirimli Fiyat (₺)</label>
+                        <input type="number" id="productDiscountPrice" class="form-control" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="productStock">Stok *</label>
+                        <input type="number" id="productStock" class="form-control" min="0" required>
+                    </div>
                 </div>
+
+                <!-- Açıklama -->
                 <div class="form-group">
-                    <label for="productDiscountPrice">İndirimli Fiyat (₺)</label>
-                    <input type="number" id="productDiscountPrice" class="form-control" step="0.01" min="0">
+                    <label for="productDescription">Açıklama</label>
+                    <textarea id="productDescription" class="form-control" rows="3"></textarea>
                 </div>
-                <div class="form-group">
-                    <label for="productStock">Stok *</label>
-                    <input type="number" id="productStock" class="form-control" min="0" required>
+
+                <!-- Otomatik doldurulan bilgiler (sadece gösterim için) -->
+                <div class="auto-fill-info" style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none;" id="autoFillInfo">
+                    <small><strong>Otomatik doldurulacak:</strong> 
+                        <span id="unitTypeDisplay"></span>, 
+                        <span id="taxRateDisplay"></span>
+                    </small>
                 </div>
-            </div>
 
-            <!-- Açıklama -->
-            <div class="form-group">
-                <label for="productDescription">Açıklama</label>
-                <textarea id="productDescription" class="form-control" rows="3"></textarea>
-            </div>
-
-            <!-- Otomatik doldurulan bilgiler (sadece gösterim için) -->
-            <div class="auto-fill-info" style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none;" id="autoFillInfo">
-                <small><strong>Otomatik doldurulacak:</strong> 
-                    <span id="unitTypeDisplay"></span>, 
-                    <span id="taxRateDisplay"></span>
-                </small>
-            </div>
-
-            <!-- Butonlar -->
-            <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">İptal</button>
-                <button type="submit" class="btn btn-primary">Ürünü Ekle</button>
-            </div>
+                <!-- Butonlar -->
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelProductModal">İptal</button>
+                    <button type="submit" class="btn btn-primary">Ürünü Ekle</button>
+                </div>
             </form>
         </div>
     </div>`;
     
+    // Eski modal varsa temizle
+    const existingModal = document.querySelector('.modal-overlay');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Yeni modalı ekle
     document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // İptal butonu eventini ekle
+    document.getElementById('cancelProductModal').addEventListener('click', () => {
+        document.querySelector('.modal-overlay').remove();
+    });
     
     // Selectleri doldur
     this.loadModalSelects();
@@ -1637,9 +1645,9 @@ showAddProductModal() {
         e.preventDefault();
         this.addNewProduct();
     });
-}
-    
-    
+
+    console.log('✅ Ürün ekleme modalı açıldı');
+}    
 
 
 
