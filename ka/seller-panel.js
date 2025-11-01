@@ -1866,54 +1866,85 @@ async filterCategoriesByReyon(reyonId) {
 // ✅ YENİ ÜRÜN EKLEME - GÜNCELLENMİŞ
 async addNewProduct() {
     try {
-        console.log('🔍 DEBUG - Form değerleri alınıyor...');
+        console.log('🔍 Ürün ekleme başlıyor...');
         
+        // Form değerlerini güvenli şekilde al
+        const getValue = (id) => {
+            const element = document.getElementById(id);
+            return element ? element.value.trim() : '';
+        };
+
+        const getNumber = (id) => {
+            const element = document.getElementById(id);
+            const value = element ? element.value : '';
+            return value !== '' ? Number(value) : null;
+        };
+
         // Tüm form değerlerini al
         const formData = {
-            name: document.getElementById('productName').value.trim(),
-            barcode: document.getElementById('productBarcode').value.trim(),
-            price: Number(document.getElementById('productPrice').value),
-            discountPrice: document.getElementById('productDiscountPrice').value ? 
-                Number(document.getElementById('productDiscountPrice').value) : null,
-            stock: Number(document.getElementById('productStock').value),
-            description: document.getElementById('productDescription').value.trim(),
-            storeTypeId: document.getElementById('productStoreType').value,
-            categoryId: document.getElementById('productCategory').value,
-            reyonId: document.getElementById('productReyon').value,
-            brandId: document.getElementById('productBrand').value || null
+            name: getValue('productName'),
+            barcode: getValue('productBarcode') || null,
+            price: getNumber('productPrice'),
+            discountPrice: getNumber('productDiscountPrice'),
+            stock: getNumber('productStock'),
+            description: getValue('productDescription') || '',
+            reyonId: getValue('productReyon'),
+            categoryId: getValue('productCategory'),
+            brandId: getValue('productBrand') || null
         };
 
         console.log('🔍 FORM DATA:', formData);
 
         // Validation
-        const requiredFields = [
-            { value: formData.name, field: 'Ürün adı' },
-            { value: formData.price, field: 'Fiyat' },
-            { value: formData.stock, field: 'Stok' },
-            { value: formData.storeTypeId, field: 'Mağaza türü' },
-            { value: formData.categoryId, field: 'Kategori' },
-            { value: formData.reyonId, field: 'Reyon' }
-        ];
+        if (!formData.name) {
+            this.showAlert('❌ Ürün adı zorunludur!', 'error');
+            return;
+        }
 
-        for (const field of requiredFields) {
-            if (!field.value && field.value !== 0) {
-                this.showAlert(`❌ ${field.field} zorunludur!`, 'error');
-                return;
-            }
+        if (formData.price === null || isNaN(formData.price) || formData.price < 0) {
+            this.showAlert('❌ Geçerli bir fiyat giriniz!', 'error');
+            return;
+        }
+
+        if (formData.stock === null || isNaN(formData.stock) || formData.stock < 0) {
+            this.showAlert('❌ Geçerli bir stok miktarı giriniz!', 'error');
+            return;
+        }
+
+        if (!formData.reyonId) {
+            this.showAlert('❌ Reyon seçimi zorunludur!', 'error');
+            return;
+        }
+
+        if (!formData.categoryId) {
+            this.showAlert('❌ Kategori seçimi zorunludur!', 'error');
+            return;
         }
 
         // İlişkili tablo verilerini al
-        const storeType = this.storeTypes.find(st => st.id === formData.storeTypeId);
-        const category = this.allCategories.find(cat => cat.id === formData.categoryId);
-        const reyon = this.allReyons.find(rey => rey.id === formData.reyonId);
-        const brand = formData.brandId ? this.brands.find(br => br.id === formData.brandId) : null;
+        const reyon = this.reyons.find(r => r.id === formData.reyonId);
+        const category = this.categories.find(c => c.id === formData.categoryId);
+        const brand = formData.brandId ? this.brands.find(b => b.id === formData.brandId) : null;
 
-        if (!storeType || !category || !reyon) {
+        if (!reyon || !category) {
             this.showAlert('❌ Geçersiz kategori veya reyon seçimi!', 'error');
             return;
         }
 
-        // Products tablosu için tam veri
+        // Mağaza türü kontrolü
+        if (!this.sellerStoreTypeId || !this.sellerStoreTypeName) {
+            this.showAlert('❌ Mağaza türü bulunamadı!', 'error');
+            return;
+        }
+
+        console.log('🔍 İlişkili veriler:', {
+            reyon,
+            category,
+            brand,
+            storeType: this.sellerStoreTypeName
+        });
+
+        // ✅ PRODUCTS TABLOSU İÇİN VERİ
         const productData = {
             // Temel bilgiler
             name: formData.name,
@@ -1921,25 +1952,25 @@ async addNewProduct() {
             price: formData.price,
             stock: formData.stock,
             description: formData.description,
-            seller_id: this.sellerData.id,
+            seller_id: this.userProfile.id,
             currency: 'TRY',
             is_active: true,
             
-            // Store type ilişkisi
-            store_id: formData.storeTypeId,
-            store_name: storeType.name,
+            // ✅ Satıcının mağaza türü
+            store_id: this.sellerStoreTypeId,
+            store_name: this.sellerStoreTypeName,
             
-            // Kategori ilişkisi
+            // ✅ Kategori ilişkisi
             category_id: formData.categoryId,
             category_name: category.name,
             
-            // Reyon ilişkisi
+            // ✅ Reyon ilişkisi
             reyon_id: formData.reyonId,
             reyon_name: reyon.name,
             unit_type: reyon.unit_type_name,
             tax_rate: reyon.tax_rate,
             
-            // Marka ilişkisi
+            // ✅ Marka ilişkisi
             brand_id: formData.brandId,
             brand_name: brand ? brand.name : null,
             
@@ -1950,7 +1981,8 @@ async addNewProduct() {
 
         console.log('🔍 PRODUCT DATA:', productData);
 
-        // Önce products tablosuna ekle
+        // 1. Önce products tablosuna ekle
+        console.log('📦 Products tablosuna ekleniyor...');
         const { data: newProduct, error: productError } = await this.supabase
             .from('products')
             .insert([productData])
@@ -1964,10 +1996,11 @@ async addNewProduct() {
 
         console.log('✅ Products tablosuna eklendi:', newProduct);
 
-        // Sonra product_prices tablosuna ekle
+        // 2. Sonra product_prices tablosuna ekle
+        console.log('💰 Product prices tablosuna ekleniyor...');
         const priceData = {
             product_id: newProduct.id,
-            seller_id: this.sellerData.id,
+            seller_id: this.userProfile.id,
             price: formData.price,
             discount_price: formData.discountPrice,
             stock: formData.stock,
@@ -1977,7 +2010,7 @@ async addNewProduct() {
         };
 
         // Eğer centre_id varsa ekle
-        if (this.sellerData.centre_id) {
+        if (this.sellerData?.centre_id) {
             priceData.centre_id = this.sellerData.centre_id;
         }
 
@@ -1990,16 +2023,25 @@ async addNewProduct() {
             throw priceError;
         }
 
+        console.log('✅ Product prices tablosuna eklendi');
+
+        // Başarı mesajı ve temizlik
         this.showAlert('✅ Ürün başarıyla eklendi!', 'success');
-        document.querySelector('.modal-overlay').remove();
+        
+        // Modalı kapat
+        const modal = document.querySelector('.modal-overlay');
+        if (modal) {
+            modal.remove();
+        }
+        
+        // Ürün listesini yenile
         await this.loadProductsData();
 
     } catch (error) {
-        console.error('Ürün ekleme hatası:', error);
-        this.showAlert('❌ Ürün eklenemedi!', 'error');
+        console.error('❌ Ürün ekleme hatası:', error);
+        this.showAlert('❌ Ürün eklenemedi: ' + error.message, 'error');
     }
-}
-    
+}    
     
 // ✅ ÜRÜN GÜNCELLEME - PRODUCT_PRICES ODAKLI
 async updateProduct(productId) {
