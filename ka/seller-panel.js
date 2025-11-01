@@ -415,7 +415,7 @@ playFallbackSound() {
             const { data, error } = await this.supabase
                 .from('seller_profiles')
                 .select('*')
-                .eq('id', this.userProfile.id)
+                    .eq('id', this.userProfile.id)
                 .single();
 
             if (error) {
@@ -1371,7 +1371,12 @@ showAddProductModal() {
     <div class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
         <div class="modal-content" style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px;">
             <h3>Yeni Ürün Ekle</h3>
-            <form id="productForm">
+            <!-- Ürün Ekleme/Edit Modal -->
+<div class="modal-overlay">
+    <div class="modal-content">
+        <h3>Yeni Ürün Ekle</h3>
+        
+        <form id="productForm">
             <!-- Temel Bilgiler -->
             <div class="form-row">
                 <div class="form-group">
@@ -1384,12 +1389,12 @@ showAddProductModal() {
                 </div>
             </div>
 
-            <!-- Mağaza Türü -->
+            <!-- Reyon -->
             <div class="form-row">
                 <div class="form-group">
-                    <label for="productStoreType">Mağaza Türü *</label>
-                    <select id="productStoreType" class="form-control" required>
-                        <option value="">Mağaza Türü Seçin</option>
+                    <label for="productReyon">Reyon *</label>
+                    <select id="productReyon" class="form-control" required>
+                        <option value="">Reyon Seçin</option>
                         <!-- Dinamik olarak doldurulacak -->
                     </select>
                 </div>
@@ -1402,21 +1407,18 @@ showAddProductModal() {
                 </div>
             </div>
 
-            <!-- Reyon ve Kategori -->
+            <!-- Kategori -->
             <div class="form-row">
-                <div class="form-group">
-                    <label for="productReyon">Reyon *</label>
-                    <select id="productReyon" class="form-control" required>
-                        <option value="">Reyon Seçin</option>
-                        <!-- Dinamik olarak doldurulacak -->
-                    </select>
-                </div>
                 <div class="form-group">
                     <label for="productCategory">Kategori *</label>
                     <select id="productCategory" class="form-control" required>
                         <option value="">Kategori Seçin</option>
                         <!-- Dinamik olarak doldurulacak -->
                     </select>
+                </div>
+                <div class="form-group" style="display: none;">
+                    <label for="productStoreType">Mağaza Türü</label>
+                    <input type="text" id="productStoreType" class="form-control" readonly>
                 </div>
             </div>
 
@@ -1458,8 +1460,7 @@ showAddProductModal() {
             </div>
         </form>
     </div>
-    
-    </div>`;
+ </div>`;
     
     // Eski modal varsa temizle
     const existingModal = document.querySelector('.modal-overlay');
@@ -1614,44 +1615,22 @@ showEditProductModal(product) {
 }
 
 // ✅ MODAL FORM SELECTLERİNİ DOLDUR
-// ✅ MODAL FORM SELECTLERİNİ DOLDUR
 async loadModalSelects() {
     try {
         console.log('🔍 Modal selectler dolduruluyor...');
 
-        // Mağaza türlerini yükle
-        const { data: storeTypes, error: storeError } = await this.supabase
-            .from('store_type')
-            .select('*');
-        
-        if (!storeError && storeTypes) {
-            this.storeTypes = storeTypes;
-            const storeSelect = document.getElementById('productStoreType');
-            storeSelect.innerHTML = '<option value="">Mağaza Türü Seçin</option>' +
-                storeTypes.map(store => 
-                    `<option value="${store.id}">${store.name}</option>`
-                ).join('');
+        // Satıcının mağaza türünü al
+        await this.loadSellerStoreType();
 
-            // ✅ MAĞAZA TÜRÜ DEĞİŞİNCE REYONLARI FİLTRELE
-            storeSelect.addEventListener('change', (e) => {
-                this.filterReyonsByStoreType(e.target.value);
-            });
-        }
-
-        // Tüm reyonları yükle (filtrelenmek üzere)
+        // Reyondları yükle (satıcının mağaza türüne göre filtrelenecek)
         const { data: allReyons, error: reyonError } = await this.supabase
             .from('reyon')
             .select('*');
         
         if (!reyonError && allReyons) {
-            this.allReyons = allReyons; // Tüm reyonları sakla
-            const reyonSelect = document.getElementById('productReyon');
-            reyonSelect.innerHTML = '<option value="">Reyon Seçin</option>';
-
-            // ✅ REYON SEÇİLDİĞİNDE KATEGORİLERİ FİLTRELE VE OTOMATİK DOLDUR
-            reyonSelect.addEventListener('change', (e) => {
-                this.handleReyonChange(e.target.value);
-            });
+            this.allReyons = allReyons;
+            // Satıcının mağaza türüne göre reyonları filtrele
+            this.filterReyonsBySellerStoreType();
         }
 
         // Tüm kategorileri yükle (filtrelenmek üzere)
@@ -1660,37 +1639,93 @@ async loadModalSelects() {
             .select('*');
         
         if (!catError && allCategories) {
-            this.allCategories = allCategories; // Tüm kategorileri sakla
+            this.allCategories = allCategories;
             const catSelect = document.getElementById('productCategory');
             catSelect.innerHTML = '<option value="">Kategori Seçin</option>';
         }
 
-        // Markaları yükle
-        const { data: brands, error: brandError } = await this.supabase
-            .from('brands')
-            .select('id, name')
-            .not('name', 'is', null) // NULL isimleri filtrele
-            .order('name');
-        
-        if (!brandError && brands) {
-            this.brands = brands;
-            const brandSelect = document.getElementById('productBrand');
-            brandSelect.innerHTML = '<option value="">Marka Seçin</option>' +
-                brands.map(brand => 
-                    `<option value="${brand.id}">${brand.name}</option>`
-                ).join('');
-            console.log('✅ Markalar yüklendi:', brands.length, 'adet');
-        } else {
-            console.error('❌ Marka yükleme hatası:', brandError);
-            const brandSelect = document.getElementById('productBrand');
-            brandSelect.innerHTML = '<option value="">Marka bulunamadı</option>';
-        }
+        // ✅ MARKALARI DÜZGÜN ŞEKİLDE YÜKLE
+        await this.loadBrands();
 
     } catch (error) {
         console.error('Modal select yükleme hatası:', error);
     }
 }
 
+  // ✅ SATICININ MAĞAZA TÜRÜNÜ AL
+async loadSellerStoreType() {
+    try {
+        // seller_profiles tablosundan satıcının mağaza türünü al
+        const { data: sellerProfile, error } = await this.supabase
+            .from('seller_profiles')
+            .select('store_type_id')
+            .eq('id', this.userProfile.id)
+            .single();
+
+        if (!error && sellerProfile) {
+            this.sellerStoreTypeId = sellerProfile.store_type_id;
+            console.log('🔍 Satıcı mağaza türü ID:', this.sellerStoreTypeId);
+
+            // Mağaza türü adını al
+            const { data: storeType } = await this.supabase
+                .from('store_type')
+                .select('name')
+                .eq('id', this.sellerStoreTypeId)
+                .single();
+
+            if (storeType) {
+                this.sellerStoreTypeName = storeType.name;
+                // Gizli inputa mağaza türünü yaz
+                document.getElementById('productStoreType').value = this.sellerStoreTypeName;
+                console.log('🔍 Satıcı mağaza türü:', this.sellerStoreTypeName);
+            }
+        }
+    } catch (error) {
+        console.error('Satıcı mağaza türü yükleme hatası:', error);
+    }
+}
+
+
+// ✅ MARKALARI YÜKLE - DÜZELTİLMİŞ
+async loadBrands() {
+    try {
+        console.log('🔍 Markalar yükleniyor...');
+        
+        const { data: brands, error: brandError } = await this.supabase
+            .from('brands')
+            .select('id, name')
+            .not('name', 'is', null) // NULL isimleri filtrele
+            .order('name');
+
+        if (brandError) {
+            console.error('❌ Marka yükleme hatası:', brandError);
+            throw brandError;
+        }
+
+        if (brands && brands.length > 0) {
+            this.brands = brands;
+            const brandSelect = document.getElementById('productBrand');
+            
+            brandSelect.innerHTML = '<option value="">Marka Seçin</option>' +
+                brands.map(brand => 
+                    `<option value="${brand.id}">${brand.name}</option>`
+                ).join('');
+            
+            console.log('✅ Markalar yüklendi:', brands.length, 'adet');
+            console.log('🔍 İlk 5 marka:', brands.slice(0, 5));
+        } else {
+            console.warn('⚠️ Marka bulunamadı');
+            const brandSelect = document.getElementById('productBrand');
+            brandSelect.innerHTML = '<option value="">Marka bulunamadı</option>';
+        }
+
+    } catch (error) {
+        console.error('❌ Marka yükleme hatası:', error);
+        const brandSelect = document.getElementById('productBrand');
+        brandSelect.innerHTML = '<option value="">Marka yüklenemedi</option>';
+    }
+}
+    
 // ✅ MAĞAZA TÜRÜNE GÖRE REYONLARI FİLTRELE
 filterReyonsByStoreType(storeTypeId) {
     const reyonSelect = document.getElementById('productReyon');
@@ -1730,10 +1765,7 @@ async handleReyonChange(reyonId) {
         // 1. Otomatik bilgileri göster
         unitTypeDisplay.textContent = `Birim: ${reyon.unit_type_name}`;
         taxRateDisplay.textContent = `KDV: %${reyon.tax_rate}`;
-        
-        // Mağaza adını bul ve göster
-        const storeType = this.storeTypes.find(st => st.id === reyon.store_type_id);
-        storeNameDisplay.textContent = storeType ? `Mağaza: ${storeType.name}` : '';
+        storeNameDisplay.textContent = `Mağaza: ${this.sellerStoreTypeName}`;
         
         autoFillInfo.style.display = 'block';
         
@@ -1741,7 +1773,7 @@ async handleReyonChange(reyonId) {
             reyon_name: reyon.name,
             unit_type: reyon.unit_type_name,
             tax_rate: reyon.tax_rate,
-            store_type_id: reyon.store_type_id
+            store_type: this.sellerStoreTypeName
         });
 
         // 2. Kategorileri reyon_id'ye göre filtrele
@@ -1753,7 +1785,7 @@ async handleReyonChange(reyonId) {
         catSelect.innerHTML = '<option value="">Kategori Seçin</option>';
     }
 }
-
+    
 // ✅ REYON'A GÖRE KATEGORİLERİ FİLTRELE
 async filterCategoriesByReyon(reyonId) {
     const catSelect = document.getElementById('productCategory');
@@ -1779,7 +1811,7 @@ async filterCategoriesByReyon(reyonId) {
         console.warn('⚠️ Bu reyon için kategori bulunamadı');
     }
 }
-
+    
 // ✅ YENİ ÜRÜN EKLEME - GÜNCELLENMİŞ
 async addNewProduct() {
     try {
