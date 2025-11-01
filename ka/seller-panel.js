@@ -1368,7 +1368,7 @@ renderProductsTable(products) {
     tbody.innerHTML = products.map(product => {
         // Kategori ismini bul
         const category = this.categories.find(cat => cat.id === product.category_id);
-        const categoryName = category ? category.name : (product.category_name || '-');
+        const categoryName = category ? category.name : (product.reyon_name || '-');
 
         // Fiyat bilgilerini product_prices'tan al
         const displayPrice = product.current_price || product.price;
@@ -1695,7 +1695,7 @@ showEditProductModal(product) {
                             <select id="editProductCategory" class="form-control">
                                 <option value="">Kategori Seçin</option>
                                 ${this.categories.map(cat => 
-                                    `<option value="${cat.id}" ${cat.name === product.category_name ? 'selected' : ''}>${cat.name}</option>`
+                                    `<option value="${cat.id}" ${cat.name === product.reyon_name ? 'selected' : ''}>${cat.name}</option>`
                                 ).join('')}
                             </select>
                         </div>
@@ -1734,7 +1734,7 @@ async updateProduct(productId) {
         name: document.getElementById('editProductName').value,
         barcode: document.getElementById('editProductBarcode').value || null,
         description: document.getElementById('editProductDescription').value || null,
-        category_name: document.getElementById('editProductCategory').value ? 
+        reyon_name: document.getElementById('editProductCategory').value ? 
             this.categories.find(cat => cat.id === document.getElementById('editProductCategory').value)?.name : null,
         updated_at: new Date().toISOString()
     };
