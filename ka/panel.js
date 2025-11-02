@@ -3,33 +3,33 @@ class PanelSystem {
         this.currentPanel = null;
         this.userProfile = null;
         this.setupMobileMenu();
-        this.setupAccordionMenus();
+        this.setupAccordionMenus(); // Akordiyon menüleri ekle
     }
 
     setupAccordionMenus() {
         console.log('🎪 Akordiyon menüler ayarlanıyor...');
         
-        // Akordiyon event listener'ları
-        document.addEventListener('click', (e) => {
-            const accordionHeader = e.target.closest('.accordion-header');
-            if (accordionHeader) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const accordionId = accordionHeader.getAttribute('data-accordion');
-                const accordionContent = document.getElementById(accordionId);
-                
-                if (accordionContent) {
-                    // Toggle active class
-                    const isActive = accordionHeader.classList.contains('active');
-                    accordionHeader.classList.toggle('active');
-                    accordionContent.classList.toggle('active');
+        document.addEventListener('DOMContentLoaded', () => {
+            // Akordiyon açma/kapama
+            const accordionHeaders = document.querySelectorAll('.accordion-header');
+            
+            accordionHeaders.forEach(header => {
+                header.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const accordionId = this.getAttribute('data-accordion');
+                    const accordionContent = document.getElementById(accordionId);
                     
-                    console.log('🔘 Akordiyon toggled:', accordionId, !isActive);
-                }
-            });
-        }); 
+                    if (accordionContent) {
+                        // Toggle active class
+                        this.classList.toggle('active');
+                        accordionContent.classList.toggle('active');
+                        
+                        console.log('🔘 Akordiyon toggled:', accordionId, this.classList.contains('active'));
+                    }
+                });
+            }); 
 
+            
             // Nav item click handler - akordiyon item'ları için
             const navItems = document.querySelectorAll('.nav-item');
             navItems.forEach(item => {
