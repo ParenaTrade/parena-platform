@@ -8,6 +8,179 @@ class AdminPanel {
         console.log('Admin panel initialized');
     }
 
+       // ✅ YENİ: SİPARİŞ YÖNETİMİ SECTION
+    async loadOrderManagement() {
+        const section = document.getElementById('orderManagementSection');
+        section.innerHTML = `
+            <div class="section-header">
+                <h2>🚚 Sipariş & Kurye Yönetimi</h2>
+                <div class="header-actions">
+                    <button class="btn btn-success" onclick="adminPanel.startAutoAssignment()">
+                        <i class="fas fa-robot"></i> Otomatik Kurye Atama
+                    </button>
+                    <button class="btn btn-info" onclick="adminPanel.refreshOrderList()">
+                        <i class="fas fa-sync"></i> Yenile
+                    </button>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="pendingOrdersCount">0</h3>
+                        <p>Kurye Bekleyen</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-motorcycle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="availableCouriersCount">0</h3>
+                        <p>Müsait Kurye</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>📋 Kurye Ataması Bekleyen Siparişler</h3>
+                </div>
+                <div class="card-body">
+                    <div id="ordersNeedingAssignment">
+                        <div class="loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Siparişler yükleniyor...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        await this.loadOrdersNeedingAssignment();
+        await this.loadOrderManagementStats();
+    }
+
+    // ✅ KURYE ATAMA BEKLEYEN SİPARİŞLER
+    async loadOrdersNeedingAssignment() {
+        try {
+            const { data: orders, error } = await supabase
+                .from('orders')
+                .select(`
+                    *,
+                    customer:customers(name, phone),
+                    seller:seller_profiles(business_name)
+                `)
+                .in('status', ['confirmed', 'preparing'])
+                .is('courier_id', null)
+                .order('created_at', { ascending: true });
+
+            const container = document.getElementById('ordersNeedingAssignment');
+            
+            if (!orders || orders.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="fas fa-check-circle" style="font-size: 48px; color: #28a745;"></i>
+                        <h4>🎉 Tüm siparişlere kurye atandı!</h4>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = orders.map(order => `
+                <div class="order-card" style="border: 1px solid #e1e5e9; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <strong>Sipariş #${order.id.slice(-8)}</strong>
+                            <div style="color: #666; font-size: 14px;">
+                                ${order.customer?.name} • ${order.seller?.business_name}
+                            </div>
+                            <div style="color: #999; font-size: 12px;">
+                                ${order.delivery_address}
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: bold; color: var(--primary);">
+                                ${parseFloat(order.total_amount || 0).toFixed(2)} ₺
+                            </div>
+                            <div style="color: #666; font-size: 12px;">
+                                ${new Date(order.created_at).toLocaleTimeString('tr-TR')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button class="btn btn-success btn-sm" 
+                                onclick="adminPanel.autoAssignCourier('${order.id}')">
+                            <i class="fas fa-robot"></i> Otomatik Ata
+                        </button>
+                        
+                        <select class="form-control form-control-sm" 
+                                onchange="adminPanel.manualAssignCourier('${order.id}', this.value)"
+                                style="min-width: 200px;">
+                            <option value="">Manuel Kurye Seçin</option>
+                        </select>
+                    </div>
+                </div>
+            `).join('');
+
+            // Kurye listelerini yükle
+            for (const order of orders) {
+                await this.loadAvailableCouriersForOrder(order.id);
+            }
+
+        } catch (error) {
+            console.error('Sipariş yükleme hatası:', error);
+        }
+    }
+
+    // ✅ OTOMATİK KURYE ATAMA
+    async autoAssignCourier(orderId) {
+        try {
+            const suitableCouriers = await this.findSuitableCouriers(orderId);
+            
+            if (suitableCouriers.length === 0) {
+                window.panelSystem.showAlert('Uygun kurye bulunamadı!', 'error');
+                return;
+            }
+
+            const bestCourier = suitableCouriers[0];
+            const success = await this.assignCourierToOrder(orderId, bestCourier.id);
+            
+            if (success) {
+                window.panelSystem.showAlert(`Kurye atandı: ${bestCourier.full_name}`, 'success');
+                await this.loadOrdersNeedingAssignment();
+            }
+
+        } catch (error) {
+            console.error('Otomatik atama hatası:', error);
+            window.panelSystem.showAlert('Otomatik atama başarısız!', 'error');
+        }
+    }
+
+    // ✅ KURYE ATAMA İŞLEMİ
+    async assignCourierToOrder(orderId, courierId) {
+        try {
+            const { error } = await supabase
+                .from('orders')
+                .update({
+                    courier_id: courierId,
+                    status: 'preparing',
+                    assigned_at: new Date().toISOString()
+                })
+                .eq('id', orderId);
+
+            return !error;
+        } catch (error) {
+            console.error('Kurye atama hatası:', error);
+            return false;
+        }
+    }
+    
+    // ✅ loadSectionData'ya EKLE
     async loadSectionData(sectionName) {
         const section = document.getElementById(sectionName + 'Section');
         
@@ -21,6 +194,9 @@ class AdminPanel {
             case 'courierManagement':
                 await this.loadCourierManagement();
                 break;
+            case 'orderManagement':  // ✅ YENİ EKLENDİ
+                await this.loadOrderManagement();
+                break;
             case 'allOrders':
                 await this.loadAllOrders();
                 break;
@@ -32,7 +208,7 @@ class AdminPanel {
                 break;
         }
     }
-
+}
     async loadAdminDashboard() {
         const section = document.getElementById('dashboardSection');
         section.innerHTML = `
