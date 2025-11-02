@@ -1928,8 +1928,7 @@ class CustomerPanel {
             element.addEventListener(event, handler);
             this.referralEventListeners.push({ element, event, handler });
         }
-    }
-x"xc"c        
+    }     
 
    async startReferralProcess() {
         try {
