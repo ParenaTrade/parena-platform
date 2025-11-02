@@ -3,6 +3,59 @@ class PanelSystem {
         this.currentPanel = null;
         this.userProfile = null;
         this.setupMobileMenu();
+        this.setupAccordionMenus(); // Akordiyon menüleri ekle
+    }
+
+    setupAccordionMenus() {
+        console.log('🎪 Akordiyon menüler ayarlanıyor...');
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Akordiyon açma/kapama
+            const accordionHeaders = document.querySelectorAll('.accordion-header');
+            
+            accordionHeaders.forEach(header => {
+                header.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const accordionId = this.getAttribute('data-accordion');
+                    const accordionContent = document.getElementById(accordionId);
+                    
+                    if (accordionContent) {
+                        // Toggle active class
+                        this.classList.toggle('active');
+                        accordionContent.classList.toggle('active');
+                        
+                        console.log('🔘 Akordiyon toggled:', accordionId, this.classList.contains('active'));
+                    }
+                });
+            });
+
+            // Nav item click handler - akordiyon item'ları için
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    if (this.getAttribute('data-section')) {
+                        // Remove active class from all items
+                        navItems.forEach(navItem => {
+                            navItem.classList.remove('active');
+                        });
+                        // Add active class to clicked item
+                        this.classList.add('active');
+                        
+                        // Sayfa başlığını güncelle
+                        const pageTitle = this.querySelector('span')?.textContent || 'Panel';
+                        document.getElementById('pageTitle').textContent = pageTitle;
+                        
+                        // Mobile menüyü kapat
+                        const sidebar = document.getElementById('sidebar');
+                        if (sidebar && sidebar.classList.contains('mobile-open')) {
+                            sidebar.classList.remove('mobile-open');
+                        }
+                    }
+                });
+            });
+
+            console.log('✅ Akordiyon menüler ayarlandı');
+        });
     }
 
     setupMobileMenu() {
@@ -12,6 +65,7 @@ class PanelSystem {
         if (mobileMenuBtn && sidebar) {
             mobileMenuBtn.addEventListener('click', () => {
                 sidebar.classList.toggle('mobile-open');
+                console.log('📱 Mobile menu toggled:', sidebar.classList.contains('mobile-open'));
             });
             
             // Mobile menüyü kapatmak için overlay tıklama
@@ -20,6 +74,7 @@ class PanelSystem {
                     !sidebar.contains(e.target) && 
                     e.target !== mobileMenuBtn) {
                     sidebar.classList.remove('mobile-open');
+                    console.log('📱 Mobile menu closed by overlay');
                 }
             });
         }
@@ -50,8 +105,24 @@ class PanelSystem {
         // Navigation'ı kur
         this.setupNavigation();
         
+        // Akordiyon menüleri başlat
+        this.initializeAccordionMenus();
+        
         // Rol bazlı paneli başlat
         this.initializeRoleSpecificPanel(this.userProfile);
+    }
+
+    initializeAccordionMenus() {
+        console.log('🎪 Akordiyon menüler başlatılıyor...');
+        
+        // İlk akordiyonu aç
+        setTimeout(() => {
+            const firstAccordion = document.querySelector('.accordion-header');
+            if (firstAccordion && !document.querySelector('.accordion-header.active')) {
+                firstAccordion.click();
+                console.log('✅ İlk akordiyon açıldı:', firstAccordion.getAttribute('data-accordion'));
+            }
+        }, 100);
     }
 
     setupContainers() {
@@ -292,6 +363,21 @@ class PanelSystem {
             const navItem = document.querySelector(`[data-section="${sectionName}"]`);
             if (navItem) {
                 navItem.classList.add('active');
+                
+                // Eğer bu bir akordiyon item'ı ise, parent akordiyonu aç
+                const accordionItem = navItem.closest('.accordion-item');
+                if (accordionItem) {
+                    const accordionContent = accordionItem.closest('.accordion-content');
+                    if (accordionContent) {
+                        const accordionId = accordionContent.id;
+                        const accordionHeader = document.querySelector(`[data-accordion="${accordionId}"]`);
+                        if (accordionHeader && !accordionHeader.classList.contains('active')) {
+                            accordionHeader.classList.add('active');
+                            accordionContent.classList.add('active');
+                            console.log('🔘 İlgili akordiyon açıldı:', accordionId);
+                        }
+                    }
+                }
             }
             
             this.updatePageTitle(sectionName);
@@ -331,7 +417,26 @@ class PanelSystem {
             'reports': 'Raporlar',
             'systemSettings': 'Sistem Ayarları',
             'deliveryAreas': 'Teslimat Bölgeleri',
-            'sellerReports': 'Satış Raporları'
+            'sellerReports': 'Satış Raporları',
+            // Yeni akordiyon menü başlıkları
+            'customerManagement': 'Müşteri Yönetimi',
+            'sellerApproval': 'Satıcı Onayı',
+            'courierApproval': 'Kurye Onayı',
+            'activeOrders': 'Aktif Siparişler',
+            'orderTracking': 'Sipariş Takibi',
+            'orderReports': 'Sipariş Analitik',
+            'financialReports': 'Finansal Raporlar',
+            'commissionSettings': 'Komisyon Ayarları',
+            'payoutManagement': 'Ödeme Yönetimi',
+            'taxSettings': 'Vergi Ayarları',
+            'platformCampaigns': 'Platform Kampanyaları',
+            'couponManagement': 'Kupon Yönetimi',
+            'promotionManagement': 'Promosyon Yönetimi',
+            'ticketManagement': 'Ticket Yönetimi',
+            'liveSupport': 'Canlı Destek',
+            'refundManagement': 'İade Yönetimi',
+            'apiIntegrations': 'API Entegrasyonları',
+            'roleManagement': 'Rol & Yetki Yönetimi'
         };
         
         const pageTitleElement = document.getElementById('pageTitle');
