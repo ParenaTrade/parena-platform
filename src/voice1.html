@@ -6568,118 +6568,6 @@ async function safeVoiceMatchQuery(userInput) {
         }
     }
 
-// =============================================
-// YENİ REFERRAL VE BONUS SİSTEMİ
-// =============================================
-
-// =============================================
-// REFERRAL VERİTABANI İŞLEMLERİ
-// =============================================
-
-// Referral kurallarını yükle
-async function loadReferralRules() {
-    try {
-        const { data, error } = await supabase
-            .from('referral_rules')
-            .select('*')
-            .eq('is_active', true);
-
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error('Referral kuralları yükleme hatası:', error);
-        return createDefaultReferralRules();
-    }
-}
-
-// Varsayılan referral kuralları
-async function createDefaultReferralRules() {
-    const defaultRules = [
-        {
-            name: 'Referans Bonusu',
-            bonus_amount: 10.00,
-            bonus_type: 'fixed',
-            description: 'Her başarılı referral için sabit bonus',
-            is_active: true
-        },
-        {
-            name: 'Sipariş Bonusu',
-            bonus_amount: 2.00,
-            bonus_type: 'percentage',
-            description: 'Sipariş tutarı üzerinden %2 bonus',
-            is_active: true
-        }
-    ];
-
-    try {
-        const { error } = await supabase
-            .from('referral_rules')
-            .insert(defaultRules);
-
-        if (error) throw error;
-        return defaultRules;
-    } catch (error) {
-        console.error('Varsayılan kurallar oluşturma hatası:', error);
-        return defaultRules;
-    }
-}
-
-// =============================================
-// GRUP YÖNETİMİ
-// =============================================
-
-// Grup kodu oluştur
-function generateGroupCode() {
-    return Math.random().toString(36).substring(2, 10).toUpperCase();
-}
-
-// Lider kontrolü
-async function checkGroupLeader(userId) {
-    try {
-        const { data, error } = await supabase
-            .from('customers')
-            .select('role, group_code')
-            .eq('id', userId)
-            .single();
-
-        if (error) throw error;
-        return data && data.role === 'Lider' ? data.group_code : null;
-    } catch (error) {
-        console.error('Lider kontrol hatası:', error);
-        return null;
-    }
-}
-
-// Grup oluştur
-async function createReferralGroup(leaderUserId, groupName) {
-    try {
-        const groupCode = generateGroupCode();
-        
-        const { data, error } = await supabase
-            .from('referral_groups')
-            .insert([{
-                name: groupName,
-                group_code: groupCode,
-                leader_user_id: leaderUserId,
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        // Müşteri kaydını güncelle
-        await supabase
-            .from('customers')
-            .update({ group_code: groupCode })
-            .eq('id', leaderUserId);
-
-        return data;
-    } catch (error) {
-        console.error('Grup oluşturma hatası:', error);
-        return null;
-    }
-}
 
 // =============================================
 // REFERRAL LİNK YÖNETİMİ
@@ -6693,8 +6581,6 @@ function getReferralFromUrl() {
 
     return { referralCode, groupCode };
 }
-
-        
         
 // =============================================
 // BONUS HESAPLAMA VE DAĞITIM
@@ -7251,48 +7137,7 @@ function updatePaymentButtons() {
     }
 }
 
-function showGroupLeaderFeatures() {
-    // Grup lideri için özel butonlar
-    const referralBtn = document.createElement('button');
-    referralBtn.className = 'action-btn';
-    referralBtn.innerHTML = `
-        <i class="fas fa-user-plus"></i>
-        <span>Davet Gönder</span>
-    `;
-    referralBtn.onclick = async () => {
-        await generateAndShowReferralLink();
-    };
-    
-    // Header'a ekle
-    const headerActions = document.querySelector('.header-actions');
-    if (headerActions) {
-        headerActions.insertBefore(referralBtn, headerActions.querySelector('.order-summary'));
-    }
-    
-    // Grup istatistiklerini göster
-    showGroupStats();
-}
 
-async function showGroupStats() {
-    try {
-        const { data, error } = await supabase
-            .from('referral_groups')
-            .select(`
-                *,
-                referral_tracking(count),
-                referral_bonus(sum:bonus_amount)
-            `)
-            .eq('group_code', currentReferralGroup)
-            .single();
-            
-        if (!error && data) {
-            console.log('📊 Grup istatistikleri:', data);
-            // İstatistikleri profil dropdown'da gösterebilirsiniz
-        }
-    } catch (error) {
-        console.error('Grup istatistikleri hatası:', error);
-    }
-}
 
 function checkCartState() {
     // Sepet kilit durumunu kontrol et
@@ -14614,6 +14459,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
