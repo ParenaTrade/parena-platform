@@ -6685,79 +6685,6 @@ async function createReferralGroup(leaderUserId, groupName) {
 // REFERRAL LİNK YÖNETİMİ
 // =============================================
 
-// Referral link oluştur
-async function generateReferralLink(ownerUserId, groupCode = null) {
-    try {
-        const referralCode = generateGroupCode(); // Benzersiz kod
-        
-        const linkData = {
-            owner_user_id: ownerUserId,
-            referral_code: referralCode,
-            created_at: new Date().toISOString()
-        };
-
-        if (groupCode) {
-            linkData.group_code = groupCode;
-        }
-
-        const { data, error } = await supabase
-            .from('referral_links')
-            .insert([linkData])
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        const baseUrl = window.location.origin;
-        const referralLink = groupCode 
-            ? `${baseUrl}?group_code=${groupCode}&ref=${referralCode}`
-            : `${baseUrl}?ref=${referralCode}`;
-
-        return {
-            link: referralLink,
-            code: referralCode,
-            id: data.id
-        };
-    } catch (error) {
-        console.error('Referral link oluşturma hatası:', error);
-        return null;
-    }
-}
-
-// URL'den referral bilgilerini al
-function getReferralFromUrl() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const referralCode = urlParams.get('ref');
-    const groupCode = urlParams.get('group_code');
-
-    return { referralCode, groupCode };
-}
-
-// =============================================
-// REFERRAL TAKİP
-// =============================================
-
-// Referral tracking kaydı oluştur
-async function createReferralTracking(referralCode, groupCode, referrerUserId) {
-    try {
-        const { data, error } = await supabase
-            .from('referral_tracking')
-            .insert([{
-                referral_code: referralCode,
-                group_code: groupCode,
-                referrer_user_id: referrerUserId,
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
-
-        if (error) throw error;
-        return data;
-    } catch (error) {
-        console.error('Referral tracking hatası:', error);
-        return null;
-    }
-}
 
 // Yeni kullanıcı için referral tracking'i güncelle
 async function updateReferralTrackingWithNewUser(referralCode, newUserId) {
@@ -15189,5 +15116,6 @@ function updateBonusUI() {
     </script>
 </body>
 </html>
+
 
 
