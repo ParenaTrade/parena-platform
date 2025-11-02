@@ -2146,7 +2146,7 @@ class CustomerPanel {
             `;
         }
     }
-}
+
     async loadReferralEarningsSection() {
         const section = document.getElementById('referralEarningsSection');
         if (!section) return;
