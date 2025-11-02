@@ -27,11 +27,8 @@ class PanelSystem {
                     
                     console.log('🔘 Akordiyon toggled:', accordionId, !isActive);
                 }
-            }
-        });
-
-        console.log('✅ Akordiyon menüler ayarlandı');
-    }
+            });
+        }); 
 
             // Nav item click handler - akordiyon item'ları için
             const navItems = document.querySelectorAll('.nav-item');
