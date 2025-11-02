@@ -558,3 +558,6 @@ const customerMenuItems = [
         section: 'customerSupport'
     }
 ];
+// panel.js dosyasının EN SONUNA ekle:
+window.PanelSystem = PanelSystem;
+console.log('✅ PanelSystem global olarak tanımlandı');
