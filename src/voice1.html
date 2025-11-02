@@ -6685,6 +6685,55 @@ async function createReferralGroup(leaderUserId, groupName) {
 // REFERRAL LİNK YÖNETİMİ
 // =============================================
 // Referral link oluştur
+async function generateReferralLink(ownerUserId, groupCode = null) {
+    try {
+        const referralCode = generateGroupCode(); // Benzersiz kod
+        
+        const linkData = {
+            owner_user_id: ownerUserId,
+            referral_code: referralCode,
+            created_at: new Date().toISOString()
+        };
+
+        if (groupCode) {
+            linkData.group_code = groupCode;
+        }
+
+        const { data, error } = await supabase
+            .from('referral_links')
+            .insert([linkData])
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        const baseUrl = window.location.origin;
+        const referralLink = groupCode 
+            ? `${baseUrl}?group_code=${groupCode}&ref=${referralCode}`
+            : `${baseUrl}?ref=${referralCode}`;
+
+        return {
+            link: referralLink,
+            code: referralCode,
+            id: data.id
+        };
+    } catch (error) {
+        console.error('Referral link oluşturma hatası:', error);
+        return null;
+    }
+}
+
+// URL'den referral bilgilerini al
+function getReferralFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const referralCode = urlParams.get('ref');
+    const groupCode = urlParams.get('group_code');
+
+    return { referralCode, groupCode };
+}
+
+        
+        
 // =============================================
 // BONUS HESAPLAMA VE DAĞITIM
 // =============================================
@@ -14610,6 +14659,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
