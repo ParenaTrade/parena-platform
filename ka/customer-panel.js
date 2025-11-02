@@ -1889,8 +1889,6 @@ class CustomerPanel {
                 </div>
             `;
 
-            // 10 saniye bekleyip link oluştur
-            await this.startReferralProcess();
             
             // 🔥 Yeni: İlk kez mi yükleniyor kontrolü
             if (!this.isReferralInitialized) {
