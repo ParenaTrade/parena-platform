@@ -6,6 +6,9 @@ class CustomerPanel {
         this.payments = [];
         this.currentSection = '';
         this.isDataLoaded = false;
+        this.isReferralInitialized = false;
+        this.referralEventListeners = []; // 🔥 BU SATIRI EKLE
+        this.initializeCustomerPanel();
         
         // Referral özellikleri
         this.referralData = null;
@@ -40,6 +43,23 @@ class CustomerPanel {
         console.log('✅ CustomerPanel başlatma tamamlandı');
     }
 
+
+    async initializeCustomerPanel() {
+        console.log('👤 Customer Panel başlatılıyor...');
+        
+        try {
+            // Müşteri verilerini yükle
+            await this.loadCustomerData();
+            this.isDataLoaded = true;
+            console.log('✅ Customer Panel başlatıldı');
+            
+        } catch (error) {
+            console.error('❌ Customer Panel başlatma hatası:', error);
+            this.isDataLoaded = true; // Hata olsa bile yüklendi olarak işaretle
+        }
+    }
+
+    
     async loadCustomerData() {
         try {
             console.log('📥 Müşteri verisi yükleniyor...');
@@ -133,7 +153,6 @@ class CustomerPanel {
             case 'customerSupport':
                 await this.loadCustomerSupport();
                 break;
-            // YENİ: Referral section'ları
             case 'customerReferral':
                 await this.loadCustomerReferral();
                 break;
@@ -143,6 +162,8 @@ class CustomerPanel {
             case 'referralInvites':
                 await this.loadReferralInvitesSection();
                 break;
+            default:
+                console.warn('⚠️ Bilinmeyen section:', sectionName);
         }
     }
 
@@ -1791,13 +1812,18 @@ class CustomerPanel {
 
     async loadCustomerReferral() {
         const section = document.getElementById('customerReferralSection');
-        if (!section) return;
-
-        // 🔥 ÖNEMLİ: Event listener'ları temizle
-        this.clearReferralEventListeners();
+        if (!section) {
+            console.error('❌ Referral section bulunamadı');
+            return;
+        }
 
         try {
-            // Butonları başlangıçta pasif yap
+            console.log('🎁 Referral section yükleniyor...');
+            
+            // 🔥 ÖNEMLİ: Event listener'ları güvenli şekilde temizle
+            this.clearReferralEventListeners();
+
+            // HTML içeriğini yükle
             section.innerHTML = `
                 <div class="section-header">
                     <h2>🎁 Arkadaşını Davet Et</h2>
@@ -1855,33 +1881,7 @@ class CustomerPanel {
                             </div>
                             <div class="card-body">
                                 <div class="bonus-rules">
-                                    <div class="rule-item" style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee;">
-                                        <div style="background: #007bff; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
-                                            <i class="fas fa-gift"></i>
-                                        </div>
-                                        <div>
-                                            <strong>Referans Bonusu</strong>
-                                            <p style="margin: 5px 0 0 0; color: #666;">Arkadaşın üye olduğunda sabit bonus kazan</p>
-                                        </div>
-                                    </div>
-                                    <div class="rule-item" style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee;">
-                                        <div style="background: #28a745; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
-                                            <i class="fas fa-shopping-cart"></i>
-                                        </div>
-                                        <div>
-                                            <strong>Sipariş Bonusu</strong>
-                                            <p style="margin: 5px 0 0 0; color: #666;">Arkadaşın sipariş verdikçe % bazlı bonus kazan</p>
-                                        </div>
-                                    </div>
-                                    <div class="rule-item" style="display: flex; align-items: center; padding: 15px;">
-                                        <div style="background: #ffc107; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
-                                            <i class="fas fa-calendar-alt"></i>
-                                        </div>
-                                        <div>
-                                            <strong>Ay Sonu Hakediş</strong>
-                                            <p style="margin: 5px 0 0 0; color: #666;">Bonuslar ay sonunda bakiyene eklenecek</p>
-                                        </div>
-                                    </div>
+                                    <!-- Bonus kuralları içeriği -->
                                 </div>
                             </div>
                         </div>
@@ -1889,8 +1889,7 @@ class CustomerPanel {
                 </div>
             `;
 
-            
-            // 🔥 Yeni: İlk kez mi yükleniyor kontrolü
+            // İlk kez mi yükleniyor kontrolü
             if (!this.isReferralInitialized) {
                 this.isReferralInitialized = true;
                 await this.startReferralProcess();
@@ -1901,33 +1900,80 @@ class CustomerPanel {
 
         } catch (error) {
             console.error('❌ Referral sayfası yükleme hatası:', error);
-            this.isReferralInitialized = false; // Hata durumunda resetle
+            this.isReferralInitialized = false;
             this.showReferralError();
         }
     }
 
-    // 🔥 YENİ: Event listener'ları temizleme metodu
+    
+     // 🔥 DÜZELTİLMİŞ: Güvenli clearReferralEventListeners
     clearReferralEventListeners() {
-        this.referralEventListeners.forEach(({ element, event, handler }) => {
-            if (element && handler) {
-                element.removeEventListener(event, handler);
+        // Eğer referralEventListeners tanımlı değilse, başlat ve çık
+        if (!this.referralEventListeners) {
+            console.log('⚠️ referralEventListeners tanımlı değil, başlatılıyor...');
+            this.referralEventListeners = [];
+            return;
+        }
+        
+        // Eğer boşsa, çık
+        if (this.referralEventListeners.length === 0) {
+            console.log('ℹ️ Temizlenecek event listener yok');
+            return;
+        }
+        
+        console.log(`🧹 ${this.referralEventListeners.length} event listener temizleniyor...`);
+        
+        // Her bir event listener'ı güvenli şekilde kaldır
+        this.referralEventListeners.forEach((listener, index) => {
+            try {
+                if (listener && listener.element && listener.handler) {
+                    listener.element.removeEventListener(listener.event, listener.handler);
+                    console.log(`✅ Event listener ${index} kaldırıldı`);
+                }
+            } catch (error) {
+                console.warn(`⚠️ Event listener ${index} kaldırılırken hata:`, error);
             }
         });
+        
+        // Diziyi temizle
         this.referralEventListeners = [];
-        console.log('🧹 Referral event listenerlar temizlendi');
+        console.log('✅ Tüm event listenerlar temizlendi');
     }
 
-    // 🔥 YENİ: Event listener ekleme metodu (çoklanmayı önlemek için)
+    // 🔥 DÜZELTİLMİŞ: Güvenli addReferralEventListener
     addReferralEventListener(element, event, handler) {
-        if (element && handler) {
+        // Eğer referralEventListeners tanımlı değilse başlat
+        if (!this.referralEventListeners) {
+            console.log('⚠️ referralEventListeners tanımlı değil, başlatılıyor...');
+            this.referralEventListeners = [];
+        }
+        
+        // Element ve handler kontrolü
+        if (!element || !handler || typeof handler !== 'function') {
+            console.error('❌ Geçersiz element veya handler');
+            return;
+        }
+        
+        try {
             // Önce aynı event'i kaldır
             element.removeEventListener(event, handler);
             // Sonra yeni event'i ekle
             element.addEventListener(event, handler);
-            this.referralEventListeners.push({ element, event, handler });
+            
+            // Listener'ı kaydet
+            this.referralEventListeners.push({ 
+                element, 
+                event, 
+                handler 
+            });
+            
+            console.log(`✅ Event listener eklendi: ${event}`);
+            
+        } catch (error) {
+            console.error('❌ Event listener eklenirken hata:', error);
         }
-    }     
-
+    }
+    
    async startReferralProcess() {
         try {
             let countdown = 10;
@@ -2269,8 +2315,9 @@ class CustomerPanel {
     }
 } // CLASS SONU
 
-// Global erişim için
-window.customerPanel = null;
+// Global tanımlama
+window.CustomerPanel = CustomerPanel;
+console.log('✅ CustomerPanel global olarak tanımlandı');
 
 // ⚠️ HATA KORUMALI VERSİYON - panelSystem kontrolü ekleyin
 if (window.panelSystem && typeof window.panelSystem.on === 'function') {
