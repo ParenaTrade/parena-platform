@@ -7,6 +7,108 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Akordiyon Menü Stilleri */
+        .accordion-menu {
+            margin-bottom: 10px;
+        }
+        
+        .accordion-header {
+            padding: 12px 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            margin: 5px 0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        
+        .accordion-header:hover {
+            background: rgba(255,255,255,0.15);
+        }
+        
+        .accordion-header i {
+            transition: transform 0.3s ease;
+        }
+        
+        .accordion-header.active i {
+            transform: rotate(180deg);
+        }
+        
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: rgba(0,0,0,0.1);
+            border-radius: 5px;
+        }
+        
+        .accordion-content.active {
+            max-height: 500px;
+        }
+        
+        .accordion-item {
+            padding: 10px 15px 10px 25px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-left: 3px solid transparent;
+        }
+        
+        .accordion-item:hover {
+            background: rgba(255,255,255,0.05);
+            border-left-color: #4CAF50;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-complete { background: #4CAF50; }
+        .status-inprogress { background: #FF9800; }
+        .status-pending { background: #f44336; }
+        .status-planned { background: #2196F3; }
+        
+        .feature-status {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: auto;
+        }
+        
+        .feature-complete { background: #4CAF50; color: white; }
+        .feature-inprogress { background: #FF9800; color: white; }
+        .feature-pending { background: #f44336; color: white; }
+        
+        .checklist-summary {
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+        
+        .progress-bar {
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            margin: 5px 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+    </style>
 </head>
 <body>
     <!-- Login Container -->
@@ -35,122 +137,229 @@
             <nav class="nav-menu">
                 <!-- Admin Menu -->
                 <div id="adminMenu" class="role-menu">
-                    <a href="#" class="nav-item" data-section="dashboard">
+                    <!-- Dashboard -->
+                    <a href="#" class="nav-item active" data-section="dashboard">
                         <i class="fas fa-tachometer-alt"></i>
                         <span>Dashboard</span>
                     </a>
-                    <a href="#" class="nav-item" data-section="sellerManagement">
-                        <i class="fas fa-store"></i>
-                        <span>Satıcı Yönetimi</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="courierManagement">
-                        <i class="fas fa-motorcycle"></i>
-                        <span>Kurye Yönetimi</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="allOrders">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>Tüm Siparişler</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="reports">
-                        <i class="fas fa-chart-bar"></i>
-                        <span>Raporlar</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="systemSettings">
-                        <i class="fas fa-cogs"></i>
-                        <span>Sistem Ayarları</span>
-                    </a>
+
+                    <!-- Satıcı Yönetimi Akordiyon -->
+                    <div class="accordion-menu">
+                        <div class="accordion-header" data-accordion="sellerManagementAccordion">
+                            <div>
+                                <i class="fas fa-store"></i>
+                                <span>Satıcı Yönetimi</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="accordion-content" id="sellerManagementAccordion">
+                            <a href="#" class="accordion-item" data-section="sellerList">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Satıcı Listesi</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="sellerApproval">
+                                <span class="status-indicator status-pending"></span>
+                                <span>Satıcı Onayı</span>
+                                <span class="feature-status feature-pending">!</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="sellerCommissions">
+                                <span class="status-indicator status-inprogress"></span>
+                                <span>Komisyon Ayarları</span>
+                                <span class="feature-status feature-inprogress">⌛</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="sellerReports">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Satıcı Raporları</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Kurye Yönetimi Akordiyon -->
+                    <div class="accordion-menu">
+                        <div class="accordion-header" data-accordion="courierManagementAccordion">
+                            <div>
+                                <i class="fas fa-motorcycle"></i>
+                                <span>Kurye Yönetimi</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="accordion-content" id="courierManagementAccordion">
+                            <a href="#" class="accordion-item" data-section="courierList">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Kurye Listesi</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="courierAssignment">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Kurye Atama</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="courierApproval">
+                                <span class="status-indicator status-pending"></span>
+                                <span>Kurye Onayı</span>
+                                <span class="feature-status feature-pending">!</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="courierEarnings">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Kurye Kazançları</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="courierShifts">
+                                <span class="status-indicator status-pending"></span>
+                                <span>Vardiya Planlama</span>
+                                <span class="feature-status feature-pending">!</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="courierPerformance">
+                                <span class="status-indicator status-inprogress"></span>
+                                <span>Performans Analizi</span>
+                                <span class="feature-status feature-inprogress">⌛</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Sipariş Yönetimi Akordiyon -->
+                    <div class="accordion-menu">
+                        <div class="accordion-header" data-accordion="orderManagementAccordion">
+                            <div>
+                                <i class="fas fa-shopping-cart"></i>
+                                <span>Sipariş Yönetimi</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="accordion-content" id="orderManagementAccordion">
+                            <a href="#" class="accordion-item" data-section="allOrders">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Tüm Siparişler</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="activeOrders">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Aktif Siparişler</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="orderTracking">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Sipariş Takibi</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="orderReports">
+                                <span class="status-indicator status-inprogress"></span>
+                                <span>Sipariş Raporları</span>
+                                <span class="feature-status feature-inprogress">⌛</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Finans Yönetimi Akordiyon -->
+                    <div class="accordion-menu">
+                        <div class="accordion-header" data-accordion="financeManagementAccordion">
+                            <div>
+                                <i class="fas fa-chart-bar"></i>
+                                <span>Finans & Raporlar</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="accordion-content" id="financeManagementAccordion">
+                            <a href="#" class="accordion-item" data-section="reports">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Genel Raporlar</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="financialReports">
+                                <span class="status-indicator status-inprogress"></span>
+                                <span>Finansal Raporlar</span>
+                                <span class="feature-status feature-inprogress">⌛</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="commissionReports">
+                                <span class="status-indicator status-pending"></span>
+                                <span>Komisyon Raporları</span>
+                                <span class="feature-status feature-pending">!</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="payoutManagement">
+                                <span class="status-indicator status-pending"></span>
+                                <span>Ödeme Yönetimi</span>
+                                <span class="feature-status feature-pending">!</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Sistem Ayarları Akordiyon -->
+                    <div class="accordion-menu">
+                        <div class="accordion-header" data-accordion="systemSettingsAccordion">
+                            <div>
+                                <i class="fas fa-cogs"></i>
+                                <span>Sistem Ayarları</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="accordion-content" id="systemSettingsAccordion">
+                            <a href="#" class="accordion-item" data-section="systemSettings">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Genel Ayarlar</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="paymentSettings">
+                                <span class="status-indicator status-pending"></span>
+                                <span>Ödeme Ayarları</span>
+                                <span class="feature-status feature-pending">!</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="notificationSettings">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Bildirim Ayarları</span>
+                                <span class="feature-status feature-complete">✓</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="apiIntegrations">
+                                <span class="status-indicator status-pending"></span>
+                                <span>API Entegrasyonları</span>
+                                <span class="feature-status feature-pending">!</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Checklist Görünümü -->
+                    <div class="accordion-menu">
+                        <div class="accordion-header" data-accordion="checklistAccordion">
+                            <div>
+                                <i class="fas fa-tasks"></i>
+                                <span>Geliştirme Checklist</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="accordion-content" id="checklistAccordion">
+                            <div class="checklist-summary">
+                                <div>Toplam İlerleme</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 65%"></div>
+                                </div>
+                                <div>65% Tamamlandı</div>
+                            </div>
+                            <a href="#" class="accordion-item" data-section="customerChecklist">
+                                <span class="status-indicator status-complete"></span>
+                                <span>Müşteri Uygulaması</span>
+                                <span class="feature-status feature-complete">✓ 85%</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="sellerChecklist">
+                                <span class="status-indicator status-inprogress"></span>
+                                <span>Satıcı Uygulaması</span>
+                                <span class="feature-status feature-inprogress">⌛ 70%</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="courierChecklist">
+                                <span class="status-indicator status-inprogress"></span>
+                                <span>Kurye Uygulaması</span>
+                                <span class="feature-status feature-inprogress">⌛ 60%</span>
+                            </a>
+                            <a href="#" class="accordion-item" data-section="adminChecklist">
+                                <span class="status-indicator status-inprogress"></span>
+                                <span>Admin Paneli</span>
+                                <span class="feature-status feature-inprogress">⌛ 45%</span>
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Seller Menu -->
-                <div id="sellerMenu" class="role-menu">
-                    <a href="#" class="nav-item active" data-section="sellerDashboard">
-                        <i class="fas fa-tachometer-alt"></i>
-                        <span>Dashboard</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="sellerInfo">
-                        <i class="fas fa-store"></i>
-                        <span>İşletme Bilgileri</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="products">
-                        <i class="fas fa-box"></i>
-                        <span>Ürün Yönetimi</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="orders">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>Siparişler</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="deliveryAreas">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>Teslimat Bölgeleri</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="sellerReports">
-                        <i class="fas fa-chart-line"></i>
-                        <span>Raporlar</span>
-                    </a>
-                </div>
-
-                <!-- Courier Menu -->
-                <div id="courierMenu" class="role-menu">
-                    <a href="#" class="nav-item active" data-section="courierDashboard">
-                        <i class="fas fa-tachometer-alt"></i>
-                        <span>Dashboard</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="courierInfo">
-                        <i class="fas fa-user"></i>
-                        <span>Profilim</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="courierDeliveries">
-                        <i class="fas fa-truck"></i>
-                        <span>Teslimatlarım</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="courierEarnings">
-                        <i class="fas fa-money-bill-wave"></i>
-                        <span>Kazançlarım</span>
-                    </a>
-                </div>
-
-                <!-- Customer Menu -->
-                <div id="customerMenu" class="role-menu">
-                    <a href="#" class="nav-item active" data-section="customerDashboard">
-                        <i class="fas fa-home"></i>
-                        <span>Dashboard</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="customerProfile">
-                        <i class="fas fa-user-circle"></i>
-                        <span>Profilim</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="customerOrders">
-                        <i class="fas fa-shopping-bag"></i>
-                        <span>Siparişlerim</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="customerPayments">
-                        <i class="fas fa-credit-card"></i>
-                        <span>Ödemelerim</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="customerAddresses">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>Adreslerim</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="customerSupport">
-                        <i class="fas fa-headset"></i>
-                        <span>Destek</span>
-                    </a>
-                    
-                    <!-- REFERRAL MENÜ ÖĞELERİ -->
-                    <div class="nav-divider"></div>
-                    <a href="#" class="nav-item" data-section="customerReferral">
-                        <i class="fas fa-user-plus"></i>
-                        <span>🎁 Arkadaşını Davet Et</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="referralEarnings">
-                        <i class="fas fa-coins"></i>
-                        <span>💰 Bonus Kazançlarım</span>
-                    </a>
-                    <a href="#" class="nav-item" data-section="referralInvites">
-                        <i class="fas fa-users"></i>
-                        <span>👥 Davet Ettiklerim</span>
-                    </a>
-                </div>
+                <!-- Diğer menüler (Satıcı, Kurye, Müşteri) aynı şekilde akordiyon yapısına dönüştürülebilir -->
 
                 <!-- Common Menu Items -->
                 <div class="nav-divider"></div>
@@ -198,62 +407,83 @@
                     </div>
                 </div>
 
-                <div class="content-section" id="sellerDashboardSection">
-                    <!-- Seller dashboard içeriği buraya gelecek -->
+                <!-- Kurye Yönetimi Section'ları -->
+                <div class="content-section" id="courierListSection">
+                    <!-- Kurye listesi içeriği -->
+                </div>
+                <div class="content-section" id="courierAssignmentSection">
+                    <!-- Kurye atama içeriği -->
+                </div>
+                <div class="content-section" id="courierApprovalSection">
+                    <!-- Kurye onay içeriği -->
+                </div>
+                <div class="content-section" id="courierEarningsSection">
+                    <!-- Kurye kazançları içeriği -->
+                </div>
+                <div class="content-section" id="courierShiftsSection">
+                    <!-- Kurye vardiya içeriği -->
+                </div>
+                <div class="content-section" id="courierPerformanceSection">
+                    <!-- Kurye performans içeriği -->
                 </div>
 
-                <div class="content-section" id="courierDashboardSection">
-                    <!-- Courier dashboard içeriği buraya gelecek -->
+                <!-- Checklist Section'ları -->
+                <div class="content-section" id="customerChecklistSection">
+                    <!-- Müşteri checklist detayları -->
+                </div>
+                <div class="content-section" id="sellerChecklistSection">
+                    <!-- Satıcı checklist detayları -->
+                </div>
+                <div class="content-section" id="courierChecklistSection">
+                    <!-- Kurye checklist detayları -->
+                </div>
+                <div class="content-section" id="adminChecklistSection">
+                    <!-- Admin checklist detayları -->
                 </div>
 
-                <div class="content-section" id="customerDashboardSection">
-                    <!-- Customer dashboard içeriği buraya gelecek -->
-                </div>
-
-                <!-- Customer Sections -->
-                <div class="content-section" id="customerProfileSection"></div>
-                <div class="content-section" id="customerOrdersSection"></div>
-                <div class="content-section" id="customerPaymentsSection"></div>
-                <div class="content-section" id="customerAddressesSection"></div>
-                <div class="content-section" id="customerSupportSection"></div>
-
-                <!-- REFERRAL SECTIONS -->
-                <div class="content-section" id="customerReferralSection">
-                    <!-- Arkadaşını Davet Et içeriği buraya gelecek -->
-                </div>
-                <div class="content-section" id="referralEarningsSection">
-                    <!-- Bonus Kazançlarım içeriği buraya gelecek -->
-                </div>
-                <div class="content-section" id="referralInvitesSection">
-                    <!-- Davet Ettiklerim içeriği buraya gelecek -->
-                </div>
-
-                <!-- Diğer section'lar -->
-                <div class="content-section" id="sellerInfoSection"></div>
-                <div class="content-section" id="productsSection"></div>
-                <div class="content-section" id="ordersSection"></div>
-                <div class="content-section" id="sellerManagementSection"></div>
-                <div class="content-section" id="courierManagementSection"></div>
-                <div class="content-section" id="allOrdersSection"></div>
-                <div class="content-section" id="reportsSection"></div>
-                <div class="content-section" id="systemSettingsSection"></div>
-                <div class="content-section" id="deliveryAreasSection"></div>
-                <div class="content-section" id="sellerReportsSection"></div>
-                <div class="content-section" id="courierInfoSection"></div>
-                <div class="content-section" id="courierDeliveriesSection"></div>
-                <div class="content-section" id="courierEarningsSection"></div>
-                <div class="content-section" id="settingsSection"></div>
+                <!-- Diğer section'lar... -->
             </div>
         </div>
     </div>
-
-    <!-- Modals Container -->
-    <div id="modalsContainer"></div>
 
     <!-- Scripts -->
     <script src="config.js"></script>
     <script src="auth-system.js"></script>
     <script src="panel.js"></script>
+    <script>
+        // Akordiyon Menü Fonksiyonları
+        document.addEventListener('DOMContentLoaded', function() {
+            // Akordiyon açma/kapama
+            const accordionHeaders = document.querySelectorAll('.accordion-header');
+            
+            accordionHeaders.forEach(header => {
+                header.addEventListener('click', function() {
+                    const accordionId = this.getAttribute('data-accordion');
+                    const accordionContent = document.getElementById(accordionId);
+                    
+                    // Toggle active class
+                    this.classList.toggle('active');
+                    accordionContent.classList.toggle('active');
+                    
+                    // Diğer akordiyonları kapat
+                    accordionHeaders.forEach(otherHeader => {
+                        if (otherHeader !== this) {
+                            const otherAccordionId = otherHeader.getAttribute('data-accordion');
+                            const otherAccordionContent = document.getElementById(otherAccordionId);
+                            otherHeader.classList.remove('active');
+                            otherAccordionContent.classList.remove('active');
+                        }
+                    });
+                });
+            });
+
+            // Sayfa yüklendiğinde ilk akordiyonu aç
+            const firstAccordion = document.querySelector('.accordion-header');
+            if (firstAccordion) {
+                firstAccordion.click();
+            }
+        });
+    </script>
     <script src="customer-panel.js"></script>
     <script src="seller-panel.js"></script>
     <script src="courier-panel.js"></script>
