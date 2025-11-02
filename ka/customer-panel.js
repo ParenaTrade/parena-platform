@@ -1793,6 +1793,9 @@ class CustomerPanel {
         const section = document.getElementById('customerReferralSection');
         if (!section) return;
 
+        // 🔥 ÖNEMLİ: Event listener'ları temizle
+        this.clearReferralEventListeners();
+
         try {
             // Butonları başlangıçta pasif yap
             section.innerHTML = `
@@ -1888,21 +1891,47 @@ class CustomerPanel {
 
             // 10 saniye bekleyip link oluştur
             await this.startReferralProcess();
+            
+            // 🔥 Yeni: İlk kez mi yükleniyor kontrolü
+            if (!this.isReferralInitialized) {
+                this.isReferralInitialized = true;
+                await this.startReferralProcess();
+            } else {
+                // Zaten yüklenmişse, sadece butonları aktif et
+                this.activateReferralButtons();
+            }
 
         } catch (error) {
             console.error('❌ Referral sayfası yükleme hatası:', error);
-            section.innerHTML = `
-                <div class="error-message">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <h3>Link oluşturulamadı</h3>
-                    <p>Lütfen sayfayı yenileyin ve tekrar deneyin.</p>
-                    <button class="btn btn-primary" onclick="location.reload()">Yenile</button>
-                </div>
-            `;
+            this.isReferralInitialized = false; // Hata durumunda resetle
+            this.showReferralError();
         }
     }
 
-    async startReferralProcess() {
+    // 🔥 YENİ: Event listener'ları temizleme metodu
+    clearReferralEventListeners() {
+        this.referralEventListeners.forEach(({ element, event, handler }) => {
+            if (element && handler) {
+                element.removeEventListener(event, handler);
+            }
+        });
+        this.referralEventListeners = [];
+        console.log('🧹 Referral event listenerlar temizlendi');
+    }
+
+    // 🔥 YENİ: Event listener ekleme metodu (çoklanmayı önlemek için)
+    addReferralEventListener(element, event, handler) {
+        if (element && handler) {
+            // Önce aynı event'i kaldır
+            element.removeEventListener(event, handler);
+            // Sonra yeni event'i ekle
+            element.addEventListener(event, handler);
+            this.referralEventListeners.push({ element, event, handler });
+        }
+    }
+x"xc"c        
+
+   async startReferralProcess() {
         try {
             let countdown = 10;
             const loadingElement = document.getElementById('referralLoading');
@@ -1926,9 +1955,10 @@ class CustomerPanel {
 
         } catch (error) {
             console.error('❌ Referral proses hatası:', error);
+            this.isReferralInitialized = false;
         }
     }
-
+    
     async initializeReferralLink() {
         try {
             const loadingElement = document.getElementById('referralLoading');
@@ -1961,6 +1991,7 @@ class CustomerPanel {
 
         } catch (error) {
             console.error('❌ Link başlatma hatası:', error);
+            this.isReferralInitialized = false;
             this.showReferralError();
         }
     }
@@ -2015,7 +2046,7 @@ class CustomerPanel {
             throw error;
         }
     }
-
+    
     activateReferralButtons() {
         const referralLink = this.referralData ? 
             `${window.location.origin}?ref=${this.referralData.referral_code}` : 
@@ -2027,7 +2058,7 @@ class CustomerPanel {
             linkInput.value = referralLink;
         }
 
-        // Butonları aktif et ve event listener ekle
+        // 🔥 DEĞİŞTİ: Yeni event listener ekleme metodunu kullan
         const copyBtn = document.getElementById('copyReferralBtn');
         const whatsappBtn = document.getElementById('shareWhatsAppBtn');
         const telegramBtn = document.getElementById('shareTelegramBtn');
@@ -2035,25 +2066,25 @@ class CustomerPanel {
 
         if (copyBtn) {
             copyBtn.disabled = false;
-            copyBtn.addEventListener('click', () => this.copyReferralLink());
+            this.addReferralEventListener(copyBtn, 'click', () => this.copyReferralLink());
         }
         if (whatsappBtn) {
             whatsappBtn.disabled = false;
-            whatsappBtn.addEventListener('click', () => this.shareOnWhatsApp());
+            this.addReferralEventListener(whatsappBtn, 'click', () => this.shareOnWhatsApp());
         }
         if (telegramBtn) {
             telegramBtn.disabled = false;
-            telegramBtn.addEventListener('click', () => this.shareOnTelegram());
+            this.addReferralEventListener(telegramBtn, 'click', () => this.shareOnTelegram());
         }
         if (smsBtn) {
             smsBtn.disabled = false;
-            smsBtn.addEventListener('click', () => this.shareAsSMS());
+            this.addReferralEventListener(smsBtn, 'click', () => this.shareAsSMS());
         }
 
-        console.log('✅ Referral butonları aktif edildi');
+        console.log('✅ Referral butonları aktif edildi (çoklanma önlendi)');
     }
 
-    // PAYLAŞIM FONKSİYONLARI
+    // PAYLAŞIM FONKSİYONLARI (Aynı kalacak)
     copyReferralLink() {
         const input = document.getElementById('referralLinkInput');
         if (input && this.referralData) {
@@ -2062,7 +2093,7 @@ class CustomerPanel {
             window.panelSystem.showAlert('Davet linki kopyalandı!', 'success');
         }
     }
-
+    
     shareOnWhatsApp() {
         if (!this.referralData) return;
         
@@ -2093,7 +2124,7 @@ class CustomerPanel {
             alert(`SMS için mesajı kopyalayın: ${message}`);
         }
     }
-
+    
     generateReferralCode() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let result = '';
@@ -2103,7 +2134,7 @@ class CustomerPanel {
         return result;
     }
 
-        showReferralError() {
+    showReferralError() {
         const contentElement = document.getElementById('referralContent');
         if (contentElement) {
             contentElement.innerHTML = `
@@ -2116,7 +2147,7 @@ class CustomerPanel {
             `;
         }
     }
-
+}
     async loadReferralEarningsSection() {
         const section = document.getElementById('referralEarningsSection');
         if (!section) return;
