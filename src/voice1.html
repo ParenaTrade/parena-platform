@@ -6242,6 +6242,23 @@ async function processVoiceCommand(transcript) {
             return;
         }
 
+         // =============================================
+        // 1. ÖDEME SÜRECİ KONTROLLERİ (EN ÖNEMLİ DEĞİŞİKLİK)
+        // =============================================
+        
+        // 🔴 CRITICAL FIX: AD-SOYAD KONTROLÜ EN ÜSTTE OLSUN
+        if (isWaitingForName && expectedInput === 'name') {
+            console.log('👤 AD-SOYAD BEKLENİYOR - tüm diğer komutlar engellendi');
+            await processCustomerName(message);
+            return;
+        }
+        
+        // Telefon numarası bekleniyor
+        if (isWaitingForPhone && expectedInput === 'phone') {
+            await processPhoneNumber(message);
+            return;
+        }        
+
         // =============================================
         // 1. SİSTEM KOMUTLARI (MİKROFON, YARDIM, KONUM)
         // =============================================
@@ -6276,20 +6293,7 @@ async function processVoiceCommand(transcript) {
         // =============================================
         // 2. ÖDEME SÜRECİ KONTROLLERİ
         // =============================================
-        
-        // Telefon numarası bekleniyor
-        if (isWaitingForPhone && expectedInput === 'phone') {
-            await processPhoneNumber(message);
-            return;
-        }
-        
-        // 🔴 CRITICAL FIX: MÜŞTERİ ADI KONTROLÜ REFERRAL'DAN ÖNCE
-        if (isWaitingForName && expectedInput === 'name') {
-            console.log('👤 AD-SOYAD BEKLENİYOR - referral ve diğer komutlar engellendi');
-            await processCustomerName(message);
-            return;
-        }
-        
+              
         // Bina numarası bekleniyor
         if (isWaitingForBuilding && expectedInput === 'building') {
             await processBuildingInfo(message);
@@ -14660,6 +14664,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
