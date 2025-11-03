@@ -1974,6 +1974,7 @@ class CustomerPanel {
                 .from('referral_groups')
                 .select('*')
                 .eq('leader_user_id', this.customerData.id)
+                .limit(1)
                 .single();
 
             if (!groupError && userGroup) {
