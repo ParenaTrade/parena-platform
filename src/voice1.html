@@ -6685,86 +6685,88 @@ async function createReferralGroup(leaderUserId, groupName) {
 // REFERRAL LİNK AL YÖNETİMİ
 // =============================================
 
-// URL'den referral bilgilerini al
-function getReferralFromUrl() {
+// PENDING REFERRAL CODE'U GETİREN FONKSİYON
+function getPendingReferralCode() {
+    // Önce URL'den kontrol et
     const urlParams = new URLSearchParams(window.location.search);
-    const referralCode = urlParams.get('ref');
-    const groupCode = urlParams.get('group_code');
-
-    return { referralCode, groupCode };
+    const urlReferralCode = urlParams.get('ref');
+    
+    if (urlReferralCode) {
+        return urlReferralCode;
+    }
+    
+    // Sonra localStorage'dan kontrol et
+    const storedReferralCode = localStorage.getItem('pendingReferralCode');
+    if (storedReferralCode) {
+        return storedReferralCode;
+    }
+    
+    // Global değişkenden kontrol et
+    if (window.pendingReferralCode) {
+        return window.pendingReferralCode;
+    }
+    
+    return null;
 }
 
+ // PENDING REFERRAL'I TEMİZLEYEN FONKSİYON
+function clearPendingReferral() {
+    // URL'den temizle (sayfa yeniden yüklenmeden)
+    if (window.history.replaceState) {
+        const newUrl = window.location.pathname + window.location.search.replace(/[?&]ref=[^&]+/, '');
+        window.history.replaceState({}, document.title, newUrl);
+    }
+    
+    // localStorage'dan temizle
+    localStorage.removeItem('pendingReferralCode');
+    
+    // Global değişkenden temizle
+    window.pendingReferralCode = null;
+    
+    console.log('🧹 Pending referral temizlendi');
+}
+
+ // SAYFA YÜKLENDİĞİNDE REFERRAL CODE'U YAKALA
+function initializeReferralTracking() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const referralCode = urlParams.get('ref');
+    
+    if (referralCode) {
+        // LocalStorage'a kaydet (sayfa yenileme koruması)
+        localStorage.setItem('pendingReferralCode', referralCode);
+        console.log('🎯 Referral code kaydedildi:', referralCode);
+    }
+}
+
+// Sayfa yüklendiğinde çalıştır
+document.addEventListener('DOMContentLoaded', initializeReferralTracking);       
+       
 // =============================================
 // REFERRAL TAKİP
 // =============================================
-
-// Referral tracking kaydı oluştur
-async function createReferralTracking(referralCode, groupCode, referrerUserId) {
+// REFERRAL İŞLEMLERİNİ YAPAN FONKSİYON
+async function processReferralAfterRegistration(newCustomerId) {
     try {
-        const { data, error } = await supabase
-            .from('referral_tracking')
-            .insert([{
-                referral_code: referralCode,
-                group_code: groupCode,
-                referrer_user_id: referrerUserId,
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
+        const pendingReferralCode = getPendingReferralCode();
+        if (!pendingReferralCode) return;
+        
+        console.log(`🔄 Referral işleniyor: ${pendingReferralCode} → ${newCustomerId}`);
+        
+        // BASİT - Tek fonksiyon çağrısı
+        const { data: results, error } = await supabase
+            .rpc('complete_referral_after_registration', {
+                p_referral_code: pendingReferralCode,
+                p_new_user_id: newCustomerId
+            });
 
-        if (error) throw error;
-        return data;
+        if (error) return;
+
+        console.log('✅ Referral işlemleri tamamlandı:', results);
+        displayMessage("🎉 Referans kodunuz uygulandı!");
+        clearPendingReferral();
+        
     } catch (error) {
-        console.error('Referral tracking hatası:', error);
-        return null;
-    }
-}
-
-// Yeni kullanıcı için referral tracking'i güncelle
-async function updateReferralTrackingWithNewUser(referralCode, newUserId) {
-    try {
-        const { error } = await supabase
-            .from('referral_tracking')
-            .update({ new_user_id: newUserId })
-            .eq('referral_code', referralCode);
-
-        if (error) throw error;
-        return true;
-    } catch (error) {
-        console.error('Tracking güncelleme hatası:', error);
-        return false;
-    }
-}
-
-// =============================================
-// BONUS HESAPLAMA VE DAĞITIM
-// =============================================
-
-// Referans bonusu uygula
-async function applyReferralBonus(referralTrackingId) {
-    try {
-        const referralRule = await getReferralRuleByName('Referans Bonusu');
-        if (!referralRule) return false;
-
-        const { data, error } = await supabase
-            .from('referral_bonus')
-            .insert([{
-                referral_tracking_id: referralTrackingId,
-                bonus_amount: referralRule.bonus_amount,
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        // Referrer'ın bonus bakiyesini güncelle
-        await updateUserBonusBalance(data.referrer_user_id, referralRule.bonus_amount);
-
-        return true;
-    } catch (error) {
-        console.error('Referral bonus uygulama hatası:', error);
-        return false;
+        console.error('❌ Referral işleme hatası:', error);
     }
 }
 
@@ -6928,7 +6930,7 @@ async function getUserBonusBalance(userId) {
 
 async function initializeReferralSystem() {
     try {
-        // Referral kurallarını yükle
+        // Referral kurallarını yükle - KEEP (sipariş bonusu için)
         await loadReferralRules();
         
         // URL'den referral kontrolü
@@ -6937,16 +6939,10 @@ async function initializeReferralSystem() {
         if (referralCode) {
             pendingReferralCode = referralCode;
             currentReferralGroup = groupCode;
-            
-            console.log(`🎯 Referral algılandı: ${referralCode}, Grup: ${groupCode}`);
-            
-            if (currentCustomer) {
-                // Kullanıcı giriş yapmışsa hemen işle
-                await processPendingReferral();
-            }
+            console.log(`🎯 Referral algılandı: ${referralCode}`);
         }
 
-        // Bonus bakiyesini yükle
+        // Bonus bakiyesini yükle - KEEP (siparişte kullanılıyor)
         if (currentCustomer) {
             referralBonusBalance = await getUserBonusBalance(currentCustomer.id);
             updateBonusUI();
@@ -6957,53 +6953,6 @@ async function initializeReferralSystem() {
         console.error('Referral sistem başlatma hatası:', error);
     }
 }
-
-// Bekleyen referral'ı işle
-async function processPendingReferral() {
-    if (!pendingReferralCode || !currentCustomer) return;
-
-    try {
-        // Referral tracking oluştur
-        const tracking = await createReferralTracking(
-            pendingReferralCode, 
-            currentReferralGroup, 
-            null // Referrer ID sonradan güncellenecek
-        );
-
-        if (tracking) {
-            // Yeni kullanıcı ID'sini güncelle
-            await updateReferralTrackingWithNewUser(pendingReferralCode, currentCustomer.id);
-            
-            // Referrer ID'yi bul ve güncelle
-            const { data: linkData, error } = await supabase
-                .from('referral_links')
-                .select('owner_user_id')
-                .eq('referral_code', pendingReferralCode)
-                .single();
-
-            if (!error && linkData) {
-                await supabase
-                    .from('referral_tracking')
-                    .update({ referrer_user_id: linkData.owner_user_id })
-                    .eq('id', tracking.id);
-
-                // Bonus uygula
-                await applyReferralBonus(tracking.id);
-            }
-
-            displayMessage(`✅ Referral kodu başarıyla uygulandı! ${money(10)} bonus hesabınıza eklendi.`);
-            speakToUser("Referans kodu başarıyla uygulandı");
-        }
-
-        // Temizle
-        pendingReferralCode = null;
-        currentReferralGroup = null;
-
-    } catch (error) {
-        console.error('Bekleyen referral işleme hatası:', error);
-    }
-}
-
 // =============================================
 // UI GÜNCELLEMELERİ
 // =============================================
@@ -13593,8 +13542,12 @@ async function completeCustomerRegistration() {
         if (error) throw error;
         
         currentCustomer = data;
+        console.log('✅ Müşteri kaydı tamamlandı:', data.id);
         displayMessage("✅ Müşteri kaydı tamamlandı");
         speakToUser("kaydınız tamamlandı");
+        
+        // REFERRAL İŞLEMLERİNİ YAP
+        await processReferralAfterRegistration(data.id);
         
         // Sipariş onayı iste
         requestOrderConfirmation();
@@ -13606,6 +13559,7 @@ async function completeCustomerRegistration() {
     }
 }
 
+        
 async function updateCustomerAddress() {
     console.log('🏠 Müşteri adresi güncelleniyor...');
     
@@ -14686,4 +14640,5 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
