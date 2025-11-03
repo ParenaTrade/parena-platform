@@ -6,9 +6,6 @@ class CustomerPanel {
         this.payments = [];
         this.currentSection = '';
         this.isDataLoaded = false;
-        this.isReferralInitialized = false;
-        this.referralEventListeners = []; // 🔥 BU SATIRI EKLE
-        this.initializeCustomerPanel();
         
         // Referral özellikleri
         this.referralData = null;
@@ -43,23 +40,6 @@ class CustomerPanel {
         console.log('✅ CustomerPanel başlatma tamamlandı');
     }
 
-
-    async initializeCustomerPanel() {
-        console.log('👤 Customer Panel başlatılıyor...');
-        
-        try {
-            // Müşteri verilerini yükle
-            await this.loadCustomerData();
-            this.isDataLoaded = true;
-            console.log('✅ Customer Panel başlatıldı');
-            
-        } catch (error) {
-            console.error('❌ Customer Panel başlatma hatası:', error);
-            this.isDataLoaded = true; // Hata olsa bile yüklendi olarak işaretle
-        }
-    }
-
-    
     async loadCustomerData() {
         try {
             console.log('📥 Müşteri verisi yükleniyor...');
@@ -153,6 +133,7 @@ class CustomerPanel {
             case 'customerSupport':
                 await this.loadCustomerSupport();
                 break;
+            // YENİ: Referral section'ları
             case 'customerReferral':
                 await this.loadCustomerReferral();
                 break;
@@ -162,8 +143,6 @@ class CustomerPanel {
             case 'referralInvites':
                 await this.loadReferralInvitesSection();
                 break;
-            default:
-                console.warn('⚠️ Bilinmeyen section:', sectionName);
         }
     }
 
@@ -1812,18 +1791,10 @@ class CustomerPanel {
 
     async loadCustomerReferral() {
         const section = document.getElementById('customerReferralSection');
-        if (!section) {
-            console.error('❌ Referral section bulunamadı');
-            return;
-        }
+        if (!section) return;
 
         try {
-            console.log('🎁 Referral section yükleniyor...');
-            
-            // 🔥 ÖNEMLİ: Event listener'ları güvenli şekilde temizle
-            this.clearReferralEventListeners();
-
-            // HTML içeriğini yükle
+            // Butonları başlangıçta pasif yap
             section.innerHTML = `
                 <div class="section-header">
                     <h2>🎁 Arkadaşını Davet Et</h2>
@@ -1881,7 +1852,33 @@ class CustomerPanel {
                             </div>
                             <div class="card-body">
                                 <div class="bonus-rules">
-                                    <!-- Bonus kuralları içeriği -->
+                                    <div class="rule-item" style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee;">
+                                        <div style="background: #007bff; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
+                                            <i class="fas fa-gift"></i>
+                                        </div>
+                                        <div>
+                                            <strong>Referans Bonusu</strong>
+                                            <p style="margin: 5px 0 0 0; color: #666;">Arkadaşın üye olduğunda sabit bonus kazan</p>
+                                        </div>
+                                    </div>
+                                    <div class="rule-item" style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #eee;">
+                                        <div style="background: #28a745; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
+                                            <i class="fas fa-shopping-cart"></i>
+                                        </div>
+                                        <div>
+                                            <strong>Sipariş Bonusu</strong>
+                                            <p style="margin: 5px 0 0 0; color: #666;">Arkadaşın sipariş verdikçe % bazlı bonus kazan</p>
+                                        </div>
+                                    </div>
+                                    <div class="rule-item" style="display: flex; align-items: center; padding: 15px;">
+                                        <div style="background: #ffc107; color: white; padding: 10px; border-radius: 8px; margin-right: 15px;">
+                                            <i class="fas fa-calendar-alt"></i>
+                                        </div>
+                                        <div>
+                                            <strong>Ay Sonu Hakediş</strong>
+                                            <p style="margin: 5px 0 0 0; color: #666;">Bonuslar ay sonunda bakiyene eklenecek</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1889,92 +1886,23 @@ class CustomerPanel {
                 </div>
             `;
 
-            // İlk kez mi yükleniyor kontrolü
-            if (!this.isReferralInitialized) {
-                this.isReferralInitialized = true;
-                await this.startReferralProcess();
-            } else {
-                // Zaten yüklenmişse, sadece butonları aktif et
-                this.activateReferralButtons();
-            }
+            // 10 saniye bekleyip link oluştur
+            await this.startReferralProcess();
 
         } catch (error) {
             console.error('❌ Referral sayfası yükleme hatası:', error);
-            this.isReferralInitialized = false;
-            this.showReferralError();
+            section.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Link oluşturulamadı</h3>
+                    <p>Lütfen sayfayı yenileyin ve tekrar deneyin.</p>
+                    <button class="btn btn-primary" onclick="location.reload()">Yenile</button>
+                </div>
+            `;
         }
     }
 
-    
-     // 🔥 DÜZELTİLMİŞ: Güvenli clearReferralEventListeners
-    clearReferralEventListeners() {
-        // Eğer referralEventListeners tanımlı değilse, başlat ve çık
-        if (!this.referralEventListeners) {
-            console.log('⚠️ referralEventListeners tanımlı değil, başlatılıyor...');
-            this.referralEventListeners = [];
-            return;
-        }
-        
-        // Eğer boşsa, çık
-        if (this.referralEventListeners.length === 0) {
-            console.log('ℹ️ Temizlenecek event listener yok');
-            return;
-        }
-        
-        console.log(`🧹 ${this.referralEventListeners.length} event listener temizleniyor...`);
-        
-        // Her bir event listener'ı güvenli şekilde kaldır
-        this.referralEventListeners.forEach((listener, index) => {
-            try {
-                if (listener && listener.element && listener.handler) {
-                    listener.element.removeEventListener(listener.event, listener.handler);
-                    console.log(`✅ Event listener ${index} kaldırıldı`);
-                }
-            } catch (error) {
-                console.warn(`⚠️ Event listener ${index} kaldırılırken hata:`, error);
-            }
-        });
-        
-        // Diziyi temizle
-        this.referralEventListeners = [];
-        console.log('✅ Tüm event listenerlar temizlendi');
-    }
-
-    // 🔥 DÜZELTİLMİŞ: Güvenli addReferralEventListener
-    addReferralEventListener(element, event, handler) {
-        // Eğer referralEventListeners tanımlı değilse başlat
-        if (!this.referralEventListeners) {
-            console.log('⚠️ referralEventListeners tanımlı değil, başlatılıyor...');
-            this.referralEventListeners = [];
-        }
-        
-        // Element ve handler kontrolü
-        if (!element || !handler || typeof handler !== 'function') {
-            console.error('❌ Geçersiz element veya handler');
-            return;
-        }
-        
-        try {
-            // Önce aynı event'i kaldır
-            element.removeEventListener(event, handler);
-            // Sonra yeni event'i ekle
-            element.addEventListener(event, handler);
-            
-            // Listener'ı kaydet
-            this.referralEventListeners.push({ 
-                element, 
-                event, 
-                handler 
-            });
-            
-            console.log(`✅ Event listener eklendi: ${event}`);
-            
-        } catch (error) {
-            console.error('❌ Event listener eklenirken hata:', error);
-        }
-    }
-    
-   async startReferralProcess() {
+    async startReferralProcess() {
         try {
             let countdown = 10;
             const loadingElement = document.getElementById('referralLoading');
@@ -1998,10 +1926,9 @@ class CustomerPanel {
 
         } catch (error) {
             console.error('❌ Referral proses hatası:', error);
-            this.isReferralInitialized = false;
         }
     }
-    
+
     async initializeReferralLink() {
         try {
             const loadingElement = document.getElementById('referralLoading');
@@ -2034,7 +1961,6 @@ class CustomerPanel {
 
         } catch (error) {
             console.error('❌ Link başlatma hatası:', error);
-            this.isReferralInitialized = false;
             this.showReferralError();
         }
     }
@@ -2089,7 +2015,7 @@ class CustomerPanel {
             throw error;
         }
     }
-    
+
     activateReferralButtons() {
         const referralLink = this.referralData ? 
             `${window.location.origin}?ref=${this.referralData.referral_code}` : 
@@ -2101,7 +2027,7 @@ class CustomerPanel {
             linkInput.value = referralLink;
         }
 
-        // 🔥 DEĞİŞTİ: Yeni event listener ekleme metodunu kullan
+        // Butonları aktif et ve event listener ekle
         const copyBtn = document.getElementById('copyReferralBtn');
         const whatsappBtn = document.getElementById('shareWhatsAppBtn');
         const telegramBtn = document.getElementById('shareTelegramBtn');
@@ -2109,25 +2035,25 @@ class CustomerPanel {
 
         if (copyBtn) {
             copyBtn.disabled = false;
-            this.addReferralEventListener(copyBtn, 'click', () => this.copyReferralLink());
+            copyBtn.addEventListener('click', () => this.copyReferralLink());
         }
         if (whatsappBtn) {
             whatsappBtn.disabled = false;
-            this.addReferralEventListener(whatsappBtn, 'click', () => this.shareOnWhatsApp());
+            whatsappBtn.addEventListener('click', () => this.shareOnWhatsApp());
         }
         if (telegramBtn) {
             telegramBtn.disabled = false;
-            this.addReferralEventListener(telegramBtn, 'click', () => this.shareOnTelegram());
+            telegramBtn.addEventListener('click', () => this.shareOnTelegram());
         }
         if (smsBtn) {
             smsBtn.disabled = false;
-            this.addReferralEventListener(smsBtn, 'click', () => this.shareAsSMS());
+            smsBtn.addEventListener('click', () => this.shareAsSMS());
         }
 
-        console.log('✅ Referral butonları aktif edildi (çoklanma önlendi)');
+        console.log('✅ Referral butonları aktif edildi');
     }
 
-    // PAYLAŞIM FONKSİYONLARI (Aynı kalacak)
+    // PAYLAŞIM FONKSİYONLARI
     copyReferralLink() {
         const input = document.getElementById('referralLinkInput');
         if (input && this.referralData) {
@@ -2136,7 +2062,7 @@ class CustomerPanel {
             window.panelSystem.showAlert('Davet linki kopyalandı!', 'success');
         }
     }
-    
+
     shareOnWhatsApp() {
         if (!this.referralData) return;
         
@@ -2167,7 +2093,7 @@ class CustomerPanel {
             alert(`SMS için mesajı kopyalayın: ${message}`);
         }
     }
-    
+
     generateReferralCode() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let result = '';
@@ -2177,7 +2103,7 @@ class CustomerPanel {
         return result;
     }
 
-    showReferralError() {
+        showReferralError() {
         const contentElement = document.getElementById('referralContent');
         if (contentElement) {
             contentElement.innerHTML = `
@@ -2315,9 +2241,8 @@ class CustomerPanel {
     }
 } // CLASS SONU
 
-// Global tanımlama
-window.CustomerPanel = CustomerPanel;
-console.log('✅ CustomerPanel global olarak tanımlandı');
+// Global erişim için
+window.customerPanel = null;
 
 // ⚠️ HATA KORUMALI VERSİYON - panelSystem kontrolü ekleyin
 if (window.panelSystem && typeof window.panelSystem.on === 'function') {
