@@ -208,7 +208,6 @@ class AdminPanel {
                 break;
         }
     }
-}
     async loadAdminDashboard() {
         const section = document.getElementById('dashboardSection');
         section.innerHTML = `
