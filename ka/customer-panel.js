@@ -1967,29 +1967,38 @@ class CustomerPanel {
 
     async createNewReferralLink() {
     try {
-        let groupCode = 'DEFAULT';
-
-        // Grup kontrolü
-        const { data: userGroup, error: groupError } = await this.supabase
-            .from('referral_groups')
+        // MÜŞTERİNİN KENDİ group_code'sunu al
+        const { data: customer, error: customerError } = await this.supabase
+            .from('customers')
             .select('group_code')
-            .eq('leader_user_id', this.customerData.id)
+            .eq('id', this.customerData.id)
             .single();
 
-        if (!groupError && userGroup) {
-            groupCode = userGroup.group_code;
+        if (customerError) {
+            console.error('❌ Müşteri bilgisi alınamadı:', customerError);
+            throw customerError;
+        }
+
+        let groupCode = 'DEFAULT';
+
+        // Müşterinin group_code'u varsa onu kullan
+        if (customer && customer.group_code) {
+            groupCode = customer.group_code;
+            console.log('✅ Müşteri group_code kullanılıyor:', groupCode);
+        } else {
+            console.log('ℹ️ Müşteride group_code yok, DEFAULT kullanılıyor');
         }
 
         const referralCode = this.generateReferralCode();
         
-        // SADECE referral_links tablosuna kayıt - is_used = false
+        // referral_links tablosuna kayıt
         const { data: newLink, error } = await this.supabase
             .from('referral_links')
             .insert({
                 group_code: groupCode,
                 owner_user_id: this.customerData.id,
                 referral_code: referralCode,
-                is_used: false, // BAŞLANGIÇTA FALSE
+                is_used: false,
                 created_at: new Date().toISOString()
             })
             .select()
@@ -1998,7 +2007,7 @@ class CustomerPanel {
         if (error) throw error;
 
         this.referralData = newLink;
-        console.log('✅ Yeni referral link oluşturuldu:', referralCode);
+        console.log('✅ Yeni referral link oluşturuldu:', referralCode, 'Group:', groupCode);
         return newLink;
 
     } catch (error) {
@@ -2006,6 +2015,7 @@ class CustomerPanel {
         throw error;
     }
 }
+    
     activateReferralButtons() {
         const referralLink = this.referralData ? 
             `${window.location.origin}?ref=${this.referralData.referral_code}` : 
