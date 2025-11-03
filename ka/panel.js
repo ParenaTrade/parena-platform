@@ -3,61 +3,108 @@ class PanelSystem {
         this.currentPanel = null;
         this.userProfile = null;
         this.setupMobileMenu();
-        this.setupAccordionMenus(); // Akordiyon menüleri ekle
+        this.setupAccordionMenus();
     }
 
     setupAccordionMenus() {
         console.log('🎪 Akordiyon menüler ayarlanıyor...');
         
-        document.addEventListener('DOMContentLoaded', () => {
-            // Akordiyon açma/kapama
-            const accordionHeaders = document.querySelectorAll('.accordion-header');
-            
-            accordionHeaders.forEach(header => {
-                header.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const accordionId = this.getAttribute('data-accordion');
-                    const accordionContent = document.getElementById(accordionId);
+        // DOMContentLoaded beklemeyelim, doğrudan çalıştıralım
+        this.initializeAccordionEventListeners();
+    }
+
+    initializeAccordionEventListeners() {
+        console.log('🔧 Akordiyon event listenerlar ekleniyor...');
+        
+        // Akordiyon başlıklarına tıklama eventi
+        document.addEventListener('click', (e) => {
+            const accordionHeader = e.target.closest('.accordion-header');
+            if (accordionHeader) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const accordionId = accordionHeader.getAttribute('data-accordion');
+                const accordionContent = document.getElementById(accordionId);
+                
+                if (accordionContent) {
+                    // Diğer tüm akordiyonları kapat
+                    this.closeAllAccordionsExcept(accordionId);
                     
-                    if (accordionContent) {
-                        // Toggle active class
-                        this.classList.toggle('active');
-                        accordionContent.classList.toggle('active');
-                        
-                        console.log('🔘 Akordiyon toggled:', accordionId, this.classList.contains('active'));
-                    }
-                });
-            }); 
+                    // Toggle active class
+                    accordionHeader.classList.toggle('active');
+                    accordionContent.classList.toggle('active');
+                    
+                    console.log('🔘 Akordiyon toggled:', accordionId, accordionHeader.classList.contains('active'));
+                }
+            }
+        });
 
-            
-            // Nav item click handler - akordiyon item'ları için
-            const navItems = document.querySelectorAll('.nav-item');
-            navItems.forEach(item => {
-                item.addEventListener('click', function(e) {
-                    if (this.getAttribute('data-section')) {
-                        // Remove active class from all items
-                        navItems.forEach(navItem => {
-                            navItem.classList.remove('active');
-                        });
-                        // Add active class to clicked item
-                        this.classList.add('active');
-                        
-                        // Sayfa başlığını güncelle
-                        const pageTitle = this.querySelector('span')?.textContent || 'Panel';
-                        document.getElementById('pageTitle').textContent = pageTitle;
-                        
-                        // Mobile menüyü kapat
-                        const sidebar = document.getElementById('sidebar');
-                        if (sidebar && sidebar.classList.contains('mobile-open')) {
-                            sidebar.classList.remove('mobile-open');
-                        }
+        // Nav item click handler
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            item.addEventListener('click', function(e) {
+                if (this.getAttribute('data-section')) {
+                    // Remove active class from all items
+                    navItems.forEach(navItem => {
+                        navItem.classList.remove('active');
+                    });
+                    // Add active class to clicked item
+                    this.classList.add('active');
+                    
+                    // Sayfa başlığını güncelle
+                    const pageTitle = this.querySelector('span')?.textContent || 'Panel';
+                    document.getElementById('pageTitle').textContent = pageTitle;
+                    
+                    // Mobile menüyü kapat
+                    const sidebar = document.getElementById('sidebar');
+                    if (sidebar && sidebar.classList.contains('mobile-open')) {
+                        sidebar.classList.remove('mobile-open');
                     }
-                });
+                }
             });
+        });
 
-            console.log('✅ Akordiyon menüler ayarlandı');
+        console.log('✅ Akordiyon event listenerlar eklendi');
+    }
+
+    closeAllAccordionsExcept(exceptAccordionId = null) {
+        const allAccordionHeaders = document.querySelectorAll('.accordion-header');
+        const allAccordionContents = document.querySelectorAll('.accordion-content');
+        
+        allAccordionHeaders.forEach(header => {
+            if (exceptAccordionId && header.getAttribute('data-accordion') === exceptAccordionId) {
+                return; // Bu akordiyonu atla
+            }
+            header.classList.remove('active');
+        });
+        
+        allAccordionContents.forEach(content => {
+            if (exceptAccordionId && content.id === exceptAccordionId) {
+                return; // Bu içeriği atla
+            }
+            content.classList.remove('active');
         });
     }
+
+    initializeAccordionMenus() {
+        console.log('🎪 Akordiyon menüler başlatılıyor...');
+        
+        // İlk akordiyonu aç
+        setTimeout(() => {
+            const firstAccordionHeader = document.querySelector('.accordion-header');
+            if (firstAccordionHeader) {
+                const accordionId = firstAccordionHeader.getAttribute('data-accordion');
+                const accordionContent = document.getElementById(accordionId);
+                
+                if (accordionContent && !firstAccordionHeader.classList.contains('active')) {
+                    firstAccordionHeader.classList.add('active');
+                    accordionContent.classList.add('active');
+                    console.log('✅ İlk akordiyon açıldı:', accordionId);
+                }
+            }
+        }, 300);
+    }
+
 
     setupMobileMenu() {
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
