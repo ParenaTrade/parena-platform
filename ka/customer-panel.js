@@ -1966,56 +1966,69 @@ class CustomerPanel {
     }
 
     async createNewReferralLink() {
-        try {
-            let groupCode = 'DEFAULT';
+    try {
+        // ÖNEMLİ: Aynı kullanıcı için aktif link var mı kontrol et
+        const { data: activeLinks, error: activeError } = await this.supabase
+            .from('referral_links')
+            .select('id')
+            .eq('owner_user_id', this.customerData.id)
+            .eq('is_used', false)
+            .limit(1);
 
-            // Grup kontrolü
-            const { data: userGroup, error: groupError } = await this.supabase
+        if (!activeError && activeLinks && activeLinks.length > 0) {
+            console.log('⚠️ Zaten aktif bir referral linki var');
+            return; // YENİ LINK OLUŞTURMA, ÇIK
+        }
+
+        let groupCode = 'DEFAULT';
+
+        // Grup kontrolü
+        const { data: userGroup, error: groupError } = await this.supabase
+            .from('referral_groups')
+            .select('*')
+            .eq('leader_user_id', this.customerData.id)
+            .single();
+
+        if (!groupError && userGroup) {
+            groupCode = userGroup.group_code;
+        } else {
+            // Varsayılan grup
+            const { data: defaultGroup, error: defaultError } = await this.supabase
                 .from('referral_groups')
                 .select('*')
-                .eq('leader_user_id', this.customerData.id)
+                .eq('is_active', true)
                 .limit(1)
                 .single();
 
-            if (!groupError && userGroup) {
-                groupCode = userGroup.group_code;
-            } else {
-                // Varsayılan grup
-                const { data: defaultGroup, error: defaultError } = await this.supabase
-                    .from('referral_groups')
-                    .select('*')
-                    .eq('is_active', true)
-                    .limit(1)
-                    .single();
-
-                if (!defaultError && defaultGroup) {
-                    groupCode = defaultGroup.group_code;
-                }
+            if (!defaultError && defaultGroup) {
+                groupCode = defaultGroup.group_code;
             }
-
-            const referralCode = this.generateReferralCode();
-            
-            const { data: newLink, error } = await this.supabase
-                .from('referral_links')
-                .insert({
-                    group_code: groupCode,
-                    owner_user_id: this.customerData.id,
-                    referral_code: referralCode,
-                    is_used: false
-                })
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            this.referralData = newLink;
-            console.log('✅ Yeni referral link oluşturuldu:', referralCode);
-
-        } catch (error) {
-            console.error('❌ Yeni link oluşturma hatası:', error);
-            throw error;
         }
+
+        const referralCode = this.generateReferralCode();
+        
+        // SADECE 1 KAYIT EKLE
+        const { data: newLink, error } = await this.supabase
+            .from('referral_links')
+            .insert({
+                group_code: groupCode,
+                owner_user_id: this.customerData.id,
+                referral_code: referralCode,
+                is_used: false
+            })
+            .select()
+            .single(); // SADECE 1 TANE DÖNDÜR
+
+        if (error) throw error;
+
+        this.referralData = newLink;
+        console.log('✅ Yeni referral link oluşturuldu:', referralCode);
+
+    } catch (error) {
+        console.error('❌ Yeni link oluşturma hatası:', error);
+        throw error;
     }
+}
 
     activateReferralButtons() {
         const referralLink = this.referralData ? 
