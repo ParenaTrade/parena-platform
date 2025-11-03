@@ -1982,7 +1982,7 @@ class CustomerPanel {
 
         const referralCode = this.generateReferralCode();
         
- // SADECE referral_links tablosuna kayıt
+        // SADECE referral_links tablosuna kayıt - is_used = false
         const { data: newLink, error } = await this.supabase
             .from('referral_links')
             .insert({
@@ -1997,11 +1997,12 @@ class CustomerPanel {
 
         if (error) throw error;
 
+        this.referralData = newLink;
         console.log('✅ Yeni referral link oluşturuldu:', referralCode);
         return newLink;
 
     } catch (error) {
-        console.error('❌ Link oluşturma hatası:', error);
+        console.error('❌ Yeni link oluşturma hatası:', error);
         throw error;
     }
 }
