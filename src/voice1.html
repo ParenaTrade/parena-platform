@@ -6684,8 +6684,16 @@ async function createReferralGroup(leaderUserId, groupName) {
 // =============================================
 // REFERRAL LİNK AL YÖNETİMİ
 // =============================================
+// 1. URL'den referral al (YENİ EKLENEN)
+function getReferralFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const referralCode = urlParams.get('ref');
+    const groupCode = urlParams.get('group_code');
+    return { referralCode, groupCode };
+}
+        
 
-// PENDING REFERRAL CODE'U GETİREN FONKSİYON
+// 2. Pending referral code'u getir (ZATEN VAR)
 function getPendingReferralCode() {
     // Önce URL'den kontrol et
     const urlParams = new URLSearchParams(window.location.search);
@@ -6708,8 +6716,7 @@ function getPendingReferralCode() {
     
     return null;
 }
-
- // PENDING REFERRAL'I TEMİZLEYEN FONKSİYON
+ // 3. Pending referral'ı temizle (ZATEN VAR)
 function clearPendingReferral() {
     // URL'den temizle (sayfa yeniden yüklenmeden)
     if (window.history.replaceState) {
@@ -6726,7 +6733,7 @@ function clearPendingReferral() {
     console.log('🧹 Pending referral temizlendi');
 }
 
- // SAYFA YÜKLENDİĞİNDE REFERRAL CODE'U YAKALA
+// 4. Sayfa yüklendiğinde referral code'u yakala (ZATEN VAR)
 function initializeReferralTracking() {
     const urlParams = new URLSearchParams(window.location.search);
     const referralCode = urlParams.get('ref');
@@ -6738,8 +6745,8 @@ function initializeReferralTracking() {
     }
 }
 
-// Sayfa yüklendiğinde çalıştır
-document.addEventListener('DOMContentLoaded', initializeReferralTracking);       
+// Sayfa yüklendiğinde çalıştır (ZATEN VAR)
+document.addEventListener('DOMContentLoaded', initializeReferralTracking);     
        
 // =============================================
 // REFERRAL TAKİP
@@ -6930,22 +6937,25 @@ async function getUserBonusBalance(userId) {
 
 async function initializeReferralSystem() {
     try {
-        // Referral kurallarını yükle - KEEP (sipariş bonusu için)
-        await loadReferralRules();
+        console.log('🔄 Referral sistemi başlatılıyor...');
         
-        // URL'den referral kontrolü
+        // URL'den referral kontrolü - ARTIK TANIMLI!
         const { referralCode, groupCode } = getReferralFromUrl();
         
         if (referralCode) {
-            pendingReferralCode = referralCode;
-            currentReferralGroup = groupCode;
-            console.log(`🎯 Referral algılandı: ${referralCode}`);
-        }
-
-        // Bonus bakiyesini yükle - KEEP (siparişte kullanılıyor)
-        if (currentCustomer) {
-            referralBonusBalance = await getUserBonusBalance(currentCustomer.id);
-            updateBonusUI();
+            console.log(`🎯 Referral algılandı: ${referralCode}, Grup: ${groupCode}`);
+            
+            // Global değişkenlere ata
+            window.pendingReferralCode = referralCode;
+            window.currentReferralGroup = groupCode;
+            
+            // Eğer kullanıcı zaten giriş yapmışsa hemen işle
+            if (window.currentCustomer) {
+                console.log('👤 Kullanıcı giriş yapmış, referral işleniyor...');
+                await processReferralAfterRegistration(window.currentCustomer.id);
+            }
+        } else {
+            console.log('ℹ️ URL\'de referral code bulunamadı');
         }
 
         console.log('✅ Referral sistemi başlatıldı');
@@ -14640,5 +14650,6 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
