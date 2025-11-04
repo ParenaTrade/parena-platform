@@ -123,7 +123,7 @@
  /* ÜRÜN GRID HEADER SABİT SLIDER STİLLERİ - DÜZELTİLMİŞ */
 .command-slider-header {
     position: fixed;
-    top: 120px;
+    top: 85px;
     left: 50%;
     transform: translateX(-50%);
     width: 100%;
@@ -4394,7 +4394,7 @@ function initCommandSlider() {
     notificationContainer.innerHTML = `
         <div class="voice-notification-content">
             <i class="fas fa-microphone"></i>
-            <span class="voice-notification-text">"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz</span>
+            <span class="voice-notification-text">"Sepeti sil" veya "Ödeme yap" diyebilirsiniz</span>
         </div>
     `;
 
@@ -6204,7 +6204,7 @@ async function safeVoiceMatchQuery(userInput) {
 }
         
 
-    async function processVoiceCommand(transcript) {
+async function processVoiceCommand(transcript) {
         const message = transcript.toLowerCase().trim();
         console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
     
@@ -6355,13 +6355,13 @@ async function safeVoiceMatchQuery(userInput) {
             // =============================================
             
             const clearCartCommands = [
-                'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+                'sepeti sil', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
                 'clear cart', 'empty cart', 'reset cart', 'temizle',
                 'hepsini sil', 'ürünleri kaldır', 'sepetten kaldır', 'boşalt'
             ];
             
             if (clearCartCommands.some(cmd => message.includes(cmd))) {
-                console.log('🛒 Sepeti boşaltma komutu algılandı');
+                console.log('🛒 Sepeti sil komutu algılandı');
                 clearCart();
                 return;
             }
@@ -6568,6 +6568,7 @@ async function safeVoiceMatchQuery(userInput) {
         }
     }
 
+        
 // =============================================
 // YENİ REFERRAL VE BONUS SİSTEMİ
 // =============================================
@@ -6682,128 +6683,98 @@ async function createReferralGroup(leaderUserId, groupName) {
 }
 
 // =============================================
-// REFERRAL LİNK YÖNETİMİ
+// REFERRAL LİNK AL YÖNETİMİ
 // =============================================
-
-// Referral link oluştur
-async function generateReferralLink(ownerUserId, groupCode = null) {
-    try {
-        const referralCode = generateGroupCode(); // Benzersiz kod
-        
-        const linkData = {
-            owner_user_id: ownerUserId,
-            referral_code: referralCode,
-            created_at: new Date().toISOString()
-        };
-
-        if (groupCode) {
-            linkData.group_code = groupCode;
-        }
-
-        const { data, error } = await supabase
-            .from('referral_links')
-            .insert([linkData])
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        const baseUrl = window.location.origin;
-        const referralLink = groupCode 
-            ? `${baseUrl}?group_code=${groupCode}&ref=${referralCode}`
-            : `${baseUrl}?ref=${referralCode}`;
-
-        return {
-            link: referralLink,
-            code: referralCode,
-            id: data.id
-        };
-    } catch (error) {
-        console.error('Referral link oluşturma hatası:', error);
-        return null;
-    }
-}
-
-// URL'den referral bilgilerini al
+// 1. URL'den referral al (YENİ EKLENEN)
 function getReferralFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     const referralCode = urlParams.get('ref');
     const groupCode = urlParams.get('group_code');
-
     return { referralCode, groupCode };
 }
+        
 
+// 2. Pending referral code'u getir (ZATEN VAR)
+function getPendingReferralCode() {
+    // Önce URL'den kontrol et
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlReferralCode = urlParams.get('ref');
+    
+    if (urlReferralCode) {
+        return urlReferralCode;
+    }
+    
+    // Sonra localStorage'dan kontrol et
+    const storedReferralCode = localStorage.getItem('pendingReferralCode');
+    if (storedReferralCode) {
+        return storedReferralCode;
+    }
+    
+    // Global değişkenden kontrol et
+    if (window.pendingReferralCode) {
+        return window.pendingReferralCode;
+    }
+    
+    return null;
+}
+ // 3. Pending referral'ı temizle (ZATEN VAR)
+function clearPendingReferral() {
+    // URL'den temizle (sayfa yeniden yüklenmeden)
+    if (window.history.replaceState) {
+        const newUrl = window.location.pathname + window.location.search.replace(/[?&]ref=[^&]+/, '');
+        window.history.replaceState({}, document.title, newUrl);
+    }
+    
+    // localStorage'dan temizle
+    localStorage.removeItem('pendingReferralCode');
+    
+    // Global değişkenden temizle
+    window.pendingReferralCode = null;
+    
+    console.log('🧹 Pending referral temizlendi');
+}
+
+// 4. Sayfa yüklendiğinde referral code'u yakala (ZATEN VAR)
+function initializeReferralTracking() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const referralCode = urlParams.get('ref');
+    
+    if (referralCode) {
+        // LocalStorage'a kaydet (sayfa yenileme koruması)
+        localStorage.setItem('pendingReferralCode', referralCode);
+        console.log('🎯 Referral code kaydedildi:', referralCode);
+    }
+}
+
+// Sayfa yüklendiğinde çalıştır (ZATEN VAR)
+document.addEventListener('DOMContentLoaded', initializeReferralTracking);     
+       
 // =============================================
 // REFERRAL TAKİP
 // =============================================
-
-// Referral tracking kaydı oluştur
-async function createReferralTracking(referralCode, groupCode, referrerUserId) {
+// REFERRAL İŞLEMLERİNİ YAPAN FONKSİYON
+async function processReferralAfterRegistration(newCustomerId) {
     try {
-        const { data, error } = await supabase
-            .from('referral_tracking')
-            .insert([{
-                referral_code: referralCode,
-                group_code: groupCode,
-                referrer_user_id: referrerUserId,
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
+        const pendingReferralCode = getPendingReferralCode();
+        if (!pendingReferralCode) return;
+        
+        console.log(`🔄 Referral işleniyor: ${pendingReferralCode} → ${newCustomerId}`);
+        
+        // BASİT - Tek fonksiyon çağrısı
+        const { data: results, error } = await supabase
+            .rpc('complete_referral_after_registration', {
+                p_referral_code: pendingReferralCode,
+                p_new_user_id: newCustomerId
+            });
 
-        if (error) throw error;
-        return data;
+        if (error) return;
+
+        console.log('✅ Referral işlemleri tamamlandı:', results);
+        displayMessage("🎉 Referans kodunuz uygulandı!");
+        clearPendingReferral();
+        
     } catch (error) {
-        console.error('Referral tracking hatası:', error);
-        return null;
-    }
-}
-
-// Yeni kullanıcı için referral tracking'i güncelle
-async function updateReferralTrackingWithNewUser(referralCode, newUserId) {
-    try {
-        const { error } = await supabase
-            .from('referral_tracking')
-            .update({ new_user_id: newUserId })
-            .eq('referral_code', referralCode);
-
-        if (error) throw error;
-        return true;
-    } catch (error) {
-        console.error('Tracking güncelleme hatası:', error);
-        return false;
-    }
-}
-
-// =============================================
-// BONUS HESAPLAMA VE DAĞITIM
-// =============================================
-
-// Referans bonusu uygula
-async function applyReferralBonus(referralTrackingId) {
-    try {
-        const referralRule = await getReferralRuleByName('Referans Bonusu');
-        if (!referralRule) return false;
-
-        const { data, error } = await supabase
-            .from('referral_bonus')
-            .insert([{
-                referral_tracking_id: referralTrackingId,
-                bonus_amount: referralRule.bonus_amount,
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        // Referrer'ın bonus bakiyesini güncelle
-        await updateUserBonusBalance(data.referrer_user_id, referralRule.bonus_amount);
-
-        return true;
-    } catch (error) {
-        console.error('Referral bonus uygulama hatası:', error);
-        return false;
+        console.error('❌ Referral işleme hatası:', error);
     }
 }
 
@@ -6918,6 +6889,11 @@ async function useBonusForPayment(userId, usedAmount, orderId) {
     }
 }
 
+
+        // Konsolda test edin:
+console.log('getReferralFromUrl çalışıyor mu?', getReferralFromUrl());
+console.log('getPendingReferralCode çalışıyor mu?', getPendingReferralCode());
+console.log('LocalStorage referral:', localStorage.getItem('pendingReferralCode'));
 // =============================================
 // YARDIMCI FONKSİYONLAR
 // =============================================
@@ -6967,28 +6943,25 @@ async function getUserBonusBalance(userId) {
 
 async function initializeReferralSystem() {
     try {
-        // Referral kurallarını yükle
-        await loadReferralRules();
+        console.log('🔄 Referral sistemi başlatılıyor...');
         
-        // URL'den referral kontrolü
+        // URL'den referral kontrolü - ARTIK TANIMLI!
         const { referralCode, groupCode } = getReferralFromUrl();
         
         if (referralCode) {
-            pendingReferralCode = referralCode;
-            currentReferralGroup = groupCode;
-            
             console.log(`🎯 Referral algılandı: ${referralCode}, Grup: ${groupCode}`);
             
-            if (currentCustomer) {
-                // Kullanıcı giriş yapmışsa hemen işle
-                await processPendingReferral();
+            // Global değişkenlere ata
+            window.pendingReferralCode = referralCode;
+            window.currentReferralGroup = groupCode;
+            
+            // Eğer kullanıcı zaten giriş yapmışsa hemen işle
+            if (window.currentCustomer) {
+                console.log('👤 Kullanıcı giriş yapmış, referral işleniyor...');
+                await processReferralAfterRegistration(window.currentCustomer.id);
             }
-        }
-
-        // Bonus bakiyesini yükle
-        if (currentCustomer) {
-            referralBonusBalance = await getUserBonusBalance(currentCustomer.id);
-            updateBonusUI();
+        } else {
+            console.log('ℹ️ URL\'de referral code bulunamadı');
         }
 
         console.log('✅ Referral sistemi başlatıldı');
@@ -6996,53 +6969,6 @@ async function initializeReferralSystem() {
         console.error('Referral sistem başlatma hatası:', error);
     }
 }
-
-// Bekleyen referral'ı işle
-async function processPendingReferral() {
-    if (!pendingReferralCode || !currentCustomer) return;
-
-    try {
-        // Referral tracking oluştur
-        const tracking = await createReferralTracking(
-            pendingReferralCode, 
-            currentReferralGroup, 
-            null // Referrer ID sonradan güncellenecek
-        );
-
-        if (tracking) {
-            // Yeni kullanıcı ID'sini güncelle
-            await updateReferralTrackingWithNewUser(pendingReferralCode, currentCustomer.id);
-            
-            // Referrer ID'yi bul ve güncelle
-            const { data: linkData, error } = await supabase
-                .from('referral_links')
-                .select('owner_user_id')
-                .eq('referral_code', pendingReferralCode)
-                .single();
-
-            if (!error && linkData) {
-                await supabase
-                    .from('referral_tracking')
-                    .update({ referrer_user_id: linkData.owner_user_id })
-                    .eq('id', tracking.id);
-
-                // Bonus uygula
-                await applyReferralBonus(tracking.id);
-            }
-
-            displayMessage(`✅ Referral kodu başarıyla uygulandı! ${money(10)} bonus hesabınıza eklendi.`);
-            speakToUser("Referans kodu başarıyla uygulandı");
-        }
-
-        // Temizle
-        pendingReferralCode = null;
-        currentReferralGroup = null;
-
-    } catch (error) {
-        console.error('Bekleyen referral işleme hatası:', error);
-    }
-}
-
 // =============================================
 // UI GÜNCELLEMELERİ
 // =============================================
@@ -7634,7 +7560,7 @@ function showHelp() {
 📦 REYON SEÇİMİ: "Manav", "Süt ürünleri", "İçecekler"
 🛒 ÜRÜN EKLEME: "1 kilo domates", "2 paket süt"
 💳 ÖDEME: "Ödeme yap", "Nakit öde", "Kartla öde"
-🗑️ SEPET: "Sepeti boşalt", "Sepetim"
+🗑️ SEPET: "Sepeti sil", "Sepetim"
 ↩️ NAVİGASYON: "Geri git", "Ana sayfa"
 
 Sesli komutlarınızı net ve anlaşılır şekilde söyleyin!
@@ -7926,7 +7852,7 @@ function cartHasItems() {
 // Sepet temizleme komutlarını tespit et
 function isClearCartCommand(message) {
     const clearCommands = [
-        'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+        'sepeti sil', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
         'clear cart', 'empty cart', 'reset cart', 'temizle'
     ];
     
@@ -8188,7 +8114,7 @@ function updateVoiceNotification(message, type = 'info', autoReset = true, reset
     // ⭐ OTOMATİK GERİ DÖNÜŞ
     if (autoReset && type !== 'info') {
         notificationTimeout = setTimeout(() => {
-            updateVoiceNotification('"Sepeti boşalt" veya "Sipariş ver" diyebilirsiniz', 'info', false);
+            updateVoiceNotification('"Sepeti sil" veya "Sipariş ver" diyebilirsiniz', 'info', false);
         }, resetDelay);
     }
 }
@@ -8262,7 +8188,7 @@ function addClearCartButton() {
     if (!document.getElementById('clearCartBtn') && cart.length > 0) {
         const clearBtn = document.createElement('button');
         clearBtn.id = 'clearCartBtn';
-        clearBtn.innerHTML = '<i class="fas fa-trash"></i> Sepeti Boşalt';
+        clearBtn.innerHTML = '<i class="fas fa-trash"></i> Sepeti sil';
         clearBtn.style.cssText = `
             width: 100%;
             padding: 12px;
@@ -10128,7 +10054,7 @@ async function processAILogic(message, root) {
         const currentSeller = firstCartItem ? sellers.find(s => s.id === firstCartItem.seller_id) : null;
         
         return {
-            message: `Sepet dolu ve ${currentSeller?.business_name || 'mevcut mağaza'} kilitli. Sadece bu mağazadan ürün ekleyebilirsiniz. "Sepeti boşalt" diyerek kilidi kaldırabilir veya ödeme yaparak siparişi tamamlayabilirsiniz.`,
+            message: `Sepet dolu ve ${currentSeller?.business_name || 'mevcut mağaza'} kilitli. Sadece bu mağazadan ürün ekleyebilirsiniz. "Sepeti sil" diyerek kilidi kaldırabilir veya ödeme yaparak siparişi tamamlayabilirsiniz.`,
             confidence: 0.9
         };
     }
@@ -12385,11 +12311,11 @@ async function restoreSession() {
         
 
 
-// Sesli komutlara sepeti boşaltma ekle
+// Sesli komutlara sepeti sil ekle
 function setupClearCartVoiceCommand() {
     // handleDynamicAIRequest içinde veya ayrı bir fonksiyonda
     const clearCartCommands = [
-        'sepeti boşalt', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
+        'sepeti sil', 'sepeti temizle', 'her şeyi sil', 'sıfırla',
         'clear cart', 'empty cart', 'reset cart'
     ];
     
@@ -12962,7 +12888,7 @@ function showPaymentModal() {
     showPaymentMethodSelection();
 }
 
-   function closePaymentModal() {
+  function closePaymentModal() {
     const paymentModal = document.getElementById('paymentModal');
     if (paymentModal) {
         paymentModal.style.display = 'none';
@@ -12970,6 +12896,10 @@ function showPaymentModal() {
     }
 }
 
+// MEVCUT state'lerin olduğu yere ekle:
+let isInPaymentFlow = false;
+let currentPaymentStep = null; // 'method', 'phone', 'name', 'address', 'confirmation'
+        
     function resetPaymentState() {
     isWaitingForPhone = false;
     isWaitingForName = false;
@@ -12989,11 +12919,25 @@ function showPaymentModal() {
 
 function checkExpectedInput(command) {
     console.log('🔍 Beklenen input kontrolü:', { 
-        command, 
+        command,
+        isWaitingForName,
         isWaitingForAddressConfirm, 
         isWaitingForOrderConfirm,
         expectedInput 
     });
+
+
+        // İsim bekleniyorsa
+    if (isWaitingForName && expectedInput === 'name') {
+        processCustomerName(command);
+        return true;
+    }
+
+ // Telefon bekleniyorsa
+    if (isWaitingForPhone && expectedInput === 'phone') {
+        processPhoneNumber(command);
+        return true;
+    }
     
     // Adres onayı bekleniyorsa
     if (isWaitingForAddressConfirm) {
@@ -13011,7 +12955,18 @@ function checkExpectedInput(command) {
             return true; // Yine de true dön ki ürün ekleme kısmına geçmesin
         }
     }
+
+       // Bina numarası bekleniyorsa
+    if (isWaitingForBuilding && expectedInput === 'building') {
+        processBuildingInfo(command);
+        return true;
+    }
     
+    // Daire numarası bekleniyorsa
+    if (isWaitingForApartment && expectedInput === 'apartment') {
+        processApartmentInfo(command);
+        return true;
+    }
     // Sipariş onayı bekleniyorsa
     if (isWaitingForOrderConfirm) {
         console.log('✅ Sipariş onayı bekleniyor, komut:', command);
@@ -13028,30 +12983,7 @@ function checkExpectedInput(command) {
             return true;
         }
     }
-    
-    // Telefon bekleniyorsa
-    if (isWaitingForPhone && expectedInput === 'phone') {
-        processPhoneNumber(command);
-        return true;
-    }
-    
-    // İsim bekleniyorsa
-    if (isWaitingForName && expectedInput === 'name') {
-        processCustomerName(command);
-        return true;
-    }
-    
-    // Bina numarası bekleniyorsa
-    if (isWaitingForBuilding && expectedInput === 'building') {
-        processBuildingInfo(command);
-        return true;
-    }
-    
-    // Daire numarası bekleniyorsa
-    if (isWaitingForApartment && expectedInput === 'apartment') {
-        processApartmentInfo(command);
-        return true;
-    }
+        
     
     return false;
 }
@@ -13632,11 +13564,15 @@ async function completeCustomerRegistration() {
         if (error) throw error;
         
         currentCustomer = data;
+        console.log('✅ Müşteri kaydı tamamlandı:', data.id);
         displayMessage("✅ Müşteri kaydı tamamlandı");
         speakToUser("kaydınız tamamlandı");
         
+        // REFERRAL İŞLEMLERİNİ YAP
+    //    await processReferralAfterRegistration(data.id);
+        
         // Sipariş onayı iste
-        requestOrderConfirmation();
+       requestOrderConfirmation();
         
     } catch (error) {
         console.error('❌ Müşteri kayıt hatası:', error);
@@ -13645,6 +13581,7 @@ async function completeCustomerRegistration() {
     }
 }
 
+        
 async function updateCustomerAddress() {
     console.log('🏠 Müşteri adresi güncelleniyor...');
     
@@ -13889,7 +13826,7 @@ function cancelOrder() {
     resetOrderState();
 }
 
-        // 3. SİPARİŞ ONAY İŞLEMİ FONKSİYONU (eksik olan)
+// 3. SİPARİŞ ONAY İŞLEMİ FONKSİYONU (eksik olan)
 async function processOrderConfirmation(response) {
     console.log('🔄 Sipariş onayı işleniyor:', response);
     
@@ -13981,30 +13918,18 @@ function calculatePaymentDistribution(totalAmount, bonusBalance, paymentMethod) 
 }
         
 
+// payments.js modülünde
 async function savePaymentRecord(orderId, paymentDistribution) {
     try {
         console.log('💳 Ödeme kaydı oluşturuluyor:', { orderId, paymentDistribution });
         
-        // Payment type belirle
-        let paymentType = 'full'; // Varsayılan
-        
-        if (paymentDistribution.bonus_amount > 0) {
-            if (paymentDistribution.bonus_amount === paymentDistribution.total_amount) {
-                paymentType = 'bonus_only'; // Sadece bonus
-            } else {
-                paymentType = 'partial'; // Kısmi ödeme (bonus + nakit/kart)
-            }
-        }
-        
-        console.log('🎯 Payment Type Seçildi:', paymentType);
-        
-        // 💰 AMOUNT = SİPARİŞ TOPLAM TUTARI (bonus dahil)
+        // 💰 CRITICAL FIX: AMOUNT = SİPARİŞ TOPLAM TUTARI
         const paymentData = {
             order_id: orderId,
             customer_id: currentCustomer ? currentCustomer.id : null,
             payment_method: paymentDistribution.payment_method,
             amount: paymentDistribution.total_amount, // ✅ SİPARİŞ TOPLAMI
-            payment_type: paymentType,
+            payment_type: calculatePaymentType(paymentDistribution),
             bonus_used: paymentDistribution.bonus_amount,
             cash_amount: paymentDistribution.cash_amount,
             card_amount: paymentDistribution.card_amount,
@@ -14019,19 +13944,29 @@ async function savePaymentRecord(orderId, paymentDistribution) {
             .from('customer_payments')
             .insert([paymentData]);
             
-        if (error) {
-            console.error('❌ Ödeme kaydı hatası:', error);
-            throw new Error(`Ödeme kaydı oluşturulamadı: ${error.message}`);
-        }
+        if (error) throw error;
         
         console.log('✅ Ödeme kaydı oluşturuldu');
         return data;
         
     } catch (error) {
-        console.error('❌ Ödeme kaydı oluşturma hatası:', error);
+        console.error('❌ Ödeme kaydı hatası:', error);
         throw error;
     }
 }
+
+// Payment type hesaplama
+function calculatePaymentType(paymentDistribution) {
+    if (paymentDistribution.bonus_amount > 0) {
+        if (paymentDistribution.bonus_amount === paymentDistribution.total_amount) {
+            return 'bonus_only';
+        } else {
+            return 'partial';
+        }
+    }
+    return 'full';
+}
+
         
 // referral_payouts tablosunda RLS (Row Level Security) aktif
 async function saveBonusUsage(customerId, orderId, bonusAmount) {
@@ -14080,16 +14015,37 @@ async function saveBonusUsage(customerId, orderId, bonusAmount) {
     try {
         console.log('💰 Bonus bakiyesi güncelleniyor:', { customerId, bonusAmountUsed });
         
-        // Mevcut bonus bakiyesini al
-        const currentBonus = await getUserBonusBalance(customerId);
+        // 1. Mevcut bonus bakiyesini al
+        const { data: customer, error: fetchError } = await supabase
+            .from('customers')
+            .select('bonus_balance')
+            .eq('id', customerId)
+            .single();
+            
+        if (fetchError) throw fetchError;
+        
+        const currentBonus = customer.bonus_balance || 0;
         const newBalance = currentBonus - bonusAmountUsed;
         
         console.log(`💰 Bonus güncelleme: ${currentBonus} - ${bonusAmountUsed} = ${newBalance}`);
         
-        // referral_payouts tablosuna kullanım kaydı ekle
+        // 2. customers.bonus_balance GÜNCELLE
+        const { error: updateError } = await supabase
+            .from('customers')
+            .update({ 
+                bonus_balance: newBalance,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', customerId);
+            
+        if (updateError) throw updateError;
+        
+        console.log('✅ customers.bonus_balance güncellendi');
+        
+        // 3. referral_payouts tablosuna kullanım kaydı ekle
         const payoutData = {
             customer_id: customerId,
-            amount: -bonusAmountUsed, // Eksi değer - kullanım
+            amount: -bonusAmountUsed,
             payout_type: 'bonus_usage',
             status: 'completed',
             description: `Sipariş için bonus kullanımı`,
@@ -14101,16 +14057,15 @@ async function saveBonusUsage(customerId, orderId, bonusAmount) {
             .insert([payoutData]);
             
         if (payoutError) {
-            console.error('❌ Bonus kullanım kaydı hatası:', payoutError);
-            throw new Error(`Bonus kullanım kaydedilemedi: ${payoutError.message}`);
+            console.error('❌ referral_payouts kaydı hatası:', payoutError);
+            // Bu hata kritik değil, devam et
         }
         
-        console.log('✅ Bonus kullanımı kaydedildi');
-        
-        // Bonus bakiyesini local olarak güncelle
+        // 4. Local state'i güncelle
         referralBonusBalance = newBalance;
         updateBonusUI();
         
+        console.log('✅ Bonus bakiye güncelleme tamamlandı');
         return newBalance;
         
     } catch (error) {
@@ -14118,6 +14073,36 @@ async function saveBonusUsage(customerId, orderId, bonusAmount) {
         throw error;
     }
 }
+
+// Bonus güncellemeyi test et
+async function testBonusUpdate() {
+    if (currentCustomer) {
+        console.log('🧪 Bonus güncelleme testi...');
+        
+        // Önce mevcut bakiyeyi al
+        const { data: customer } = await supabase
+            .from('customers')
+            .select('bonus_balance')
+            .eq('id', currentCustomer.id)
+            .single();
+            
+        console.log('📊 Mevcut bonus bakiye:', customer?.bonus_balance);
+        
+        // 10₺ bonus kullanımı simüle et
+        await updateCustomerBonusBalance(currentCustomer.id, 10);
+        
+        // Sonraki bakiyeyi kontrol et
+        const { data: updatedCustomer } = await supabase
+            .from('customers')
+            .select('bonus_balance')
+            .eq('id', currentCustomer.id)
+            .single();
+            
+        console.log('📊 Güncel bonus bakiye:', updatedCustomer?.bonus_balance);
+    }
+}
+
+// Console'da çalıştır: testBonusUpdate()
         
 // Tablo yapısını öğrenmek için test fonksiyonu
 async function testPaymentTableStructure() {
@@ -14231,6 +14216,11 @@ async function saveOrder() {
         
         // 2️⃣ ÖDEME KAYDINI OLUŞTUR
         await savePaymentRecord(order.id, paymentDistribution);
+
+        // Bonus_Balance Bakiye Güncelleme
+        if (paymentDistribution.bonus_amount > 0 && currentCustomer) {
+        await updateCustomerBonusBalance(currentCustomer.id, paymentDistribution.bonus_amount);
+        }
         
         // 3️⃣ BONUS KULLANIMI VARSA REFERRAL_PAYOUTS'A KAYDET
         if (paymentDistribution.bonus_amount > 0 && currentCustomer) {
@@ -14463,7 +14453,6 @@ async function getCustomerByPhone(phone) {
 }
 
 
-
 // =============================================
 // MANUEL ÖDEME FORMÜ
 // =============================================
@@ -14670,33 +14659,9 @@ function savePaymentInfoManually() {
 }
 
 
-
-        
-        
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
