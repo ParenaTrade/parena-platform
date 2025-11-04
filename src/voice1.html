@@ -6241,7 +6241,7 @@ async function processVoiceCommand(transcript) {
                 await processOrderConfirmation(message);
                 return;
             }
- 
+    
             // =============================================
             // 1. ÖNCELİK: ÖDEME SÜRECİ KONTROLLERİ
             // =============================================
@@ -6341,7 +6341,7 @@ async function processVoiceCommand(transcript) {
                     selectPaymentMethod('meal_card');
                     return;
                 }
-           
+            
             // =============================================
             // 3. REFERRAL KOMUTLARI - YENİ SİSTEM İLE ENTEGRE
             // =============================================
@@ -6349,7 +6349,7 @@ async function processVoiceCommand(transcript) {
             // Yeni referral sistemi ile entegre
             const referralHandled = await handleReferralVoiceCommand(message);
             if (referralHandled) return;
-
+    
             // =============================================
             // 4. SEPET YÖNETİMİ KOMUTLARI
             // =============================================
@@ -6500,8 +6500,7 @@ async function processVoiceCommand(transcript) {
                     return;
                 }
             }
-
-            
+    
             // =============================================
             // 8. NAVİGASYON KOMUTLARI
             // =============================================
@@ -7024,6 +7023,30 @@ function setupBonusPayment() {
         });
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         
 // =============================================
 // SESLİ KOMUT ENTEGRASYONU
@@ -14637,12 +14660,433 @@ function savePaymentInfoManually() {
 
 
     </script>
+
+<script>
+/* ======= Integrated Voice + Flow Control Overrides =======
+   This script overrides and hardens existing voice/mic functions in the page.
+   It intentionally preserves your existing helper function names (displayMessage,
+   processPhoneNumber, processCustomerName, startRecognition, stopListening, etc.)
+   so connections remain intact. Drop this block at the end of the body. */
+
+// --- Globals / tuning ---
+window.flowState = window.flowState || { current: "idle", locked: false, tempData: {} };
+window.lastSpeakEndTime = window.lastSpeakEndTime || 0;
+const DEFAULT_COOLDOWN = typeof SPEAK_COOLDOWN !== 'undefined' ? SPEAK_COOLDOWN : 1200;
+const SIMILARITY_THRESHOLD = typeof SIMILARITY_THRESHOLD !== 'undefined' ? SIMILARITY_THRESHOLD : 0.45;
+
+// --- start/stop wrappers (safe) ---
+function startListening() {
+  try { if (typeof startRecognition === 'function') startRecognition(); }
+  catch(e){ console.warn('startListening wrapper error', e); }
+}
+function stopListening() {
+  try { if (typeof recognition !== 'undefined' && recognition) recognition.stop(); }
+  catch(e){ console.warn('stopListening wrapper error', e); }
+}
+
+// --- speakToUser override (hardens behavior) ---
+(function(){
+  const origSpeak = window.speakToUser || function(){ console.warn('speakToUser not defined'); };
+  window.speakToUser = function(message, priority = false) {
+    try {
+      const cleanMessage = (message||'').trim();
+      if (!cleanMessage) return;
+      // show message in UI if available
+      try { if (typeof displayMessage === 'function') displayMessage(cleanMessage); } catch(e){}
+      const now = Date.now();
+      if (!priority && cleanMessage === window.lastSpokenMessage) {
+        console.log("🛑 Same TTS repeated, blocked:", cleanMessage); return;
+      }
+      if (!priority && (now - (window.lastSpeakEndTime||0)) < DEFAULT_COOLDOWN) {
+        console.log("🛑 TTS cooldown active, blocked:", cleanMessage); return;
+      }
+      if (!window.speechSynthesis) {
+        console.log("🔇 speechSynthesis unsupported - showing only:", cleanMessage);
+        window.lastSpokenMessage = cleanMessage;
+        window.lastSpeakEndTime = Date.now();
+        return;
+      }
+      if (window.isAssistantSpeaking) {
+        console.log("⏳ Assistant already speaking, queueing:", cleanMessage);
+        window.speechQueue = window.speechQueue || [];
+        if (priority) window.speechQueue.unshift(cleanMessage); else window.speechQueue.push(cleanMessage);
+        return;
+      }
+      if (!window.isMicrophoneEnabled && !priority) {
+        console.log("🔇 Microphone disabled - skipping speak:", cleanMessage);
+        return;
+      }
+
+      // set flags
+      window.isAssistantSpeaking = true;
+      window.flowState.locked = true;
+      try { stopListening(); } catch(e){}
+      const utter = new SpeechSynthesisUtterance(cleanMessage);
+      utter.lang = 'tr-TR';
+      utter.volume = 0.9;
+      utter.rate = 0.95;
+      utter.pitch = 1.0;
+
+      utter.onstart = function(){ console.log("✅ TTS started"); try { updateSpeakingIndicator && updateSpeakingIndicator(true); } catch(e){}; };
+      utter.onend = function(){
+        console.log("✅ TTS ended");
+        window.isAssistantSpeaking = false;
+        window.flowState.locked = false;
+        try { updateSpeakingIndicator && updateSpeakingIndicator(false); } catch(e){};
+        window.lastSpokenMessage = cleanMessage;
+        window.lastSpeakEndTime = Date.now();
+        window.lastSpeakTime = Date.now();
+        // small cooldown then restart listening
+        setTimeout(()=>{ try { if (window.isMicrophoneEnabled && !window.isAssistantSpeaking) startListening(); } catch(e){} }, DEFAULT_COOLDOWN);
+        // process next queued speech
+        try { processNextSpeech(); } catch(e){}
+      };
+      utter.onerror = function(ev){ console.error("TTS error", ev); window.isAssistantSpeaking=false; window.flowState.locked=false; try{ processNextSpeech(); }catch(e){} };
+
+      try { window.speechSynthesis.cancel(); } catch(e){}
+      window.speechSynthesis.speak(utter);
+
+    } catch(err){
+      console.error("speakToUser override error:", err);
+    }
+  };
+
+  window.processNextSpeech = function(){
+    window.speechQueue = window.speechQueue || [];
+    if (window.speechQueue.length > 0 && !window.isAssistantSpeaking) {
+      const next = window.speechQueue.shift();
+      console.log("📣 Processing queued TTS:", next);
+      setTimeout(()=> window.speakToUser(next), 400);
+    }
+  };
+
+  window.speakToUserForce = function(msg){
+    window.speechQueue = [];
+    window.lastSpokenMessage = "";
+    window.lastSpeakTime = 0;
+    window.lastSpeakEndTime = 0;
+    window.isAssistantSpeaking = false;
+    window.flowState.locked = false;
+    window.speakToUser(msg, true);
+  };
+})();
+
+// --- similarity helper ---
+function isSimilarMessage(newMessage, oldMessage) {
+  if (!oldMessage) return false;
+  try {
+    const nw = newMessage.toLowerCase().split(/\s+/).filter(w=>w.length>2);
+    const ow = oldMessage.toLowerCase().split(/\s+/).filter(w=>w.length>2);
+    if (nw.length===0 || ow.length===0) return false;
+    const common = nw.filter(w => ow.includes(w));
+    const similarity = common.length / Math.max(nw.length, ow.length);
+    console.log(`🔍 similarity ${similarity.toFixed(2)} (${common.join(',')})`);
+    return similarity > SIMILARITY_THRESHOLD;
+  } catch(e) { return false; }
+}
+
+// --- SpeechRecognition init override (robust) ---
+function initializeDynamicSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    console.error('❌ Web Speech API not supported');
+    try { displayMessage("Tarayıcınız ses tanımayı desteklemiyor."); } catch(e){}
+    try { setupManualMode && setupManualMode(); } catch(e){}
+    return false;
+  }
+
+  try {
+    if (window.recognition) {
+      try { window.recognition.stop(); } catch(e){};
+      window.recognition = null;
+    }
+    const recognition = new SpeechRecognition();
+    window.recognition = recognition;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'tr-TR';
+    recognition.maxAlternatives = 3;
+
+    let restartTimer = null;
+    let errorCount = 0;
+    const MAX_ERROR = 6;
+    let lastFinal = '';
+
+    recognition.onstart = function(){ console.log('✅ recognition started'); window.isListening = true; errorCount=0; try{ updateRecognitionStatus && updateRecognitionStatus('listening'); }catch(e){}; if (restartTimer) clearTimeout(restartTimer); restartTimer=null; };
+    recognition.onresult = function(event){
+      if (window.isAssistantSpeaking || window.flowState.locked) { console.log('⏸️ assistant speaking or locked - ignoring recognition result'); return; }
+      let interim=''; let final='';
+      for (let i=event.resultIndex;i<event.results.length;++i){ if (event.results[i].isFinal) final += event.results[i][0].transcript; else interim += event.results[i][0].transcript; }
+      if (interim) console.log('🎤 interim:', interim);
+      if (final) {
+        final = final.trim();
+        console.log('🎯 final:', final);
+        // skip if similar to assistant
+        if (window.lastSpokenMessage && isSimilarMessage(final, window.lastSpokenMessage)) { console.log('⚠️ final similar to assistant TTS - ignore'); lastFinal = final; return; }
+        if (Date.now() - (window.lastSpeakEndTime||0) < DEFAULT_COOLDOWN) { console.log('🕐 final within cooldown - ignore'); lastFinal = final; return; }
+        const ignored = ["bina numarasını söyleyin","daire numarasını söyleyin","adresinize teslimat","evet veya hayır","teslimat adresi","geçersiz bina numarası"];
+        if (ignored.some(p=> final.toLowerCase().includes(p))) { console.log('ℹ️ ignored phrase matched - ignore'); lastFinal = final; return; }
+        if (final !== lastFinal) {
+          lastFinal = final;
+          try { processVoiceCommand(final); } catch(e){ console.error('processVoiceCommand error', e); }
+        }
+        if (restartTimer) clearTimeout(restartTimer);
+        restartTimer = setTimeout(()=>{ lastFinal=''; }, 2000);
+      }
+    };
+    recognition.onerror = function(event){ console.log('⚠️ recognition error', event && event.error); window.isListening=false; errorCount++; try{ updateRecognitionStatus && updateRecognitionStatus('error'); }catch(e){}; const critical = ['not-allowed','service-not-allowed','permission-denied']; if (event && event.error && critical.includes(event.error)) { console.error('Critical recognition error, disabling mic'); try{ disableDynamicMicrophone && disableDynamicMicrophone(); }catch(e){}; return; } if (errorCount>MAX_ERROR){ setTimeout(()=>{ if (window.isMicrophoneEnabled) startRecognition(); },5000); return; } if (window.isMicrophoneEnabled && !window.isListening) setTimeout(()=>startRecognition(),1500); };
+    recognition.onend = function(){ console.log('🔚 recognition ended'); window.isListening=false; try{ updateRecognitionStatus && updateRecognitionStatus('waiting'); }catch(e){}; if (window.isMicrophoneEnabled && !window.isAssistantSpeaking) setTimeout(()=>startRecognition(),1000); };
+
+    // start recognition
+    startRecognition();
+    return true;
+  } catch(err){
+    console.error('initializeDynamicSpeechRecognition error', err);
+    return false;
+  }
+}
+
+// --- startRecognition with robust handling ---
+function startRecognition() {
+  try {
+    if (!window.recognition) { console.log('🔄 recognition not present, initializing'); if (!initializeDynamicSpeechRecognition()) return; }
+    if (!window.isMicrophoneEnabled) { console.log('⏸️ mic disabled'); return; }
+    if (window.isAssistantSpeaking) { console.log('⏸️ assistant speaking, delaying recognition'); setTimeout(()=>{ if (window.isMicrophoneEnabled && !window.isAssistantSpeaking) startRecognition(); },1200); return; }
+    if (window.isListening) { console.log('ℹ️ already listening'); return; }
+    window.recognition.start();
+    console.log('✅ recognition.start() called');
+  } catch(err){
+    console.warn('startRecognition error', err);
+    if (String(err).toLowerCase().includes('already')) { window.isListening = true; return; }
+    setTimeout(()=>{ if (window.isMicrophoneEnabled && !window.isListening) startRecognition(); },1000);
+  }
+}
+
+function restartRecognition(){
+  try{
+    console.log('🔄 restartRecognition');
+    if (window.recognition && window.isListening) try { window.recognition.stop(); } catch(e){}
+  } catch(e){}
+  setTimeout(()=>{ if (window.isMicrophoneEnabled && !window.isListening) startRecognition(); },600);
+}
+
+// --- Updated processVoiceCommand wrapper (preserves user logic) ---
+async function processVoiceCommand(transcript) {
+    const message = transcript.toLowerCase().trim();
+    console.log(`🔊 Sesli komut: "${message}" | Kök: ${typeof currentRoot !== 'undefined' ? currentRoot : 'unknown'}`);
+
+    // Block if flow locked or within TTS cooldown
+    if (window.flowState && window.flowState.locked) {
+        console.log("⚠️ Sistem kilitli, komut reddedildi.");
+        return;
+    }
+    if (Date.now() - (window.lastSpeakEndTime || 0) < DEFAULT_COOLDOWN) {
+        console.log("🕐 Cooldown: asistan sesi yankılanması ihtimali, atlandı");
+        return;
+    }
+
+    // Prevent recognizing assistant's own TTS (improved)
+    if (window.lastSpokenMessage && transcript.trim().startsWith((window.lastSpokenMessage||'').trim().slice(0,10))) {
+        console.log("⚠️ Asistan kendi mesajını algıladı, atlandı:", transcript);
+        return;
+    }
+
+    // Original user-provided logic preserved below (cleaned and integrated)
+    // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ already handled above
+
+    // GEREKSİZ KELİMELERİ FİLTRELE
+    const filteredMessage = (typeof filterUnnecessaryWords === 'function') ? filterUnnecessaryWords(message) : message;
+    if (!filteredMessage) {
+        console.log("🔇 Gereksiz mesaj filtrelendi");
+        return;
+    }
+
+    console.log(`🎯 Filtrelenmiş komut: "${filteredMessage}"`);
+
+    try {
+        // 0. EVET/HAYIR CONTROLS
+        if (typeof isWaitingForAddressConfirm !== 'undefined' && isWaitingForAddressConfirm && (message === 'evet' || message === 'hayır')) {
+            console.log('🏠 Adres onayı için evet/hayır algılandı');
+            if (typeof processAddressConfirmation === 'function') { await processAddressConfirmation(message); }
+            return;
+        }
+        if (typeof isWaitingForOrderConfirm !== 'undefined' && isWaitingForOrderConfirm && (message === 'evet' || message === 'hayır')) {
+            console.log('✅ Sipariş onayı için evet/hayır algılandı');
+            if (typeof processOrderConfirmation === 'function') { await processOrderConfirmation(message); }
+            return;
+        }
+
+        // 1. ÖDEME SÜRECİ KONTROLLERİ
+        if (typeof isWaitingForPhone !== 'undefined' && isWaitingForPhone && expectedInput === 'phone') {
+            if (typeof processPhoneNumber === 'function') await processPhoneNumber(message);
+            // check new user detection - preserve original logic if available
+            if (typeof isNewCustomerDetected !== 'undefined' && isNewCustomerDetected) {
+                window.flowState.current = "newUserRegistration";
+                window.flowState.tempData = window.flowState.tempData || {};
+                window.flowState.tempData.phone = message;
+                window.speakToUser("Yeni müşteri kaydı oluşturulacak. Lütfen adınızı ve soyadınızı söyleyin.");
+                return;
+            }
+            return;
+        }
+        if (typeof isWaitingForName !== 'undefined' && isWaitingForName && expectedInput === 'name') {
+            window.flowState.current = "newUserRegistration";
+            window.flowState.locked = true;
+            if (typeof processCustomerName === 'function') await processCustomerName(message);
+            window.flowState.locked = false;
+            window.flowState.current = "ordering";
+            return;
+        }
+        if (typeof isWaitingForBuilding !== 'undefined' && isWaitingForBuilding && expectedInput === 'building') {
+            if (typeof processBuildingInfo === 'function') await processBuildingInfo(message);
+            return;
+        }
+        if (typeof isWaitingForApartment !== 'undefined' && isWaitingForApartment && expectedInput === 'apartment') {
+            if (typeof processApartmentInfo === 'function') await processApartmentInfo(message);
+            return;
+        }
+        if (typeof isWaitingForNewBuilding !== 'undefined' && isWaitingForNewBuilding && expectedInput === 'new_building') {
+            if (typeof processNewBuildingInfo === 'function') await processNewBuildingInfo(message);
+            return;
+        }
+        if (typeof isWaitingForNewApartment !== 'undefined' && isWaitingForNewApartment && expectedInput === 'new_apartment') {
+            if (typeof processNewApartmentInfo === 'function') await processNewApartmentInfo(message);
+            return;
+        }
+
+        // 2. ÖDEME KOMUTLARI
+        if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
+            if (Array.isArray(window.cart) && window.cart.length === 0) {
+                try { displayMessage("❌ Sepetiniz boş. Ödeme yapabilmek için sepete ürün ekleyin."); } catch(e){}
+                try { speakToUser("Sepetiniz boş"); } catch(e){}
+                return;
+            }
+            if (typeof showPaymentModal === 'function') showPaymentModal();
+            if (typeof displayMessage === 'function') displayMessage("💳 Ödeme yöntemi seçin: Nakit, Kart, Bonus veya Yemek Kartı");
+            speakToUser("Ödeme yöntemi seçin");
+            window.flowState.current = "payment";
+            return;
+        }
+        if (message.includes('nakit') || message.includes('para ile')) {
+            if (Array.isArray(window.cart) && window.cart.length === 0) { displayMessage && displayMessage("❌ Sepetiniz boş."); speakToUser("Sepetiniz boş"); return; }
+            if (typeof startPaymentProcess === 'function') startPaymentProcess('cash');
+            window.flowState.current = "payment";
+            return;
+        }
+        if (message.includes('kart') || message.includes('kredi kartı') || message.includes('bank kartı')) {
+            if (Array.isArray(window.cart) && window.cart.length === 0) { displayMessage && displayMessage("❌ Sepetiniz boş."); speakToUser("Sepetiniz boş"); return; }
+            if (typeof startPaymentProcess === 'function') startPaymentProcess('card');
+            window.flowState.current = "payment";
+            return;
+        }
+        if (message.includes('bonus') || message.includes('puan') || message.includes('puanla')) {
+            if (Array.isArray(window.cart) && window.cart.length === 0) { displayMessage && displayMessage("❌ Sepetiniz boş."); speakToUser("Sepetiniz boş"); return; }
+            if (typeof startPaymentProcess === 'function') startPaymentProcess('bonus');
+            window.flowState.current = "payment";
+            return;
+        }
+        if (message.includes('yemek kartı') || message.includes('yemek kart') || message.includes('yemek')) {
+            if (Array.isArray(window.cart) && window.cart.length === 0) { displayMessage && displayMessage("❌ Sepetiniz boş."); speakToUser("Sepetiniz boş"); return; }
+            if (typeof selectPaymentMethod === 'function') selectPaymentMethod('meal_card');
+            window.flowState.current = "payment";
+            return;
+        }
+
+        // 3. REFERRAL (if handler exists)
+        if (typeof handleReferralVoiceCommand === 'function') {
+            const handled = await handleReferralVoiceCommand(message);
+            if (handled) return;
+        }
+
+        // 4. SEPET YÖNETİMİ
+        const clearCartCommands = ['sepeti sil','sepeti temizle','her şeyi sil','sıfırla','clear cart','empty cart','reset cart','temizle','hepsini sil','ürünleri kaldır','sepetten kaldır','boşalt'];
+        if (clearCartCommands.some(cmd => message.includes(cmd))) { console.log('🛒 Clear cart command'); clearCart && clearCart(); return; }
+        if (message.includes('sepet') || message.includes('sepetim') || message.includes('sepeti göster')) {
+            if (!window.cart || window.cart.length === 0) { displayMessage && displayMessage("🛒 Sepetiniz boş"); speakToUser && speakToUser("Sepetiniz boş"); }
+            else { openDynamicCart && openDynamicCart(); displayMessage && displayMessage(`🛒 Sepetinizde ${window.cart ? window.cart.length : 0} ürün bulunuyor`); speakToUser && speakToUser(`Sepetinizde ${window.cart.reduce((s,i)=>s+(i.quantity||0),0)} adet ürün var`); }
+            return;
+        }
+
+        // 5. TESLİMAT KONTROLLERİ
+        if (message.includes('mesafe') || message.includes('uzaklık') || message.includes('kaç km')) {
+            if (selectedSellerId && userLocation && userLocation.latitude) { await showDeliveryDistanceInfo && showDeliveryDistanceInfo(); return; }
+            else { displayMessage && displayMessage("❌ Mesafe bilgisi için önce satıcı seçin ve konumunuzu belirleyin."); speakToUser && speakToUser("Önce satıcı seçin"); return; }
+        }
+        if (message.includes('teslimat ücreti') || message.includes('kargo ücreti')) {
+            if (selectedSellerId) { await showDeliveryFeeInfo && showDeliveryFeeInfo(); return; }
+            else { displayMessage && displayMessage("❌ Teslimat ücreti için önce bir satıcı seçin."); speakToUser && speakToUser("Önce satıcı seçin"); return; }
+        }
+
+        // 6. AKILLI ÜRÜN FİLTRELEME
+        if ((typeof currentRoot !== 'undefined' && (currentRoot === "5:0")) || selectedCategoryId) {
+            if (window.products && window.products.length>0 && !message.includes('numara')) {
+                console.log('🔍 smart filter:', message);
+                if (typeof findProductByNameForFilter === 'function') {
+                    const hasMatches = await findProductByNameForFilter(message);
+                    if (hasMatches) {
+                        const filteredProducts = await smartFilterProducts(message);
+                        if (filteredProducts && filteredProducts.length>0) {
+                            displayProducts && displayProducts(filteredProducts, message);
+                            displayMessage && displayMessage(`🔍 "${message}" için ${filteredProducts.length} ürün bulundu. Lütfen numara söyleyin.`);
+                            speakToUser && speakToUser(`${filteredProducts.length} ürün bulundu, numara söyleyin`);
+                            return;
+                        }
+                    }
+                }
+                console.log(`❌ smart filter no match, continue`);
+            }
+        }
+
+        // 7. ALIŞVERİŞ AKIŞI KOMUTLARI (store, seller, category, product add)
+        if ((currentRoot === "2:0" || currentRoot === "2:1") && typeof hasStoreTypeKeywords === 'function' && hasStoreTypeKeywords(filteredMessage)) {
+            const success = await handleVoiceStoreSelection(filteredMessage);
+            if (success) return;
+        }
+        if (message.includes('tüm satıcılar') || message.includes('tüm mağazalar') || message.includes('hepsini göster')) { showAllSellers && showAllSellers(); speakToUser && speakToUser("Tüm satıcılar gösteriliyor"); return; }
+        if ((currentRoot === "2:0" || currentRoot === "2:1" || currentRoot === "3:0") && typeof hasSellerKeywords === 'function' && hasSellerKeywords(filteredMessage)) {
+            const success = await handleVoiceSellerSelection(filteredMessage);
+            if (success) return;
+        }
+        if (message.includes('açık mağaza') || message.includes('açık satıcı') || message.includes('hangi mağaza açık')) { await showOpenSellers && showOpenSellers(); return; }
+        if (message.includes('mağaza durumu') || message.includes('satıcı durumu')) { if (selectedSellerId) { await showCurrentSellerStatus && showCurrentSellerStatus(); } else { displayMessage && displayMessage("❌ Önce bir satıcı seçin."); speakToUser && speakToUser("Önce satıcı seçin"); } return; }
+        if ((currentRoot === "3:0" || currentRoot === "4:0" || (selectedSellerId && !selectedCategoryId)) && typeof hasCategoryKeywords === 'function' && hasCategoryKeywords(filteredMessage)) {
+            const success = await handleVoiceCategorySelection(filteredMessage);
+            if (success) return;
+        }
+        if ((currentRoot === "5:0" || selectedCategoryId) && window.products && window.products.length>0) {
+            if (message === 'evet' || message === 'hayır') { displayMessage && displayMessage("❌ Lütfen ürün ismi söyleyin"); speakToUser && speakToUser("Ürün ismi söyleyin"); return; }
+            const success = await handleVoiceProductAdd(filteredMessage);
+            if (success) return;
+        }
+
+        // 8. NAVİGASYON
+        if (message.includes('geri') || message.includes('geri git') || message.includes('back')) { await handleBackNavigation && handleBackNavigation(); return; }
+        if (message.includes('ana sayfa') || message.includes('başlangıç') || message.includes('home')) { resetToHome && resetToHome(); return; }
+        if (message.includes('yardım') || message.includes('help') || message.includes('nasıl')) { showHelp && showHelp(); return; }
+
+        // 9. SİSTEM KOMUTLARI
+        if (message.includes('mikrofon') || message.includes('ses')) {
+            if (message.includes('aç') || message.includes('başlat')) { if (!isMicrophoneEnabled && typeof enableDynamicMicrophone === 'function') { enableDynamicMicrophone(); } return; }
+            else if (message.includes('kapat') || message.includes('durdur')) { if (isMicrophoneEnabled && typeof disableDynamicMicrophone === 'function') { disableDynamicMicrophone(); } return; }
+        }
+        if (message.includes('konum') || message.includes('yer') || message.includes('location')) { showDynamicLocationModal && showDynamicLocationModal(); return; }
+
+        // 10. FALLBACK
+        console.log('❌ No command matched, fallback...');
+        const fallbackMessage = (typeof getSmartFallback === 'function') ? getSmartFallback() : null;
+        if (fallbackMessage) { displayMessage && displayMessage(fallbackMessage); speakToUser && speakToUser(fallbackMessage); }
+    } catch (error) {
+        console.error('❌ processVoiceCommand error:', error);
+        if (Date.now() - (window.lastSpeakTime || 0) > (typeof SPEAK_COOLDOWN !== 'undefined' ? SPEAK_COOLDOWN : 1200)) {
+            try { displayMessage && displayMessage("❌ Bir hata oluştu, lütfen tekrar deneyin."); } catch(e){};
+            try { speakToUser && speakToUser("Bir hata oluştu, tekrar deneyin."); } catch(e){};
+        }
+    }
+}
+
+</script>
 </body>
 </html>
-
-
-
-
 
 
 
