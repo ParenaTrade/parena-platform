@@ -6227,26 +6227,7 @@ async function processVoiceCommand(transcript) {
         // =============================================
         // 0. ÖZEL: EVET/HAYIR KONTROLÜ (EN ÖNCELİKLİ)
         // =============================================
-        
-        // Adres onayı bekleniyorsa
-        if (isWaitingForAddressConfirm && (message === 'evet' || message === 'hayır')) {
-            console.log('🏠 Adres onayı için evet/hayır algılandı');
-            await processAddressConfirmation(message);
-            return;
-        }
-        
-        // Sipariş onayı bekleniyorsa
-        if (isWaitingForOrderConfirm && (message === 'evet' || message === 'hayır')) {
-            console.log('✅ Sipariş onayı için evet/hayır algılandı');
-            await processOrderConfirmation(message);
-            return;
-        }
-
-         // =============================================
-        // 1. ÖDEME SÜRECİ KONTROLLERİ (EN ÖNEMLİ DEĞİŞİKLİK)
-        // =============================================
-        
-        // 🔴 CRITICAL FIX: AD-SOYAD KONTROLÜ EN ÜSTTE OLSUN
+         // 🔴 CRITICAL FIX: AD-SOYAD KONTROLÜ EN ÜSTTE OLSUN
         if (isWaitingForName && expectedInput === 'name') {
             console.log('👤 AD-SOYAD BEKLENİYOR - tüm diğer komutlar engellendi');
             await processCustomerName(message);
@@ -6257,7 +6238,73 @@ async function processVoiceCommand(transcript) {
         if (isWaitingForPhone && expectedInput === 'phone') {
             await processPhoneNumber(message);
             return;
-        }        
+        }
+        // Adres onayı bekleniyorsa
+        if (isWaitingForAddressConfirm && (message === 'evet' || message === 'hayır')) {
+            console.log('🏠 Adres onayı için evet/hayır algılandı');
+            await processAddressConfirmation(message);
+            return;
+        }
+        
+        // =============================================
+        // 3. ÖDEME KOMUTLARI
+        // =============================================
+        
+        if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
+            if (cart.length === 0) {
+                displayMessage("❌ Sepetiniz boş. Ödeme yapabilmek için sepete ürün ekleyin.");
+                speakToUser("Sepetiniz boş");
+                return;
+            }
+            
+            showPaymentModal();
+            displayMessage("💳 Ödeme yöntemi seçin: Nakit, Kart, Bonus veya Yemek Kartı");
+            speakToUser("Ödeme yöntemi seçin");
+            return;
+        }
+        
+        // Nakit ödeme
+        if (message.includes('nakit') || message.includes('para ile')) {
+            if (cart.length === 0) {
+                displayMessage("❌ Sepetiniz boş.");
+                speakToUser("Sepetiniz boş");
+                return;
+            }
+            startPaymentProcess('cash');
+            return;
+        }
+        
+        // Kart ile ödeme
+        if (message.includes('kart') || message.includes('kredi kartı') || message.includes('bank kartı')) {
+            if (cart.length === 0) {
+                displayMessage("❌ Sepetiniz boş.");
+                speakToUser("Sepetiniz boş");
+                return;
+            }
+            startPaymentProcess('card');
+            return;
+        }
+        
+        // Bonus ile ödeme
+        if (message.includes('bonus') || message.includes('puan') || message.includes('puanla')) {
+            if (cart.length === 0) {
+                displayMessage("❌ Sepetiniz boş.");
+                speakToUser("Sepetiniz boş");
+                return;
+            }
+            startPaymentProcess('bonus');
+            return;
+        }
+
+        if (message.includes('yemek kartı') || message.includes('yemek kart') || message.includes('yemek')) {
+            if (cart.length === 0) {
+                displayMessage("❌ Sepetiniz boş.");
+                speakToUser("Sepetiniz boş");
+                return;
+            }
+            selectPaymentMethod('meal_card');
+            return;
+        }              
 
         // =============================================
         // 1. SİSTEM KOMUTLARI (MİKROFON, YARDIM, KONUM)
@@ -6318,66 +6365,13 @@ async function processVoiceCommand(transcript) {
             return;
         }
 
-        // =============================================
-        // 3. ÖDEME KOMUTLARI
-        // =============================================
-        
-        if (message.includes('ödeme') || message.includes('öde') || message.includes('satın al')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş. Ödeme yapabilmek için sepete ürün ekleyin.");
-                speakToUser("Sepetiniz boş");
-                return;
-            }
-            
-            showPaymentModal();
-            displayMessage("💳 Ödeme yöntemi seçin: Nakit, Kart, Bonus veya Yemek Kartı");
-            speakToUser("Ödeme yöntemi seçin");
+       
+         // Sipariş onayı bekleniyorsa
+        if (isWaitingForOrderConfirm && (message === 'evet' || message === 'hayır')) {
+            console.log('✅ Sipariş onayı için evet/hayır algılandı');
+            await processOrderConfirmation(message);
             return;
         }
-        
-        // Nakit ödeme
-        if (message.includes('nakit') || message.includes('para ile')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
-                speakToUser("Sepetiniz boş");
-                return;
-            }
-            startPaymentProcess('cash');
-            return;
-        }
-        
-        // Kart ile ödeme
-        if (message.includes('kart') || message.includes('kredi kartı') || message.includes('bank kartı')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
-                speakToUser("Sepetiniz boş");
-                return;
-            }
-            startPaymentProcess('card');
-            return;
-        }
-        
-        // Bonus ile ödeme
-        if (message.includes('bonus') || message.includes('puan') || message.includes('puanla')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
-                speakToUser("Sepetiniz boş");
-                return;
-            }
-            startPaymentProcess('bonus');
-            return;
-        }
-
-        if (message.includes('yemek kartı') || message.includes('yemek kart') || message.includes('yemek')) {
-            if (cart.length === 0) {
-                displayMessage("❌ Sepetiniz boş.");
-                speakToUser("Sepetiniz boş");
-                return;
-            }
-            selectPaymentMethod('meal_card');
-            return;
-        }
-
         // =============================================
         // 4. REFERRAL KOMUTLARI
         // =============================================
@@ -14666,6 +14660,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
