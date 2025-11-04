@@ -12923,11 +12923,25 @@ let currentPaymentStep = null; // 'method', 'phone', 'name', 'address', 'confirm
 
 function checkExpectedInput(command) {
     console.log('🔍 Beklenen input kontrolü:', { 
-        command, 
+        command,
+        isWaitingForName,
         isWaitingForAddressConfirm, 
         isWaitingForOrderConfirm,
         expectedInput 
     });
+
+
+        // İsim bekleniyorsa
+    if (isWaitingForName && expectedInput === 'name') {
+        processCustomerName(command);
+        return true;
+    }
+
+ // Telefon bekleniyorsa
+    if (isWaitingForPhone && expectedInput === 'phone') {
+        processPhoneNumber(command);
+        return true;
+    }
     
     // Adres onayı bekleniyorsa
     if (isWaitingForAddressConfirm) {
@@ -12945,7 +12959,18 @@ function checkExpectedInput(command) {
             return true; // Yine de true dön ki ürün ekleme kısmına geçmesin
         }
     }
+
+       // Bina numarası bekleniyorsa
+    if (isWaitingForBuilding && expectedInput === 'building') {
+        processBuildingInfo(command);
+        return true;
+    }
     
+    // Daire numarası bekleniyorsa
+    if (isWaitingForApartment && expectedInput === 'apartment') {
+        processApartmentInfo(command);
+        return true;
+    }
     // Sipariş onayı bekleniyorsa
     if (isWaitingForOrderConfirm) {
         console.log('✅ Sipariş onayı bekleniyor, komut:', command);
@@ -12962,30 +12987,7 @@ function checkExpectedInput(command) {
             return true;
         }
     }
-    
-    // Telefon bekleniyorsa
-    if (isWaitingForPhone && expectedInput === 'phone') {
-        processPhoneNumber(command);
-        return true;
-    }
-    
-    // İsim bekleniyorsa
-    if (isWaitingForName && expectedInput === 'name') {
-        processCustomerName(command);
-        return true;
-    }
-    
-    // Bina numarası bekleniyorsa
-    if (isWaitingForBuilding && expectedInput === 'building') {
-        processBuildingInfo(command);
-        return true;
-    }
-    
-    // Daire numarası bekleniyorsa
-    if (isWaitingForApartment && expectedInput === 'apartment') {
-        processApartmentInfo(command);
-        return true;
-    }
+        
     
     return false;
 }
@@ -13177,6 +13179,7 @@ async function processPhoneNumber(message) {
 function requestCustomerName() {
     console.log('👤 Müşteri adı isteniyor...');
     
+    // 🔴 BU STATE'LERİ DOĞRU AYARLA
     isWaitingForName = true;
     expectedInput = 'name';
     
@@ -13199,13 +13202,13 @@ function requestCustomerName() {
     displayMessage("👤 Lütfen adınızı ve soyadınızı söyleyin");
     speakToUser("adınızı ve soyadınızı söyleyin");
 }
-
 async function processCustomerName(message) {
     console.log('👤 Müşteri adı işleniyor:', message);
-    
-    if (message.trim().length < 2) {
-        displayMessage("❌ Geçersiz isim. Lütfen adınızı ve soyadınızı söyleyin.");
-        speakToUser("geçersiz isim");
+      // Basit kontrol - ürün komutlarını engelle
+    if (message.includes('numara') || message.includes('kilo') || message.includes('kg')) {
+        console.log('❌ Ürün komutu ad soyad olarak algılandı, engellendi');
+        displayMessage("❌ Lütfen sadece adınızı ve soyadınızı söyleyin");
+        speakToUser("Lütfen adınızı ve soyadınızı söyleyin");
         return;
     }
     
@@ -14664,6 +14667,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
