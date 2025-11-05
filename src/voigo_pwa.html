@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Voigo — Your Voice Commerce AI</title>
+<meta name="description" content="Voigo PWA — voice commerce assistant. Çok dilli, PWA, Google Cloud entegrasyonuna hazır." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
+<!-- Manifest for PWA -->
+<link rel="manifest" href="manifest.json" />
+<style>
+  :root{--bg:#0b1220;--card:#0f1724;--accent:#27b4ff;--text:#e6eef8}
+  body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;background:linear-gradient(180deg,#071021,#0b1220);color:var(--text)}
+  .app{max-width:980px;margin:24px auto;padding:16px}
+  header{display:flex;align-items:center;gap:12px}
+  .logo{display:flex;align-items:center;gap:8px}
+  .logo .brand{font-weight:700;font-size:20px}
+  .card{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.6);margin-top:12px}
+  #assistantMessage{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);min-height:48px}
+  #microphoneToggle{cursor:pointer;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);display:inline-flex;align-items:center;gap:8px}
+  #languageSelect{padding:6px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--text);border:0}
+  #debugPanel{position:fixed;bottom:0;left:0;right:0;font-size:12px;background:#021; color:#7ff;padding:6px;display:flex;gap:12px;align-items:center;z-index:9999}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  button.primary{background:var(--accent);color:#042;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div style="font-size:28px">🎙️</div>
+      <div>
+        <div class="brand">VOIGO</div>
+        <div style="font-size:12px;opacity:.8">Your Voice Commerce AI</div>
+      </div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <select id="languageSelect" aria-label="Dil seçimi">
+        <option value="auto">Otomatik (Tarayıcı)</option>
+        <option value="tr">Türkçe</option>
+        <option value="ru">Русский</option>
+        <option value="en">English</option>
+        <option value="ka">ქართული</option>
+      </select>
+      <div id="microphoneToggle" title="Mikrofonu aç/kapat">🔈 <span id="micText">Mikrofon (KAPALI)</span></div>
+    </div>
+  </header>
+
+  <div class="card">
+    <div id="assistantMessage">Voigo hazır. Dil otomatik algılanıyor...</div>
+    <div class="controls">
+      <button id="testSpeak" class="primary">Test Konuş</button>
+      <button id="openCart">Sepeti Aç</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <strong>Debug</strong>
+    <pre id="logArea" style="height:220px;overflow:auto;background:#021;padding:8px;border-radius:8px"></pre>
+  </div>
+</div>
+
+<div id="debugPanel">
+  <div id="flowDebug">FLOW: idle</div>
+  <div id="langDebug">LANG: tr</div>
+  <div id="micDebug">MIC: off</div>
+</div>
+
+<!-- Google Translate hidden element -->
+<div id="google_translate_element" style="display:none"></div>
+
+<script>
+/* ======= Voigo PWA Voice v1 - Core (client-side) ======= */
+/* Globals */
+window.flowState = { current: 'idle', locked: false, tempData: {} };
+window.isMicrophoneEnabled = false;
+window.isAssistantSpeaking = false;
+window.isListening = false;
+window.speechQueue = [];
+window.lastSpokenMessage = "";
+window.lastSpeakEndTime = 0;
+window.SPEAK_COOLDOWN = 1600;
+window.SIMILARITY_THRESHOLD = 0.5;
+window.detectedLang = 'tr'; // runtime
+window.speechLang = 'tr-TR';
+window.recognition = null;
+window.micStream = null;
+window.cart = [];
+window.products = [
+  {id:1,name:"Domates Sofralık"},
+  {id:2,name:"Domates Çeri"},
+  {id:3,name:"Soğan"},
+  {id:4,name:"Kabak"},
+  {id:5,name:"Peynir"}
+];
+
+/* Simple logger */
+function log(msg){ const a=document.getElementById('logArea'); a.innerText += msg + "\\n"; a.scrollTop = a.scrollHeight; console.log(msg); updateDebugPanel(); }
+function displayMessage(msg){ const el=document.getElementById('assistantMessage'); el.textContent = msg; log("📱 Display Message: "+msg); }
+function updateDebugPanel(){ document.getElementById('flowDebug').textContent = "FLOW: "+window.flowState.current; document.getElementById('langDebug').textContent = "LANG: "+window.detectedLang; document.getElementById('micDebug').textContent = "MIC: "+(window.isMicrophoneEnabled?"on":"off"); }
+
+/* ---------------- Language detection & Google Translate integration ---------------- */
+function detectSystemLanguage(){
+  const lang = (navigator.language || 'tr').toLowerCase();
+  if (lang.startsWith('tr')) return 'tr';
+  if (lang.startsWith('en')) return 'en';
+  if (lang.startsWith('ru')) return 'ru';
+  if (lang.startsWith('ka')) return 'ka';
+  // Central Asian languages fallback to Russian
+  if (['uz','kk','tk','ky'].some(c=>lang.startsWith(c))) return 'ru';
+  return 'tr';
+}
+
+function setLanguage(langCode){
+  if(langCode==='auto'){ langCode = detectSystemLanguage(); }
+  window.detectedLang = langCode;
+  // map to speech lang codes
+  window.speechLang = langCode==='en'?'en-US': langCode==='ru'?'ru-RU' : langCode==='ka'?'ka-GE' : 'tr-TR';
+  document.getElementById('languageSelect').value = langCode;
+  displayMessage("🌍 Dil seçildi: "+langCode);
+  log("🔄 Dil ayarlandı: " + langCode + " -> speechLang:"+window.speechLang);
+  // trigger Google Translate (if combo exists)
+  const select = document.querySelector('.goog-te-combo');
+  if(select){
+    select.value = langCode;
+    select.dispatchEvent(new Event('change'));
+  }
+  // Save preference
+  localStorage.setItem('voigo_lang', langCode);
+}
+
+/* Load google translate widget */
+function googleTranslateElementInit(){ try{ new google.translate.TranslateElement({pageLanguage:'tr',includedLanguages:'tr,en,ru,ka',autoDisplay:false},'google_translate_element'); log("✅ Google Translate widget yüklendi"); }catch(e){ log("⚠️ Google Translate init error:"+e); } }
+
+/* ---------------- PWA manifest + serviceworker (basic) ---------------- */
+const manifest = {
+  "name":"Voigo Voice Assistant",
+  "short_name":"Voigo",
+  "start_url":".",
+  "display":"standalone",
+  "background_color":"#071021",
+  "description":"Voigo PWA — voice commerce assistant",
+  "icons":[{"src":"favicon.png","sizes":"192x192","type":"image/png"}]
+};
+// write manifest.json to blob URL for demo (in deployed app put static file)
+const mf = new Blob([JSON.stringify(manifest)],{type:'application/json'});
+const mfUrl = URL.createObjectURL(mf);
+var link = document.querySelector('link[rel="manifest"]');
+if(link) link.href = mfUrl;
+
+/* Service worker simple registration for PWA caching (demo) */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('voigo-sw.js').catch(e=>log("SW register failed:"+e));
+}
+
+/* ---------------- Speech (TTS) system ---------------- */
+function speakToUser(message, priority=false){
+  const clean = (message||"").trim();
+  if(!clean) return;
+  displayMessage(clean);
+  log("🗣️ Asistan (TTS): "+clean);
+  const now = Date.now();
+  if(!priority && clean===window.lastSpokenMessage){ log("🛑 Aynı TTS engellendi"); return; }
+  if(!priority && (now - (window.lastSpeakEndTime||0)) < window.SPEAK_COOLDOWN){ log("🛑 TTS cooldown aktıv, engellendi"); return; }
+  if(!window.speechSynthesis){ log("🔇 speechSynthesis unsupported, fallback text only"); window.lastSpokenMessage = clean; window.lastSpeakEndTime = Date.now(); return; }
+  if(window.isAssistantSpeaking){ window.speechQueue.push(clean); log("⏳ Kuyruğa eklendi: "+clean); return; }
+  // set flags + stop recognition gracefully
+  window.isAssistantSpeaking = true;
+  window.flowState.locked = true;
+  try{ if(window.recognition && window.isListening) { window.recognition.stop(); } }catch(e){}
+  const utter = new SpeechSynthesisUtterance(clean);
+  utter.lang = window.speechLang || 'tr-TR';
+  utter.rate = 0.88;
+  utter.pitch = 1.05;
+  utter.volume = 1.0;
+  utter.onstart = ()=>{ log("✅ TTS başladı"); updateDebugPanel(); };
+  utter.onend = ()=>{
+    log("✅ TTS bitti");
+    window.lastSpokenMessage = clean;
+    window.lastSpeakEndTime = Date.now();
+    window.isAssistantSpeaking = false;
+    window.flowState.locked = false;
+    // small cooldown then restart recognition
+    setTimeout(()=>{ try{ if(window.isMicrophoneEnabled && !window.isAssistantSpeaking) startRecognition(); }catch(e){} }, window.SPEAK_COOLDOWN);
+    // process queue
+    processNextSpeech();
+    updateDebugPanel();
+  };
+  utter.onerror = (ev)=>{ log("❌ TTS error:"+ev && ev.error); window.isAssistantSpeaking=false; window.flowState.locked=false; processNextSpeech(); };
+  try{ window.speechSynthesis.cancel(); window.speechSynthesis.speak(utter); }catch(e){ log("TTS speak error:"+e); }
+}
+
+function processNextSpeech(){ if(window.speechQueue.length>0 && !window.isAssistantSpeaking){ const next = window.speechQueue.shift(); log("📣 Kuyruktan konuşma: "+next); setTimeout(()=>speakToUser(next),600); } }
+function speakForce(msg){ window.speechQueue=[]; window.lastSpokenMessage=""; window.lastSpeakEndTime=0; speakToUser(msg,true); }
+
+/* ---------------- Speech Recognition (robust) ---------------- */
+function initializeDynamicSpeechRecognition(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition){ log("❌ Tarayıcı ses tanımayı desteklemiyor"); displayMessage("Tarayıcınız ses tanımayı desteklemiyor."); setupManualMode(); return false; }
+  try{
+    if(window.recognition){ try{ window.recognition.stop(); }catch(e){} window.recognition=null; }
+    const recognition = new SpeechRecognition();
+    window.recognition = recognition;
+    recognition.continuous = true; // we'll handle mobile debounce
+    recognition.interimResults = false; // avoid noisy interim triggers
+    recognition.lang = window.speechLang || 'tr-TR';
+    recognition.maxAlternatives = 1;
+    let restartTimer = null;
+    let errorCount = 0;
+    const MAX_ERROR = 4;
+    let lastFinal='';
+    recognition.onstart = function(){ log("✅ recognition started"); window.isListening=true; errorCount=0; updateDebugPanel(); if(restartTimer){ clearTimeout(restartTimer); restartTimer=null; } };
+    recognition.onresult = function(event){
+      if(window.isAssistantSpeaking || window.flowState.locked){ log("⏸️ Asistan konuşuyor veya sistem kilitli, sonuç atlandı"); return; }
+      let final='';
+      for(let i=event.resultIndex;i<event.results.length;++i){ if(event.results[i].isFinal) final += event.results[i][0].transcript; }
+      if(final){ final = final.trim(); log("🎯 Tanınan komut: "+final); // filter own speech similarity
+        if(window.lastSpokenMessage && isSimilarMessage(final, window.lastSpokenMessage)){ log("⚠️ Kendi TTS'ine benzer, atlandı"); return; }
+        if(Date.now() - (window.lastSpeakEndTime||0) < window.SPEAK_COOLDOWN){ log("🕐 Cooldown içindeki final atlandı"); return; }
+        lastFinal = final;
+        processVoiceCommand(final);
+      }
+    };
+    recognition.onerror = function(event){ log("⚠️ recognition error: "+(event && event.error)); window.isListening=false; errorCount++; if(['not-allowed','service-not-allowed','permission-denied'].includes(event.error)){ log("❌ Kritik hata, mikrofon kapatılıyor"); disableDynamicMicrophone(); return; } if(errorCount>MAX_ERROR){ setTimeout(()=>{ if(window.isMicrophoneEnabled) startRecognition(); },3000); return; } if(window.isMicrophoneEnabled && !window.isListening){ setTimeout(()=>startRecognition(),1500); } };
+    recognition.onend = function(){ log("🔚 recognition ended"); window.isListening=false; updateDebugPanel(); // mobile debounce: don't restart immediately
+      if(window.isAssistantSpeaking) return;
+      if(window.isMicrophoneEnabled){
+        setTimeout(()=>{ log("🔄 recognition restart (debounce)"); startRecognition(); }, 2000);
+      }
+    };
+    startRecognition();
+    return true;
+  }catch(err){ log("initializeDynamicSpeechRecognition error:"+err); return false; }
+}
+
+function startRecognition(){
+  try{
+    if(!window.recognition){ log("🔄 recognition yok, oluşturuluyor"); if(!initializeDynamicSpeechRecognition()) return; }
+    if(!window.isMicrophoneEnabled){ log("⏸️ Mikrofon kapalı"); return; }
+    if(window.isAssistantSpeaking){ log("⏸️ Asistan konuşuyor, recognition ertelendi"); setTimeout(()=>{ if(window.isMicrophoneEnabled && !window.isAssistantSpeaking) startRecognition(); },1200); return; }
+    if(window.isListening){ log("ℹ️ Zaten dinleniyor"); return; }
+    window.recognition.lang = window.speechLang || window.recognition.lang;
+    window.recognition.start();
+    log("✅ recognition.start() çağrıldı");
+  }catch(err){
+    log("startRecognition error:"+err);
+    if(String(err).toLowerCase().includes('already')){ window.isListening=true; return; }
+    setTimeout(()=>{ if(window.isMicrophoneEnabled && !window.isListening) startRecognition(); },1000);
+  }
+}
+
+function stopRecognition(){ try{ if(window.recognition && window.isListening) window.recognition.stop(); }catch(e){ log("stopRecognition error:"+e); } }
+
+function disableDynamicMicrophone(){
+  log("🔇 Mikrofon kapatılıyor...");
+  window.isMicrophoneEnabled=false;
+  window.isListening=false;
+  window.isAssistantSpeaking=false;
+  if(window.recognition){ try{ window.recognition.stop(); }catch(e){} window.recognition=null; }
+  if(window.micStream){ try{ window.micStream.getTracks().forEach(t=>t.stop()); }catch(e){} window.micStream=null; }
+  try{ if(window.speechSynthesis) window.speechSynthesis.cancel(); }catch(e){};
+  updateDebugPanel();
+  displayMessage("Mikrofon kapalı.");
+}
+
+async function enableDynamicMicrophone(){
+  log("🎤 Mikrofon açılmak isteniyor...");
+  // require user interaction for mobile permissions - ensure called from click
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ displayMessage("Tarayıcı mikrofonu desteklemiyor."); return; }
+  try{
+    window.micStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true } });
+    window.isMicrophoneEnabled=true;
+    updateDebugPanel();
+    displayMessage("Mikrofon açıldı. Dinliyorum...");
+    log("✅ Mikrofon erişimi alındı");
+    // init recognition
+    window.speechLang = window.speechLang || 'tr-TR';
+    initializeDynamicSpeechRecognition();
+    // small welcome TTS if first time
+    setTimeout(()=> speakToUser("Mikrofon açıldı. Siparişe başlayabilirsiniz."),600);
+  }catch(err){ log("❌ Mikrofon izni hatası:"+err); displayMessage("Mikrofon izni verilmedi."); }
+}
+
+/* ---------------- Utility / Helpers ---------------- */
+function isSimilarMessage(newMessage, oldMessage){
+  if(!oldMessage) return false;
+  const nw = newMessage.toLowerCase().split(/\s+/).filter(w=>w.length>2);
+  const ow = oldMessage.toLowerCase().split(/\s+/).filter(w=>w.length>2);
+  if(nw.length===0||ow.length===0) return false;
+  const common = nw.filter(w => ow.includes(w));
+  const similarity = common.length / Math.max(nw.length, ow.length);
+  log("🔍 Benzerlik: "+similarity.toFixed(2));
+  return similarity > window.SIMILARITY_THRESHOLD;
+}
+
+function setupManualMode(){
+  document.addEventListener('click', e=>{
+    const card = e.target.closest('.product-card, .seller-card');
+    if(card){ const name = card.textContent || card.innerText; speakToUser(name + " seçildi"); }
+  });
+}
+
+/* ---------------- Voice Flow: processVoiceCommand (context-aware) ---------------- */
+async function processVoiceCommand(transcript){
+  const message = (transcript||"").toLowerCase().trim();
+  log("🔊 Sesli komut: \""+message+"\" | root:"+ (window.flowState.current||'unknown'));
+
+  // Ignore if locked or recent TTS echo
+  if(window.flowState.locked){ log("⚠️ Sistem kilitli, komut reddedildi"); return; }
+  if(Date.now() - (window.lastSpeakEndTime||0) < window.SPEAK_COOLDOWN){ log("🕐 Cooldown içi, atlandı"); return; }
+
+  // If waiting for name/registration, accept name and block product flow
+  if(window.flowState.current === 'awaiting_name' || window.flowState.current === 'customer_registration'){
+    log("🧠 Kayıt modunda, ad-soyad bekleniyor - işleniyor: "+message);
+    const cleaned = message.replace(/ürün|kilo|paket|adet|numara|sipariş/gi,'').trim();
+    if(cleaned.split(' ').length >= 2){
+      window.currentCustomer = { name: cleaned, phone: window.flowState.tempData.phone || null };
+      displayMessage("✅ Kayıt tamamlandı: "+cleaned);
+      speakToUser("Hoş geldiniz " + cleaned + ". Siparişe başlayabilirsiniz.");
+      window.flowState.current = 'shopping';
+      window.flowState.tempData = {};
+      return;
+    } else {
+      displayMessage("❌ Ad ve soyad tam algılanamadı, tekrar edin.");
+      speakToUser("Adınızı ve soyadınızı tekrar söyler misiniz?");
+      return;
+    }
+  }
+
+  // Payment flow: phone expected etc.
+  if(window.flowState.current === 'awaiting_phone' || window.flowState.current === 'payment_phone'){
+    log("📞 Telefon bekleniyor: "+message);
+    // naive phone detection
+    const digits = message.replace(/\D/g,'');
+    if(digits.length>=10){
+      window.flowState.tempData = window.flowState.tempData || {};
+      window.flowState.tempData.phone = digits;
+      displayMessage("📞 Telefon alındı: "+digits);
+      speakToUser("Yeni kayıt oluşturuluyor. Lütfen adınızı ve soyadınızı söyleyin.");
+      window.flowState.current = 'awaiting_name';
+      return;
+    } else {
+      speakToUser("Telefon numaranızı tekrar söyler misiniz?");
+      return;
+    }
+  }
+
+  // Payment commands
+  if(message.includes('ödeme') || message.includes('öde') || message.includes('satın al')){
+    if(!Array.isArray(window.cart) || window.cart.length===0){ displayMessage("❌ Sepet boş"); speakToUser("Sepetiniz boş"); return; }
+    displayMessage("💳 Ödeme - Lütfen telefon numaranızı söyleyin");
+    speakToUser("Ödeme için telefon numaranızı söyleyin");
+    window.flowState.current = 'awaiting_phone';
+    return;
+  }
+  if(message.includes('nakit')){ if(!window.cart.length){ displayMessage("Sepet boş"); speakToUser("Sepet boş"); return;} speakToUser("Nakit ödeme seçildi"); startPaymentProcess && startPaymentProcess('cash'); return; }
+  if(message.includes('kart')){ if(!window.cart.length){ displayMessage("Sepet boş"); speakToUser("Sepet boş"); return;} speakToUser("Kart ile ödeme seçildi"); startPaymentProcess && startPaymentProcess('card'); return; }
+
+  // Clear cart
+  const clearCmds = ['sepeti sil','sepeti temizle','reset','clear cart','temizle'];
+  if(clearCmds.some(c=>message.includes(c))){ log("🧹 Sepet temizleme"); window.cart=[]; displayMessage("Sepet temizlendi"); speakToUser("Sepetiniz temizlendi"); return; }
+
+  // Smart product filter - only when shopping
+  if((window.flowState.current === 'shopping' || window.flowState.current === 'idle') && window.products && window.products.length>0){
+    log("🔍 Akıllı filtreleme: "+message);
+    // patterns like "1 kilo domates", "bir kilo soğan", "2 paket süt", "domates"
+    const qtyMatch = message.match(/(\\d+|bir|iki|üç|dört|beş|yarım)\\s*(kilo|kg|paket|adet)?/i);
+    const numberMap = {bir:1,iki:2,'üç':3,'dört':4,'beş':5,'yarım':0.5};
+    let qty = 1;
+    if(qtyMatch){
+      const n = qtyMatch[1].toLowerCase();
+      qty = numberMap[n] || parseInt(n) || 1;
+    }
+    // find product name by scanning products
+    const found = window.products.find(p=> message.includes(p.name.toLowerCase()) || message.includes(p.name.split(' ')[0].toLowerCase()));
+    if(found){
+      // add to cart
+      window.cart.push({ productId: found.id, name: found.name, quantity: qty });
+      displayMessage("✅ "+qty+" "+found.name+" sepete eklendi");
+      speakToUser(qty + " " + found.name + " sepete eklendi");
+      log("🛒 addToCart çağrıldı: "+found.name+" "+qty);
+      window.flowState.current = 'shopping';
+      return;
+    }
+  }
+
+  // Navigation commands
+  if(message.includes('geri')||message.includes('ana sayfa')){ displayMessage("Ana sayfa"); speakToUser("Ana sayfa"); window.flowState.current='idle'; return; }
+
+  // Fallback
+  const fallback = "Üzgünüm, anlayamadım. Tekrar söyler misiniz?";
+  displayMessage(fallback);
+  speakToUser(fallback);
+}
+
+/* ---------------- Payment placeholder ---------------- */
+function startPaymentProcess(mode){ log("💰 startPaymentProcess: "+mode); displayMessage("Ödeme başlatılıyor: "+mode); speakToUser("Ödeme işlemi başlatılıyor"); window.flowState.current='payment'; }
+
+/* ---------------- UI handlers ---------------- */
+document.getElementById('microphoneToggle').addEventListener('click', ()=>{
+  if(!window.isMicrophoneEnabled) enableDynamicMicrophone(); else disableDynamicMicrophone();
+});
+document.getElementById('languageSelect').addEventListener('change', (e)=> setLanguage(e.target.value));
+document.getElementById('testSpeak').addEventListener('click', ()=> speakToUser("Voigo hazır. Test başarılı."));
+document.getElementById('openCart').addEventListener('click', ()=> { displayMessage("Sepet: "+ (window.cart.length? window.cart.map(i=>i.name+" x"+i.quantity).join(", "): "Boş")); });
+
+/* Initialize on load */
+window.addEventListener('load', ()=>{
+  const saved = localStorage.getItem('voigo_lang')||'auto';
+  setTimeout(()=>{
+    document.getElementById('languageSelect').value = saved;
+    setLanguage(saved);
+  },300);
+  // try load google translate script async
+  const s = document.createElement('script');
+  s.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+  s.async = true;
+  document.head.appendChild(s);
+
+  // initial UI
+  displayMessage("Voigo başlatılıyor...");
+  log("🚀 Voigo PWA Voice v1 yükleniyor");
+  // defer microphone open until user clicks (mobile requirement)
+  updateDebugPanel();
+  // demo: restore cart from session
+  try{ const c = JSON.parse(sessionStorage.getItem('voigo_cart')||'[]'); if(c && c.length) window.cart = c; }catch(e){}
+});
+
+/* Save session cart periodically */
+setInterval(()=>{ sessionStorage.setItem('voigo_cart', JSON.stringify(window.cart||[])); }, 3000);
+
+/* small helper to expose for console testing */
+window._voigo = { speakToUser, processVoiceCommand, enableDynamicMicrophone, disableDynamicMicrophone, setLanguage };
+
+</script>
+
+<!-- Small service-worker file for demo purposes: voigo-sw.js -->
+<script>
+// Create a simple service-worker file blob so the demo can register it.
+// In real deployment, serve a real service worker file from server.
+const swCode = `self.addEventListener('install', e=>{ self.skipWaiting(); }); self.addEventListener('activate', e=>{ clients.claim(); }); self.addEventListener('fetch', e=>{ /* noop caching for demo */ });`;
+const swBlob = new Blob([swCode], {type:'text/javascript'});
+const swUrl = URL.createObjectURL(swBlob);
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register(swUrl).then(reg=>console.log("demo SW registered")).catch(e=>console.warn("SW reg failed",e));
+}
+</script>
+
+</body>
+</html>
