@@ -5229,7 +5229,7 @@ function speakToUserForce(message) {
 }
 
 
-// ✅ SES TANIMA SİSTEMİ
+// ✅ SES TANIMA SİSTEMİ - DÜZELTİLMİŞ VERSİYON
 function initializeDynamicSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
@@ -5249,8 +5249,8 @@ function initializeDynamicSpeechRecognition() {
     }
     
     recognition = new SpeechRecognition();
-    recognition.continuous = true; // ✅ SÜREKLİ DİNLEME
-    recognition.interimResults = true; // ✅ ANLIK SONUÇLAR
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = 'tr-TR';
     recognition.maxAlternatives = 3;
     
@@ -5258,6 +5258,8 @@ function initializeDynamicSpeechRecognition() {
     let errorCount = 0;
     const MAX_ERROR_COUNT = 5;
     let lastFinalResult = '';
+    let lastProcessedTime = 0;
+    const PROCESS_COOLDOWN = 1000; // 1 saniye bekle
     
     recognition.onstart = function() {
         console.log('✅ Ses tanıma başladı');
@@ -5294,27 +5296,60 @@ function initializeDynamicSpeechRecognition() {
             console.log('🎤 Dinleniyor:', interimTranscript);
         }
         
-        // Final sonucu işle
-        if (finalTranscript !== '' && finalTranscript !== lastFinalResult) {
-            console.log('🎯 Tanınan komut:', finalTranscript);
-            lastFinalResult = finalTranscript;
+        // 🔥 CRITICAL FIX: FİNAL SONUÇ İŞLEME
+        if (finalTranscript !== '') {
+            const now = Date.now();
+            const cleanTranscript = finalTranscript.trim().toLowerCase();
             
-            // Sistem kendi sesini filtrele
+            // 1. COOLDOWN KONTROLÜ - Aynı komut tekrar işlenmesin
+            if (now - lastProcessedTime < PROCESS_COOLDOWN) {
+                console.log('⏸️ Cooldown süresinde, işlem atlandı');
+                return;
+            }
+            
+            // 2. BENZER KOMUT KONTROLÜ - Aynı içerik tekrar işlenmesin
+            if (cleanTranscript === lastFinalResult) {
+                console.log('🔄 Aynı komut tekrar algılandı, atlandı');
+                return;
+            }
+            
+            // 3. SİSTEMİN KENDİ SESİNİ FİLTRELE
             const ignoredPhrases = [
                 "bina numarasını söyleyin", "daire numarasını söyleyin",
                 "adresinize teslimat", "evet veya hayır", "kayısı",
-                "teslimat adresi", "geçersiz bina numarası"
+                "teslimat adresi", "geçersiz bina numarası",
+                "telefon numaranızı söyleyin", "adınızı ve soyadınızı söyleyin",
+                "ödeme yöntemi seçin", "hoş geldiniz", "sistem hazır"
             ];
             
-            if (!ignoredPhrases.some(p => finalTranscript.includes(p))) {
-                processVoiceCommand(finalTranscript);
+            const shouldIgnore = ignoredPhrases.some(phrase => 
+                cleanTranscript.includes(phrase.toLowerCase())
+            );
+            
+            if (shouldIgnore) {
+                console.log('🚫 Sistem sesi filtrelendi:', cleanTranscript);
+                return;
             }
             
-            // Sessizlik timeout'unu sıfırla
+            // 4. UZUNLUK KONTROLÜ - Çok kısa komutları atla
+            if (cleanTranscript.length < 2) {
+                console.log('📏 Çok kısa komut atlandı:', cleanTranscript);
+                return;
+            }
+            
+            console.log('🎯 Tanınan komut:', cleanTranscript);
+            lastFinalResult = cleanTranscript;
+            lastProcessedTime = now;
+            
+            // Komutu işle
+            processVoiceCommand(cleanTranscript);
+            
+            // Sessizlik timeout'unu sıfırla (daha uzun süre)
             clearTimeout(restartTimeout);
             restartTimeout = setTimeout(() => {
+                console.log('🔄 Sessizlik zaman aşımı, sonuç temizlendi');
                 lastFinalResult = '';
-            }, 2000);
+            }, 4000); // 4 saniye
         }
     };
     
@@ -5348,7 +5383,7 @@ function initializeDynamicSpeechRecognition() {
         if (isMicrophoneEnabled && !isListening) {
             restartTimeout = setTimeout(() => {
                 startRecognition();
-            }, 1500);
+            }, 2000);
         }
     };
     
@@ -5361,7 +5396,7 @@ function initializeDynamicSpeechRecognition() {
         if (isMicrophoneEnabled && !isAssistantSpeaking) {
             restartTimeout = setTimeout(() => {
                 startRecognition();
-            }, 1000);
+            }, 1500);
         }
     };
     
@@ -5369,7 +5404,6 @@ function initializeDynamicSpeechRecognition() {
     startRecognition();
     return true;
 }
-
 function startRecognition() {
     if (!recognition) {
         console.log('🔄 Recognition objesi yok, yeniden oluşturuluyor...');
@@ -6203,16 +6237,22 @@ async function safeVoiceMatchQuery(userInput) {
     }
 }
         
-
 async function processVoiceCommand(transcript) {
-        const message = transcript.toLowerCase().trim();
-        console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
+    const message = transcript.toLowerCase().trim();
+    console.log(`🔊 Sesli komut: "${message}" | Kök: ${currentRoot}`);
     
-        // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
-        if (transcript.trim() === lastSpokenMessage.trim()) {
-            console.log("⚠️ Kendi cevabımız tekrar algılandı, atlandı");
-            return;
-        }
+    // 🔥 ACİL DÜZELTME: BEKLENEN INPUT KONTROLÜ EN ÜSTE
+    const isExpectedInput = checkExpectedInput(message);
+    if (isExpectedInput) {
+        console.log('✅ Beklenen input işlendi, diğer komutlar engellendi');
+        return;
+    }
+    
+    // KENDİ MESAJIMIZI TEKRAR ALGILAMA KONTROLÜ
+    if (transcript.trim() === lastSpokenMessage.trim()) {
+        console.log("⚠️ Kendi cevabımız tekrar algılandı, atlandı");
+        return;
+    }
     
         // GEREKSİZ KELİMELERİ FİLTRELE
         const filteredMessage = filterUnnecessaryWords(message);
@@ -14662,6 +14702,7 @@ function savePaymentInfoManually() {
     </script>
 </body>
 </html>
+
 
 
 
