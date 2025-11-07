@@ -712,30 +712,6 @@
             initializeApp();
         });
 
-        async function initializeApp() {
-            // Mobile menu toggle
-            const mobileMenuButton = document.getElementById('mobile-menu-button');
-            const mobileMenu = document.getElementById('mobile-menu');
-            
-            mobileMenuButton.addEventListener('click', function() {
-                mobileMenu.classList.toggle('hidden');
-            });
-            
-            // Rapor şablonlarını yükle
-            await loadReportTemplates();
-            
-            // Firma Analiz Sohbeti event listener'ları
-            setupCompanyAnalysisChat();
-            
-            // Hızlı Pazar Sorgulama event listener'ları
-            setupQuickReportForm();
-            
-            // Sepet işlevselliği
-            setupCartFunctionality();
-            
-            // Modal işlevselliği
-            setupModalFunctionality();
-        }
 
         // Rapor Şablonlarını Yükle
         async function loadReportTemplates() {
@@ -843,111 +819,148 @@
             });
         }
 
-        // Firma Analiz Sohbeti Kurulumu
-        function setupCompanyAnalysisChat() {
-            const serviceSelect = document.getElementById('service-select');
-            const chatInput = document.getElementById('chat-input');
-            const sendTextButton = document.getElementById('send-text');
-            const goBackBtn = document.getElementById('go-back-btn');
-            const chatInputArea = document.getElementById('chat-input-area');
+        // ÖNCE fonksiyonu tanımla
+function addMessageToChat(message, isUser = false) {
+    const chatContainer = document.getElementById('chat-container');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-bubble ${isUser ? 'user' : ''}`;
+    messageDiv.innerHTML = `<p>${message}</p>`;
+    
+    chatContainer.appendChild(messageDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
 
-            serviceSelect.addEventListener('change', function() {
-                const selectedService = this.value;
-                if (selectedService) {
-                    currentService = selectedService;
-                    currentQuestionIndex = 0;
-                    companyProfile[selectedService] = {};
-                    
-                    // Sohbeti başlat
-                    addMessageToChat(SERVICE_QUESTIONS[selectedService][0]);
-                    chatInputArea.classList.remove('hidden');
-                    goBackBtn.classList.add('hidden');
-                }
-            });
+// SONRA Firma Analiz Sohbeti Kurulumu
+function setupCompanyAnalysisChat() {
+    const serviceSelect = document.getElementById('service-select');
+    const chatInput = document.getElementById('chat-input');
+    const sendTextButton = document.getElementById('send-text');
+    const goBackBtn = document.getElementById('go-back-btn');
+    const chatInputArea = document.getElementById('chat-input-area');
 
-            sendTextButton.addEventListener('click', handleAnswerSubmit);
-            chatInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    handleAnswerSubmit();
-                }
-            });
-
-            goBackBtn.addEventListener('click', function() {
-                if (currentQuestionIndex > 0) {
-                    currentQuestionIndex--;
-                    // Önceki soruya dön
-                    const previousQuestion = SERVICE_QUESTIONS[currentService][currentQuestionIndex];
-                    // Sohbeti düzenle (son 2 mesajı kaldır)
-                    const chatContainer = document.getElementById('chat-container');
-                    chatContainer.removeChild(chatContainer.lastChild);
-                    chatContainer.removeChild(chatContainer.lastChild);
-                    
-                    addMessageToChat(previousQuestion);
-                    goBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
-                }
-            });
-        }
-
-        // Cevap Gönderme İşlemi
-        function handleAnswerSubmit() {
-            const chatInput = document.getElementById('chat-input');
-            const message = chatInput.value.trim();
-            const goBackBtn = document.getElementById('go-back-btn');
+    serviceSelect.addEventListener('change', function() {
+        const selectedService = this.value;
+        if (selectedService) {
+            currentService = selectedService;
+            currentQuestionIndex = 0;
+            companyProfile[selectedService] = {};
             
-            if (!message) return;
-
-            // Kullanıcı mesajını ekle
-            addMessageToChat(message, true);
-
-            // Şirket profilini güncelle
-            const currentQuestion = SERVICE_QUESTIONS[currentService][currentQuestionIndex];
-            companyProfile[currentService][currentQuestion] = message;
-
-            chatInput.value = '';
-
-            // Sonraki soruya geç veya analiz yap
-            if (currentQuestionIndex < SERVICE_QUESTIONS[currentService].length - 1) {
-                currentQuestionIndex++;
-                const nextQuestion = SERVICE_QUESTIONS[currentService][currentQuestionIndex];
-                setTimeout(() => {
-                    addMessageToChat(nextQuestion);
-                    goBackBtn.classList.remove('hidden');
-                }, 500);
-            } else {
-                // Tüm sorular cevaplandı, analiz yap
-                setTimeout(() => {
-                    addMessageToChat("Teşekkür ederim! Bilgilerinizi analiz ediyorum ve size özel öneriler hazırlıyorum...");
-                    generateCompanyAnalysis();
-                }, 1000);
-            }
+            // Sohbeti başlat - addMessageToChat artık tanımlı
+            addMessageToChat(SERVICE_QUESTIONS[selectedService][0]);
+            chatInputArea.classList.remove('hidden');
+            goBackBtn.classList.add('hidden');
         }
+    });
 
-        // Şirket Analizi Oluştur
-        async function generateCompanyAnalysis() {
-            try {
-                const response = await fetch('/api/analyze-company', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        service: currentService,
-                        profile: companyProfile[currentService]
-                    })
-                });
-
-                const analysis = await response.json();
-                
-                setTimeout(() => {
-                    addMessageToChat(analysis.result);
-                    // Önerilen hizmetleri göster
-                    addMessageToChat("Size özel hazırladığım hizmet paketlerini sepete ekleyebilirsiniz.");
-                }, 2000);
-
-            } catch (error) {
-                console.error('Analiz oluşturma hatası:', error);
-                addMessageToChat("Üzgünüm, analiz sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
-            }
+    sendTextButton.addEventListener('click', handleAnswerSubmit);
+    chatInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleAnswerSubmit();
         }
+    });
 
+    goBackBtn.addEventListener('click', function() {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            // Önceki soruya dön
+            const previousQuestion = SERVICE_QUESTIONS[currentService][currentQuestionIndex];
+            // Sohbeti düzenle (son 2 mesajı kaldır)
+            const chatContainer = document.getElementById('chat-container');
+            chatContainer.removeChild(chatContainer.lastChild);
+            chatContainer.removeChild(chatContainer.lastChild);
+            
+            addMessageToChat(previousQuestion);
+            goBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
+        }
+    });
+}
+
+// Cevap Gönderme İşlemi
+function handleAnswerSubmit() {
+    const chatInput = document.getElementById('chat-input');
+    const message = chatInput.value.trim();
+    const goBackBtn = document.getElementById('go-back-btn');
+    
+    if (!message) return;
+
+    // Kullanıcı mesajını ekle
+    addMessageToChat(message, true);
+
+    // Şirket profilini güncelle
+    const currentQuestion = SERVICE_QUESTIONS[currentService][currentQuestionIndex];
+    companyProfile[currentService][currentQuestion] = message;
+
+    chatInput.value = '';
+
+    // Sonraki soruya geç veya analiz yap
+    if (currentQuestionIndex < SERVICE_QUESTIONS[currentService].length - 1) {
+        currentQuestionIndex++;
+        const nextQuestion = SERVICE_QUESTIONS[currentService][currentQuestionIndex];
+        setTimeout(() => {
+            addMessageToChat(nextQuestion);
+            goBackBtn.classList.remove('hidden');
+        }, 500);
+    } else {
+        // Tüm sorular cevaplandı, analiz yap
+        setTimeout(() => {
+            addMessageToChat("Teşekkür ederim! Bilgilerinizi analiz ediyorum ve size özel öneriler hazırlıyorum...");
+            generateCompanyAnalysis();
+        }, 1000);
+    }
+}
+
+// Şirket Analizi Oluştur
+async function generateCompanyAnalysis() {
+    try {
+        const response = await fetch('/api/analyze-company', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                service: currentService,
+                profile: companyProfile[currentService]
+            })
+        });
+
+        const analysis = await response.json();
+        
+        setTimeout(() => {
+            addMessageToChat(analysis.result);
+            // Önerilen hizmetleri göster
+            addMessageToChat("Size özel hazırladığım hizmet paketlerini sepete ekleyebilirsiniz.");
+        }, 2000);
+
+    } catch (error) {
+        console.error('Analiz oluşturma hatası:', error);
+        addMessageToChat("Üzgünüm, analiz sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+    }
+}
+
+// Initialize App içinde setupCompanyAnalysisChat çağrısı
+async function initializeApp() {
+    // Mobile menu toggle
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const mobileMenu = document.getElementById('mobile-menu');
+    
+    mobileMenuButton.addEventListener('click', function() {
+        mobileMenu.classList.toggle('hidden');
+    });
+    
+    // Rapor şablonlarını yükle
+    await loadReportTemplates();
+    
+    // Firma Analiz Sohbeti event listener'ları - BURADA ÇAĞIR
+    setupCompanyAnalysisChat();
+    
+    // Hızlı Pazar Sorgulama event listener'ları
+    setupQuickReportForm();
+    
+    // Sepet işlevselliği
+    setupCartFunctionality();
+    
+    // Modal işlevselliği
+    setupModalFunctionality();
+}
+        
         // Hızlı Rapor Formu Kurulumu
         function setupQuickReportForm() {
             const templateSelect = document.getElementById('report-template-select');
@@ -1074,82 +1087,120 @@ function getFieldTitle(field) {
             return titles[field] || field;
         }
 
-        // AI Raporu Oluştur
-        async function generateAIReport() {
-            const generateBtn = document.getElementById('generate-report-btn');
-            const progressSection = document.getElementById('report-progress');
-            
-            generateBtn.disabled = true;
-            generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Oluşturuluyor...';
-            progressSection.classList.remove('hidden');
+       // AI Raporu Oluştur
+async function generateAIReport() {
+    const generateBtn = document.getElementById('generate-report-btn');
+    const progressSection = document.getElementById('report-progress');
+    
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Oluşturuluyor...';
+    progressSection.classList.remove('hidden');
 
-            try {
-                // Progress bar'ı güncelle
-                updateProgress(10);
+    try {
+        // Progress bar'ı güncelle
+        updateProgress(10);
 
-                // Rapor kaydı oluştur
-                const reportData = {
-                    template_id: selectedTemplate.id,
-                    report_title: selectedTemplate.report_name,
-                    ...formData,
-                    status: 'generating'
-                };
+        // 1. ÖNCE PROMPT'U HAZIRLA
+        const finalPrompt = selectedTemplate.report_prompt.replace(
+            /\{\{(\w+)\}\}/g, 
+            (match, variable) => formData[variable] || ''
+        );
 
-                // Supabase'e kaydet
-                const { data: report, error } = await supabase
-                    .from('ai_reports')
-                    .insert(reportData)
-                    .select()
-                    .single();
+        // 2. OPENAI'YE GÖNDER VE RAPORU AL
+        updateProgress(30);
 
-                if (error) throw error;
+        const openaiResponse = await fetch('/api/generate-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: finalPrompt,
+                template: selectedTemplate
+            })
+        });
 
-                updateProgress(30);
-
-                // OpenAI'ye prompt gönder
-                const finalPrompt = selectedTemplate.report_prompt.replace(
-                    /\{\{(\w+)\}\}/g, 
-                    (match, variable) => formData[variable] || ''
-                );
-
-                const response = await fetch('/api/generate-report', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        reportId: report.id,
-                        prompt: finalPrompt,
-                        template: selectedTemplate
-                    })
-                });
-
-                updateProgress(70);
-
-                if (!response.ok) throw new Error('OpenAI API hatası');
-
-                const result = await response.json();
-
-                updateProgress(100);
-
-                // Sepete ekle
-                addToAICart(selectedTemplate, report.id);
-
-                // Sonuçları göster
-                document.getElementById('quick-analysis-result').classList.remove('hidden');
-                
-                setTimeout(() => {
-                    progressSection.classList.add('hidden');
-                    generateBtn.disabled = false;
-                    generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
-                }, 2000);
-
-            } catch (error) {
-                console.error('Rapor oluşturma hatası:', error);
-                alert('Rapor oluşturulurken bir hata oluştu: ' + error.message);
-                generateBtn.disabled = false;
-                generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
-                progressSection.classList.add('hidden');
-            }
+        if (!openaiResponse.ok) {
+            throw new Error('OpenAI API hatası');
         }
+
+        const aiResult = await openaiResponse.json();
+        const reportContent = aiResult.content;
+
+        updateProgress(70);
+
+        // 3. ŞİMDİ TÜM VERİLERİ TABLOYA KAYDET
+        const reportData = {
+            template_id: selectedTemplate.id,
+            report_title: selectedTemplate.report_name, // EVET, BUNU KAYDET
+            report_prompt: finalPrompt, // TAMAMLANMIŞ PROMPT'U KAYDET
+            report_content: reportContent, // AI'DAN GELEN CEVABI KAYDET
+            country: formData.ulke,
+            sector: formData.sektor,
+            product: formData.urun,
+            region: formData.bolge,
+            gtip: formData.gtip,
+            period: formData.zaman,
+            purpose: formData.amac,
+            language: formData.dil,
+            depth: formData.derinlik,
+            report_type: selectedTemplate.report_type,
+            status: 'completed'
+        };
+
+        // Supabase'e kaydetme
+        const { data: report, error } = await supabase
+            .from('ai_reports')
+            .insert(reportData)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Supabase kayıt hatası:', error);
+            throw error;
+        }
+
+        updateProgress(100);
+
+        // 4. SEPETE EKLE
+        addToAICart(selectedTemplate, report.id);
+
+        // 5. SONUÇLARI GÖSTER
+        document.getElementById('quick-analysis-result').classList.remove('hidden');
+        
+        setTimeout(() => {
+            progressSection.classList.add('hidden');
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
+        }, 2000);
+
+    } catch (error) {
+        console.error('Rapor oluşturma hatası:', error);
+        
+        // Hata durumunda sadece temel verileri kaydet
+        const errorReportData = {
+            template_id: selectedTemplate.id,
+            report_title: selectedTemplate.report_name,
+            report_prompt: finalPrompt,
+            country: formData.ulke,
+            sector: formData.sektor,
+            product: formData.urun,
+            region: formData.bolge,
+            gtip: formData.gtip,
+            period: formData.zaman,
+            purpose: formData.amac,
+            language: formData.dil,
+            depth: formData.derinlik,
+            report_type: selectedTemplate.report_type,
+            status: 'failed'
+        };
+
+        await supabase.from('ai_reports').insert(errorReportData);
+
+        alert('Rapor oluşturulurken bir hata oluştu: ' + error.message);
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
+        progressSection.classList.add('hidden');
+    }
+}
 
         // Progress Bar'ı Güncelle
         function updateProgress(percent) {
