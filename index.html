@@ -729,8 +729,6 @@
         const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 
-
-        const serviceCart = [];
         const serviceCartItems = document.getElementById('service-cart-items');
         const serviceCartTotal = document.getElementById('service-cart-total');
         const completeServiceOrder = document.getElementById('complete-service-order');
@@ -1468,61 +1466,56 @@ async function generateAIReport() {
 
         function closeModal() {
             document.getElementById('service-order-modal').classList.add('hidden');
-        }
-
-
-   
-
-       
+        }    
         
         // Hizmet sepetini güncelleme (ORIJINAL)
-        function updateServiceCart() {
-            // Sepet boşsa
-            if (serviceCart.length === 0) {
-                serviceCartItems.innerHTML = '<p class="text-gray-500 text-center py-4">Sepetinizde hizmet bulunmamaktadır</p>';
-                serviceCartTotal.textContent = '0₺';
-                completeServiceOrder.disabled = true;
-                return;
-            }
-            
-            // Sepet doluysa
-            let cartHTML = '';
-            let total = 0;
-            
-            serviceCart.forEach(item => {
-                const itemTotal = item.price * item.quantity;
-                total += itemTotal;
-                
-                cartHTML += `
-                    <div class="cart-item">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h4 class="font-semibold">${item.name}</h4>
-                                <p class="text-gray-600 text-sm">${item.price}₺ x ${item.quantity}</p>
-                            </div>
-                            <div class="flex items-center">
-                                <span class="font-bold mr-4">${itemTotal}₺</span>
-                                <button class="text-red-500 remove-service" data-id="${item.id}">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
+        // Sepeti güncelleme fonksiyonu
+function updateServiceCart() {
+    if (serviceCart.length === 0) {
+        serviceCartItems.innerHTML = '<p class="text-gray-500 text-center py-4">Sepetinizde ürün bulunmamaktadır</p>';
+        serviceCartTotal.textContent = '0₺';
+        completeServiceOrder.disabled = true;
+        return;
+    }
+    
+    let cartHTML = '';
+    let total = 0;
+    
+    serviceCart.forEach(item => {
+        const itemTotal = item.price * item.quantity;
+        total += itemTotal;
+        
+        cartHTML += `
+            <div class="cart-item">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h4 class="font-semibold">${item.name}</h4>
+                        <p class="text-gray-600 text-sm">${item.price}${item.currency || '₺'} x ${item.quantity}</p>
                     </div>
-                `;
-            });
-            
-            serviceCartItems.innerHTML = cartHTML;
-            serviceCartTotal.textContent = `${total}₺`;
-            completeServiceOrder.disabled = false;
-            
-            // Kaldırma butonlarına event listener ekle
-            document.querySelectorAll('.remove-service').forEach(button => {
-                button.addEventListener('click', function() {
-                    const serviceId = this.getAttribute('data-id');
-                    removeServiceFromCart(serviceId);
-                });
-            });
-        }
+                    <div class="flex items-center">
+                        <span class="font-bold mr-4">${itemTotal}${item.currency || '₺'}</span>
+                        <button class="text-red-500 remove-item" data-id="${item.id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    serviceCartItems.innerHTML = cartHTML;
+    serviceCartTotal.textContent = `${total}₺`;
+    completeServiceOrder.disabled = false;
+    
+    // Kaldırma butonları
+    document.querySelectorAll('.remove-item').forEach(button => {
+        button.addEventListener('click', function() {
+            const itemId = this.getAttribute('data-id');
+            serviceCart = serviceCart.filter(item => item.id !== itemId);
+            updateServiceCart();
+        });
+    });
+}
         
         // Sepetten hizmet kaldırma (ORIJINAL)
         function removeServiceFromCart(serviceId) {
