@@ -974,31 +974,52 @@ function handleAnswerSubmit() {
 }
 
 // Şirket Analizi Oluştur
+// Şirket Analizi Oluştur
 async function generateCompanyAnalysis() {
     try {
-        const response = await fetch('/api/analyze-company', {
+        addMessageToChat("🔍 Bilgileriniz analiz ediliyor...");
+        
+        const response = await fetch('https://parenatrade.vercel.app/api/analyze-company', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({
                 service: currentService,
                 profile: companyProfile[currentService]
             })
         });
 
+        // Response tipini kontrol et
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Beklenmeyen yanıt:', text);
+            throw new Error('Sunucu hatası - lütfen daha sonra tekrar deneyin');
+        }
+
         const analysis = await response.json();
         
-        setTimeout(() => {
+        if (!response.ok) {
+            throw new Error(analysis.error || 'API hatası');
+        }
+        
+        if (analysis.success) {
             addMessageToChat(analysis.result);
-            // Önerilen hizmetleri göster
-            addMessageToChat("Size özel hazırladığım hizmet paketlerini sepete ekleyebilirsiniz.");
-        }, 2000);
+            addMessageToChat("💼 Size özel hazırladığım hizmet paketlerini sepete ekleyebilirsiniz.");
+        } else {
+            throw new Error(analysis.error);
+        }
 
     } catch (error) {
         console.error('Analiz oluşturma hatası:', error);
-        addMessageToChat("Üzgünüm, analiz sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+        // Hata durumunda mock analiz göster
+        const mockAnalysis = generateMockAnalysis(currentService, companyProfile[currentService]);
+        addMessageToChat("⚠️ " + error.message);
+        addMessageToChat(mockAnalysis);
     }
 }
-
 // Initialize App içinde setupCompanyAnalysisChat çağrısı
 async function initializeApp() {
     // Mobile menu toggle
