@@ -1046,6 +1046,53 @@ async function initializeApp() {
     setupModalFunctionality();
 }
         
+
+// Mock analiz oluşturma fonksiyonunu ekleyin
+function generateMockAnalysis(service, profile) {
+    const serviceNames = {
+        hedef_ulke_rapor: 'Hedef Ülke Raporu',
+        firma_kurulus: 'Firma Kuruluşu',
+        banka_hesap: 'Banka Hesabı Açılışı',
+        muhasebe: 'Muhasebe Hizmetleri',
+        ihracat_kredileri: 'İhracat Kredileri'
+    };
+
+    const profileText = Object.entries(profile)
+        .map(([question, answer]) => `• ${question}: ${answer}`)
+        .join('\n');
+
+    return `
+🎯 **${serviceNames[service]} ANALİZ RAPORU**
+
+📋 **VERİLEN BİLGİLER:**
+${profileText}
+
+💡 **ÖN DEĞERLENDİRME:**
+Vermiş olduğunuz bilgiler doğrultusunda ihtiyaçlarınız analiz edilmiştir. Mevcut durumunuz ve hedefleriniz değerlendirilerek size özel bir çözüm planı hazırlanmıştır.
+
+🚀 **ÖNERİLER:**
+1. İhtiyaçlarınıza özel kapsamlı çözüm paketi
+2. Yerel ve uluslararası mevzuata uyum süreci
+3. Maliyet optimizasyonu ve verimlilik artırıcı önlemler
+4. Süreç takibi ve danışmanlık hizmeti
+
+📅 **SONRAKİ ADIMLAR:**
+1. Detaylı ihtiyaç analizi görüşmesi
+2. Gerekli belge ve bilgilerin temini
+3. Proje takvimi oluşturulması
+4. Süreç başlangıcı
+
+✅ **BEKLENEN FAYDALAR:**
+- Zaman ve maliyet tasarrufu
+- Yasal uyum garantisi
+- Uluslararası standartlara uygunluk
+- Profesyonel danışmanlık desteği
+
+💼 Size özel hazırlanacak detaylı teklif için hizmet paketlerimizi inceleyebilirsiniz.
+    `.trim();
+}        
+        
+        
         // Hızlı Rapor Formu Kurulumu
         function setupQuickReportForm() {
             const templateSelect = document.getElementById('report-template-select');
@@ -1416,6 +1463,12 @@ async function generateAIReport() {
             document.getElementById('service-order-modal').classList.add('hidden');
         }
 
+
+        const serviceCart = [];
+const serviceCartItems = document.getElementById('service-cart-items');
+const serviceCartTotal = document.getElementById('service-cart-total');
+const completeServiceOrder = document.getElementById('complete-service-order');
+
        
         
         // Hizmet sepetini güncelleme (ORIJINAL)
@@ -1483,6 +1536,31 @@ async function generateAIReport() {
                 document.getElementById('service-order-modal').classList.remove('hidden');
             }
         });
+
+// Sepete hizmet ekleme (ORIJINAL)
+document.querySelectorAll('.add-service').forEach(button => {
+    button.addEventListener('click', function() {
+        const serviceId = this.getAttribute('data-id');
+        const serviceName = this.getAttribute('data-name');
+        const servicePrice = parseInt(this.getAttribute('data-price'));
+        
+        // Hizmet zaten sepette mi kontrol et
+        const existingService = serviceCart.find(item => item.id === serviceId);
+        
+        if (existingService) {
+            existingService.quantity += 1;
+        } else {
+            serviceCart.push({
+                id: serviceId,
+                name: serviceName,
+                price: servicePrice,
+                quantity: 1
+            });
+        }
+        
+        updateServiceCart();
+    });
+});
         
         // Modal kapatma (ORIJINAL)
         document.getElementById('close-service-modal').addEventListener('click', function() {
