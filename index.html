@@ -914,7 +914,7 @@ let serviceTypesLoaded = false;
 
 // En basit ve güvenli yöntem
 async function loadServiceTypesSimple() {
-    try {
+        try {
         console.log('🔍 Hizmet türleri yükleniyor...');
         
         const { data, error } = await supabase
@@ -922,10 +922,13 @@ async function loadServiceTypesSimple() {
             .select('id, service_name')
             .order('service_name');
         
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Supabase hatası:', error);
+            return false;
+        }
         
-        // EN BASİT KONTROL: data array ve en az 1 elemanı var mı?
-        if (Array.isArray(data) && data.length > 0) {
+        // BASİT KONTROL: data var mı ve içinde kayıt var mı?
+        if (data && data.length > 0) {
             const serviceSelect = document.getElementById('service-select');
             serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
             
@@ -937,16 +940,16 @@ async function loadServiceTypesSimple() {
             });
             
             console.log(`✅ ${data.length} hizmet türü yüklendi`);
-            return true; // başarılı
+            return true;
             
         } else {
-            console.error('❌ Veri boş veya array değil');
-            return false; // başarısız
+            console.error('❌ Veri boş veya hiç kayıt yok');
+            return false;
         }
         
     } catch (error) {
         console.error('❌ Hizmet türleri yüklenirken hata:', error);
-        return false; // başarısız
+        return false;
     }
 }
         
