@@ -911,61 +911,44 @@ document.addEventListener('DOMContentLoaded', function() {
 // Global değişken - veri yüklendi mi takip et
 let serviceTypesLoaded = false;
 
-async function loadServiceTypes() {
+
+// En basit ve güvenli yöntem
+async function loadServiceTypesSimple() {
     try {
-        // GERÇEK kontrol: Supabase'den veri yüklendi mi?
-        if (serviceTypesLoaded) {
-            console.log('Hizmet türleri zaten yüklenmiş');
-            return;
-        }
+        console.log('🔍 Hizmet türleri yükleniyor...');
         
-        console.log('🔍 Hizmet türleri Supabase\'den yükleniyor...');
-        
-        const { data, error, count } = await supabase
+        const { data, error } = await supabase
             .from('ai_service_type')
-            .select('id, service_name', { count: 'exact' }) // count da al
+            .select('id, service_name')
             .order('service_name');
         
-        if (error) {
-            console.error('❌ Supabase hatası:', error);
-            throw error;
-        }
+        if (error) throw error;
         
-        console.log(`📊 Supabase'den ${count} kayıt geldi`);
-        
-        // GERÇEK veri kontrolü: count > 0
-        if (count > 0) {
+        // EN BASİT KONTROL: data array ve en az 1 elemanı var mı?
+        if (Array.isArray(data) && data.length > 0) {
             const serviceSelect = document.getElementById('service-select');
-            
-            // Select'i temizle
             serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
             
             data.forEach(service => {
                 const option = document.createElement('option');
-                option.value = service.id; // UUID
+                option.value = service.id;
                 option.textContent = service.service_name;
                 serviceSelect.appendChild(option);
             });
             
-            serviceTypesLoaded = true; // İşaretle
-            console.log(`✅ ${count} hizmet türü yüklendi`);
+            console.log(`✅ ${data.length} hizmet türü yüklendi`);
+            return true; // başarılı
             
         } else {
-            console.error('❌ Supabase\'de hiç hizmet türü bulunamadı (count: 0)');
-            throw new Error('Hizmet türleri bulunamadı');
+            console.error('❌ Veri boş veya array değil');
+            return false; // başarısız
         }
         
     } catch (error) {
         console.error('❌ Hizmet türleri yüklenirken hata:', error);
-        
-        // SADECE gerçekten boşsa ve DOM da boşsa fallback kullan
-        const serviceSelect = document.getElementById('service-select');
-        if (serviceSelect.children.length <= 1) {
-            loadDefaultServices();
-        }
+        return false; // başarısız
     }
 }
-
         
 // 2. SELECT DEĞİŞİMİ için - farklı fonksiyon
 async function handleServiceQuestions(selectedServiceId) {
