@@ -1392,16 +1392,13 @@ async function detectTableStructure() {
 // Güncellenmiş soru yükleme fonksiyonu
 let tableStructure = null;
 
+// Soruları yükle - DOĞRU EŞLEŞTİRME
 async function loadServiceQuestionsAdvanced(serviceId) {
     try {
-        console.log('🔍 Gelişmiş soru yükleme, serviceId:', serviceId);
+        console.log('🔍 Sorular yükleniyor, serviceId:', serviceId);
+        console.log('🔍 serviceId tipi:', typeof serviceId);
         
         if (!serviceId) throw new Error('Geçersiz service ID');
-        
-        // Tablo yapısını bir kere tespit et
-        if (!tableStructure) {
-            tableStructure = await detectTableStructure();
-        }
         
         let query = supabase
             .from('ai_question')
@@ -1409,20 +1406,40 @@ async function loadServiceQuestionsAdvanced(serviceId) {
             .eq('is_active', true)
             .order('flow_number');
         
-        // Doğru alana göre filtrele
-        if (tableStructure === 'service_type_id') {
-            query = query.eq('service_type_id', serviceId);
-        } else {
-            query = query.eq('service_type', serviceId);
-        }
+        // ÖNCE: service_type_id (UUID) ile eşleştir
+        query = query.eq('service_type_id', serviceId);
         
         const { data, error } = await query;
         
         if (error) throw error;
-        if (!data || data.length === 0) throw new Error('Soru bulunamadı');
         
-        serviceQuestions = data;
-        console.log(`✅ ${data.length} soru yüklendi`);
+        if (data && data.length > 0) {
+            serviceQuestions = data;
+            console.log(`✅ ${data.length} soru yüklendi (service_type_id eşleşmesi)`);
+            return data;
+        }
+        
+        console.log('❌ service_type_id ile eşleşme bulunamadı, service_type deneniyor...');
+        
+        // SONRA: service_type (string) ile eşleştir
+        const fallbackQuery = supabase
+            .from('ai_question')
+            .select('id, question, flow_number, service_type_id, service_type')
+            .eq('service_type', serviceId)
+            .eq('is_active', true)
+            .order('flow_number');
+            
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+        
+        if (fallbackError) throw fallbackError;
+        
+        if (fallbackData && fallbackData.length > 0) {
+            serviceQuestions = fallbackData;
+            console.log(`✅ ${fallbackData.length} soru yüklendi (service_type eşleşmesi)`);
+            return fallbackData;
+        }
+        
+        throw new Error(`"${serviceId}" için soru bulunamadı`);
         
     } catch (error) {
         console.error('❌ Sorular yüklenemedi:', error);
@@ -1430,6 +1447,47 @@ async function loadServiceQuestionsAdvanced(serviceId) {
     }
 }
 
+// DEBUG: Hizmet türlerini ve soruları birlikte göster
+async function debugServiceMatching() {
+    try {
+        console.log('=== HİZMET EŞLEŞME DEBUG ===');
+        
+        // Tüm hizmet türlerini al
+        const { data: services, error: servicesError } = await supabase
+            .from('ai_service_type')
+            .select('id, service_name');
+        
+        if (servicesError) throw servicesError;
+        
+        console.log('📋 Hizmet Türleri:', services);
+        
+        // Tüm soruları al
+        const { data: questions, error: questionsError } = await supabase
+            .from('ai_question')
+            .select('id, question, service_type_id, service_type')
+            .limit(10);
+            
+        if (questionsError) throw questionsError;
+        
+        console.log('📝 Sorular:', questions);
+        
+        // Eşleşmeleri göster
+        services.forEach(service => {
+            const matchingQuestions = questions.filter(q => 
+                q.service_type_id === service.id || q.service_type === service.id
+            );
+            console.log(`🔗 ${service.service_name} (${service.id}): ${matchingQuestions.length} soru`);
+        });
+        
+    } catch (error) {
+        console.error('Debug hatası:', error);
+    }
+}
+
+// Sayfa yüklendiğinde debug çalıştır
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(debugServiceMatching, 2000);
+});
         // Sistem durumunu kontrol et
 async function checkSystemStatus() {
     console.log('=== SİSTEM DURUM KONTROLÜ ===');
