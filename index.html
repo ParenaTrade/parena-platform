@@ -871,52 +871,68 @@ async function initializeApp() {
 }   
    
         
-// Hizmet türlerini yükle - GÜNCELLENDİ (çift eklemeyi önle)
+// Hizmet türlerini yükle - GERÇEK KONTROLLÜ
 async function loadServiceTypes() {
     try {
         const serviceSelect = document.getElementById('service-select');
         
-        // Eğer zaten yüklenmişse tekrar yükleme
+        // GERÇEK kontrol: sadece "Hizmet seçin" varsa yükle
         if (serviceSelect.children.length > 1) {
-            console.log('Hizmet türleri zaten yüklenmiş');
+            console.log('Hizmet türleri zaten yüklenmiş, çift yükleme önlendi');
             return;
         }
+        
+        console.log('🔍 Hizmet türleri Supabase\'den yükleniyor...');
         
         const { data, error } = await supabase
             .from('ai_service_type')
             .select('id, service_name')
             .order('service_name');
         
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Supabase hatası:', error);
+            throw new Error('Hizmet türleri yüklenemedi: ' + error.message);
+        }
         
-        // Select'i temizle (sadece ilk option kalacak)
+        if (!data || data.length === 0) {
+            console.error('❌ Supabase\'de hiç hizmet türü bulunamadı');
+            throw new Error('Sistemde tanımlı hizmet bulunamadı');
+        }
+        
+        // Select'i temizle
         serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
         
-        if (data && data.length > 0) {
-            data.forEach(service => {
-                const option = document.createElement('option');
-                option.value = service.id;
-                option.textContent = service.service_name;
-                serviceSelect.appendChild(option);
-            });
-            console.log(`${data.length} hizmet türü yüklendi`);
-        } else {
-            // Fallback: Varsayılan hizmet türleri
-            console.warn('Supabase\'den hizmet türleri alınamadı, fallback kullanılıyor');
+        // Verileri ekle
+        data.forEach(service => {
+            const option = document.createElement('option');
+            option.value = service.id;
+            option.textContent = service.service_name;
+            serviceSelect.appendChild(option);
+        });
+        
+        console.log(`✅ ${data.length} hizmet türü başarıyla yüklendi`);
+        
+    } catch (error) {
+        console.error('❌ Hizmet türleri yüklenirken hata:', error);
+        
+        // FALLBACK SADECE GERÇEK HATA DURUMUNDA
+        const serviceSelect = document.getElementById('service-select');
+        if (serviceSelect.children.length <= 1) {
+            console.warn('Fallback hizmet türleri yükleniyor...');
             loadDefaultServices();
         }
-    } catch (error) {
-        console.error('Hizmet türleri yüklenirken hata:', error);
-        loadDefaultServices();
     }
 }
 
-        // Varsayılan hizmet türleri - GÜNCELLENDİ (çift eklemeyi önle)
-// function loadDefaultServices() {
+// Varsayılan hizmet türleri - SADECE GERÇEK İHTİYAÇ DURUMUNDA
+function loadDefaultServices() {
     const serviceSelect = document.getElementById('service-select');
     
-    // Eğer zaten yüklenmişse tekrar yükleme
-    if (serviceSelect.children.length > 1) return;
+    // Sadece boşsa ekle
+    if (serviceSelect.children.length > 1) {
+        console.log('Fallback: Hizmet türleri zaten var, eklenmedi');
+        return;
+    }
     
     const defaultServices = [
         { id: 'hedef_ulke_rapor', service_name: 'Hedef Ülke Kapsamlı Rapor' },
@@ -932,8 +948,9 @@ async function loadServiceTypes() {
         option.textContent = service.service_name;
         serviceSelect.appendChild(option);
     });
-}
-        
+    
+    console.log('⚠️ Fallback hizmet türleri yüklendi');
+}        
  // Rapor Şablonlarını Yükle - GÜNCELLENDİ (çift eklemeyi önle)
 async function loadReportTemplates() {
     try {
@@ -1092,45 +1109,49 @@ function setupCompanyAnalysisChat() {
         }
     });
 
-    async function handleServiceChange() {
-        const selectedServiceId = this.value;
-        if (selectedServiceId) {
-            currentService = selectedServiceId;
-            currentQuestionIndex = 0;
-            companyProfile[selectedServiceId] = {};
-            
-            // Sohbet konteynırını temizle (ilk mesaj hariç)
-            const chatContainer = document.getElementById('chat-container');
-            const initialMessage = chatContainer.querySelector('.chat-bubble:first-child');
-            chatContainer.innerHTML = '';
-            if (initialMessage) {
-                chatContainer.appendChild(initialMessage);
-            }
-            
-            // Seçilen hizmetin adını al
-            const selectedServiceName = this.options[this.selectedIndex].text;
-            addMessageToChat(`"${selectedServiceName}" hizmeti için analiz başlatılıyor...`);
-            
-            // Soruları Supabase'den yükle
-            await loadServiceQuestions(selectedServiceId);
-            
-            if (serviceQuestions.length > 0) {
-                // İlk soruyu sor
-                setTimeout(() => {
-                    addMessageToChat(serviceQuestions[0].question);
-                    chatInputArea.classList.remove('hidden');
-                    newGoBackBtn.classList.add('hidden');
-                }, 1000);
-            } else {
-                addMessageToChat("Bu hizmet için henüz soru bulunmamaktadır.");
-            }
-        } else {
-            // Hizmet seçimi kaldırıldıysa
-            chatInputArea.classList.add('hidden');
-            addMessageToChat("Lütfen ilgilendiğiniz hizmeti seçin.");
-        }
+    // Service değişim handler'ı - GÜNCEL
+async function handleServiceChange() {
+    const selectedServiceId = this.value;
+    const chatInputArea = document.getElementById('chat-input-area');
+    const goBackBtn = document.getElementById('go-back-btn');
+    
+    if (!selectedServiceId) {
+        chatInputArea.classList.add('hidden');
+        addMessageToChat("Lütfen ilgilendiğiniz hizmeti seçin.");
+        return;
     }
 
+    try {
+        currentService = selectedServiceId;
+        currentQuestionIndex = 0;
+        companyProfile[selectedServiceId] = {};
+        
+        // Sohbeti temizle (ilk mesaj hariç)
+        const chatContainer = document.getElementById('chat-container');
+        const initialMessage = chatContainer.querySelector('.chat-bubble:first-child');
+        chatContainer.innerHTML = '';
+        if (initialMessage) chatContainer.appendChild(initialMessage);
+        
+        const selectedServiceName = this.options[this.selectedIndex].text;
+        addMessageToChat(`"${selectedServiceName}" hizmeti için analiz başlatılıyor...`);
+        
+        // GERÇEK soruları yükle
+        await loadServiceQuestionsAdvanced(selectedServiceId);
+        
+        if (serviceQuestions.length > 0) {
+            setTimeout(() => {
+                addMessageToChat(serviceQuestions[0].question);
+                chatInputArea.classList.remove('hidden');
+                goBackBtn.classList.add('hidden');
+            }, 1000);
+        }
+        
+    } catch (error) {
+        console.error('❌ Hizmet değişim hatası:', error);
+        addMessageToChat("❌ " + error.message);
+        addMessageToChat("🔄 Lütfen farklı bir hizmet seçin veya müşteri hizmetleri ile iletişime geçin.");
+    }
+}
     function handleGoBack() {
         if (currentQuestionIndex > 0) {
             currentQuestionIndex--;
@@ -1154,72 +1175,165 @@ function setupCompanyAnalysisChat() {
         }
     }
 }
-        // Hizmet sorularını yükle - GÜNCELLENDİ
+  // Hizmet sorularını yükle - TABLO YAPISINA UYGUN
 async function loadServiceQuestions(serviceId) {
     try {
-        const { data, error } = await supabase
+        console.log('🔍 Sorular yükleniyor, serviceId:', serviceId);
+        
+        if (!serviceId) {
+            throw new Error('Geçersiz service ID');
+        }
+        
+        // ÖNEMLİ: Tablo yapınıza göre sorguyu ayarlayın
+        let query = supabase
             .from('ai_question')
-            .select('id, question, flow_number, service_type')
-            .eq('service_type', serviceId)
+            .select('id, question, flow_number, service_type_id, service_type')
             .eq('is_active', true)
             .order('flow_number');
         
-        if (error) throw error;
+        // HANGİ ALAN İLE EŞLEŞTİRME YAPACAĞIZ?
+        // Seçenek 1: service_type_id kullan
+        query = query.eq('service_type_id', serviceId);
         
-        if (data && data.length > 0) {
-            serviceQuestions = data;
-            console.log(`Service ${serviceId} için ${data.length} soru yüklendi:`, data);
-        } else {
-            // Fallback: Varsayılan sorular
-            console.warn(`Supabase'den ${serviceId} için soru bulunamadı, fallback kullanılıyor`);
-            const defaultQuestions = {
-                'hedef_ulke_rapor': [
-                    { question: "Hedef ülkeniz hangisi?", flow_number: 1 },
-                    { question: "Hangi sektörde faaliyet göstermeyi planlıyorsunuz?", flow_number: 2 },
-                    { question: "Ürün/hizmetinizin ana özellikleri neler?", flow_number: 3 },
-                    { question: "Rakip analizi yapılmasını istediğiniz firmalar var mı?", flow_number: 4 }
-                ],
-                'firma_kurulus': [
-                    { question: "Firma türü ne olacak? (Limited, A.Ş., vb.)", flow_number: 1 },
-                    { question: "Sermaye miktarınız ne kadar?", flow_number: 2 },
-                    { question: "Ortak sayısı kaç kişi?", flow_number: 3 },
-                    { question: "Önceden ticari faaliyetiniz var mıydı?", flow_number: 4 }
-                ],
-                'banka_hesap': [
-                    { question: "Hangi ülkede banka hesabı açmak istiyorsunuz?", flow_number: 1 },
-                    { question: "Firma hesabı mı bireysel hesap mı?", flow_number: 2 },
-                    { question: "Aylık işlem hacminiz tahmini ne kadar?", flow_number: 3 },
-                    { question: "Online banking ihtiyacınız var mı?", flow_number: 4 }
-                ],
-                'muhasebe': [
-                    { question: "Muhasebe hizmeti almak istediğiniz ülke?", flow_number: 1 },
-                    { question: "Aylık işlem sayınız tahmini?", flow_number: 2 },
-                    { question: "Personel bordrosu hizmeti gerekli mi?", flow_number: 3 },
-                    { question: "Vergi beyanı desteği istiyor musunuz?", flow_number: 4 }
-                ],
-                'ihracat_kredileri': [
-                    { question: "İhracat yapmayı planladığınız ülke?", flow_number: 1 },
-                    { question: "Tahmini ihracat tutarı?", flow_number: 2 },
-                    { question: "Finansman ihtiyacınız ne kadar?", flow_number: 3 },
-                    { question: "Önceden ihracat tecrübeniz var mı?", flow_number: 4 }
-                ]
-            };
-            
-            if (defaultQuestions[serviceId]) {
-                serviceQuestions = defaultQuestions[serviceId];
-            } else {
-                serviceQuestions = [
-                    { question: "Size nasıl yardımcı olabilirim?", flow_number: 1 }
-                ];
-            }
+        // VEYA Seçenek 2: service_type kullan (string eşleşme)
+        // query = query.eq('service_type', serviceId);
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error('❌ Sorular yüklenemedi:', error);
+            throw error;
         }
+        
+        if (!data || data.length === 0) {
+            console.warn(`⚠️ ${serviceId} için soru bulunamadı`);
+            throw new Error('Bu hizmet için henüz soru bulunmamaktadır');
+        }
+        
+        serviceQuestions = data;
+        console.log(`✅ ${data.length} soru yüklendi:`, data);
+        
     } catch (error) {
-        console.error('Sorular yüklenirken hata:', error);
-        serviceQuestions = [
-            { question: "Size nasıl yardımcı olabilirim?", flow_number: 1 }
-        ];
+        console.error('❌ Sorular yüklenirken hata:', error);
+        throw error; // Hata yukarı fırlatılsın
     }
 }
+        // Tablo yapısını kontrol et ve doğru sorguyu belirle
+async function detectTableStructure() {
+    try {
+        console.log('🔍 Tablo yapısı kontrol ediliyor...');
+        
+        // ai_question tablosunun sütunlarını kontrol et
+        const { data: columns, error } = await supabase
+            .from('information_schema.columns')
+            .select('column_name, data_type')
+            .eq('table_name', 'ai_question')
+            .eq('table_schema', 'public');
+        
+        if (error) {
+            console.warn('Tablo yapısı kontrol edilemedi, varsayılan kullanılacak');
+            return 'service_type'; // varsayılan
+        }
+        
+        const hasServiceTypeId = columns.some(col => col.column_name === 'service_type_id');
+        const hasServiceType = columns.some(col => col.column_name === 'service_type');
+        
+        console.log('Tablo sütunları:', columns);
+        console.log('service_type_id var mı?:', hasServiceTypeId);
+        console.log('service_type var mı?:', hasServiceType);
+        
+        if (hasServiceTypeId) {
+            console.log('✅ service_type_id kullanılacak');
+            return 'service_type_id';
+        } else if (hasServiceType) {
+            console.log('✅ service_type kullanılacak');
+            return 'service_type';
+        } else {
+            console.error('❌ Hiçbir eşleşme alanı bulunamadı');
+            throw new Error('Tablo yapısı uyumsuz');
+        }
+        
+    } catch (error) {
+        console.error('Tablo yapısı kontrol hatası:', error);
+        return 'service_type'; // varsayılan
+    }
+}
+
+// Güncellenmiş soru yükleme fonksiyonu
+let tableStructure = null;
+
+async function loadServiceQuestionsAdvanced(serviceId) {
+    try {
+        console.log('🔍 Gelişmiş soru yükleme, serviceId:', serviceId);
+        
+        if (!serviceId) throw new Error('Geçersiz service ID');
+        
+        // Tablo yapısını bir kere tespit et
+        if (!tableStructure) {
+            tableStructure = await detectTableStructure();
+        }
+        
+        let query = supabase
+            .from('ai_question')
+            .select('id, question, flow_number, service_type_id, service_type')
+            .eq('is_active', true)
+            .order('flow_number');
+        
+        // Doğru alana göre filtrele
+        if (tableStructure === 'service_type_id') {
+            query = query.eq('service_type_id', serviceId);
+        } else {
+            query = query.eq('service_type', serviceId);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error('Soru bulunamadı');
+        
+        serviceQuestions = data;
+        console.log(`✅ ${data.length} soru yüklendi`);
+        
+    } catch (error) {
+        console.error('❌ Sorular yüklenemedi:', error);
+        throw error;
+    }
+}
+
+        // Sistem durumunu kontrol et
+async function checkSystemStatus() {
+    console.log('=== SİSTEM DURUM KONTROLÜ ===');
+    
+    try {
+        // 1. Service types kontrolü
+        const { data: services, error: servicesError } = await supabase
+            .from('ai_service_type')
+            .select('id, service_name')
+            .limit(5);
+        
+        console.log('Service Types:', servicesError ? 'HATA' : services);
+        
+        // 2. Questions kontrolü  
+        const { data: questions, error: questionsError } = await supabase
+            .from('ai_question')
+            .select('id, question, service_type_id, service_type')
+            .limit(5);
+            
+        console.log('Questions:', questionsError ? 'HATA' : questions);
+        
+        // 3. Tablo yapısı
+        await detectTableStructure();
+        
+    } catch (error) {
+        console.error('Sistem kontrol hatası:', error);
+    }
+}
+
+// Sayfa yüklendiğinde kontrol et
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(checkSystemStatus, 1000);
+});
+        
         // Cevap Gönderme İşlemi - GÜNCELLENDİ
 function handleAnswerSubmit() {
     const chatInput = document.getElementById('chat-input');
