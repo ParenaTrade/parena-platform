@@ -914,7 +914,7 @@ let serviceTypesLoaded = false;
 
 // En basit ve güvenli yöntem
 async function loadServiceTypesSimple() {
-        try {
+            try {
         console.log('🔍 Hizmet türleri yükleniyor...');
         
         const { data, error } = await supabase
@@ -922,30 +922,26 @@ async function loadServiceTypesSimple() {
             .select('id, service_name')
             .order('service_name');
         
-        if (error) {
-            console.error('❌ Supabase hatası:', error);
+        if (error) throw error;
+        
+        // EN BASİT YOL: data varsa işle
+        if (!data || data.length === 0) {
+            console.error('❌ Tablo boş');
             return false;
         }
         
-        // BASİT KONTROL: data var mı ve içinde kayıt var mı?
-        if (data && data.length > 0) {
-            const serviceSelect = document.getElementById('service-select');
-            serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
-            
-            data.forEach(service => {
-                const option = document.createElement('option');
-                option.value = service.id;
-                option.textContent = service.service_name;
-                serviceSelect.appendChild(option);
-            });
-            
-            console.log(`✅ ${data.length} hizmet türü yüklendi`);
-            return true;
-            
-        } else {
-            console.error('❌ Veri boş veya hiç kayıt yok');
-            return false;
-        }
+        const serviceSelect = document.getElementById('service-select');
+        serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
+        
+        data.forEach(service => {
+            const option = document.createElement('option');
+            option.value = service.id;
+            option.textContent = service.service_name;
+            serviceSelect.appendChild(option);
+        });
+        
+        console.log(`✅ ${data.length} hizmet türü yüklendi`);
+        return true;
         
     } catch (error) {
         console.error('❌ Hizmet türleri yüklenirken hata:', error);
