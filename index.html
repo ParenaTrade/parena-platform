@@ -1168,7 +1168,7 @@ function setupCompanyAnalysisChat() {
         }
     });
 
-// 3. Service Change Handler - SADELEŞTİRİLMİŞ
+// Service değişim handler'ı - GÜNCEL
 async function handleServiceChange() {
     const selectedServiceId = this.value;
     const chatInputArea = document.getElementById('chat-input-area');
@@ -1194,12 +1194,12 @@ async function handleServiceChange() {
         const selectedServiceName = this.options[this.selectedIndex].text;
         addMessageToChat(`"${selectedServiceName}" hizmeti için analiz başlatılıyor...`);
         
-        // YENİ fonksiyonu kullan
-        const questions = await handleServiceQuestions(selectedServiceId);
+        // GERÇEK soruları yükle
+        await loadServiceQuestionsAdvanced(selectedServiceId);
         
-        if (questions.length > 0) {
+        if (serviceQuestions.length > 0) {
             setTimeout(() => {
-                addMessageToChat(questions[0].question);
+                addMessageToChat(serviceQuestions[0].question);
                 chatInputArea.classList.remove('hidden');
                 goBackBtn.classList.add('hidden');
             }, 1000);
@@ -1208,9 +1208,9 @@ async function handleServiceChange() {
     } catch (error) {
         console.error('❌ Hizmet değişim hatası:', error);
         addMessageToChat("❌ " + error.message);
+        addMessageToChat("🔄 Lütfen farklı bir hizmet seçin veya müşteri hizmetleri ile iletişime geçin.");
     }
-}
-    
+}    
     function handleGoBack() {
         if (currentQuestionIndex > 0) {
             currentQuestionIndex--;
@@ -1320,6 +1320,48 @@ async function loadServiceQuestions(serviceId) {
         throw error; // Hata yukarı fırlatılsın
     }
 }
+
+        // Tablo yapısını kontrol et ve doğru sorguyu belirle
+async function detectTableStructure() {
+    try {
+        console.log('🔍 Tablo yapısı kontrol ediliyor...');
+        
+        // ai_question tablosunun sütunlarını kontrol et
+        const { data: columns, error } = await supabase
+            .from('information_schema.columns')
+            .select('column_name, data_type')
+            .eq('table_name', 'ai_question')
+            .eq('table_schema', 'public');
+        
+        if (error) {
+            console.warn('Tablo yapısı kontrol edilemedi, varsayılan kullanılacak');
+            return 'service_type'; // varsayılan
+        }
+        
+        const hasServiceTypeId = columns.some(col => col.column_name === 'service_type_id');
+        const hasServiceType = columns.some(col => col.column_name === 'service_type');
+        
+        console.log('Tablo sütunları:', columns);
+        console.log('service_type_id var mı?:', hasServiceTypeId);
+        console.log('service_type var mı?:', hasServiceType);
+        
+        if (hasServiceTypeId) {
+            console.log('✅ service_type_id kullanılacak');
+            return 'service_type_id';
+        } else if (hasServiceType) {
+            console.log('✅ service_type kullanılacak');
+            return 'service_type';
+        } else {
+            console.error('❌ Hiçbir eşleşme alanı bulunamadı');
+            throw new Error('Tablo yapısı uyumsuz');
+        }
+        
+    } catch (error) {
+        console.error('Tablo yapısı kontrol hatası:', error);
+        return 'service_type'; // varsayılan
+    }
+}
+
 
 // Güncellenmiş soru yükleme fonksiyonu
 let tableStructure = null;
