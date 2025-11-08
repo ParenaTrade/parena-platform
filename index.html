@@ -862,6 +862,51 @@ async function initializeApp() {
     
     console.log('ParenaTrade uygulaması başlatıldı');
 }   
+
+  // Tablo durumunu kontrol et
+async function checkTableStatus() {
+    try {
+        console.log('=== TABLO DURUM KONTROLÜ ===');
+        
+        // 1. ai_service_type kontrolü
+        const { data: services, count: serviceCount, error: serviceError } = await supabase
+            .from('ai_service_type')
+            .select('*', { count: 'exact' });
+        
+        console.log('ai_service_type:');
+        console.log('- Count:', serviceCount);
+        console.log('- Error:', serviceError);
+        console.log('- Sample:', services?.slice(0, 3));
+        
+        // 2. ai_question kontrolü
+        const { data: questions, count: questionCount, error: questionError } = await supabase
+            .from('ai_question')
+            .select('*', { count: 'exact' })
+            .limit(5);
+            
+        console.log('ai_question:');
+        console.log('- Count:', questionCount);
+        console.log('- Error:', questionError);
+        console.log('- Sample:', questions);
+        
+        // 3. Eşleşme kontrolü
+        if (services && questions) {
+            const serviceIds = services.map(s => s.id);
+            const matchingQuestions = questions.filter(q => 
+                serviceIds.includes(q.service_type_id)
+            );
+            console.log('Eşleşen sorular:', matchingQuestions.length);
+        }
+        
+    } catch (error) {
+        console.error('Tablo kontrol hatası:', error);
+    }
+}
+
+// Sayfa yüklendiğinde kontrol et
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(checkTableStatus, 1000);
+});      
         
 // Global değişken - veri yüklendi mi takip et
 let serviceTypesLoaded = false;
