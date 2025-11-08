@@ -823,21 +823,30 @@
         let currentQuestionIndex = 0;
         let companyProfile = {};
         let serviceQuestions = [];
+        let isInitialized = false;
 
         // DOM yüklendikten sonra çalışacak kodlar
         document.addEventListener('DOMContentLoaded', function() {
             initializeApp();
         });
 
-        // Uygulamayı başlat
-        // Uygulamayı başlat - GÜNCELLENDİ
+ // Uygulamayı başlat - GÜNCELLENDİ
 async function initializeApp() {
-    // Mobile menu toggle
-    const mobileMenuButton = document.getElementById('mobile-menu-button');
-    const mobileMenu = document.getElementById('mobile-menu');
+    // Çift çalışmayı önle
+    if (isInitialized) {
+        console.log('Uygulama zaten başlatılmış');
+        return;
+    }
+    isInitialized = true;
     
-    mobileMenuButton.addEventListener('click', function() {
-        mobileMenu.classList.toggle('hidden');
+    console.log('ParenaTrade uygulaması başlatılıyor...');
+    
+    // Mobile menu toggle - EVENT DELEGATION kullan
+    document.addEventListener('click', function(e) {
+        if (e.target.id === 'mobile-menu-button' || e.target.closest('#mobile-menu-button')) {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        }
     });
     
     // ÖNCE hizmet türlerini yükle
@@ -846,38 +855,33 @@ async function initializeApp() {
     // SONRA rapor şablonlarını yükle
     await loadReportTemplates();
     
-    // Firma Analiz Sohbeti event listener'ları
+    // Firma Analiz Sohbeti event listener'ları - BİR KERE
     setupCompanyAnalysisChat();
     
-    // Hızlı Pazar Sorgulama event listener'ları
+    // Hızlı Pazar Sorgulama event listener'ları - BİR KERE
     setupQuickReportForm();
     
-    // Sepet işlevselliği
+    // Sepet işlevselliği - BİR KERE
     setupCartFunctionality();
     
-    // Modal işlevselliği
+    // Modal işlevselliği - BİR KERE
     setupModalFunctionality();
     
-    // Smooth scrolling for navigation links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                target.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }
-        });
-    });
-    
     console.log('ParenaTrade uygulaması başlatıldı');
-}
+}   
+   
         
-// Hizmet türlerini yükle - GÜNCELLENDİ
+// Hizmet türlerini yükle - GÜNCELLENDİ (çift eklemeyi önle)
 async function loadServiceTypes() {
     try {
+        const serviceSelect = document.getElementById('service-select');
+        
+        // Eğer zaten yüklenmişse tekrar yükleme
+        if (serviceSelect.children.length > 1) {
+            console.log('Hizmet türleri zaten yüklenmiş');
+            return;
+        }
+        
         const { data, error } = await supabase
             .from('ai_service_type')
             .select('id, service_name')
@@ -885,7 +889,7 @@ async function loadServiceTypes() {
         
         if (error) throw error;
         
-        const serviceSelect = document.getElementById('service-select');
+        // Select'i temizle (sadece ilk option kalacak)
         serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
         
         if (data && data.length > 0) {
@@ -895,135 +899,159 @@ async function loadServiceTypes() {
                 option.textContent = service.service_name;
                 serviceSelect.appendChild(option);
             });
+            console.log(`${data.length} hizmet türü yüklendi`);
         } else {
             // Fallback: Varsayılan hizmet türleri
             console.warn('Supabase\'den hizmet türleri alınamadı, fallback kullanılıyor');
-            const defaultServices = [
-                { id: 'hedef_ulke_rapor', service_name: 'Hedef Ülke Kapsamlı Rapor' },
-                { id: 'firma_kurulus', service_name: 'Firma Kuruluşu' },
-                { id: 'banka_hesap', service_name: 'Banka Hesabı Açılışı' },
-                { id: 'muhasebe', service_name: 'Muhasebe İşlemleri' },
-                { id: 'ihracat_kredileri', service_name: 'İhracat Kredileri' }
-            ];
-            
-            defaultServices.forEach(service => {
-                const option = document.createElement('option');
-                option.value = service.id;
-                option.textContent = service.service_name;
-                serviceSelect.appendChild(option);
-            });
+            loadDefaultServices();
         }
     } catch (error) {
         console.error('Hizmet türleri yüklenirken hata:', error);
+        loadDefaultServices();
     }
 }
 
-        // Rapor Şablonlarını Yükle
-        async function loadReportTemplates() {
-            try {
-                // Burada Supabase'den şablonları çekeceğiz
-                // Şimdilik mock data kullanıyoruz
-                aiReportTemplates = [
-                    {
-                        id: 'kapsamli',
-                        report_name: 'Kapsamlı Pazar Raporu',
-                        report_type: 'kapsamli',
-                        report_description: 'Ürün, sektör ve ülke bazında derin pazar analizi, fiyat trendleri, rakip ve stratejik fırsat raporu.',
-                        report_price: 199.00,
-                        report_currency: 'USD',
-                        report_prompt: 'Sen bir uluslararası ticaret ve pazar araştırma uzmanısın. Aşağıdaki parametrelere göre profesyonel, veri odaklı ve yönetim sunumuna uygun bir "Kapsamlı Pazar Raporu" hazırla. Rapor dili: {{dil}}. Ülke: {{ulke}} Sektör: {{sektor}} Ürün: {{urun}} Bölge: {{bolge}} GTIP: {{gtip}} Zaman Aralığı: {{zaman}} Amaç: {{amac}} Derinlik Düzeyi: {{derinlik}} Rapor Türü: {{rapor_turu}}'
-                    },
-                    {
-                        id: 'firma_bazli',
-                        report_name: 'Firma Bazlı Pazar Raporu',
-                        report_type: 'firma_bazli',
-                        report_description: 'Belirli üretici veya marka için pazar, fiyat ve rekabet analizi raporu.',
-                        report_price: 129.00,
-                        report_currency: 'USD',
-                        report_prompt: 'Sen bir uluslararası ticaret analisti ve finans danışmanısın. Belirli bir üretici veya markaya ait veriler doğrultusunda "Firma Bazlı Pazar Raporu" hazırla. Rapor dili: {{dil}}. Firma Adı: {{urun}} Ülke: {{ulke}} Sektör: {{sektor}} Bölge: {{bolge}} Zaman Aralığı: {{zaman}} Amaç: {{amac}}'
-                    },
-                    {
-                        id: 'gtip_bazli',
-                        report_name: 'GTIP Bazlı Ticaret Raporu',
-                        report_type: 'gtip_bazli',
-                        report_description: 'GTIP (HS kodu) bazında ithalat/ihracat verileri, fiyat trendleri ve fırsat analizi raporu.',
-                        report_price: 159.00,
-                        report_currency: 'USD',
-                        report_prompt: 'Sen bir dış ticaret ve gümrük veri analisti olarak çalışıyorsun. Belirli bir GTIP (HS) koduna göre uluslararası ticaret raporu oluştur. Rapor dili: {{dil}}. GTIP Kodu: {{gtip}} Ürün Adı: {{urun}} Ülke: {{ulke}} Zaman Aralığı: {{zaman}} Amaç: {{amac}}'
-                    }
-                ];
-
-                // Rapor şablonlarını select'e yükle
-                const templateSelect = document.getElementById('report-template-select');
-                aiReportTemplates.forEach(template => {
-                    const option = document.createElement('option');
-                    option.value = template.id;
-                    option.textContent = `${template.report_name} - $${template.report_price}`;
-                    templateSelect.appendChild(option);
-                });
-
-                // Hizmet paketlerini yükle
-                loadServicePackages();
-
-            } catch (error) {
-                console.error('Rapor şablonları yüklenirken hata:', error);
+        // Varsayılan hizmet türleri - GÜNCELLENDİ (çift eklemeyi önle)
+function loadDefaultServices() {
+    const serviceSelect = document.getElementById('service-select');
+    
+    // Eğer zaten yüklenmişse tekrar yükleme
+    if (serviceSelect.children.length > 1) return;
+    
+    const defaultServices = [
+        { id: 'hedef_ulke_rapor', service_name: 'Hedef Ülke Kapsamlı Rapor' },
+        { id: 'firma_kurulus', service_name: 'Firma Kuruluşu' },
+        { id: 'banka_hesap', service_name: 'Banka Hesabı Açılışı' },
+        { id: 'muhasebe', service_name: 'Muhasebe İşlemleri' },
+        { id: 'ihracat_kredileri', service_name: 'İhracat Kredileri' }
+    ];
+    
+    defaultServices.forEach(service => {
+        const option = document.createElement('option');
+        option.value = service.id;
+        option.textContent = service.service_name;
+        serviceSelect.appendChild(option);
+    });
+}
+        
+ // Rapor Şablonlarını Yükle - GÜNCELLENDİ (çift eklemeyi önle)
+async function loadReportTemplates() {
+    try {
+        const templateSelect = document.getElementById('report-template-select');
+        
+        // Eğer zaten yüklenmişse tekrar yükleme
+        if (templateSelect.children.length > 1) {
+            console.log('Rapor şablonları zaten yüklenmiş');
+            return;
+        }
+        
+        // Burada Supabase'den şablonları çekeceğiz
+        // Şimdilik mock data kullanıyoruz
+        aiReportTemplates = [
+            {
+                id: 'kapsamli',
+                report_name: 'Kapsamlı Pazar Raporu',
+                report_type: 'kapsamli',
+                report_description: 'Ürün, sektör ve ülke bazında derin pazar analizi, fiyat trendleri, rakip ve stratejik fırsat raporu.',
+                report_price: 199.00,
+                report_currency: 'USD',
+                report_prompt: 'Sen bir uluslararası ticaret ve pazar araştırma uzmanısın. Aşağıdaki parametrelere göre profesyonel, veri odaklı ve yönetim sunumuna uygun bir "Kapsamlı Pazar Raporu" hazırla. Rapor dili: {{dil}}. Ülke: {{ulke}} Sektör: {{sektor}} Ürün: {{urun}} Bölge: {{bolge}} GTIP: {{gtip}} Zaman Aralığı: {{zaman}} Amaç: {{amac}} Derinlik Düzeyi: {{derinlik}} Rapor Türü: {{rapor_turu}}'
+            },
+            {
+                id: 'firma_bazli',
+                report_name: 'Firma Bazlı Pazar Raporu',
+                report_type: 'firma_bazli',
+                report_description: 'Belirli üretici veya marka için pazar, fiyat ve rekabet analizi raporu.',
+                report_price: 129.00,
+                report_currency: 'USD',
+                report_prompt: 'Sen bir uluslararası ticaret analisti ve finans danışmanısın. Belirli bir üretici veya markaya ait veriler doğrultusunda "Firma Bazlı Pazar Raporu" hazırla. Rapor dili: {{dil}}. Firma Adı: {{urun}} Ülke: {{ulke}} Sektör: {{sektor}} Bölge: {{bolge}} Zaman Aralığı: {{zaman}} Amaç: {{amac}}'
+            },
+            {
+                id: 'gtip_bazli',
+                report_name: 'GTIP Bazlı Ticaret Raporu',
+                report_type: 'gtip_bazli',
+                report_description: 'GTIP (HS kodu) bazında ithalat/ihracat verileri, fiyat trendleri ve fırsat analizi raporu.',
+                report_price: 159.00,
+                report_currency: 'USD',
+                report_prompt: 'Sen bir dış ticaret ve gümrük veri analisti olarak çalışıyorsun. Belirli bir GTIP (HS) koduna göre uluslararası ticaret raporu oluştur. Rapor dili: {{dil}}. GTIP Kodu: {{gtip}} Ürün Adı: {{urun}} Ülke: {{ulke}} Zaman Aralığı: {{zaman}} Amaç: {{amac}}'
             }
-        }
+        ];
 
-        // Hizmet Paketlerini Yükle
-        function loadServicePackages() {
-            const packagesContainer = document.getElementById('ai-report-templates');
-            
-            aiReportTemplates.forEach(template => {
-                const packageHTML = `
-                    <div class="bg-white rounded-xl shadow-md service-card">
-                        <div class="p-6 border-b border-gray-200">
-                            <div class="sector-icon text-center">
-                                <i class="fas fa-chart-line"></i>
-                            </div>
-                            <h3 class="text-xl font-bold mb-2 text-center">${template.report_name}</h3>
-                            <p class="text-gray-600 text-center mb-4">${template.report_description}</p>
-                            <div class="text-center mb-4">
-                                <span class="text-3xl font-bold text-indigo-600">$${template.report_price}</span>
-                                <span class="text-gray-500">${template.report_currency}</span>
-                            </div>
-                        </div>
-                        <div class="p-6">
-                            <ul class="space-y-3 mb-6">
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>AI destekli analiz</span>
-                                </li>
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>Detaylı pazar verileri</span>
-                                </li>
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>Rakip analizi</span>
-                                </li>
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>Fiyat trendleri</span>
-                                </li>
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>Stratejik öneriler</span>
-                                </li>
-                            </ul>
-                            <button class="w-full bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300 add-ai-report" 
-                                    data-id="${template.id}" 
-                                    data-name="${template.report_name}" 
-                                    data-price="${template.report_price}">
-                                Sepete Ekle
-                            </button>
-                        </div>
+        // Rapor şablonlarını select'e yükle - TEMİZLE ve EKLE
+        templateSelect.innerHTML = '<option value="">Rapor türü seçin</option>';
+        aiReportTemplates.forEach(template => {
+            const option = document.createElement('option');
+            option.value = template.id;
+            option.textContent = `${template.report_name} - $${template.report_price}`;
+            templateSelect.appendChild(option);
+        });
+
+        // Hizmet paketlerini yükle - BİR KERE
+        loadServicePackages();
+
+        console.log(`${aiReportTemplates.length} rapor şablonu yüklendi`);
+
+    } catch (error) {
+        console.error('Rapor şablonları yüklenirken hata:', error);
+    }
+}
+
+ // Hizmet Paketlerini Yükle - GÜNCELLENDİ (çift eklemeyi önle)
+function loadServicePackages() {
+    const packagesContainer = document.getElementById('ai-report-templates');
+    
+    // Eğer zaten yüklenmişse temizle
+    packagesContainer.innerHTML = '';
+    
+    aiReportTemplates.forEach(template => {
+        const packageHTML = `
+            <div class="bg-white rounded-xl shadow-md service-card">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="sector-icon text-center">
+                        <i class="fas fa-chart-line"></i>
                     </div>
-                `;
-                packagesContainer.innerHTML += packageHTML;
-            });
-        }
-
+                    <h3 class="text-xl font-bold mb-2 text-center">${template.report_name}</h3>
+                    <p class="text-gray-600 text-center mb-4">${template.report_description}</p>
+                    <div class="text-center mb-4">
+                        <span class="text-3xl font-bold text-indigo-600">$${template.report_price}</span>
+                        <span class="text-gray-500">${template.report_currency}</span>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <ul class="space-y-3 mb-6">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>AI destekli analiz</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>Detaylı pazar verileri</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>Rakip analizi</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>Fiyat trendleri</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>Stratejik öneriler</span>
+                        </li>
+                    </ul>
+                    <button class="w-full bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300 add-ai-report" 
+                            data-id="${template.id}" 
+                            data-name="${template.report_name}" 
+                            data-price="${template.report_price}">
+                        Sepete Ekle
+                    </button>
+                </div>
+            </div>
+        `;
+        packagesContainer.innerHTML += packageHTML;
+    });
+}
         // Mesajı sohbete ekle
         function addMessageToChat(message, isUser = false) {
             const chatContainer = document.getElementById('chat-container');
@@ -1035,8 +1063,7 @@ async function loadServiceTypes() {
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        // Firma Analiz Sohbeti Kurulumu
-        // Firma Analiz Sohbeti Kurulumu - GÜNCELLENDİ
+// Firma Analiz Sohbeti Kurulumu - GÜNCELLENDİ (çift event listener'ı önle)
 function setupCompanyAnalysisChat() {
     const serviceSelect = document.getElementById('service-select');
     const chatInput = document.getElementById('chat-input');
@@ -1044,7 +1071,28 @@ function setupCompanyAnalysisChat() {
     const goBackBtn = document.getElementById('go-back-btn');
     const chatInputArea = document.getElementById('chat-input-area');
 
-    serviceSelect.addEventListener('change', async function() {
+    // Event listener'ları temizle (çift eklenmesini önlemek için)
+    serviceSelect.replaceWith(serviceSelect.cloneNode(true));
+    const newServiceSelect = document.getElementById('service-select');
+    
+    sendTextButton.replaceWith(sendTextButton.cloneNode(true));
+    const newSendTextButton = document.getElementById('send-text');
+    
+    goBackBtn.replaceWith(goBackBtn.cloneNode(true));
+    const newGoBackBtn = document.getElementById('go-back-btn');
+
+    // Yeni event listener'ları ekle
+    newServiceSelect.addEventListener('change', handleServiceChange);
+    newSendTextButton.addEventListener('click', handleAnswerSubmit);
+    newGoBackBtn.addEventListener('click', handleGoBack);
+    
+    chatInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleAnswerSubmit();
+        }
+    });
+
+    async function handleServiceChange() {
         const selectedServiceId = this.value;
         if (selectedServiceId) {
             currentService = selectedServiceId;
@@ -1071,7 +1119,7 @@ function setupCompanyAnalysisChat() {
                 setTimeout(() => {
                     addMessageToChat(serviceQuestions[0].question);
                     chatInputArea.classList.remove('hidden');
-                    goBackBtn.classList.add('hidden');
+                    newGoBackBtn.classList.add('hidden');
                 }, 1000);
             } else {
                 addMessageToChat("Bu hizmet için henüz soru bulunmamaktadır.");
@@ -1081,16 +1129,9 @@ function setupCompanyAnalysisChat() {
             chatInputArea.classList.add('hidden');
             addMessageToChat("Lütfen ilgilendiğiniz hizmeti seçin.");
         }
-    });
+    }
 
-    sendTextButton.addEventListener('click', handleAnswerSubmit);
-    chatInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            handleAnswerSubmit();
-        }
-    });
-
-    goBackBtn.addEventListener('click', function() {
+    function handleGoBack() {
         if (currentQuestionIndex > 0) {
             currentQuestionIndex--;
             // Önceki soruya dön
@@ -1106,14 +1147,13 @@ function setupCompanyAnalysisChat() {
             
             // Önceki soruyu tekrar sor
             addMessageToChat(previousQuestion);
-            goBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
+            newGoBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
             
             // Form alanını temizle
             chatInput.value = '';
         }
-    });
+    }
 }
-
         // Hizmet sorularını yükle - GÜNCELLENDİ
 async function loadServiceQuestions(serviceId) {
     try {
@@ -1764,15 +1804,26 @@ async function checkSupabaseConnection() {
     }
 }
 
-// Sayfa yüklendiğinde bağlantıyı test et
+// Sayfa yüklendiğinde bağlantıyı test et - GÜNCELLENDİ
 document.addEventListener('DOMContentLoaded', async function() {
+    console.log('DOM yüklendi, uygulama başlatılıyor...');
     const isConnected = await checkSupabaseConnection();
     if (!isConnected) {
         console.warn('Supabase bağlantısı sorunlu, fallback modunda çalışılıyor');
     }
+    
+    // Sadece bir kere initialize et
     await initializeApp();
-})
+});
 
+// Çift yüklenmeyi önlemek için ayrıca bir kontrol
+let initializationStarted = false;
+
+// Alternatif başlatma yöntemi
+if (!initializationStarted) {
+    initializationStarted = true;
+    document.addEventListener('DOMContentLoaded', initializeApp);
+}
         // Modal İşlevselliği
         function setupModalFunctionality() {
             // Modal kapatma
