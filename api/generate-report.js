@@ -1,47 +1,56 @@
 // pages/api/generate-report.js
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 export default async function handler(req, res) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-    const { prompt, template } = req.body;
+  const { prompt, template, parameters } = req.body;
 
-    try {
-        // OpenAI API çağrısı
-        const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'gpt-4',
-                messages: [{ role: 'user', content: prompt }],
-                max_tokens: 4000,
-                temperature: 0.7,
-            }),
-        });
+  try {
+    console.log('🔍 OpenAI API çağrısı yapılıyor...');
+    console.log('📝 Prompt:', prompt.substring(0, 200) + '...');
 
-        const data = await openaiResponse.json();
-
-        if (!openaiResponse.ok) {
-            throw new Error(data.error?.message || 'OpenAI API hatası');
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'system',
+          content: `Sen bir uluslararası ticaret ve pazar analizi uzmanısın. 
+          ${template || 'pazar raporu'} hazırlıyorsun. 
+          Profesyonel, veri odaklı, yönetim sunumuna uygun ve iş odaklı raporlar hazırla.
+          Raporu Türkçe olarak hazırla ve net, anlaşılır bir dil kullan.`
+        },
+        {
+          role: 'user',
+          content: prompt
         }
+      ],
+      max_tokens: 4000,
+      temperature: 0.7,
+    });
 
-        const reportContent = data.choices[0].message.content;
+    const reportContent = completion.choices[0].message.content;
 
-        // Başarılı yanıt
-        res.json({ 
-            success: true, 
-            content: reportContent,
-            token_usage: data.usage?.total_tokens
-        });
+    console.log('✅ OpenAI başarılı, token kullanımı:', completion.usage?.total_tokens);
 
-    } catch (error) {
-        console.error('OpenAI API hatası:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
-        });
-    }
+    res.json({ 
+      success: true, 
+      result: reportContent,
+      token_usage: completion.usage?.total_tokens
+    });
+
+  } catch (error) {
+    console.error('❌ OpenAI API hatası:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      details: 'OpenAI API anahtarı veya bağlantı hatası'
+    });
+  }
 }
