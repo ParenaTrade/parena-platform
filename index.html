@@ -872,13 +872,14 @@ async function initializeApp() {
    
         
 // Hizmet türlerini yükle - GERÇEK KONTROLLÜ
+// 1. İLK YÜKLEME için - sadece bir kere çalışsın
 async function loadServiceTypes() {
     try {
         const serviceSelect = document.getElementById('service-select');
         
-        // GERÇEK kontrol: sadece "Hizmet seçin" varsa yükle
+        // Gerçek kontrol: sadece "Hizmet seçin" varsa yükle
         if (serviceSelect.children.length > 1) {
-            console.log('Hizmet türleri zaten yüklenmiş, çift yükleme önlendi');
+            console.log('Hizmet türleri zaten yüklenmiş');
             return;
         }
         
@@ -891,39 +892,97 @@ async function loadServiceTypes() {
         
         if (error) {
             console.error('❌ Supabase hatası:', error);
-            throw new Error('Hizmet türleri yüklenemedi: ' + error.message);
+            throw error;
         }
         
-        if (!data || data.length === 0) {
+        console.log('Supabase verisi:', data); // DEBUG
+        
+        if (data && data.length > 0) {
+            // Select'i temizle
+            serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
+            
+            data.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id; // UUID olacak
+                option.textContent = service.service_name;
+                serviceSelect.appendChild(option);
+            });
+            console.log(`✅ ${data.length} hizmet türü yüklendi`);
+        } else {
             console.error('❌ Supabase\'de hiç hizmet türü bulunamadı');
-            throw new Error('Sistemde tanımlı hizmet bulunamadı');
+            throw new Error('Hizmet türleri bulunamadı');
         }
-        
-        // Select'i temizle
-        serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
-        
-        // Verileri ekle
-        data.forEach(service => {
-            const option = document.createElement('option');
-            option.value = service.id;
-            option.textContent = service.service_name;
-            serviceSelect.appendChild(option);
-        });
-        
-        console.log(`✅ ${data.length} hizmet türü başarıyla yüklendi`);
         
     } catch (error) {
         console.error('❌ Hizmet türleri yüklenirken hata:', error);
-        
-        // FALLBACK SADECE GERÇEK HATA DURUMUNDA
+        // SADECE gerçekten boşsa fallback kullan
         const serviceSelect = document.getElementById('service-select');
         if (serviceSelect.children.length <= 1) {
-            console.warn('Fallback hizmet türleri yükleniyor...');
             loadDefaultServices();
         }
     }
 }
 
+// 2. SELECT DEĞİŞİMİ için - farklı fonksiyon
+async function handleServiceQuestions(selectedServiceId) {
+    try {
+        console.log('🔍 Sorular yükleniyor, serviceId:', selectedServiceId);
+        
+        if (!selectedServiceId) {
+            throw new Error('Geçersiz service ID');
+        }
+        
+        // Konsola göre: hem service_type_id HEM service_type var
+        // service_type_id: UUID (f3c8c3b7-5cd9-4579-b26d-3b757334fc3b)
+        // service_type: string ('hedef_ulke_rapor')
+        
+        let query = supabase
+            .from('ai_question')
+            .select('id, question, flow_number, service_type_id, service_type')
+            .eq('is_active', true)
+            .order('flow_number');
+        
+        // ÖNCE: UUID ile eşleştirmeyi dene (gerçek ID)
+        query = query.eq('service_type_id', selectedServiceId);
+        
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+            serviceQuestions = data;
+            console.log(`✅ ${data.length} soru yüklendi (UUID eşleşmesi)`);
+            return data;
+        }
+        
+        // Eğer UUID ile eşleşme yoksa, FALLBACK ID'ler için string eşleştirme yap
+        console.log('UUID eşleşmesi bulunamadı, fallback deneniyor...');
+        
+        const fallbackQuery = supabase
+            .from('ai_question')
+            .select('id, question, flow_number, service_type_id, service_type')
+            .eq('service_type', selectedServiceId)
+            .eq('is_active', true)
+            .order('flow_number');
+            
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+        
+        if (fallbackError) throw fallbackError;
+        
+        if (fallbackData && fallbackData.length > 0) {
+            serviceQuestions = fallbackData;
+            console.log(`✅ ${fallbackData.length} soru yüklendi (string eşleşmesi)`);
+            return fallbackData;
+        }
+        
+        throw new Error('Bu hizmet için soru bulunamadı');
+        
+    } catch (error) {
+        console.error('❌ Sorular yüklenemedi:', error);
+        throw error;
+    }
+}
+        
 // Varsayılan hizmet türleri - SADECE GERÇEK İHTİYAÇ DURUMUNDA
 function loadDefaultServices() {
     const serviceSelect = document.getElementById('service-select');
@@ -1109,7 +1168,7 @@ function setupCompanyAnalysisChat() {
         }
     });
 
-    // Service değişim handler'ı - GÜNCEL
+// 3. Service Change Handler - SADELEŞTİRİLMİŞ
 async function handleServiceChange() {
     const selectedServiceId = this.value;
     const chatInputArea = document.getElementById('chat-input-area');
@@ -1135,12 +1194,12 @@ async function handleServiceChange() {
         const selectedServiceName = this.options[this.selectedIndex].text;
         addMessageToChat(`"${selectedServiceName}" hizmeti için analiz başlatılıyor...`);
         
-        // GERÇEK soruları yükle
-        await loadServiceQuestionsAdvanced(selectedServiceId);
+        // YENİ fonksiyonu kullan
+        const questions = await handleServiceQuestions(selectedServiceId);
         
-        if (serviceQuestions.length > 0) {
+        if (questions.length > 0) {
             setTimeout(() => {
-                addMessageToChat(serviceQuestions[0].question);
+                addMessageToChat(questions[0].question);
                 chatInputArea.classList.remove('hidden');
                 goBackBtn.classList.add('hidden');
             }, 1000);
@@ -1149,9 +1208,9 @@ async function handleServiceChange() {
     } catch (error) {
         console.error('❌ Hizmet değişim hatası:', error);
         addMessageToChat("❌ " + error.message);
-        addMessageToChat("🔄 Lütfen farklı bir hizmet seçin veya müşteri hizmetleri ile iletişime geçin.");
     }
 }
+    
     function handleGoBack() {
         if (currentQuestionIndex > 0) {
             currentQuestionIndex--;
@@ -1175,6 +1234,49 @@ async function handleServiceChange() {
         }
     }
 }
+
+        // 4. Tablo verisini debug için göster
+async function debugServiceTypes() {
+    try {
+        const { data, error } = await supabase
+            .from('ai_service_type')
+            .select('*');
+        
+        if (error) {
+            console.error('Debug hatası:', error);
+            return;
+        }
+        
+        console.log('🔍 ai_service_type tablosu:', data);
+        console.log('📊 Toplam hizmet:', data?.length || 0);
+        
+        // Questions tablosunu da kontrol et
+        const { data: questions, error: qError } = await supabase
+            .from('ai_question')
+            .select('id, question, service_type_id, service_type')
+            .limit(10);
+            
+        if (!qError && questions) {
+            console.log('🔍 ai_question tablosu (ilk 10):', questions);
+            
+            // Eşleşmeleri göster
+            const serviceIds = data?.map(s => s.id) || [];
+            const matchingQuestions = questions.filter(q => 
+                serviceIds.includes(q.service_type_id)
+            );
+            console.log('🔗 Eşleşen sorular:', matchingQuestions.length);
+        }
+        
+    } catch (error) {
+        console.error('Debug hatası:', error);
+    }
+}
+
+// Sayfa yüklendiğinde debug çalıştır
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(debugServiceTypes, 1500);
+});
+        
   // Hizmet sorularını yükle - TABLO YAPISINA UYGUN
 async function loadServiceQuestions(serviceId) {
     try {
