@@ -830,88 +830,93 @@
         });
 
         // Uygulamayı başlat
-        async function initializeApp() {
-            // Mobile menu toggle
-            const mobileMenuButton = document.getElementById('mobile-menu-button');
-            const mobileMenu = document.getElementById('mobile-menu');
-            
-            mobileMenuButton.addEventListener('click', function() {
-                mobileMenu.classList.toggle('hidden');
-            });
-            
-            // Rapor şablonlarını yükle
-            await loadReportTemplates();
-            
-            // Hizmet türlerini yükle
-            await loadServiceTypes();
-            
-            // Firma Analiz Sohbeti event listener'ları
-            setupCompanyAnalysisChat();
-            
-            // Hızlı Pazar Sorgulama event listener'ları
-            setupQuickReportForm();
-            
-            // Sepet işlevselliği
-            setupCartFunctionality();
-            
-            // Modal işlevselliği
-            setupModalFunctionality();
-            
-            // Smooth scrolling for navigation links
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    const target = document.querySelector(this.getAttribute('href'));
-                    if (target) {
-                        target.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start'
-                        });
-                    }
+        // Uygulamayı başlat - GÜNCELLENDİ
+async function initializeApp() {
+    // Mobile menu toggle
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const mobileMenu = document.getElementById('mobile-menu');
+    
+    mobileMenuButton.addEventListener('click', function() {
+        mobileMenu.classList.toggle('hidden');
+    });
+    
+    // ÖNCE hizmet türlerini yükle
+    await loadServiceTypes();
+    
+    // SONRA rapor şablonlarını yükle
+    await loadReportTemplates();
+    
+    // Firma Analiz Sohbeti event listener'ları
+    setupCompanyAnalysisChat();
+    
+    // Hızlı Pazar Sorgulama event listener'ları
+    setupQuickReportForm();
+    
+    // Sepet işlevselliği
+    setupCartFunctionality();
+    
+    // Modal işlevselliği
+    setupModalFunctionality();
+    
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
                 });
+            }
+        });
+    });
+    
+    console.log('ParenaTrade uygulaması başlatıldı');
+}
+        
+// Hizmet türlerini yükle - GÜNCELLENDİ
+async function loadServiceTypes() {
+    try {
+        const { data, error } = await supabase
+            .from('ai_service_type')
+            .select('id, service_name')
+            .order('service_name');
+        
+        if (error) throw error;
+        
+        const serviceSelect = document.getElementById('service-select');
+        serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
+        
+        if (data && data.length > 0) {
+            data.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id;
+                option.textContent = service.service_name;
+                serviceSelect.appendChild(option);
+            });
+        } else {
+            // Fallback: Varsayılan hizmet türleri
+            console.warn('Supabase\'den hizmet türleri alınamadı, fallback kullanılıyor');
+            const defaultServices = [
+                { id: 'hedef_ulke_rapor', service_name: 'Hedef Ülke Kapsamlı Rapor' },
+                { id: 'firma_kurulus', service_name: 'Firma Kuruluşu' },
+                { id: 'banka_hesap', service_name: 'Banka Hesabı Açılışı' },
+                { id: 'muhasebe', service_name: 'Muhasebe İşlemleri' },
+                { id: 'ihracat_kredileri', service_name: 'İhracat Kredileri' }
+            ];
+            
+            defaultServices.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id;
+                option.textContent = service.service_name;
+                serviceSelect.appendChild(option);
             });
         }
-
-        // Hizmet türlerini yükle
-        async function loadServiceTypes() {
-            try {
-                const { data, error } = await supabase
-                    .from('ai_service_type')
-                    .select('*')
-                    .order('service_name');
-                
-                if (error) throw error;
-                
-                const serviceSelect = document.getElementById('service-select');
-                
-                if (data && data.length > 0) {
-                    data.forEach(service => {
-                        const option = document.createElement('option');
-                        option.value = service.id;
-                        option.textContent = service.service_name;
-                        serviceSelect.appendChild(option);
-                    });
-                } else {
-                    // Fallback: Varsayılan hizmet türleri
-                    const defaultServices = [
-                        { id: 'hedef_ulke_rapor', service_name: 'Hedef Ülke Kapsamlı Rapor' },
-                        { id: 'firma_kurulus', service_name: 'Firma Kuruluşu' },
-                        { id: 'banka_hesap', service_name: 'Banka Hesabı Açılışı' },
-                        { id: 'muhasebe', service_name: 'Muhasebe İşlemleri' },
-                        { id: 'ihracat_kredileri', service_name: 'İhracat Kredileri' }
-                    ];
-                    
-                    defaultServices.forEach(service => {
-                        const option = document.createElement('option');
-                        option.value = service.id;
-                        option.textContent = service.service_name;
-                        serviceSelect.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('Hizmet türleri yüklenirken hata:', error);
-            }
-        }
+    } catch (error) {
+        console.error('Hizmet türleri yüklenirken hata:', error);
+    }
+}
 
         // Rapor Şablonlarını Yükle
         async function loadReportTemplates() {
@@ -1031,138 +1036,183 @@
         }
 
         // Firma Analiz Sohbeti Kurulumu
-        function setupCompanyAnalysisChat() {
-            const serviceSelect = document.getElementById('service-select');
-            const chatInput = document.getElementById('chat-input');
-            const sendTextButton = document.getElementById('send-text');
-            const goBackBtn = document.getElementById('go-back-btn');
-            const chatInputArea = document.getElementById('chat-input-area');
+        // Firma Analiz Sohbeti Kurulumu - GÜNCELLENDİ
+function setupCompanyAnalysisChat() {
+    const serviceSelect = document.getElementById('service-select');
+    const chatInput = document.getElementById('chat-input');
+    const sendTextButton = document.getElementById('send-text');
+    const goBackBtn = document.getElementById('go-back-btn');
+    const chatInputArea = document.getElementById('chat-input-area');
 
-            serviceSelect.addEventListener('change', async function() {
-                const selectedServiceId = this.value;
-                if (selectedServiceId) {
-                    currentService = selectedServiceId;
-                    currentQuestionIndex = 0;
-                    companyProfile[selectedServiceId] = {};
-                    
-                    // Soruları Supabase'den yükle
-                    await loadServiceQuestions(selectedServiceId);
-                    
-                    if (serviceQuestions.length > 0) {
-                        // Sohbeti başlat
-                        addMessageToChat(serviceQuestions[0].question);
-                        chatInputArea.classList.remove('hidden');
-                        goBackBtn.classList.add('hidden');
-                    } else {
-                        addMessageToChat("Bu hizmet için henüz soru bulunmamaktadır.");
-                    }
-                }
-            });
-
-            sendTextButton.addEventListener('click', handleAnswerSubmit);
-            chatInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    handleAnswerSubmit();
-                }
-            });
-
-            goBackBtn.addEventListener('click', function() {
-                if (currentQuestionIndex > 0) {
-                    currentQuestionIndex--;
-                    // Önceki soruya dön
-                    const previousQuestion = serviceQuestions[currentQuestionIndex].question;
-                    // Sohbeti düzenle (son 2 mesajı kaldır)
-                    const chatContainer = document.getElementById('chat-container');
-                    chatContainer.removeChild(chatContainer.lastChild);
-                    chatContainer.removeChild(chatContainer.lastChild);
-                    
-                    addMessageToChat(previousQuestion);
-                    goBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
-                }
-            });
+    serviceSelect.addEventListener('change', async function() {
+        const selectedServiceId = this.value;
+        if (selectedServiceId) {
+            currentService = selectedServiceId;
+            currentQuestionIndex = 0;
+            companyProfile[selectedServiceId] = {};
+            
+            // Sohbet konteynırını temizle (ilk mesaj hariç)
+            const chatContainer = document.getElementById('chat-container');
+            const initialMessage = chatContainer.querySelector('.chat-bubble:first-child');
+            chatContainer.innerHTML = '';
+            if (initialMessage) {
+                chatContainer.appendChild(initialMessage);
+            }
+            
+            // Seçilen hizmetin adını al
+            const selectedServiceName = this.options[this.selectedIndex].text;
+            addMessageToChat(`"${selectedServiceName}" hizmeti için analiz başlatılıyor...`);
+            
+            // Soruları Supabase'den yükle
+            await loadServiceQuestions(selectedServiceId);
+            
+            if (serviceQuestions.length > 0) {
+                // İlk soruyu sor
+                setTimeout(() => {
+                    addMessageToChat(serviceQuestions[0].question);
+                    chatInputArea.classList.remove('hidden');
+                    goBackBtn.classList.add('hidden');
+                }, 1000);
+            } else {
+                addMessageToChat("Bu hizmet için henüz soru bulunmamaktadır.");
+            }
+        } else {
+            // Hizmet seçimi kaldırıldıysa
+            chatInputArea.classList.add('hidden');
+            addMessageToChat("Lütfen ilgilendiğiniz hizmeti seçin.");
         }
+    });
 
-        // Hizmet sorularını yükle
-        async function loadServiceQuestions(serviceId) {
-            try {
-                const { data, error } = await supabase
-                    .from('ai_question')
-                    .select('*')
-                    .eq('service_type', serviceId)
-                    .eq('is_active', true)
-                    .order('flow_number');
-                
-                if (error) throw error;
-                
-                if (data && data.length > 0) {
-                    serviceQuestions = data;
-                } else {
-                    // Fallback: Varsayılan sorular
-                    const defaultQuestions = {
-                        'hedef_ulke_rapor': [
-                            { question: "Hedef ülkeniz hangisi?", flow_number: 1 },
-                            { question: "Hangi sektörde faaliyet göstermeyi planlıyorsunuz?", flow_number: 2 },
-                            { question: "Ürün/hizmetinizin ana özellikleri neler?", flow_number: 3 },
-                            { question: "Rakip analizi yapılmasını istediğiniz firmalar var mı?", flow_number: 4 }
-                        ],
-                        'firma_kurulus': [
-                            { question: "Firma türü ne olacak? (Limited, A.Ş., vb.)", flow_number: 1 },
-                            { question: "Sermaye miktarınız ne kadar?", flow_number: 2 },
-                            { question: "Ortak sayısı kaç kişi?", flow_number: 3 },
-                            { question: "Önceden ticari faaliyetiniz var mıydı?", flow_number: 4 }
-                        ]
-                    };
-                    
-                    if (defaultQuestions[serviceId]) {
-                        serviceQuestions = defaultQuestions[serviceId];
-                    } else {
-                        serviceQuestions = [
-                            { question: "Size nasıl yardımcı olabilirim?", flow_number: 1 }
-                        ];
-                    }
-                }
-            } catch (error) {
-                console.error('Sorular yüklenirken hata:', error);
+    sendTextButton.addEventListener('click', handleAnswerSubmit);
+    chatInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleAnswerSubmit();
+        }
+    });
+
+    goBackBtn.addEventListener('click', function() {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            // Önceki soruya dön
+            const previousQuestion = serviceQuestions[currentQuestionIndex].question;
+            
+            // Sohbeti düzenle (son 2 mesajı kaldır - kullanıcı cevabı ve AI sorusu)
+            const chatContainer = document.getElementById('chat-container');
+            const messages = chatContainer.querySelectorAll('.chat-bubble');
+            if (messages.length >= 2) {
+                chatContainer.removeChild(messages[messages.length - 1]); // Son mesaj (AI sorusu)
+                chatContainer.removeChild(messages[messages.length - 2]); // Son kullanıcı cevabı
+            }
+            
+            // Önceki soruyu tekrar sor
+            addMessageToChat(previousQuestion);
+            goBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
+            
+            // Form alanını temizle
+            chatInput.value = '';
+        }
+    });
+}
+
+        // Hizmet sorularını yükle - GÜNCELLENDİ
+async function loadServiceQuestions(serviceId) {
+    try {
+        const { data, error } = await supabase
+            .from('ai_question')
+            .select('id, question, flow_number, service_type')
+            .eq('service_type', serviceId)
+            .eq('is_active', true)
+            .order('flow_number');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+            serviceQuestions = data;
+            console.log(`Service ${serviceId} için ${data.length} soru yüklendi:`, data);
+        } else {
+            // Fallback: Varsayılan sorular
+            console.warn(`Supabase'den ${serviceId} için soru bulunamadı, fallback kullanılıyor`);
+            const defaultQuestions = {
+                'hedef_ulke_rapor': [
+                    { question: "Hedef ülkeniz hangisi?", flow_number: 1 },
+                    { question: "Hangi sektörde faaliyet göstermeyi planlıyorsunuz?", flow_number: 2 },
+                    { question: "Ürün/hizmetinizin ana özellikleri neler?", flow_number: 3 },
+                    { question: "Rakip analizi yapılmasını istediğiniz firmalar var mı?", flow_number: 4 }
+                ],
+                'firma_kurulus': [
+                    { question: "Firma türü ne olacak? (Limited, A.Ş., vb.)", flow_number: 1 },
+                    { question: "Sermaye miktarınız ne kadar?", flow_number: 2 },
+                    { question: "Ortak sayısı kaç kişi?", flow_number: 3 },
+                    { question: "Önceden ticari faaliyetiniz var mıydı?", flow_number: 4 }
+                ],
+                'banka_hesap': [
+                    { question: "Hangi ülkede banka hesabı açmak istiyorsunuz?", flow_number: 1 },
+                    { question: "Firma hesabı mı bireysel hesap mı?", flow_number: 2 },
+                    { question: "Aylık işlem hacminiz tahmini ne kadar?", flow_number: 3 },
+                    { question: "Online banking ihtiyacınız var mı?", flow_number: 4 }
+                ],
+                'muhasebe': [
+                    { question: "Muhasebe hizmeti almak istediğiniz ülke?", flow_number: 1 },
+                    { question: "Aylık işlem sayınız tahmini?", flow_number: 2 },
+                    { question: "Personel bordrosu hizmeti gerekli mi?", flow_number: 3 },
+                    { question: "Vergi beyanı desteği istiyor musunuz?", flow_number: 4 }
+                ],
+                'ihracat_kredileri': [
+                    { question: "İhracat yapmayı planladığınız ülke?", flow_number: 1 },
+                    { question: "Tahmini ihracat tutarı?", flow_number: 2 },
+                    { question: "Finansman ihtiyacınız ne kadar?", flow_number: 3 },
+                    { question: "Önceden ihracat tecrübeniz var mı?", flow_number: 4 }
+                ]
+            };
+            
+            if (defaultQuestions[serviceId]) {
+                serviceQuestions = defaultQuestions[serviceId];
+            } else {
                 serviceQuestions = [
                     { question: "Size nasıl yardımcı olabilirim?", flow_number: 1 }
                 ];
             }
         }
+    } catch (error) {
+        console.error('Sorular yüklenirken hata:', error);
+        serviceQuestions = [
+            { question: "Size nasıl yardımcı olabilirim?", flow_number: 1 }
+        ];
+    }
+}
+        // Cevap Gönderme İşlemi - GÜNCELLENDİ
+function handleAnswerSubmit() {
+    const chatInput = document.getElementById('chat-input');
+    const message = chatInput.value.trim();
+    const goBackBtn = document.getElementById('go-back-btn');
+    
+    if (!message) return;
 
-        // Cevap Gönderme İşlemi
-        function handleAnswerSubmit() {
-            const chatInput = document.getElementById('chat-input');
-            const message = chatInput.value.trim();
-            const goBackBtn = document.getElementById('go-back-btn');
-            
-            if (!message) return;
+    // Kullanıcı mesajını ekle
+    addMessageToChat(message, true);
 
-            // Kullanıcı mesajını ekle
-            addMessageToChat(message, true);
+    // Şirket profilini güncelle
+    const currentQuestion = serviceQuestions[currentQuestionIndex].question;
+    companyProfile[currentService][currentQuestion] = message;
 
-            // Şirket profilini güncelle
-            const currentQuestion = serviceQuestions[currentQuestionIndex].question;
-            companyProfile[currentService][currentQuestion] = message;
+    chatInput.value = '';
 
-            chatInput.value = '';
-
-            // Sonraki soruya geç veya analiz yap
-            if (currentQuestionIndex < serviceQuestions.length - 1) {
-                currentQuestionIndex++;
-                const nextQuestion = serviceQuestions[currentQuestionIndex].question;
-                setTimeout(() => {
-                    addMessageToChat(nextQuestion);
-                    goBackBtn.classList.remove('hidden');
-                }, 500);
-            } else {
-                // Tüm sorular cevaplandı, analiz yap
-                setTimeout(() => {
-                    addMessageToChat("Teşekkür ederim! Bilgilerinizi analiz ediyorum ve size özel öneriler hazırlıyorum...");
-                    generateCompanyAnalysis();
-                }, 1000);
-            }
-        }
-
+    // Sonraki soruya geç veya analiz yap
+    if (currentQuestionIndex < serviceQuestions.length - 1) {
+        currentQuestionIndex++;
+        const nextQuestion = serviceQuestions[currentQuestionIndex].question;
+        setTimeout(() => {
+            addMessageToChat(nextQuestion);
+            goBackBtn.classList.remove('hidden');
+        }, 500);
+    } else {
+        // Tüm sorular cevaplandı, analiz yap
+        setTimeout(() => {
+            addMessageToChat("Teşekkür ederim! Bilgilerinizi analiz ediyorum ve size özel öneriler hazırlıyorum...");
+            generateCompanyAnalysis();
+        }, 1000);
+    }
+}
        // Şirket Analizi Oluştur - GÜNCELLENDİ
 async function generateCompanyAnalysis() {
     try {
@@ -1692,6 +1742,36 @@ async function handleReportGenerationError(error, template, parameters) {
                 updateAICart();
             }
         }
+
+// Hata ayıklama için Supabase bağlantısını kontrol et
+async function checkSupabaseConnection() {
+    try {
+        const { data, error } = await supabase
+            .from('ai_service_type')
+            .select('count')
+            .limit(1);
+        
+        if (error) {
+            console.error('Supabase bağlantı hatası:', error);
+            return false;
+        }
+        
+        console.log('Supabase bağlantısı başarılı');
+        return true;
+    } catch (error) {
+        console.error('Supabase bağlantı testi hatası:', error);
+        return false;
+    }
+}
+
+// Sayfa yüklendiğinde bağlantıyı test et
+document.addEventListener('DOMContentLoaded', async function() {
+    const isConnected = await checkSupabaseConnection();
+    if (!isConnected) {
+        console.warn('Supabase bağlantısı sorunlu, fallback modunda çalışılıyor');
+    }
+    await initializeApp();
+})
 
         // Modal İşlevselliği
         function setupModalFunctionality() {
