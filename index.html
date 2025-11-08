@@ -830,18 +830,14 @@
             initializeApp();
         });
 
- // Uygulamayı başlat - GÜNCELLENDİ
+// Initialize App'te kullanım
 async function initializeApp() {
-    // Çift çalışmayı önle
-    if (isInitialized) {
-        console.log('Uygulama zaten başlatılmış');
-        return;
-    }
+    if (isInitialized) return;
     isInitialized = true;
     
     console.log('ParenaTrade uygulaması başlatılıyor...');
     
-    // Mobile menu toggle - EVENT DELEGATION kullan
+    // Mobile menu
     document.addEventListener('click', function(e) {
         if (e.target.id === 'mobile-menu-button' || e.target.closest('#mobile-menu-button')) {
             const mobileMenu = document.getElementById('mobile-menu');
@@ -850,44 +846,39 @@ async function initializeApp() {
     });
     
     // ÖNCE hizmet türlerini yükle
-    await loadServiceTypes();
+    const success = await loadServiceTypesSimple();
     
-    // SONRA rapor şablonlarını yükle
+    if (!success) {
+        console.warn('Hizmet türleri yüklenemedi, fallback kullanılıyor');
+        loadDefaultServices();
+    }
+    
+    // Diğer yüklemeler...
     await loadReportTemplates();
-    
-    // Firma Analiz Sohbeti event listener'ları - BİR KERE
     setupCompanyAnalysisChat();
-    
-    // Hızlı Pazar Sorgulama event listener'ları - BİR KERE
     setupQuickReportForm();
-    
-    // Sepet işlevselliği - BİR KERE
     setupCartFunctionality();
-    
-    // Modal işlevselliği - BİR KERE
     setupModalFunctionality();
     
     console.log('ParenaTrade uygulaması başlatıldı');
 }   
-   
         
-// Hizmet türlerini yükle - GERÇEK KONTROLLÜ
-// 1. İLK YÜKLEME için - sadece bir kere çalışsın
+// Global değişken - veri yüklendi mi takip et
+let serviceTypesLoaded = false;
+
 async function loadServiceTypes() {
     try {
-        const serviceSelect = document.getElementById('service-select');
-        
-        // Gerçek kontrol: sadece "Hizmet seçin" varsa yükle
-        if (serviceSelect.children.length > 1) {
+        // GERÇEK kontrol: Supabase'den veri yüklendi mi?
+        if (serviceTypesLoaded) {
             console.log('Hizmet türleri zaten yüklenmiş');
             return;
         }
         
         console.log('🔍 Hizmet türleri Supabase\'den yükleniyor...');
         
-        const { data, error } = await supabase
+        const { data, error, count } = await supabase
             .from('ai_service_type')
-            .select('id, service_name')
+            .select('id, service_name', { count: 'exact' }) // count da al
             .order('service_name');
         
         if (error) {
@@ -895,27 +886,34 @@ async function loadServiceTypes() {
             throw error;
         }
         
-        console.log('Supabase verisi:', data); // DEBUG
+        console.log(`📊 Supabase'den ${count} kayıt geldi`);
         
-        if (data && data.length > 0) {
+        // GERÇEK veri kontrolü: count > 0
+        if (count > 0) {
+            const serviceSelect = document.getElementById('service-select');
+            
             // Select'i temizle
             serviceSelect.innerHTML = '<option value="">Hizmet seçin</option>';
             
             data.forEach(service => {
                 const option = document.createElement('option');
-                option.value = service.id; // UUID olacak
+                option.value = service.id; // UUID
                 option.textContent = service.service_name;
                 serviceSelect.appendChild(option);
             });
-            console.log(`✅ ${data.length} hizmet türü yüklendi`);
+            
+            serviceTypesLoaded = true; // İşaretle
+            console.log(`✅ ${count} hizmet türü yüklendi`);
+            
         } else {
-            console.error('❌ Supabase\'de hiç hizmet türü bulunamadı');
+            console.error('❌ Supabase\'de hiç hizmet türü bulunamadı (count: 0)');
             throw new Error('Hizmet türleri bulunamadı');
         }
         
     } catch (error) {
         console.error('❌ Hizmet türleri yüklenirken hata:', error);
-        // SADECE gerçekten boşsa fallback kullan
+        
+        // SADECE gerçekten boşsa ve DOM da boşsa fallback kullan
         const serviceSelect = document.getElementById('service-select');
         if (serviceSelect.children.length <= 1) {
             loadDefaultServices();
@@ -923,6 +921,7 @@ async function loadServiceTypes() {
     }
 }
 
+        
 // 2. SELECT DEĞİŞİMİ için - farklı fonksiyon
 async function handleServiceQuestions(selectedServiceId) {
     try {
