@@ -2,34 +2,32 @@ import OpenAI from "openai";
 import PDFDocument from "pdfkit";
 import { createClient } from "@supabase/supabase-js";
 
-export const config = {
-  api: { bodyParser: true },
-};
+// Vercel serverless function için body parser açık olmalı
+export const config = { api: { bodyParser: true } };
 
 export default async function handler(req, res) {
-  // 🔒 Yalnızca POST isteklerine izin ver
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Sadece POST metodu destekleniyor." });
   }
 
-  // 🔑 Environment değişkenleri kontrolü
+  // 🔐 Ortam değişkenlerini kontrol et
   const { OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY } = process.env;
   if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
     return res.status(500).json({
       success: false,
-      error: "Gerekli environment değişkenleri eksik (OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY).",
+      error: "Gerekli environment değişkenleri eksik. (OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY)"
     });
   }
 
-  const { prompt, template, user_id, template_id } = req.body;
+  // 🧠 Supabase istemcisi
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const { prompt, template, parameters, user_id, template_id } = req.body;
 
   try {
-    console.log("🧠 OpenAI rapor oluşturma başladı...");
-
+    console.log("🧠 OpenAI çağrısı başlatılıyor...");
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-    // 1️⃣ GPT ile rapor metni oluştur
+    // 🧩 1. Rapor içeriği oluştur
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -38,34 +36,34 @@ export default async function handler(req, res) {
           content: `Sen bir uluslararası ticaret ve pazar analizi uzmanısın.
           ${template || "pazar raporu"} hazırlıyorsun.
           Profesyonel, veri odaklı, yönetim sunumuna uygun, Türkçe rapor üret.
-          Başlıklar, alt başlıklar ve analiz bölümleri içersin.`,
+          Tablo, başlık ve analiz bölümleri içersin.`
         },
-        { role: "user", content: prompt },
+        { role: "user", content: prompt }
       ],
       max_tokens: 3000,
-      temperature: 0.7,
+      temperature: 0.7
     });
 
     const reportContent = completion.choices?.[0]?.message?.content || "Rapor oluşturulamadı.";
 
-    // 2️⃣ PDF oluştur
+    // 🧩 2. PDF oluştur
     const pdfBuffer = await createPDF(reportContent);
     const fileName = `report_${Date.now()}.pdf`;
 
-    // 3️⃣ Supabase Storage’a yükle
-    const { error: uploadError } = await supabase.storage
+    // 🧩 3. Supabase Storage’a yükle
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from("reports")
       .upload(fileName, pdfBuffer, {
         contentType: "application/pdf",
-        upsert: true,
+        upsert: true
       });
 
-    if (uploadError) throw new Error("Supabase yükleme hatası: " + uploadError.message);
+    if (uploadError) throw new Error("Supabase upload hatası: " + uploadError.message);
 
     const { data: publicURL } = supabase.storage.from("reports").getPublicUrl(fileName);
     const pdf_url = publicURL?.publicUrl;
 
-    // 4️⃣ Supabase veritabanına kayıt
+    // 🧩 4. Supabase tabloya kayıt
     const { data: reportData, error: insertError } = await supabase
       .from("ai_reports")
       .insert([
@@ -76,47 +74,43 @@ export default async function handler(req, res) {
           report_prompt: prompt,
           report_content: reportContent,
           pdf_url,
-          status: "completed",
-        },
+          status: "completed"
+        }
       ])
       .select();
 
-    if (insertError) throw new Error("Supabase kayıt hatası: " + insertError.message);
+    if (insertError) throw new Error("Supabase insert hatası: " + insertError.message);
 
     console.log("✅ Rapor başarıyla oluşturuldu:", reportData?.[0]?.id);
 
-    // 5️⃣ Cevap döndür
     return res.status(200).json({
       success: true,
       report_id: reportData?.[0]?.id,
       pdf_url,
-      content: reportContent,
+      content: reportContent
     });
+
   } catch (error) {
     console.error("❌ Rapor oluşturma hatası:", error);
     return res.status(500).json({
       success: false,
-      error: error.message || "Bilinmeyen hata oluştu.",
+      error: error.message
     });
   }
 }
 
-// PDF üretici yardımcı fonksiyon
+// PDF oluşturucu
 async function createPDF(content) {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({ margin: 40 });
-      const buffers = [];
+  return new Promise((resolve) => {
+    const doc = new PDFDocument({ margin: 40 });
+    const buffers = [];
 
-      doc.on("data", (chunk) => buffers.push(chunk));
-      doc.on("end", () => resolve(Buffer.concat(buffers)));
+    doc.on("data", (chunk) => buffers.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(buffers)));
 
-      doc.fontSize(18).text("📊 Parena Trade Pazar Analizi Raporu", { align: "center" });
-      doc.moveDown();
-      doc.fontSize(12).text(content, { align: "left" });
-      doc.end();
-    } catch (err) {
-      reject(err);
-    }
+    doc.fontSize(18).text("📊 Parena Trade Pazar Analizi Raporu", { align: "center" });
+    doc.moveDown();
+    doc.fontSize(12).text(content, { align: "left" });
+    doc.end();
   });
 }
