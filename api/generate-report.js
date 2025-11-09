@@ -7,21 +7,19 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  // 🔒 Yalnızca POST isteklerine izin ver
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Sadece POST metodu destekleniyor." });
   }
 
-  // 🔑 Environment değişkenleri kontrolü
   const { OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY } = process.env;
   if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
     return res.status(500).json({
       success: false,
-      error: "Gerekli environment değişkenleri eksik (OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY).",
+      error: "Environment değişkenleri eksik.",
     });
   }
 
-  const { prompt, template, user_id, template_id } = req.body;
+  const { prompt, template, parameters } = req.body;
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
   try {
@@ -35,8 +33,7 @@ export default async function handler(req, res) {
       messages: [
         {
           role: "system",
-          content: `Sen bir uluslararası ticaret ve pazar analizi uzmanısın.
-          ${template || "pazar raporu"} hazırlıyorsun.
+          content: `Sen bir uluslararası ticaret ve pazar analizi uzmanısın. 
           Profesyonel, veri odaklı, yönetim sunumuna uygun, Türkçe rapor üret.
           Başlıklar, alt başlıklar ve analiz bölümleri içersin.`,
         },
@@ -52,46 +49,31 @@ export default async function handler(req, res) {
     const pdfBuffer = await createPDF(reportContent);
     const fileName = `report_${Date.now()}.pdf`;
 
-    // 3️⃣ Supabase Storage’a yükle
+    // 3️⃣ Supabase Storage'a yükle
     const { error: uploadError } = await supabase.storage
       .from("reports")
       .upload(fileName, pdfBuffer, {
         contentType: "application/pdf",
-        upsert: true,
+        upsert: false,
       });
 
-    if (uploadError) throw new Error("Supabase yükleme hatası: " + uploadError.message);
+    if (uploadError) {
+      console.warn("PDF yükleme hatası:", uploadError);
+      // PDF yükleme hatası rapor oluşturmaya engel değil
+    }
 
     const { data: publicURL } = supabase.storage.from("reports").getPublicUrl(fileName);
-    const pdf_url = publicURL?.publicUrl;
+    const pdf_url = publicURL?.publicUrl || null;
 
-    // 4️⃣ Supabase veritabanına kayıt
-    const { data: reportData, error: insertError } = await supabase
-      .from("ai_reports")
-      .insert([
-        {
-          user_id,
-          template_id,
-          report_title: template || "Kapsamlı Pazar Raporu",
-          report_prompt: prompt,
-          report_content: reportContent,
-          pdf_url,
-          status: "completed",
-        },
-      ])
-      .select();
+    // 4️⃣ Sadece rapor içeriğini döndür, veritabanına kayıt frontend'de yapılacak
+    console.log("✅ Rapor başarıyla oluşturuldu");
 
-    if (insertError) throw new Error("Supabase kayıt hatası: " + insertError.message);
-
-    console.log("✅ Rapor başarıyla oluşturuldu:", reportData?.[0]?.id);
-
-    // 5️⃣ Cevap döndür
     return res.status(200).json({
       success: true,
-      report_id: reportData?.[0]?.id,
-      pdf_url,
-      content: reportContent,
+      result: reportContent,
+      pdf_url: pdf_url,
     });
+
   } catch (error) {
     console.error("❌ Rapor oluşturma hatası:", error);
     return res.status(500).json({
@@ -101,7 +83,6 @@ export default async function handler(req, res) {
   }
 }
 
-// PDF üretici yardımcı fonksiyon
 async function createPDF(content) {
   return new Promise((resolve, reject) => {
     try {
