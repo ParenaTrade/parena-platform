@@ -1,160 +1,130 @@
 import OpenAI from "openai";
-import { createClient } from "@supabase/supabase-js";
 import PDFDocument from "pdfkit";
-import fs from "fs";
-import path from "path";
+import { createClient } from "@supabase/supabase-js";
+import stream from "stream";
+import { promisify } from "util";
 
-// 🧠 API ve DB bağlantıları
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const pipeline = promisify(stream.pipeline);
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+export const config = {
+  api: { bodyParser: true },
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ success: false, error: "Yalnızca POST metodu destekleniyor" });
   }
 
-  const {
-    user_id,
-    template_id,
-    country,
-    sector,
-    product,
-    region,
-    gtip,
-    period,
-    purpose,
-    depth,
-    language,
-  } = req.body;
+  const { prompt, template, parameters, user_id, template_id } = req.body;
+
+  // Supabase bağlantısı (service key varsa onu kullan, yoksa public key)
+  const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
+  );
 
   try {
-    console.log("🧠 AI rapor isteği alındı:", { country, sector, product });
+    console.log("🧠 OpenAI çağrısı başlatıldı...");
 
-    // 1️⃣ Prompt oluştur
-    const prompt = `
-Sen bir uluslararası ticaret ve pazar analizi uzmanısın.
-Aşağıdaki bilgilere göre profesyonel, veri odaklı bir pazar araştırma raporu hazırla:
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
-Ülke/Bölge: ${country || "Belirtilmemiş"}
-Sektör: ${sector || "Belirtilmemiş"}
-Ürün: ${product || "Belirtilmemiş"}
-GTIP Kodu: ${gtip || "Belirtilmemiş"}
-Zaman Aralığı: ${period || "2020-2025"}
-Amaç: ${purpose || "Pazar giriş stratejisi"}
-Derinlik Düzeyi: ${depth || "Yönetim sunumu formatı"}
-Dil: ${language || "Türkçe"}
-
-Rapor başlıkları:
-1. Pazar Tanımı ve Genel Görünüm
-2. Pazar Segmentasyonu
-3. Hedef Müşteri Profilleri
-4. Rakip Analizi
-5. Trendler ve Fırsatlar
-6. Fiyatlandırma Dinamikleri
-7. SWOT Analizi
-8. Sonuç ve Öneriler
-`;
-
-    // 2️⃣ OpenAI API çağrısı
+    // 1️⃣ GPT'den rapor içeriğini al
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: "Sen bir profesyonel pazar analisti ve rapor yazarı olarak çalışıyorsun.",
+          content: `Sen bir uluslararası ticaret ve pazar analizi uzmanısın.
+          ${template || "pazar raporu"} hazırlıyorsun.
+          Profesyonel, veri odaklı, yönetim sunumuna uygun, Türkçe rapor üret.
+          Tablo, başlık ve analiz bölümleri içersin.`,
         },
         {
           role: "user",
           content: prompt,
         },
       ],
+      max_tokens: 4000,
       temperature: 0.7,
-      max_tokens: 3500,
     });
 
-    const reportText = completion.choices[0].message.content;
-    console.log("✅ OpenAI cevabı alındı.");
+    const reportContent = completion.choices[0]?.message?.content || "Rapor oluşturulamadı.";
 
-    // 3️⃣ PDF oluştur
-    const doc = new PDFDocument();
-    const pdfPath = path.join("/tmp", `report_${Date.now()}.pdf`);
-    const stream = fs.createWriteStream(pdfPath);
-    doc.pipe(stream);
+    // 2️⃣ PDF oluştur
+    const pdfBuffer = await createPDF(reportContent);
 
-    doc.fontSize(18).text("PARENA TRADE - Pazar Raporu", { align: "center" });
-    doc.moveDown();
-    doc.fontSize(12).text(`Ülke: ${country}`);
-    doc.text(`Sektör: ${sector}`);
-    doc.text(`Ürün: ${product}`);
-    doc.moveDown();
-    doc.text(reportText, { align: "left" });
-    doc.end();
+    // 3️⃣ Supabase Storage’a PDF yükle
+    const fileName = `report_${Date.now()}.pdf`;
 
-    await new Promise((resolve) => stream.on("finish", resolve));
-
-    // 4️⃣ Supabase Storage’a PDF yükle
-    const fileBuffer = fs.readFileSync(pdfPath);
-    const { data: fileData, error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from("reports")
-      .upload(`report_${Date.now()}.pdf`, fileBuffer, {
+      .upload(fileName, pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
       });
 
-    if (uploadError) {
-      console.error("❌ PDF upload hatası:", uploadError);
-      throw uploadError;
-    }
+    if (uploadError) throw uploadError;
 
-    const pdfUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/reports/${fileData.path}`;
+    const { data: publicURL } = supabase.storage
+      .from("reports")
+      .getPublicUrl(fileName);
 
-    // 5️⃣ Rapor kaydını DB’ye ekle
-    const { error: dbError } = await supabase.from("ai_reports").insert([
-      {
-        user_id,
-        template_id,
-        report_title: `Pazar Raporu - ${country}`,
-        report_prompt: prompt,
-        report_content: reportText,
-        pdf_url: pdfUrl,
-        country,
-        sector,
-        product,
-        region,
-        gtip,
-        period,
-        purpose,
-        language,
-        depth,
-        report_type: "Kapsamlı Rapor",
-        status: "completed",
-      },
-    ]);
+    const pdf_url = publicURL.publicUrl;
 
-    if (dbError) {
-      console.error("❌ Supabase kayıt hatası:", dbError);
-      throw dbError;
-    }
+    // 4️⃣ Raporu tabloya kaydet
+    const { data: reportData, error: insertError } = await supabase
+      .from("ai_reports")
+      .insert([
+        {
+          user_id,
+          template_id,
+          report_title: template || "Kapsamlı Pazar Raporu",
+          report_prompt: prompt,
+          report_content: reportContent,
+          pdf_url,
+          status: "completed",
+        },
+      ])
+      .select();
 
-    console.log("📄 PDF başarıyla kaydedildi:", pdfUrl);
+    if (insertError) throw insertError;
 
-    // 6️⃣ Yanıt döndür
+    console.log("✅ Rapor kaydedildi:", reportData?.[0]?.id);
+
+    // 5️⃣ Cevabı döndür
     return res.status(200).json({
       success: true,
-      pdf_url: pdfUrl,
-      result: reportText,
+      report_id: reportData?.[0]?.id,
+      pdf_url,
+      content: reportContent,
     });
   } catch (error) {
     console.error("❌ Rapor oluşturma hatası:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
+      details: error.stack,
     });
   }
+}
+
+// PDF üretim fonksiyonu
+async function createPDF(content) {
+  return new Promise((resolve) => {
+    const doc = new PDFDocument({ margin: 40 });
+    const buffers = [];
+
+    doc.on("data", buffers.push.bind(buffers));
+    doc.on("end", () => {
+      const pdfData = Buffer.concat(buffers);
+      resolve(pdfData);
+    });
+
+    doc.fontSize(18).text("📊 Parena Trade Pazar Analizi Raporu", { align: "center" });
+    doc.moveDown();
+    doc.fontSize(12).text(content, { align: "left" });
+    doc.end();
+  });
 }
