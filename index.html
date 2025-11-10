@@ -1160,7 +1160,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2500);
 });
 
-// Ana uygulama başlatma fonksiyonu - GÜNCELLENMİŞ
+// Uygulama başlatmayı güncelle
 async function initializeApp() {
     if (isInitialized) {
         console.log('ℹ️ Uygulama zaten başlatılmış');
@@ -1171,16 +1171,19 @@ async function initializeApp() {
     try {
         console.log('🔧 Temel sistemler başlatılıyor...');
         
-        // 1. Temel sistemleri başlat
+        // 1. API durumunu kontrol et ve alert göster
+        await showAPIStatusAlert();
+        
+        // 2. Temel sistemleri başlat
         initializeAuthSystem();
         setupProfileTabs();
         
-        // 2. Verileri yükle
+        // 3. Verileri yükle
         console.log('📥 Veriler yükleniyor...');
         await loadServiceTypesSimple();
         await loadReportTemplates();
         
-        // 3. UI bileşenlerini kur
+        // 4. UI bileşenlerini kur
         console.log('🎨 UI bileşenleri kuruluyor...');
         setupCompanyAnalysisChat();
         setupQuickReportForm();
@@ -1192,34 +1195,95 @@ async function initializeApp() {
         
     } catch (error) {
         console.error('❌ Uygulama başlatma hatası:', error);
-        // Hata durumunda kullanıcıyı bilgilir
         showErrorModal(
             'Sistem Hatası', 
             'Uygulama başlatılırken bir hata oluştu. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.'
         );
     }
 }
-
-// API uyarı sistemini kur
+        
+// API uyarı sistemini güncelle
 function setupReportWarning() {
     const generateBtn = document.getElementById('generate-report-btn');
-    if (generateBtn) {
-        // Butonun yanına uyarı ikonu ekle (zaten varsa ekleme)
-        if (!document.getElementById('api-warning')) {
-            generateBtn.insertAdjacentHTML('beforebegin', `
-                <div id="api-warning" class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 hidden">
-                    <div class="flex items-center">
-                        <i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
-                        <span class="text-yellow-800 text-sm">
-                            <strong>Teknik Kontrol:</strong> AI servisi test ediliyor. Rapor oluşturma işlemi geçici olarak beklemede olabilir.
-                        </span>
-                    </div>
+    if (generateBtn && !document.getElementById('api-warning')) {
+        generateBtn.insertAdjacentHTML('beforebegin', `
+            <div id="api-warning" class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                    <span class="text-blue-800 text-sm">
+                        <strong>Bilgi:</strong> Rapor oluşturmadan önce AI servisi test edilecektir. 
+                        Servis kullanılamazsa size bilgi verilecektir.
+                    </span>
                 </div>
-            `);
-        }
+            </div>
+        `);
     }
 }
 
+// API test fonksiyonu - GELİŞTİRİLMİŞ
+async function testAPIEndpoint() {
+    try {
+        console.log('🧪 API test ediliyor...');
+        
+        const response = await fetch('https://parenatrade.vercel.app/api/generate-report', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                prompt: "Test connection - please ignore",
+                template: "Connection Test",
+                parameters: { test: true }
+            }),
+            signal: AbortSignal.timeout(15000) // 15 saniye timeout
+        });
+        
+        console.log('📡 API Response Status:', response.status);
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ API çalışıyor:', result);
+            return true;
+        } else {
+            console.warn('⚠️ API hata kodu:', response.status);
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('❌ API bağlantı hatası:', error);
+        return false;
+    }
+}
+
+// API durumuna göre uyarı göster
+async function showAPIStatusAlert() {
+    const apiStatus = await testAPIEndpoint();
+    
+    if (!apiStatus) {
+        // Sadece bir kere göster (spam'ı önle)
+        if (!localStorage.getItem('api_alert_shown')) {
+            setTimeout(() => {
+                showErrorModal(
+                    'AI Servisi Geçici Olarak Kullanılamıyor',
+                    'AI rapor oluşturma servisi şu an teknik bir sorun nedeniyle kullanılamıyor.<br><br>' +
+                    '• Lütfen birkaç dakika sonra tekrar deneyin<br>' +
+                    '• Rapor oluşturma butonuna tıkladığınızda bu uyarıyı tekrar göreceksiniz<br>' +
+                    '• Acil ihtiyaçlarınız için: info@parenatrade.com<br><br>' +
+                    '<small>Bu mesaj sadece bir kere gösterilecektir.</small>'
+                );
+                localStorage.setItem('api_alert_shown', 'true');
+            }, 2000);
+        }
+    } else {
+        console.log('✅ API çalışıyor, normal işleme devam');
+        // Çalışıyorsa alert kaydını temizle
+        localStorage.removeItem('api_alert_shown');
+    }
+    
+    return apiStatus;
+}
+
+        
 // Sistem durumunu kontrol et - GÜNCELLENMİŞ
 async function checkSystemStatus() {
     console.log('=== 🔍 SİSTEM DURUM KONTROLÜ ===');
@@ -1426,7 +1490,7 @@ if (window.parenaTradeInitialized) {
             
             console.log('⚠️ Fallback hizmet türleri yüklendi');
         }        
-         // Rapor Şablonlarını Yükle - GÜNCELLENDİ (çift eklemeyi önle)
+  
          // Rapor Şablonlarını Yükle - GÜNCELLENDİ (çift eklemeyi önle)
         async function loadReportTemplates() {
             try {
@@ -1689,9 +1753,7 @@ if (window.parenaTradeInitialized) {
                 console.error('Debug hatası:', error);
             }
         }
-
-        
-                
+             
           // Hizmet sorularını yükle - TABLO YAPISINA UYGUN
         async function loadServiceQuestions(serviceId) {
             try {
@@ -1736,47 +1798,51 @@ if (window.parenaTradeInitialized) {
             }
         }
 
-        // Tablo yapısını kontrol et ve doğru sorguyu belirle
-        async function detectTableStructure() {
-            try {
-                console.log('🔍 Tablo yapısı kontrol ediliyor...');
-                
-                // ai_question tablosunun sütunlarını kontrol et
-                const { data: columns, error } = await supabase
-                    .from('information_schema.columns')
-                    .select('column_name, data_type')
-                    .eq('table_name', 'ai_question')
-                    .eq('table_schema', 'public');
-                
-                if (error) {
-                    console.warn('Tablo yapısı kontrol edilemedi, varsayılan kullanılacak');
-                    return 'service_type'; // varsayılan
-                }
-                
-                const hasServiceTypeId = columns.some(col => col.column_name === 'service_type_id');
-                const hasServiceType = columns.some(col => col.column_name === 'service_type');
-                
-                console.log('Tablo sütunları:', columns);
-                console.log('service_type_id var mı?:', hasServiceTypeId);
-                console.log('service_type var mı?:', hasServiceType);
-                
-                if (hasServiceTypeId) {
-                    console.log('✅ service_type_id kullanılacak');
-                    return 'service_type_id';
-                } else if (hasServiceType) {
-                    console.log('✅ service_type kullanılacak');
-                    return 'service_type';
-                } else {
-                    console.error('❌ Hiçbir eşleşme alanı bulunamadı');
-                    throw new Error('Tablo yapısı uyumsuz');
-                }
-                
-            } catch (error) {
-                console.error('Tablo yapısı kontrol hatası:', error);
-                return 'service_type'; // varsayılan
+       // Tablo yapısını kontrol et - SADELEŞTİRİLMİŞ
+async function detectTableStructure() {
+    try {
+        console.log('🔍 Tablo yapısı kontrol ediliyor...');
+        
+        // Basit bir test sorgusu ile tablo varlığını kontrol et
+        const { data, error } = await supabase
+            .from('ai_question')
+            .select('service_type_id, service_type')
+            .limit(1);
+        
+        if (error) {
+            console.warn('Tablo yapısı kontrol edilemedi:', error);
+            return 'service_type'; // varsayılan
+        }
+        
+        // Hangi alanın dolu olduğuna bak
+        if (data && data.length > 0) {
+            const sample = data[0];
+            const hasServiceTypeId = sample.service_type_id !== null && sample.service_type_id !== undefined;
+            const hasServiceType = sample.service_type !== null && sample.service_type !== undefined;
+            
+            console.log('Tablo örnek veri:', sample);
+            console.log('service_type_id var mı?:', hasServiceTypeId);
+            console.log('service_type var mı?:', hasServiceType);
+            
+            if (hasServiceTypeId) {
+                console.log('✅ service_type_id kullanılacak');
+                return 'service_type_id';
+            } else if (hasServiceType) {
+                console.log('✅ service_type kullanılacak');
+                return 'service_type';
             }
         }
+        
+        console.log('⚠️ Hiçbir eşleşme alanı bulunamadı, varsayılan kullanılıyor');
+        return 'service_type';
+        
+    } catch (error) {
+        console.error('Tablo yapısı kontrol hatası:', error);
+        return 'service_type'; // varsayılan
+    }
+}
 
+        
         // Güncellenmiş soru yükleme fonksiyonu
         let tableStructure = null;
 
@@ -2681,25 +2747,24 @@ async function saveReportsToDatabase() {
     }
 }
 
-// AI Raporu Oluştur - ÖNCE LOGIN KONTROLÜ
+// Güncellenmiş rapor oluşturma fonksiyonu - TESTLİ
 async function generateAIReport() {
-    // ÖNCE: Kullanıcı girişi kontrol et
-    if (!currentUser) {
-        // Kullanıcı giriş yapmamışsa, raporu oluşturma, login modal aç
-        alert('Lütfen önce giriş yapın!');
-        document.getElementById('login-modal').classList.remove('hidden');
-        
-        // Rapor verilerini geçici olarak sakla
-        sessionStorage.setItem('pending_report_data', JSON.stringify({
-            template: selectedTemplate,
-            formData: formData,
-            finalPrompt: selectedTemplate.report_prompt.replace(/\{\{(\w+)\}\}/g, (match, variable) => formData[variable] || '')
-        }));
-        
+    // ÖNCE: API durumunu kontrol et
+    const apiStatus = await testAPIEndpoint();
+    
+    if (!apiStatus) {
+        showErrorModal(
+            'AI Servisi Kullanılamıyor',
+            'AI rapor oluşturma servisi şu an kullanılamıyor.<br><br>' +
+            '• Lütfen birkaç dakika sonra tekrar deneyin<br>' +
+            '• Sayfayı yenileyip tekrar deneyebilirsiniz<br>' +
+            '• Sorun devam ederse: info@parenatrade.com<br><br>' +
+            'Özür dileriz, en kısa sürede çözülecektir.'
+        );
         return;
     }
 
-    // Kullanıcı giriş yapmışsa normal akışa devam et
+    // API çalışıyorsa normal işleme devam et
     const generateBtn = document.getElementById('generate-report-btn');
     const progressSection = document.getElementById('report-progress');
     
@@ -2728,11 +2793,13 @@ async function generateAIReport() {
                 prompt: finalPrompt,
                 template: selectedTemplate.report_name,
                 parameters: formData
-            })
+            }),
+            signal: AbortSignal.timeout(30000)
         });
 
         if (!response.ok) {
-            throw new Error(`API hatası: ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`API hatası: ${response.status} - ${errorText}`);
         }
 
         const result = await response.json();
@@ -2746,7 +2813,7 @@ async function generateAIReport() {
 
         updateProgress(70);
 
-        // 3. SUPABASE'E KAYDET - ARTIK USER_ID KESİN VAR
+        // 3. SUPABASE'E KAYDET
         const reportData = {
             template_id: selectedTemplate.id,
             report_title: selectedTemplate.report_name,
@@ -2763,7 +2830,7 @@ async function generateAIReport() {
             depth: formData.derinlik || null,
             report_type: selectedTemplate.report_type,
             status: 'completed',
-            user_id: currentUser.id, // ARTIK KESİN VAR
+            user_id: currentUser.id,
             created_at: new Date().toISOString()
         };
 
@@ -2799,10 +2866,16 @@ async function generateAIReport() {
         generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
         progressSection.classList.add('hidden');
         
-        alert('Rapor oluşturulurken hata: ' + error.message);
+        showErrorModal(
+            'Rapor Oluşturulamadı',
+            'Rapor oluşturulurken bir hata oluştu:<br><br>' +
+            '• Hata: ' + error.message + '<br>' +
+            '• Lütfen tekrar deneyin<br>' +
+            '• Sorun devam ederse destek ekibimizle iletişime geçin'
+        );
     }
 }
-
+        
 // Giriş işlemi - GÜNCELLENMİŞ
 async function handleLogin(e) {
     e.preventDefault();
@@ -2853,10 +2926,22 @@ async function handleLogin(e) {
     }
 }
 
-// Bekleyen raporu tamamla
+// Bekleyen raporu tamamla - TESTLİ
 async function completePendingReport(reportData) {
     const { template, formData, finalPrompt } = reportData;
     
+    // ÖNCE: API durumunu kontrol et
+    const apiStatus = await testAPIEndpoint();
+    
+    if (!apiStatus) {
+        showErrorModal(
+            'Rapor Tamamlanamadı',
+            'Önceden başlattığınız rapor oluşturma işlemi tamamlanamıyor.<br><br>' +
+            'AI servisi geçici olarak kullanılamıyor. Lütfen daha sonra "Raporlarım" bölümünden tekrar deneyin.'
+        );
+        return;
+    }
+
     try {
         // API çağrısı
         const response = await fetch('https://parenatrade.vercel.app/api/generate-report', {
@@ -2894,7 +2979,7 @@ async function completePendingReport(reportData) {
             depth: formData.derinlik || null,
             report_type: template.report_type,
             status: 'completed',
-            user_id: currentUser.id, // ARTIK KESİN VAR
+            user_id: currentUser.id,
             created_at: new Date().toISOString()
         };
 
@@ -2909,13 +2994,19 @@ async function completePendingReport(reportData) {
         // Sepete ekle
         addToAICart(template, report.id);
         
-        alert('Rapor başarıyla oluşturuldu ve sepete eklendi!');
+        alert('✅ Rapor başarıyla oluşturuldu ve sepete eklendi!');
 
     } catch (error) {
         console.error('Bekleyen rapor tamamlama hatası:', error);
-        alert('Rapor oluşturulurken hata: ' + error.message);
+        showErrorModal(
+            'Rapor Tamamlanamadı',
+            'Giriş yaptınız ancak rapor oluşturma işlemi tamamlanamadı:<br><br>' +
+            '• Hata: ' + error.message + '<br>' +
+            '• Lütfen daha sonra "Raporlarım" bölümünden tekrar deneyin<br>' +
+            '• Sorun devam ederse müşteri hizmetleri ile iletişime geçin'
+        );
     }
-}        
+}
         
 // EKSİK FONKSİYON: generateMockReport EKLENDİ
 async function generateMockReport(template, parameters) {
