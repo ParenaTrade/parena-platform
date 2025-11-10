@@ -2360,6 +2360,8 @@ async function loadUserReports() {
     }
 }
 
+        
+
 // ÖDEME APİSİ BAŞLANGIÇ
         
 // TEST: Ödeme Simülasyonu Butonu
@@ -2471,7 +2473,184 @@ function proceedToPayment() {
         window.location.href = '/ai/payment.html?cart=' + encodeURIComponent(JSON.stringify(serviceCart));
     });
 }
+        
+// Rapor görüntüleme sistemini başlat
+function initializeReportViewer() {
+    // Modal kapatma
+    document.getElementById('close-report-modal').addEventListener('click', () => {
+        document.getElementById('report-view-modal').classList.add('hidden');
+    });
+    
+    // Görünüm değiştirme
+    document.getElementById('view-content-btn').addEventListener('click', () => {
+        showContentView();
+    });
+    
+    document.getElementById('view-pdf-btn').addEventListener('click', () => {
+        showPDFView();
+    });
+    
+    // PDF indirme
+    document.getElementById('download-pdf-btn').addEventListener('click', downloadPDF);
+}
 
+// İçerik görünümünü göster
+function showContentView() {
+    document.getElementById('view-content-btn').classList.add('bg-indigo-600', 'text-white');
+    document.getElementById('view-content-btn').classList.remove('bg-gray-200', 'text-gray-700');
+    document.getElementById('view-pdf-btn').classList.add('bg-gray-200', 'text-gray-700');
+    document.getElementById('view-pdf-btn').classList.remove('bg-indigo-600', 'text-white');
+    
+    document.getElementById('report-content-view').classList.remove('hidden');
+    document.getElementById('report-pdf-view').classList.add('hidden');
+}
+
+// PDF görünümünü göster
+function showPDFView() {
+    document.getElementById('view-pdf-btn').classList.add('bg-indigo-600', 'text-white');
+    document.getElementById('view-pdf-btn').classList.remove('bg-gray-200', 'text-gray-700');
+    document.getElementById('view-content-btn').classList.add('bg-gray-200', 'text-gray-700');
+    document.getElementById('view-content-btn').classList.remove('bg-indigo-600', 'text-white');
+    
+    document.getElementById('report-content-view').classList.add('hidden');
+    document.getElementById('report-pdf-view').classList.remove('hidden');
+}
+
+// Rapor görüntüle
+async function viewReport(reportId) {
+    try {
+        // Rapor verilerini getir
+        const { data: report, error } = await supabase
+            .from('ai_reports')
+            .select('*')
+            .eq('id', reportId)
+            .single();
+        
+        if (error) throw error;
+        
+        // Modal'ı doldur
+        document.getElementById('report-view-title').textContent = report.report_title;
+        document.getElementById('report-content-display').innerHTML = formatReportContent(report.report_content);
+        document.getElementById('report-created-date').textContent = new Date(report.created_at).toLocaleDateString('tr-TR');
+        
+        // PDF varsa yükle
+        if (report.pdf_url) {
+            document.getElementById('pdf-iframe').src = report.pdf_url;
+            document.getElementById('download-pdf-btn').classList.remove('hidden');
+        } else {
+            document.getElementById('download-pdf-btn').classList.add('hidden');
+        }
+        
+        // Modal'ı göster
+        document.getElementById('report-view-modal').classList.remove('hidden');
+        showContentView(); // Varsayılan olarak içerik görünümü
+        
+    } catch (error) {
+        console.error('Rapor yüklenirken hata:', error);
+        alert('Rapor yüklenirken hata oluştu: ' + error.message);
+    }
+}
+
+// Rapor içeriğini formatla
+function formatReportContent(content) {
+    if (!content) return '<p class="text-gray-500">İçerik bulunamadı.</p>';
+    
+    // Markdown benzeri formatlamayı HTML'e çevir
+    let html = content
+        .replace(/# (.*?)\n/g, '<h1 class="text-2xl font-bold mt-6 mb-4 text-gray-800">$1</h1>')
+        .replace(/## (.*?)\n/g, '<h2 class="text-xl font-bold mt-5 mb-3 text-gray-800">$1</h2>')
+        .replace(/### (.*?)\n/g, '<h3 class="text-lg font-bold mt-4 mb-2 text-gray-800">$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/- (.*?)\n/g, '<li class="ml-4 mb-1">$1</li>')
+        .replace(/\n/g, '<br>');
+    
+    // Liste için wrapper ekle
+    html = html.replace(/(<li.*?<\/li>)/gs, '<ul class="list-disc ml-6 mb-4">$1</ul>');
+    
+    // Paragraf wrapper'ı ekle
+    html = html.replace(/<br><br>/g, '</p><p class="mb-4">');
+    html = '<p class="mb-4">' + html + '</p>';
+    
+    return html;
+}
+
+// PDF indirme
+function downloadPDF() {
+    const pdfUrl = document.getElementById('pdf-iframe').src;
+    if (pdfUrl) {
+        const a = document.createElement('a');
+        a.href = pdfUrl;
+        a.download = `rapor_${Date.now()}.pdf`;
+        a.click();
+    }
+}
+
+
+// Örnek rapor kartlarına görüntüleme butonu ekle
+function setupExampleReports() {
+    document.querySelectorAll('#reports .bg-gray-50 button').forEach((button, index) => {
+        button.addEventListener('click', function() {
+            // Örnek rapor verisi
+            const exampleReports = [
+                {
+                    id: 'example-1',
+                    report_title: 'Romanya Domates Salçası Pazar Analizi',
+                    report_content: `# Romanya Domates Salçası Pazar Analizi\n\n## Özet\nRomanya domates salçası pazarı büyüme potansiyeli yüksek bir pazardır...`,
+                    created_at: new Date().toISOString(),
+                    pdf_url: null
+                },
+                {
+                    id: 'example-2', 
+                    report_title: 'Bulgaristan Tekstil Ürünleri Pazar Analizi',
+                    report_content: `# Bulgaristan Tekstil Ürünleri Pazar Analizi\n\n## Özet\nBulgaristan tekstil pazarı rekabetçi bir yapıya sahiptir...`,
+                    created_at: new Date().toISOString(),
+                    pdf_url: null
+                }
+            ];
+            
+            showExampleReport(exampleReports[index]);
+        });
+    });
+}
+
+// Örnek rapor göster
+function showExampleReport(report) {
+    document.getElementById('report-view-title').textContent = report.report_title;
+    document.getElementById('report-content-display').innerHTML = formatReportContent(report.report_content);
+    document.getElementById('report-created-date').textContent = new Date(report.created_at).toLocaleDateString('tr-TR');
+    document.getElementById('report-status').textContent = 'Örnek Rapor';
+    
+    document.getElementById('download-pdf-btn').classList.add('hidden');
+    document.getElementById('view-pdf-btn').classList.add('hidden');
+    
+    document.getElementById('report-view-modal').classList.remove('hidden');
+    showContentView();
+}
+
+// Uygulamayı başlatırken rapor görüntüleyiciyi de başlat
+async function initializeApp() {
+    if (isInitialized) return;
+    isInitialized = true;
+    
+    console.log('ParenaTrade uygulaması başlatılıyor...');
+    
+    // Kullanıcı yönetim sistemini başlat
+    initializeAuthSystem();
+    initializeReportViewer();
+    setupExampleReports();
+    
+    // Diğer başlatma işlemleri...
+    await loadServiceTypesSimple();
+    await loadReportTemplates();
+    setupCompanyAnalysisChat();
+    setupQuickReportForm();
+    setupCartFunctionality();
+    setupModalFunctionality();
+    
+    console.log('ParenaTrade uygulaması başlatıldı');
+}
+        
 // Raporları veritabanına kaydet - GÜNCELLENDİ
 async function saveReportsToDatabase() {
     if (!currentUser) return;
