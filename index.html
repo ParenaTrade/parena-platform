@@ -2815,9 +2815,25 @@ async function saveReportsToDatabase() {
     }
 }
 
-// AI Raporu Oluştur fonksiyonunu güncelle - user_id ekle
-// AI Raporu Oluştur - DÜZELTİLDİ
+// AI Raporu Oluştur - ÖNCE LOGIN KONTROLÜ
 async function generateAIReport() {
+    // ÖNCE: Kullanıcı girişi kontrol et
+    if (!currentUser) {
+        // Kullanıcı giriş yapmamışsa, raporu oluşturma, login modal aç
+        alert('Lütfen önce giriş yapın!');
+        document.getElementById('login-modal').classList.remove('hidden');
+        
+        // Rapor verilerini geçici olarak sakla
+        sessionStorage.setItem('pending_report_data', JSON.stringify({
+            template: selectedTemplate,
+            formData: formData,
+            finalPrompt: selectedTemplate.report_prompt.replace(/\{\{(\w+)\}\}/g, (match, variable) => formData[variable] || '')
+        }));
+        
+        return;
+    }
+
+    // Kullanıcı giriş yapmışsa normal akışa devam et
     const generateBtn = document.getElementById('generate-report-btn');
     const progressSection = document.getElementById('report-progress');
     
@@ -2864,9 +2880,9 @@ async function generateAIReport() {
 
         updateProgress(70);
 
-        // 3. SUPABASE'E KAYDET - template_id VARCHAR olarak
+        // 3. SUPABASE'E KAYDET - ARTIK USER_ID KESİN VAR
         const reportData = {
-            template_id: selectedTemplate.id, // Artık VARCHAR
+            template_id: selectedTemplate.id,
             report_title: selectedTemplate.report_name,
             report_prompt: finalPrompt,
             report_content: reportContent,
@@ -2881,11 +2897,9 @@ async function generateAIReport() {
             depth: formData.derinlik || null,
             report_type: selectedTemplate.report_type,
             status: 'completed',
-            user_id: currentUser ? currentUser.id : null,
+            user_id: currentUser.id, // ARTIK KESİN VAR
             created_at: new Date().toISOString()
         };
-
-        console.log('Rapor verisi:', reportData);
 
         const { data: report, error } = await supabase
             .from('ai_reports')
@@ -2895,26 +2909,7 @@ async function generateAIReport() {
 
         if (error) {
             console.error('Supabase kayıt hatası:', error);
-            
-            // Hata durumunda basit bir kayıt dene
-            const simpleReportData = {
-                template_id: selectedTemplate.id,
-                report_title: selectedTemplate.report_name,
-                report_content: reportContent,
-                status: 'completed'
-            };
-            
-            const { data: simpleReport, error: simpleError } = await supabase
-                .from('ai_reports')
-                .insert(simpleReportData)
-                .select()
-                .single();
-                
-            if (simpleError) {
-                throw new Error('Rapor kaydedilemedi: ' + simpleError.message);
-            }
-            
-            report = simpleReport;
+            throw error;
         }
 
         updateProgress(100);
@@ -2934,47 +2929,130 @@ async function generateAIReport() {
     } catch (error) {
         console.error('Rapor oluşturma hatası:', error);
         
-        // Hata durumunda mock rapor oluştur
-        try {
-            const mockReport = await generateMockReport(selectedTemplate, formData);
-            const mockReportData = {
-                template_id: selectedTemplate.id,
-                report_title: selectedTemplate.report_name,
-                report_content: mockReport,
-                status: 'completed',
-                is_mock: true,
-                user_id: currentUser ? currentUser.id : null
-            };
-
-            const { data: report, error: mockError } = await supabase
-                .from('ai_reports')
-                .insert(mockReportData)
-                .select()
-                .single();
-
-            if (!mockError) {
-                addToAICart(selectedTemplate, report.id);
-                document.getElementById('quick-analysis-result').classList.remove('hidden');
-                
-                generateBtn.disabled = false;
-                generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
-                progressSection.classList.add('hidden');
-                
-                alert('Demo rapor başarıyla oluşturuldu ve sepete eklendi.');
-                return;
-            }
-        } catch (mockError) {
-            console.error('Mock rapor oluşturma hatası:', mockError);
-        }
-        
-        alert('Rapor oluşturulurken hata: ' + error.message);
         generateBtn.disabled = false;
         generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
         progressSection.classList.add('hidden');
+        
+        alert('Rapor oluşturulurken hata: ' + error.message);
     }
 }
-        // EKSİK FONKSİYON: generateMockReport EKLENDİ
-        async function generateMockReport(template, parameters) {
+
+// Giriş işlemi - GÜNCELLENMİŞ
+async function handleLogin(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+        
+        if (error) throw error;
+        
+        if (data.user) {
+            currentUser = data.user;
+            authToken = data.session.access_token;
+            
+            // LocalStorage'a kaydet
+            localStorage.setItem('parenatrade_token', authToken);
+            localStorage.setItem('parenatrade_user', JSON.stringify(currentUser));
+            
+            // UI güncelle
+            updateUIForLoggedInUser();
+            
+            // Modal'ı kapat
+            document.getElementById('login-modal').classList.add('hidden');
+            
+            // BEKLEYEN RAPOR VARSA TAMAMLA
+            const pendingReport = sessionStorage.getItem('pending_report_data');
+            if (pendingReport) {
+                const reportData = JSON.parse(pendingReport);
+                sessionStorage.removeItem('pending_report_data');
+                
+                // Kullanıcıya bilgi ver
+                alert('Giriş başarılı! Rapor oluşturma işlemini tamamlıyorum...');
+                
+                // Rapor oluşturma işlemini başlat
+                await completePendingReport(reportData);
+            } else {
+                alert('Başarıyla giriş yapıldı!');
+            }
+        }
+        
+    } catch (error) {
+        alert('Giriş hatası: ' + error.message);
+    }
+}
+
+// Bekleyen raporu tamamla
+async function completePendingReport(reportData) {
+    const { template, formData, finalPrompt } = reportData;
+    
+    try {
+        // API çağrısı
+        const response = await fetch('https://parenatrade.vercel.app/api/generate-report', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                prompt: finalPrompt,
+                template: template.report_name,
+                parameters: formData
+            })
+        });
+
+        if (!response.ok) throw new Error(`API hatası: ${response.status}`);
+
+        const result = await response.json();
+        
+        if (!result.success) throw new Error(result.error);
+
+        // Supabase'e kaydet
+        const reportDbData = {
+            template_id: template.id,
+            report_title: template.report_name,
+            report_prompt: finalPrompt,
+            report_content: result.result,
+            country: formData.ulke || null,
+            sector: formData.sektor || null,
+            product: formData.urun || null,
+            region: formData.bolge || null,
+            gtip: formData.gtip || null,
+            period: formData.zaman || null,
+            purpose: formData.amac || null,
+            language: formData.dil || null,
+            depth: formData.derinlik || null,
+            report_type: template.report_type,
+            status: 'completed',
+            user_id: currentUser.id, // ARTIK KESİN VAR
+            created_at: new Date().toISOString()
+        };
+
+        const { data: report, error } = await supabase
+            .from('ai_reports')
+            .insert(reportDbData)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Sepete ekle
+        addToAICart(template, report.id);
+        
+        alert('Rapor başarıyla oluşturuldu ve sepete eklendi!');
+
+    } catch (error) {
+        console.error('Bekleyen rapor tamamlama hatası:', error);
+        alert('Rapor oluşturulurken hata: ' + error.message);
+    }
+}        
+        
+// EKSİK FONKSİYON: generateMockReport EKLENDİ
+async function generateMockReport(template, parameters) {
             // Mock rapor içeriği oluştur
             const reportContent = `
 # ${template.report_name}
@@ -3087,21 +3165,20 @@ Belirtilen kriterlere göre pazar potansiyeli değerlendirilmiştir. Detaylı an
         }
     });
 
-    // Sepeti tamamlama - GÜNCELLENDİ
-    document.getElementById('complete-ai-report-order').addEventListener('click', function() {
-        if (serviceCart.length === 0) return;
-        
-        if (!currentUser) {
-            // Kullanıcı giriş yapmamışsa login modal aç
-            document.getElementById('login-modal').classList.remove('hidden');
-            // Sipariş bilgisini sakla
-            sessionStorage.setItem('pending_order', JSON.stringify(serviceCart));
-        } else {
-            // Kullanıcı giriş yapmışsa direkt ödeme
-            proceedToPayment();
-        }
-    });
-}
+    // Sepeti tamamlama - GÜNCELLENMİŞ
+document.getElementById('complete-ai-report-order').addEventListener('click', function() {
+    if (serviceCart.length === 0) return;
+    
+    if (!currentUser) {
+        // Kullanıcı giriş yapmamışsa login modal aç
+        alert('Lütfen önce giriş yapın!');
+        document.getElementById('login-modal').classList.remove('hidden');
+        return;
+    }
+    
+    // Kullanıcı giriş yapmışsa direkt ödeme
+    proceedToPayment();
+});
 
         // AI Sepetini Güncelle - GÖRÜNTÜLEME BUTONSUZ
 function updateAICart() {
