@@ -1301,7 +1301,12 @@ function setupReportWarning() {
     }
 }
 
-        // Rapor oluşturma butonunu API durumuna göre ayarla
+// Eksik fonksiyonları ekleyelim
+async function checkAPIStatus() {
+    return await testAPIEndpoint();
+}
+        
+// Rapor butonunu kur - hata düzeltmeli
 function setupReportButton() {
     const generateBtn = document.getElementById('generate-report-btn');
     if (generateBtn) {
@@ -1323,7 +1328,44 @@ function setupReportButton() {
                 generateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 generateBtn.title = 'AI raporu oluştur';
             }
+        }).catch(error => {
+            console.error('API kontrol hatası:', error);
+            // Hata durumunda butonu devre dışı bırak
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i> Servis Kontrol Edilemiyor';
+            generateBtn.classList.add('opacity-50', 'cursor-not-allowed');
         });
+    }
+}
+        
+// Debug fonksiyonlarını basitleştirelim
+async function debugServiceTypes() {
+    try {
+        const { data: services, error } = await supabase
+            .from('ai_service_type')
+            .select('id, service_name')
+            .limit(3);
+        
+        if (!error && services) {
+            console.log('🔍 ai_service_type tablosu:', services);
+        }
+    } catch (error) {
+        console.error('Debug hatası:', error);
+    }
+}
+
+async function debugServiceMatching() {
+    try {
+        const { data: questions, error } = await supabase
+            .from('ai_question')
+            .select('id, question, service_type_id, service_type')
+            .limit(5);
+            
+        if (!error && questions) {
+            console.log('🔍 ai_question tablosu:', questions);
+        }
+    } catch (error) {
+        console.error('Debug hatası:', error);
     }
 }
 
@@ -1486,6 +1528,30 @@ async function checkSystemStatus() {
         console.error('❌ Sistem kontrol hatası:', error);
     }
 }
+
+// Basit tablo yapısı kontrolü
+async function detectTableStructure() {
+    try {
+        console.log('🔍 Tablo yapısı kontrol ediliyor...');
+        
+        // Basit bir test sorgusu
+        const { data, error } = await supabase
+            .from('ai_question')
+            .select('service_type_id, service_type')
+            .limit(1);
+        
+        if (error) {
+            console.warn('Tablo yapısı kontrol edilemedi:', error);
+            return 'service_type';
+        }
+        
+        return 'service_type_id'; // Varsayılan olarak service_type_id kullan
+        
+    } catch (error) {
+        console.error('Tablo yapısı kontrol hatası:', error);
+        return 'service_type';
+    }
+}        
 
 // Tablo durumunu kontrol et - GÜNCELLENMİŞ
 async function checkTableStatus() {
@@ -2471,71 +2537,174 @@ function checkChatSession() {
         }
 
 
-// Dropdown verilerini yükle
+// Dropdown verilerini düzeltelim - tablo isimleri yanlış
 async function loadDropdownData() {
     try {
         console.log('📊 Dropdown verileri yükleniyor...');
         
-        // 1. Dilleri yükle
-        const { data: languages, error: langError } = await supabase
-            .from('languages')
-            .select('id, name, code')
-            .order('name');
-        
-        if (!langError && languages) {
-            window.languages = languages;
-            console.log(`✅ ${languages.length} dil yüklendi`);
+        // 1. Dilleri yükle - EĞER languages tablosu yoksa, sabit veri kullan
+        try {
+            const { data: languages, error: langError } = await supabase
+                .from('languages')
+                .select('id, name, iso_code')
+                .order('name');
+            
+            if (!langError && languages) {
+                window.languages = languages;
+                console.log(`✅ ${languages.length} dil yüklendi`);
+            } else {
+                // Fallback: Sabit dil listesi
+                window.languages = [
+                    { id: 1, name: 'Türkçe', iso_code: 'tr' },
+                    { id: 2, name: 'İngilizce', iso_code: 'en' },
+                    { id: 3, name: 'Almanca', iso_code: 'de' },
+                    { id: 4, name: 'Fransızca', iso_code: 'fr' }
+                ];
+                console.log('✅ Varsayılan diller yüklendi');
+            }
+        } catch (error) {
+            window.languages = [
+                { id: 1, name: 'Türkçe', iso_code: 'tr' },
+                { id: 2, name: 'İngilizce', iso_code: 'en' }
+            ];
         }
         
-        // 2. Ülkeleri yükle
-        const { data: countries, error: countryError } = await supabase
-            .from('country')
-            .select('id, name, code')
-            .order('name');
-        
-        if (!countryError && countries) {
-            window.countries = countries;
-            console.log(`✅ ${countries.length} ülke yüklendi`);
+        // 2. Ülkeleri yükle - EĞER country tablosu yoksa, sabit veri kullan
+        try {
+            const { data: countries, error: countryError } = await supabase
+                .from('country')
+                .select('id, name, iso_code')
+                .order('name');
+            
+            if (!countryError && countries) {
+                window.countries = countries;
+                console.log(`✅ ${countries.length} ülke yüklendi`);
+            } else {
+                // Fallback: Sabit ülke listesi
+                window.countries = [
+                    { id: 1, name: 'Türkiye', iso_code: 'TR' },
+                    { id: 2, name: 'Almanya', iso_code: 'DE' },
+                    { id: 3, name: 'Fransa', iso_code: 'FR' },
+                    { id: 4, name: 'Romanya', iso_code: 'RO' },
+                    { id: 5, name: 'Bulgaristan', iso_code: 'BG' }
+                ];
+                console.log('✅ Varsayılan ülkeler yüklendi');
+            }
+        } catch (error) {
+            window.countries = [
+                { id: 1, name: 'Türkiye', iso_code: 'TR' },
+                { id: 2, name: 'Almanya', iso_code: 'DE' }
+            ];
         }
         
-        // 3. Sektörleri yükle
-        const { data: sectors, error: sectorError } = await supabase
-            .from('sector')
-            .select('id, name, code')
-            .order('name');
-        
-        if (!sectorError && sectors) {
-            window.sectors = sectors;
-            console.log(`✅ ${sectors.length} sektör yüklendi`);
+        // 3. Sektörleri yükle - EĞER sector tablosu yoksa, sabit veri kullan
+        try {
+            const { data: sectors, error: sectorError } = await supabase
+                .from('sector')
+                .select('id, name, code')
+                .order('name');
+            
+            if (!sectorError && sectors) {
+                window.sectors = sectors;
+                console.log(`✅ ${sectors.length} sektör yüklendi`);
+            } else {
+                // Fallback: Sabit sektör listesi
+                window.sectors = [
+                    { id: 1, name: 'Gıda', code: 'FOOD' },
+                    { id: 2, name: 'Tekstil', code: 'TEXTILE' },
+                    { id: 3, name: 'Kimya', code: 'CHEMICAL' },
+                    { id: 4, name: 'Otomotiv', code: 'AUTO' },
+                    { id: 5, name: 'Teknoloji', code: 'TECH' }
+                ];
+                console.log('✅ Varsayılan sektörler yüklendi');
+            }
+        } catch (error) {
+            window.sectors = [
+                { id: 1, name: 'Gıda', code: 'FOOD' },
+                { id: 2, name: 'Tekstil', code: 'TEXTILE' }
+            ];
         }
         
-        // 4. GTIP kodlarını yükle
-        const { data: gtipCodes, error: gtipError } = await supabase
-            .from('gtip')
-            .select('id, code, name, description')
-            .order('code');
-        
-        if (!gtipError && gtipCodes) {
-            window.gtipCodes = gtipCodes;
-            console.log(`✅ ${gtipCodes.length} GTIP kodu yüklendi`);
+        // 4. GTIP kodlarını yükle - EĞER gtip tablosu yoksa, sabit veri kullan
+        try {
+            const { data: gtipCodes, error: gtipError } = await supabase
+                .from('gtip')
+                .select('id, code, name')
+                .order('code');
+            
+            if (!gtipError && gtipCodes) {
+                window.gtipCodes = gtipCodes;
+                console.log(`✅ ${gtipCodes.length} GTIP kodu yüklendi`);
+            } else {
+                // Fallback: Sabit GTIP listesi
+                window.gtipCodes = [
+                    { id: 1, code: '2002.10', name: 'Domates Salçası'},
+                    { id: 2, code: '2002.90', name: 'Diğer Sebze Salçaları'},
+                    { id: 3, code: '5208', name: 'Pamuklu Dokumalar'},
+                    { id: 4, code: '6109', name: 'Tişört ve Atlet'}
+                ];
+                console.log('✅ Varsayılan GTIP kodları yüklendi');
+            }
+        } catch (error) {
+            window.gtipCodes = [
+                { id: 1, code: '2002.10', name: 'Domates Salçası'},
+                { id: 2, code: '5208', name: 'Pamuklu Dokumalar'}
+            ];
         }
         
-        // 5. Rapor şablonlarını yükle
-        const { data: reportTemplates, error: templateError } = await supabase
-            .from('ai_report_templates')
-            .select('id, report_name, report_type, report_description, report_price, report_currency')
-            .order('report_name');
-        
-        if (!templateError && reportTemplates) {
-            window.reportTemplates = reportTemplates;
-            console.log(`✅ ${reportTemplates.length} rapor şablonu yüklendi`);
+        // 5. Rapor şablonlarını yükle - ai_report_templates yerine mevcut sistemi kullan
+        try {
+            const { data: reportTemplates, error: templateError } = await supabase
+                .from('ai_report_templates')
+                .select('id, report_name, report_type, report_description, report_price, report_currency')
+                .order('report_name');
+            
+            if (!templateError && reportTemplates) {
+                window.reportTemplates = reportTemplates;
+                console.log(`✅ ${reportTemplates.length} rapor şablonu yüklendi`);
+            } else {
+                // Fallback: Mevcut rapor şablonlarını kullan
+                window.reportTemplates = aiReportTemplates;
+                console.log('✅ Mevcut rapor şablonları kullanılıyor');
+            }
+        } catch (error) {
+            window.reportTemplates = aiReportTemplates;
         }
         
     } catch (error) {
         console.error('❌ Dropdown verileri yüklenirken hata:', error);
+        // Hata durumunda varsayılan verileri yükle
+        loadDefaultDropdownData();
     }
 }
 
+// Varsayılan dropdown verileri
+function loadDefaultDropdownData() {
+    window.languages = [
+        { id: 1, name: 'Türkçe', code: 'tr' },
+        { id: 2, name: 'İngilizce', code: 'en' }
+    ];
+    
+    window.countries = [
+        { id: 1, name: 'Türkiye', code: 'TR' },
+        { id: 2, name: 'Almanya', code: 'DE' },
+        { id: 3, name: 'Fransa', code: 'FR' }
+    ];
+    
+    window.sectors = [
+        { id: 1, name: 'Gıda', code: 'FOOD' },
+        { id: 2, name: 'Tekstil', code: 'TEXTILE' },
+        { id: 3, name: 'Kimya', code: 'CHEMICAL' }
+    ];
+    
+    window.gtipCodes = [
+        { id: 1, code: '2002.10', name: 'Domates Salçası', description: 'Domates salçası' },
+        { id: 2, code: '5208', name: 'Pamuklu Dokumalar', description: 'Pamuklu dokumalar' }
+    ];
+    
+    window.reportTemplates = aiReportTemplates;
+}
+        
 // Dinamik form alanlarını oluştur - GÜNCELLENMİŞ
 function createDynamicFormFields(variables) {
     const container = document.getElementById('dynamic-form-fields');
