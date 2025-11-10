@@ -820,12 +820,13 @@
         <form id="login-form">
             <div class="mb-4">
                 <label class="block text-gray-700 mb-2">E-posta</label>
-                <input type="email" id="login-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                <input type="email" id="login-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required autocomplete="email">
             </div>
             
             <div class="mb-4">
                 <label class="block text-gray-700 mb-2">Şifre</label>
-                <input type="password" id="login-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                <input type="password" id="login-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required autocomplete="current-password">
+
             </div>
             
             <div class="flex justify-between items-center mb-6">
@@ -849,22 +850,21 @@
         <form id="register-form" class="hidden">
             <div class="mb-4">
                 <label class="block text-gray-700 mb-2">Ad Soyad</label>
-                <input type="text" id="register-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                <input type="text" id="register-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required autocomplete="name">
             </div>
             
             <div class="mb-4">
                 <label class="block text-gray-700 mb-2">E-posta</label>
-                <input type="email" id="register-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
-            </div>
+                <input type="email" id="register-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required autocomplete="email">
             
             <div class="mb-4">
                 <label class="block text-gray-700 mb-2">Şifre</label>
-                <input type="password" id="register-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                <input type="password" id="register-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required autocomplete="new-password">
             </div>
             
             <div class="mb-6">
                 <label class="block text-gray-700 mb-2">Şifre Tekrar</label>
-                <input type="password" id="register-password-confirm" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                <input type="password" id="register-password-confirm" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required autocomplete="new-password">
             </div>
             
             <button type="submit" class="w-full bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300 mb-4">
@@ -2207,42 +2207,6 @@ function setupAuthModals() {
     }
 }
 
-// Giriş işlemi
-async function handleLogin(e) {
-    e.preventDefault();
-    
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-    
-    try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
-        
-        if (error) throw error;
-        
-        if (data.user) {
-            currentUser = data.user;
-            authToken = data.session.access_token;
-            
-            // LocalStorage'a kaydet
-            localStorage.setItem('parenatrade_token', authToken);
-            localStorage.setItem('parenatrade_user', JSON.stringify(currentUser));
-            
-            // UI güncelle
-            updateUIForLoggedInUser();
-            
-            // Modal'ı kapat
-            document.getElementById('login-modal').classList.add('hidden');
-            
-            alert('Başarıyla giriş yapıldı!');
-        }
-        
-    } catch (error) {
-        alert('Giriş hatası: ' + error.message);
-    }
-}
         
 // Kayıt işlemi
 async function handleRegister(e) {
@@ -2573,86 +2537,8 @@ function proceedToPayment() {
 }
         
 
-// İçerik görünümünü göster
-function showContentView() {
-    document.getElementById('view-content-btn').classList.add('bg-indigo-600', 'text-white');
-    document.getElementById('view-content-btn').classList.remove('bg-gray-200', 'text-gray-700');
-    document.getElementById('view-pdf-btn').classList.add('bg-gray-200', 'text-gray-700');
-    document.getElementById('view-pdf-btn').classList.remove('bg-indigo-600', 'text-white');
-    
-    document.getElementById('report-content-view').classList.remove('hidden');
-    document.getElementById('report-pdf-view').classList.add('hidden');
-}
 
-// PDF görünümünü göster
-function showPDFView() {
-    document.getElementById('view-pdf-btn').classList.add('bg-indigo-600', 'text-white');
-    document.getElementById('view-pdf-btn').classList.remove('bg-gray-200', 'text-gray-700');
-    document.getElementById('view-content-btn').classList.add('bg-gray-200', 'text-gray-700');
-    document.getElementById('view-content-btn').classList.remove('bg-indigo-600', 'text-white');
-    
-    document.getElementById('report-content-view').classList.add('hidden');
-    document.getElementById('report-pdf-view').classList.remove('hidden');
-}
 
-// Rapor görüntüle
-async function viewReport(reportId) {
-    try {
-        // Rapor verilerini getir
-        const { data: report, error } = await supabase
-            .from('ai_reports')
-            .select('*')
-            .eq('id', reportId)
-            .single();
-        
-        if (error) throw error;
-        
-        // Modal'ı doldur
-        document.getElementById('report-view-title').textContent = report.report_title;
-        document.getElementById('report-content-display').innerHTML = formatReportContent(report.report_content);
-        document.getElementById('report-created-date').textContent = new Date(report.created_at).toLocaleDateString('tr-TR');
-        
-        // PDF varsa yükle
-        if (report.pdf_url) {
-            document.getElementById('pdf-iframe').src = report.pdf_url;
-            document.getElementById('download-pdf-btn').classList.remove('hidden');
-        } else {
-            document.getElementById('download-pdf-btn').classList.add('hidden');
-        }
-        
-        // Modal'ı göster
-        document.getElementById('report-view-modal').classList.remove('hidden');
-        showContentView(); // Varsayılan olarak içerik görünümü
-        
-    } catch (error) {
-        console.error('Rapor yüklenirken hata:', error);
-        alert('Rapor yüklenirken hata oluştu: ' + error.message);
-    }
-}
-
-// Rapor içeriğini formatla
-function formatReportContent(content) {
-    if (!content) return '<p class="text-gray-500">İçerik bulunamadı.</p>';
-    
-    // Markdown benzeri formatlamayı HTML'e çevir
-    let html = content
-        .replace(/# (.*?)\n/g, '<h1 class="text-2xl font-bold mt-6 mb-4 text-gray-800">$1</h1>')
-        .replace(/## (.*?)\n/g, '<h2 class="text-xl font-bold mt-5 mb-3 text-gray-800">$1</h2>')
-        .replace(/### (.*?)\n/g, '<h3 class="text-lg font-bold mt-4 mb-2 text-gray-800">$1</h3>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/- (.*?)\n/g, '<li class="ml-4 mb-1">$1</li>')
-        .replace(/\n/g, '<br>');
-    
-    // Liste için wrapper ekle
-    html = html.replace(/(<li.*?<\/li>)/gs, '<ul class="list-disc ml-6 mb-4">$1</ul>');
-    
-    // Paragraf wrapper'ı ekle
-    html = html.replace(/<br><br>/g, '</p><p class="mb-4">');
-    html = '<p class="mb-4">' + html + '</p>';
-    
-    return html;
-}
 
 // PDF indirme
 function downloadPDF() {
@@ -2704,7 +2590,6 @@ function showExampleReport(report) {
     document.getElementById('download-pdf-btn').classList.add('hidden');
     document.getElementById('view-pdf-btn').classList.add('hidden');
     
-    document.getElementById('report-view-modal').classList.remove('hidden');
     showContentView();
 }
 
