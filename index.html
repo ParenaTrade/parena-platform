@@ -916,9 +916,6 @@
                     <button class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 text-gray-700 profile-tab" data-tab="payments">
                         <i class="fas fa-credit-card mr-2"></i>Ödemelerim
                     </button>
-                    <button class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 text-gray-700 profile-tab" data-tab="messages">
-                        <i class="fas fa-envelope mr-2"></i>Mesajlarım
-                    </button>
                     <button id="logout-btn" class="w-full text-left px-4 py-2 rounded-lg hover:bg-red-100 text-red-600 mt-4">
                         <i class="fas fa-sign-out-alt mr-2"></i>Çıkış
                     </button>
@@ -967,16 +964,34 @@
                 <div id="tab-reports" class="profile-tab-content hidden">
                     <h4 class="text-lg font-semibold mb-4">Raporlarım</h4>
                     <div id="user-reports-list">
-                        <p class="text-gray-500 text-center py-4">Henüz raporunuz bulunmamaktadır.</p>
+                        <div class="text-center py-8">
+                            <i class="fas fa-file-pdf text-4xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500">Raporlarınız yükleniyor...</p>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Diğer tab içerikleri benzer şekilde eklenecek -->
+                <!-- Başvurularım -->
+                <div id="tab-applications" class="profile-tab-content hidden">
+                    <h4 class="text-lg font-semibold mb-4">Başvurularım</h4>
+                    <div class="text-center py-8">
+                        <i class="fas fa-file-alt text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">Henüz başvurunuz bulunmamaktadır.</p>
+                    </div>
+                </div>
+                
+                <!-- Ödemelerim -->
+                <div id="tab-payments" class="profile-tab-content hidden">
+                    <h4 class="text-lg font-semibold mb-4">Ödemelerim</h4>
+                    <div class="text-center py-8">
+                        <i class="fas fa-credit-card text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">Henüz ödeme kaydınız bulunmamaktadır.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
-
     <!-- Footer - EKLENDİ -->
     <footer class="bg-gray-800 text-white py-12">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -2138,36 +2153,58 @@ function checkExistingSession() {
 // Auth modal'larını kur
 function setupAuthModals() {
     // Login modal
-    document.getElementById('close-login-modal').addEventListener('click', () => {
-        document.getElementById('login-modal').classList.add('hidden');
-    });
+    const closeLoginBtn = document.getElementById('close-login-modal');
+    if (closeLoginBtn) {
+        closeLoginBtn.addEventListener('click', () => {
+            document.getElementById('login-modal').classList.add('hidden');
+        });
+    }
     
     // Register/Login toggle
-    document.getElementById('show-register').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('login-form').classList.add('hidden');
-        document.getElementById('register-form').classList.remove('hidden');
-    });
+    const showRegister = document.getElementById('show-register');
+    const showLogin = document.getElementById('show-login');
     
-    document.getElementById('show-login').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('register-form').classList.add('hidden');
-        document.getElementById('login-form').classList.remove('hidden');
-    });
+    if (showRegister) {
+        showRegister.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+        });
+    }
+    
+    if (showLogin) {
+        showLogin.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+        });
+    }
     
     // Login form
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
     
     // Register form
-    document.getElementById('register-form').addEventListener('submit', handleRegister);
+    const registerForm = document.getElementById('register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', handleRegister);
+    }
     
     // Profile modal
-    document.getElementById('close-profile-modal').addEventListener('click', () => {
-        document.getElementById('profile-modal').classList.add('hidden');
-    });
+    const closeProfileBtn = document.getElementById('close-profile-modal');
+    if (closeProfileBtn) {
+        closeProfileBtn.addEventListener('click', () => {
+            document.getElementById('profile-modal').classList.add('hidden');
+        });
+    }
     
     // Logout
-    document.getElementById('logout-btn').addEventListener('click', handleLogout);
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+    }
 }
 
 // Giriş işlemi
@@ -2199,15 +2236,14 @@ async function handleLogin(e) {
             // Modal'ı kapat
             document.getElementById('login-modal').classList.add('hidden');
             
-            // Sepetteki raporları tamamlamaya devam et
-            proceedWithOrder();
+            alert('Başarıyla giriş yapıldı!');
         }
         
     } catch (error) {
         alert('Giriş hatası: ' + error.message);
     }
 }
-
+        
 // Kayıt işlemi
 async function handleRegister(e) {
     e.preventDefault();
@@ -2245,7 +2281,7 @@ async function handleRegister(e) {
         alert('Kayıt hatası: ' + error.message);
     }
 }
-
+        
 // Çıkış işlemi
 function handleLogout() {
     supabase.auth.signOut();
@@ -2273,7 +2309,6 @@ function updateUIForLoggedInUser() {
         
         document.getElementById('profile-btn').addEventListener('click', () => {
             document.getElementById('profile-modal').classList.remove('hidden');
-            loadUserProfile();
         });
         
         document.getElementById('logout-nav-btn').addEventListener('click', handleLogout);
@@ -2302,10 +2337,17 @@ function updateUIForLoggedOutUser() {
         });
     }
 }
-
+        
 // Profile tab'larını kur
+// Profil tab'larını kur
 function setupProfileTabs() {
-    document.querySelectorAll('.profile-tab').forEach(tab => {
+    const tabs = document.querySelectorAll('.profile-tab');
+    if (tabs.length === 0) {
+        console.log('Profil tabları bulunamadı');
+        return;
+    }
+    
+    tabs.forEach(tab => {
         tab.addEventListener('click', function() {
             // Aktif tab'ı güncelle
             document.querySelectorAll('.profile-tab').forEach(t => {
@@ -2321,71 +2363,97 @@ function setupProfileTabs() {
             document.querySelectorAll('.profile-tab-content').forEach(content => {
                 content.classList.add('hidden');
             });
-            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
             
-            // Tab'a özel verileri yükle
-            if (tabName === 'reports') {
-                loadUserReports();
+            const targetTab = document.getElementById(`tab-${tabName}`);
+            if (targetTab) {
+                targetTab.classList.remove('hidden');
+                
+                // Raporlar sekmesine tıklandığında raporları yükle
+                if (tabName === 'reports') {
+                    loadUserReports();
+                }
             }
         });
     });
 }
-
-// Kullanıcı raporlarını yükle - ÖDEME YAPILMIŞ RAPORLAR
+        
+// Kullanıcı raporlarını yükle - SADE VE TEMİZ
 async function loadUserReports() {
-    if (!currentUser) return;
+    if (!currentUser) {
+        console.log('Kullanıcı girişi yok');
+        return;
+    }
+    
+    const reportsList = document.getElementById('user-reports-list');
+    if (!reportsList) {
+        console.log('reportsList elementi bulunamadı');
+        return;
+    }
     
     try {
+        console.log('Kullanıcı raporları yükleniyor:', currentUser.id);
+        
         const { data: reports, error } = await supabase
             .from('ai_reports')
             .select('*')
             .eq('user_id', currentUser.id)
-            .eq('status', 'completed') // Sadece tamamlanmış raporlar
             .order('created_at', { ascending: false });
         
-        if (error) throw error;
+        if (error) {
+            console.error('Rapor yükleme hatası:', error);
+            reportsList.innerHTML = '<p class="text-red-500 text-center py-4">Raporlar yüklenirken hata oluştu.</p>';
+            return;
+        }
         
-        const reportsList = document.getElementById('user-reports-list');
+        console.log('Yüklenen rapor sayısı:', reports?.length);
         
-        if (!data || data.length === 0) {
+        if (!reports || reports.length === 0) {
             reportsList.innerHTML = `
                 <div class="text-center py-8">
                     <i class="fas fa-file-pdf text-4xl text-gray-300 mb-4"></i>
                     <p class="text-gray-500">Henüz raporunuz bulunmamaktadır.</p>
-                    <p class="text-gray-400 text-sm mt-2">Raporlarınız ödeme sonrasında burada görünecektir.</p>
+                    <p class="text-gray-400 text-sm mt-2">Ödeme yaptıktan sonra raporlarınız burada görünecektir.</p>
                 </div>
             `;
             return;
         }
         
         let html = '';
-        data.forEach(report => {
+        reports.forEach(report => {
+            const createdDate = new Date(report.created_at).toLocaleDateString('tr-TR');
+            const isPaid = report.status === 'completed' || report.status === 'paid';
+            const canDownload = isPaid && report.pdf_url;
+            
             html += `
                 <div class="bg-white border border-gray-200 rounded-lg p-4 mb-3 shadow-sm">
                     <div class="flex justify-between items-start">
                         <div class="flex-1">
-                            <h5 class="font-semibold text-gray-800">${report.report_title}</h5>
+                            <h5 class="font-semibold text-gray-800">${report.report_title || 'İsimsiz Rapor'}</h5>
                             <p class="text-sm text-gray-600 mt-1">
-                                <i class="far fa-calendar mr-1"></i>
-                                ${new Date(report.created_at).toLocaleDateString('tr-TR')}
+                                <i class="far fa-calendar mr-1"></i>${createdDate}
                             </p>
-                            ${report.is_mock ? `
-                                <span class="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded mt-2">
-                                    <i class="fas fa-info-circle mr-1"></i>Demo Rapor
+                            <div class="flex space-x-2 mt-2">
+                                <span class="inline-block ${isPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'} text-xs px-2 py-1 rounded">
+                                    ${isPaid ? '✅ Ödeme Tamam' : '⏳ Beklemede'}
                                 </span>
-                            ` : ''}
+                                ${report.is_mock ? `
+                                    <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                                        Demo Rapor
+                                    </span>
+                                ` : ''}
+                            </div>
                         </div>
                         <div class="flex space-x-2 ml-4">
-                            ${report.pdf_url ? `
+                            ${canDownload ? `
                                 <a href="${report.pdf_url}" target="_blank" 
-                                   class="bg-green-500 text-white px-3 py-2 rounded text-sm hover:bg-green-600 transition">
+                                   class="bg-green-500 text-white px-3 py-2 rounded text-sm hover:bg-green-600 transition flex items-center">
                                     <i class="fas fa-download mr-1"></i> PDF İndir
                                 </a>
-                            ` : ''}
-                            <button class="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600 transition view-report-profile" 
-                                    data-id="${report.id}">
-                                <i class="fas fa-eye mr-1"></i> Görüntüle
-                            </button>
+                            ` : `
+                                <button class="bg-gray-300 text-gray-500 px-3 py-2 rounded text-sm cursor-not-allowed flex items-center" disabled>
+                                    <i class="fas fa-download mr-1"></i> Ödeme Gerekli
+                                </button>
+                            `}
                         </div>
                     </div>
                 </div>
@@ -2394,20 +2462,11 @@ async function loadUserReports() {
         
         reportsList.innerHTML = html;
         
-        // Profildeki görüntüleme butonlarına event listener ekle
-        document.querySelectorAll('.view-report-profile').forEach(button => {
-            button.addEventListener('click', function() {
-                const reportId = this.getAttribute('data-id');
-                viewReport(reportId);
-            });
-        });
-        
     } catch (error) {
         console.error('Raporlar yüklenirken hata:', error);
         reportsList.innerHTML = '<p class="text-red-500 text-center py-4">Raporlar yüklenirken hata oluştu.</p>';
     }
 }
-
         
 
 // ÖDEME APİSİ BAŞLANGIÇ
@@ -2468,21 +2527,16 @@ async function simulatePayment() {
     }
 }
 
-// InitializeApp'e test ödeme butonunu da ekle
+// Uygulamayı başlat - SADELEŞTİRİLMİŞ
 async function initializeApp() {
     if (isInitialized) return;
     isInitialized = true;
     
     console.log('ParenaTrade uygulaması başlatılıyor...');
     
-    // Kullanıcı yönetim sistemini başlat
+    // Temel başlatma işlemleri
     initializeAuthSystem();
-    initializeReportViewer();
-    setupExampleReports();
-    
-    // TEST BUTONLARI (SONRA KALDIRILACAK)
-    addTestPDFButton();
-    addTestPaymentButton();
+    setupProfileTabs();
     
     // Diğer başlatma işlemleri...
     await loadServiceTypesSimple();
@@ -2493,11 +2547,7 @@ async function initializeApp() {
     setupModalFunctionality();
     
     console.log('ParenaTrade uygulaması başlatıldı');
-    
-    // TEST: Tüm raporları console'da göster
-    setTimeout(testListAllReports, 3000);
 }
-
         
 // ÖDEME APSİ SONU         
 
