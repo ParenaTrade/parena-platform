@@ -1119,57 +1119,185 @@
         let activeAccordion = null;
 
         
-        // Initialize App'te kullanım
-        // DOM yüklendikten sonra çalışacak kodlar
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
-        });
-
-
-        // Tablo durumunu kontrol et
-        async function checkTableStatus() {
-            try {
-                console.log('=== TABLO DURUM KONTROLÜ ===');
-                
-                // 1. ai_service_type kontrolü
-                const { data: services, count: serviceCount, error: serviceError } = await supabase
-                    .from('ai_service_type')
-                    .select('*', { count: 'exact' });
-                
-                console.log('ai_service_type:');
-                console.log('- Count:', serviceCount);
-                console.log('- Error:', serviceError);
-                console.log('- Sample:', services?.slice(0, 3));
-                
-                // 2. ai_question kontrolü
-                const { data: questions, count: questionCount, error: questionError } = await supabase
-                    .from('ai_question')
-                    .select('*', { count: 'exact' })
-                    .limit(5);
-                    
-                console.log('ai_question:');
-                console.log('- Count:', questionCount);
-                console.log('- Error:', questionError);
-                console.log('- Sample:', questions);
-                
-                // 3. Eşleşme kontrolü
-                if (services && questions) {
-                    const serviceIds = services.map(s => s.id);
-                    const matchingQuestions = questions.filter(q => 
-                        serviceIds.includes(q.service_type_id)
-                    );
-                    console.log('Eşleşen sorular:', matchingQuestions.length);
+        // Tüm başlatma işlemleri tek bir DOMContentLoaded içinde
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 ParenaTrade - Uygulama başlatılıyor...');
+    
+    // Ana uygulamayı başlat
+    initializeApp();
+    
+    // Debug ve kontrol işlemleri - sıralı ve gecikmeli
+    setTimeout(() => {
+        checkTableStatus();
+    }, 500);
+    
+    setTimeout(() => {
+        debugServiceTypes();
+    }, 1000);
+    
+    setTimeout(() => {
+        debugServiceMatching();
+    }, 1500);
+    
+    setTimeout(() => {
+        checkSystemStatus();
+    }, 2000);
+    
+    // API durum kontrolü
+    setTimeout(() => {
+        checkAPIStatus().then(status => {
+            if (!status) {
+                console.warn('⚠️ API servisi kullanılamıyor');
+                // API uyarısını göster
+                const apiWarning = document.getElementById('api-warning');
+                if (apiWarning) {
+                    apiWarning.classList.remove('hidden');
                 }
-                
-            } catch (error) {
-                console.error('Tablo kontrol hatası:', error);
+            } else {
+                console.log('✅ API servisi çalışıyor');
             }
-        }
+        });
+    }, 2500);
+});
 
-        // Sayfa yüklendiğinde kontrol et
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(checkTableStatus, 1000);
-        });      
+// Ana uygulama başlatma fonksiyonu - GÜNCELLENMİŞ
+async function initializeApp() {
+    if (isInitialized) {
+        console.log('ℹ️ Uygulama zaten başlatılmış');
+        return;
+    }
+    isInitialized = true;
+    
+    try {
+        console.log('🔧 Temel sistemler başlatılıyor...');
+        
+        // 1. Temel sistemleri başlat
+        initializeAuthSystem();
+        setupProfileTabs();
+        
+        // 2. Verileri yükle
+        console.log('📥 Veriler yükleniyor...');
+        await loadServiceTypesSimple();
+        await loadReportTemplates();
+        
+        // 3. UI bileşenlerini kur
+        console.log('🎨 UI bileşenleri kuruluyor...');
+        setupCompanyAnalysisChat();
+        setupQuickReportForm();
+        setupCartFunctionality();
+        setupModalFunctionality();
+        setupReportWarning();
+        
+        console.log('✅ ParenaTrade uygulaması başarıyla başlatıldı');
+        
+    } catch (error) {
+        console.error('❌ Uygulama başlatma hatası:', error);
+        // Hata durumunda kullanıcıyı bilgilir
+        showErrorModal(
+            'Sistem Hatası', 
+            'Uygulama başlatılırken bir hata oluştu. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.'
+        );
+    }
+}
+
+// API uyarı sistemini kur
+function setupReportWarning() {
+    const generateBtn = document.getElementById('generate-report-btn');
+    if (generateBtn) {
+        // Butonun yanına uyarı ikonu ekle (zaten varsa ekleme)
+        if (!document.getElementById('api-warning')) {
+            generateBtn.insertAdjacentHTML('beforebegin', `
+                <div id="api-warning" class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 hidden">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                        <span class="text-yellow-800 text-sm">
+                            <strong>Teknik Kontrol:</strong> AI servisi test ediliyor. Rapor oluşturma işlemi geçici olarak beklemede olabilir.
+                        </span>
+                    </div>
+                </div>
+            `);
+        }
+    }
+}
+
+// Sistem durumunu kontrol et - GÜNCELLENMİŞ
+async function checkSystemStatus() {
+    console.log('=== 🔍 SİSTEM DURUM KONTROLÜ ===');
+    
+    try {
+        // 1. Service types kontrolü
+        const { data: services, error: servicesError } = await supabase
+            .from('ai_service_type')
+            .select('id, service_name')
+            .limit(5);
+        
+        console.log('📋 Service Types:', servicesError ? '❌ HATA' : `✅ ${services?.length} hizmet`);
+        
+        // 2. Questions kontrolü  
+        const { data: questions, error: questionsError } = await supabase
+            .from('ai_question')
+            .select('id, question, service_type_id, service_type')
+            .limit(5);
+            
+        console.log('📝 Questions:', questionsError ? '❌ HATA' : `✅ ${questions?.length} soru`);
+        
+        // 3. Tablo yapısı
+        await detectTableStructure();
+        
+        console.log('✅ Sistem durumu: STABIL');
+        
+    } catch (error) {
+        console.error('❌ Sistem kontrol hatası:', error);
+    }
+}
+
+// Tablo durumunu kontrol et - GÜNCELLENMİŞ
+async function checkTableStatus() {
+    try {
+        console.log('=== 📊 TABLO DURUM KONTROLÜ ===');
+        
+        // 1. ai_service_type kontrolü
+        const { data: services, count: serviceCount, error: serviceError } = await supabase
+            .from('ai_service_type')
+            .select('*', { count: 'exact' });
+        
+        console.log('📋 ai_service_type:');
+        console.log('- Count:', serviceCount);
+        console.log('- Error:', serviceError);
+        console.log('- Status:', serviceError ? '❌' : '✅');
+        
+        // 2. ai_question kontrolü
+        const { data: questions, count: questionCount, error: questionError } = await supabase
+            .from('ai_question')
+            .select('*', { count: 'exact' })
+            .limit(5);
+            
+        console.log('📝 ai_question:');
+        console.log('- Count:', questionCount);
+        console.log('- Error:', questionError);
+        console.log('- Status:', questionError ? '❌' : '✅');
+        
+        // 3. Eşleşme kontrolü
+        if (services && questions) {
+            const serviceIds = services.map(s => s.id);
+            const matchingQuestions = questions.filter(q => 
+                serviceIds.includes(q.service_type_id)
+            );
+            console.log('🔗 Eşleşen sorular:', matchingQuestions.length);
+        }
+        
+    } catch (error) {
+        console.error('❌ Tablo kontrol hatası:', error);
+    }
+}
+
+// Çift yüklenmeyi önlemek için global kontrol
+if (window.parenaTradeInitialized) {
+    console.log('ℹ️ ParenaTrade zaten yüklenmiş');
+} else {
+    window.parenaTradeInitialized = true;
+    // Yukarıdaki tek DOMContentLoaded listener burada olacak
+}            
                 
         // Global değişken - veri yüklendi mi takip et
         let serviceTypesLoaded = false;
@@ -1562,10 +1690,7 @@
             }
         }
 
-        // Sayfa yüklendiğinde debug çalıştır
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(debugServiceTypes, 1500);
-        });
+        
                 
           // Hizmet sorularını yükle - TABLO YAPISINA UYGUN
         async function loadServiceQuestions(serviceId) {
@@ -1746,45 +1871,6 @@
                 console.error('Debug hatası:', error);
             }
         }
-
-        // Sayfa yüklendiğinde debug çalıştır
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(debugServiceMatching, 2000);
-        });
-        
-        // Sistem durumunu kontrol et
-        async function checkSystemStatus() {
-            console.log('=== SİSTEM DURUM KONTROLÜ ===');
-            
-            try {
-                // 1. Service types kontrolü
-                const { data: services, error: servicesError } = await supabase
-                    .from('ai_service_type')
-                    .select('id, service_name')
-                    .limit(5);
-                
-                console.log('Service Types:', servicesError ? 'HATA' : services);
-                
-                // 2. Questions kontrolü  
-                const { data: questions, error: questionsError } = await supabase
-                    .from('ai_question')
-                    .select('id, question, service_type_id, service_type')
-                    .limit(5);
-                    
-                console.log('Questions:', questionsError ? 'HATA' : questions);
-                
-                // 3. Tablo yapısı
-                await detectTableStructure();
-                
-            } catch (error) {
-                console.error('Sistem kontrol hatası:', error);
-            }
-        }
-
-        // Sayfa yüklendiğinde kontrol et
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(checkSystemStatus, 1000);
-        });
                 
         // Cevap Gönderme İşlemi - GÜNCELLENDİ
         function handleAnswerSubmit() {
@@ -2491,29 +2577,6 @@ async function simulatePayment() {
     }
 }
 
-// Uygulamayı başlat - SADELEŞTİRİLMİŞ
-async function initializeApp() {
-    if (isInitialized) return;
-    isInitialized = true;
-    
-    console.log('ParenaTrade uygulaması başlatılıyor...');
-    
-    // Temel başlatma işlemleri
-    initializeAuthSystem();
-    setupProfileTabs();
-    
-    // Diğer başlatma işlemleri...
-    await loadServiceTypesSimple();
-    await loadReportTemplates();
-    setupCompanyAnalysisChat();
-    setupQuickReportForm();
-    setupCartFunctionality();
-   
-    
-    console.log('ParenaTrade uygulaması başlatıldı');
-}
-        
-// ÖDEME APSİ SONU         
 
 
 // Giriş sonrası siparişe devam et
