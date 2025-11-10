@@ -291,6 +291,54 @@
         .dynamic-form-fields::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
         }
+
+        .prose {
+    line-height: 1.6;
+    color: #374151;
+}
+
+.prose h1 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+    color: #1f2937;
+}
+
+.prose h2 {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-top: 1.25rem;
+    margin-bottom: 0.75rem;
+    color: #1f2937;
+}
+
+.prose h3 {
+    font-size: 1.125rem;
+    font-weight: bold;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    color: #1f2937;
+}
+
+.prose ul {
+    list-style-type: disc;
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.prose li {
+    margin-bottom: 0.25rem;
+}
+
+.prose strong {
+    font-weight: bold;
+    color: #1f2937;
+}
+
+.prose em {
+    font-style: italic;
+}
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -2475,6 +2523,7 @@ function proceedToPayment() {
 }
         
 // Rapor görüntüleme sistemini başlat
+// Rapor görüntüleme sistemini başlat
 function initializeReportViewer() {
     // Modal kapatma
     document.getElementById('close-report-modal').addEventListener('click', () => {
@@ -2586,6 +2635,69 @@ function downloadPDF() {
     }
 }
 
+// Sepetteki "Raporu Görüntüle" butonlarını güncelle
+function updateAICart() {
+    const cartItems = document.getElementById('ai-report-cart-items');
+    const cartTotal = document.getElementById('ai-report-cart-total');
+    const completeBtn = document.getElementById('complete-ai-report-order');
+
+    if (serviceCart.length === 0) {
+        cartItems.innerHTML = '<p class="text-gray-500 text-center py-4">Sepetinizde rapor bulunmamaktadır</p>';
+        cartTotal.textContent = '0 USD';
+        completeBtn.disabled = true;
+        return;
+    }
+
+    let cartHTML = '';
+    let total = 0;
+
+    serviceCart.forEach(item => {
+        const itemTotal = item.price * item.quantity;
+        total += itemTotal;
+
+        cartHTML += `
+            <div class="cart-item">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h4 class="font-semibold">${item.name}</h4>
+                        <p class="text-gray-600 text-sm">$${item.price} ${item.currency} x ${item.quantity}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        ${item.reportId ? `
+                            <button class="text-indigo-600 view-report-btn" data-id="${item.reportId}">
+                                <i class="fas fa-eye mr-1"></i> Görüntüle
+                            </button>
+                        ` : ''}
+                        <span class="font-bold mr-4">$${itemTotal} ${item.currency}</span>
+                        <button class="text-red-500 remove-ai-item" data-id="${item.id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    cartItems.innerHTML = cartHTML;
+    cartTotal.textContent = `$${total} USD`;
+    completeBtn.disabled = false;
+
+    // Görüntüleme butonlarına event listener ekle
+    document.querySelectorAll('.view-report-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const reportId = this.getAttribute('data-id');
+            viewReport(reportId);
+        });
+    });
+
+    // Kaldırma butonlarına event listener ekle
+    document.querySelectorAll('.remove-ai-item').forEach(button => {
+        button.addEventListener('click', function() {
+            const itemId = this.getAttribute('data-id');
+            removeFromAICart(itemId);
+        });
+    });
+}
 
 // Örnek rapor kartlarına görüntüleme butonu ekle
 function setupExampleReports() {
@@ -2649,8 +2761,7 @@ async function initializeApp() {
     setupModalFunctionality();
     
     console.log('ParenaTrade uygulaması başlatıldı');
-}
-        
+}        
 // Raporları veritabanına kaydet - GÜNCELLENDİ
 async function saveReportsToDatabase() {
     if (!currentUser) return;
