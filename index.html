@@ -1402,6 +1402,7 @@ function closeModal() {
 }
 
 // Uygulama başlatmayı güncelle
+// Ana uygulama başlatma fonksiyonu - GÜNCELLENMİŞ
 async function initializeApp() {
     if (isInitialized) {
         console.log('ℹ️ Uygulama zaten başlatılmış');
@@ -1412,32 +1413,29 @@ async function initializeApp() {
     try {
         console.log('🔧 Temel sistemler başlatılıyor...');
         
-        // 1. Temel sistemleri başlat (API'yi beklemeden)
+        // 1. Dropdown verilerini yükle
+        await loadDropdownData();
+        
+        // 2. Temel sistemleri başlat
         initializeAuthSystem();
         setupProfileTabs();
         
-        // 2. Verileri yükle
+        // 3. Verileri yükle
         console.log('📥 Veriler yükleniyor...');
         await loadServiceTypesSimple();
         await loadReportTemplates();
         
-        // 3. UI bileşenlerini kur
+        // 4. UI bileşenlerini kur
         console.log('🎨 UI bileşenleri kuruluyor...');
         setupCompanyAnalysisChat();
         setupQuickReportForm();
         setupCartFunctionality();
         setupModalFunctionality();
         setupReportWarning();
-        setupReportButton(); // Buton durumunu ayarla
+        setupReportButton();
         
-        // 4. API durumunu arka planda kontrol et
-        setTimeout(async () => {
-            const apiStatus = await checkAPIStatus();
-            if (!apiStatus) {
-                console.log('ℹ️ API çalışmıyor - kullanıcıya bilgi veriliyor');
-                // Sessiz bilgilendirme - modal açmadan
-            }
-        }, 2000);
+        // 5. Oturum kontrolü
+        checkChatSession();
         
         console.log('✅ ParenaTrade uygulaması başarıyla başlatıldı');
         
@@ -1448,7 +1446,7 @@ async function initializeApp() {
             'Uygulama başlatılırken bir hata oluştu. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.'
         );
     }
-}       
+}      
         
 // Tüm başlatma işlemleri tek bir DOMContentLoaded içinde
 document.addEventListener('DOMContentLoaded', function() {
@@ -1818,6 +1816,9 @@ if (window.parenaTradeInitialized) {
                 packagesContainer.innerHTML += packageHTML;
             });
         }
+
+
+
         
         // Mesajı sohbete ekle
         function addMessageToChat(message, isUser = false) {
@@ -1830,103 +1831,89 @@ if (window.parenaTradeInitialized) {
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        // Firma Analiz Sohbeti Kurulumu - GÜNCELLENDİ (çift event listener'ı önle)
-        function setupCompanyAnalysisChat() {
-            const serviceSelect = document.getElementById('service-select');
-            const chatInput = document.getElementById('chat-input');
-            const sendTextButton = document.getElementById('send-text');
-            const goBackBtn = document.getElementById('go-back-btn');
-            const chatInputArea = document.getElementById('chat-input-area');
+        // Firma Analiz Sohbeti - GÜNCELLENMİŞ
+function setupCompanyAnalysisChat() {
+    const serviceSelect = document.getElementById('service-select');
+    const chatInput = document.getElementById('chat-input');
+    const sendTextButton = document.getElementById('send-text');
+    const goBackBtn = document.getElementById('go-back-btn');
+    const chatInputArea = document.getElementById('chat-input-area');
 
-            // Event listener'ları temizle (çift eklenmesini önlemek için)
-            serviceSelect.replaceWith(serviceSelect.cloneNode(true));
-            const newServiceSelect = document.getElementById('service-select');
-            
-            sendTextButton.replaceWith(sendTextButton.cloneNode(true));
-            const newSendTextButton = document.getElementById('send-text');
-            
-            goBackBtn.replaceWith(goBackBtn.cloneNode(true));
-            const newGoBackBtn = document.getElementById('go-back-btn');
+    // Event listener'ları temizle ve yeniden ekle
+    serviceSelect.addEventListener('change', handleServiceChange);
+    sendTextButton.addEventListener('click', handleAnswerSubmit);
+    goBackBtn.addEventListener('click', handleGoBack);
+    
+    chatInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleAnswerSubmit();
+        }
+    });
 
-            // Yeni event listener'ları ekle
-            newServiceSelect.addEventListener('change', handleServiceChange);
-            newSendTextButton.addEventListener('click', handleAnswerSubmit);
-            newGoBackBtn.addEventListener('click', handleGoBack);
-            
-            chatInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    handleAnswerSubmit();
-                }
-            });
-
-            // Service değişim handler'ı - GÜNCEL
-            async function handleServiceChange() {
-                const selectedServiceId = this.value;
-                const chatInputArea = document.getElementById('chat-input-area');
-                const goBackBtn = document.getElementById('go-back-btn');
-                
-                if (!selectedServiceId) {
-                    chatInputArea.classList.add('hidden');
-                    addMessageToChat("Lütfen ilgilendiğiniz hizmeti seçin.");
-                    return;
-                }
-
-                try {
-                    currentService = selectedServiceId;
-                    currentQuestionIndex = 0;
-                    companyProfile[selectedServiceId] = {};
-                    
-                    // Sohbeti temizle (ilk mesaj hariç)
-                    const chatContainer = document.getElementById('chat-container');
-                    const initialMessage = chatContainer.querySelector('.chat-bubble:first-child');
-                    chatContainer.innerHTML = '';
-                    if (initialMessage) chatContainer.appendChild(initialMessage);
-                    
-                    const selectedServiceName = this.options[this.selectedIndex].text;
-                    addMessageToChat(`"${selectedServiceName}" hizmeti için analiz başlatılıyor...`);
-                    
-                    // GERÇEK soruları yükle
-                    await loadServiceQuestionsAdvanced(selectedServiceId);
-                    
-                    if (serviceQuestions.length > 0) {
-                        setTimeout(() => {
-                            addMessageToChat(serviceQuestions[0].question);
-                            chatInputArea.classList.remove('hidden');
-                            goBackBtn.classList.add('hidden');
-                        }, 1000);
-                    }
-                    
-                } catch (error) {
-                    console.error('❌ Hizmet değişim hatası:', error);
-                    addMessageToChat("❌ " + error.message);
-                    addMessageToChat("🔄 Lütfen farklı bir hizmet seçin veya müşteri hizmetleri ile iletişime geçin.");
-                }
-            }    
-            
-            function handleGoBack() {
-                if (currentQuestionIndex > 0) {
-                    currentQuestionIndex--;
-                    // Önceki soruya dön
-                    const previousQuestion = serviceQuestions[currentQuestionIndex].question;
-                    
-                    // Sohbeti düzenle (son 2 mesajı kaldır - kullanıcı cevabı ve AI sorusu)
-                    const chatContainer = document.getElementById('chat-container');
-                    const messages = chatContainer.querySelectorAll('.chat-bubble');
-                    if (messages.length >= 2) {
-                        chatContainer.removeChild(messages[messages.length - 1]); // Son mesaj (AI sorusu)
-                        chatContainer.removeChild(messages[messages.length - 2]); // Son kullanıcı cevabı
-                    }
-                    
-                    // Önceki soruyu tekrar sor
-                    addMessageToChat(previousQuestion);
-                    newGoBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
-                    
-                    // Form alanını temizle
-                    chatInput.value = '';
-                }
-            }
+    async function handleServiceChange() {
+        const selectedServiceId = this.value;
+        const chatInputArea = document.getElementById('chat-input-area');
+        const goBackBtn = document.getElementById('go-back-btn');
+        
+        if (!selectedServiceId) {
+            chatInputArea.classList.add('hidden');
+            addMessageToChat("Lütfen ilgilendiğiniz hizmeti seçin.");
+            return;
         }
 
+        try {
+            currentService = selectedServiceId;
+            currentQuestionIndex = 0;
+            companyProfile[selectedServiceId] = {};
+            
+            // Sohbeti temizle (ilk mesaj hariç)
+            const chatContainer = document.getElementById('chat-container');
+            const initialMessage = chatContainer.querySelector('.chat-bubble:first-child');
+            chatContainer.innerHTML = '';
+            if (initialMessage) chatContainer.appendChild(initialMessage);
+            
+            const selectedServiceName = this.options[this.selectedIndex].text;
+            addMessageToChat(`"${selectedServiceName}" hizmeti için analiz başlatılıyor...`);
+            
+            // Soruları yükle
+            await loadServiceQuestionsAdvanced(selectedServiceId);
+            
+            if (serviceQuestions.length > 0) {
+                setTimeout(() => {
+                    addMessageToChat(serviceQuestions[0].question);
+                    chatInputArea.classList.remove('hidden');
+                    goBackBtn.classList.add('hidden');
+                }, 1000);
+            }
+            
+        } catch (error) {
+            console.error('❌ Hizmet değişim hatası:', error);
+            addMessageToChat("❌ " + error.message);
+        }
+    }
+    
+    function handleGoBack() {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            const previousQuestion = serviceQuestions[currentQuestionIndex].question;
+            
+            // Sohbeti düzenle
+            const chatContainer = document.getElementById('chat-container');
+            const messages = chatContainer.querySelectorAll('.chat-bubble');
+            if (messages.length >= 2) {
+                chatContainer.removeChild(messages[messages.length - 1]);
+                chatContainer.removeChild(messages[messages.length - 2]);
+            }
+            
+            // Önceki soruyu tekrar sor
+            addMessageToChat(previousQuestion);
+            goBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
+            
+            // Form alanını temizle
+            chatInput.value = '';
+        }
+    }
+}
         // 4. Tablo verisini debug için göster
         async function debugServiceTypes() {
             try {
@@ -2148,40 +2135,226 @@ async function detectTableStructure() {
             }
         }
                 
-        // Cevap Gönderme İşlemi - GÜNCELLENDİ
-        function handleAnswerSubmit() {
-            const chatInput = document.getElementById('chat-input');
-            const message = chatInput.value.trim();
-            const goBackBtn = document.getElementById('go-back-btn');
+        // Firma Analiz Sohbeti - GÜNCELLENMİŞ
+function setupCompanyAnalysisChat() {
+    const serviceSelect = document.getElementById('service-select');
+    const chatInput = document.getElementById('chat-input');
+    const sendTextButton = document.getElementById('send-text');
+    const goBackBtn = document.getElementById('go-back-btn');
+    const chatInputArea = document.getElementById('chat-input-area');
+
+    // Event listener'ları temizle ve yeniden ekle
+    serviceSelect.addEventListener('change', handleServiceChange);
+    sendTextButton.addEventListener('click', handleAnswerSubmit);
+    goBackBtn.addEventListener('click', handleGoBack);
+    
+    chatInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            handleAnswerSubmit();
+        }
+    });
+
+    async function handleServiceChange() {
+        const selectedServiceId = this.value;
+        const chatInputArea = document.getElementById('chat-input-area');
+        const goBackBtn = document.getElementById('go-back-btn');
+        
+        if (!selectedServiceId) {
+            chatInputArea.classList.add('hidden');
+            addMessageToChat("Lütfen ilgilendiğiniz hizmeti seçin.");
+            return;
+        }
+
+        try {
+            currentService = selectedServiceId;
+            currentQuestionIndex = 0;
+            companyProfile[selectedServiceId] = {};
             
-            if (!message) return;
-
-            // Kullanıcı mesajını ekle
-            addMessageToChat(message, true);
-
-            // Şirket profilini güncelle
-            const currentQuestion = serviceQuestions[currentQuestionIndex].question;
-            companyProfile[currentService][currentQuestion] = message;
-
-            chatInput.value = '';
-
-            // Sonraki soruya geç veya analiz yap
-            if (currentQuestionIndex < serviceQuestions.length - 1) {
-                currentQuestionIndex++;
-                const nextQuestion = serviceQuestions[currentQuestionIndex].question;
+            // Sohbeti temizle (ilk mesaj hariç)
+            const chatContainer = document.getElementById('chat-container');
+            const initialMessage = chatContainer.querySelector('.chat-bubble:first-child');
+            chatContainer.innerHTML = '';
+            if (initialMessage) chatContainer.appendChild(initialMessage);
+            
+            const selectedServiceName = this.options[this.selectedIndex].text;
+            addMessageToChat(`"${selectedServiceName}" hizmeti için analiz başlatılıyor...`);
+            
+            // Soruları yükle
+            await loadServiceQuestionsAdvanced(selectedServiceId);
+            
+            if (serviceQuestions.length > 0) {
                 setTimeout(() => {
-                    addMessageToChat(nextQuestion);
-                    goBackBtn.classList.remove('hidden');
-                }, 500);
-            } else {
-                // Tüm sorular cevaplandı, analiz yap
-                setTimeout(() => {
-                    addMessageToChat("Teşekkür ederim! Bilgilerinizi analiz ediyorum ve size özel öneriler hazırlıyorum...");
-                    generateCompanyAnalysis();
+                    addMessageToChat(serviceQuestions[0].question);
+                    chatInputArea.classList.remove('hidden');
+                    goBackBtn.classList.add('hidden');
                 }, 1000);
             }
+            
+        } catch (error) {
+            console.error('❌ Hizmet değişim hatası:', error);
+            addMessageToChat("❌ " + error.message);
         }
+    }
+    
+    function handleGoBack() {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            const previousQuestion = serviceQuestions[currentQuestionIndex].question;
+            
+            // Sohbeti düzenle
+            const chatContainer = document.getElementById('chat-container');
+            const messages = chatContainer.querySelectorAll('.chat-bubble');
+            if (messages.length >= 2) {
+                chatContainer.removeChild(messages[messages.length - 1]);
+                chatContainer.removeChild(messages[messages.length - 2]);
+            }
+            
+            // Önceki soruyu tekrar sor
+            addMessageToChat(previousQuestion);
+            goBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
+            
+            // Form alanını temizle
+            chatInput.value = '';
+        }
+    }
+}
+
+// Cevap gönderme - GÜNCELLENMİŞ
+function handleAnswerSubmit() {
+    const chatInput = document.getElementById('chat-input');
+    const message = chatInput.value.trim();
+    const goBackBtn = document.getElementById('go-back-btn');
+    
+    if (!message) return;
+
+    // Kullanıcı mesajını ekle
+    addMessageToChat(message, true);
+
+    // Şirket profilini güncelle
+    const currentQuestion = serviceQuestions[currentQuestionIndex].question;
+    companyProfile[currentService][currentQuestion] = message;
+
+    chatInput.value = '';
+
+    // Son soruya gelindi mi kontrol et
+    if (currentQuestionIndex < serviceQuestions.length - 1) {
+        // Normal soru devam et
+        currentQuestionIndex++;
+        const nextQuestion = serviceQuestions[currentQuestionIndex].question;
+        setTimeout(() => {
+            addMessageToChat(nextQuestion);
+            goBackBtn.classList.remove('hidden');
+        }, 500);
+    } else {
+        // SON SORU - Rapor teklifi göster
+        setTimeout(() => {
+            showReportOffer();
+        }, 1000);
+    }
+}
+
+// Rapor teklifi göster
+// Rapor teklifi göster
+function showReportOffer() {
+    const offerHTML = `
+        <div class="chat-bubble">
+            <p>Kapsamlı Pazar Analizi Raporunuzu hazırlamamızı ister misiniz?</p>
+            <div class="flex space-x-4 mt-4">
+                <button id="accept-offer" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-300">
+                    ✅ Evet
+                </button>
+                <button id="decline-offer" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-300">
+                    ❌ Hayır
+                </button>
+            </div>
+        </div>
+    `;
+    
+    const chatContainer = document.getElementById('chat-container');
+    chatContainer.insertAdjacentHTML('beforeend', offerHTML);
+    
+    // Input alanını gizle
+    document.getElementById('chat-input-area').classList.add('hidden');
+    
+    // Event listener'ları ekle
+    document.getElementById('accept-offer').addEventListener('click', handleOfferAccept);
+    document.getElementById('decline-offer').addEventListener('click', handleOfferDecline);
+}
+
+// Rapor teklifi göster
+function showReportOffer() {
+    const offerHTML = `
+        <div class="chat-bubble">
+            <p>Kapsamlı Pazar Analizi Raporunuzu hazırlamamızı ister misiniz?</p>
+            <div class="flex space-x-4 mt-4">
+                <button id="accept-offer" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition duration-300">
+                    ✅ Evet
+                </button>
+                <button id="decline-offer" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-300">
+                    ❌ Hayır
+                </button>
+            </div>
+        </div>
+    `;
+    
+    const chatContainer = document.getElementById('chat-container');
+    chatContainer.insertAdjacentHTML('beforeend', offerHTML);
+    
+    // Input alanını gizle
+    document.getElementById('chat-input-area').classList.add('hidden');
+    
+    // Event listener'ları ekle
+    document.getElementById('accept-offer').addEventListener('click', handleOfferAccept);
+    document.getElementById('decline-offer').addEventListener('click', handleOfferDecline);
+}
+// Teklifi reddet
+function handleOfferDecline() {
+    addMessageToChat('Anlıyorum. İstediğiniz zaman hizmetlerimizden faydalanabilirsiniz. Size nasıl yardımcı olabilirim?');
+    
+    // Butonları kaldır
+    document.getElementById('accept-offer').style.display = 'none';
+    document.getElementById('decline-offer').style.display = 'none';
+    
+    // Oturum verisini sakla (kullanıcı çıkış yapana kadar)
+    saveChatSession();
+}
+
+// Oturum verisini sakla
+function saveChatSession() {
+    const sessionData = {
+        serviceId: currentService,
+        profile: companyProfile[currentService],
+        timestamp: new Date().getTime()
+    };
+    sessionStorage.setItem('chat_session', JSON.stringify(sessionData));
+}
+
+// Oturum verisini temizle
+function clearChatSession() {
+    sessionStorage.removeItem('chat_session');
+    companyProfile = {};
+    currentService = null;
+    currentQuestionIndex = 0;
+    serviceQuestions = [];
+}
+
+// Sayfa yüklendiğinde oturum kontrolü
+function checkChatSession() {
+    const savedSession = sessionStorage.getItem('chat_session');
+    if (savedSession) {
+        const sessionData = JSON.parse(savedSession);
+        const now = new Date().getTime();
+        const sessionAge = now - sessionData.timestamp;
         
+        // 1 saatten eski oturumları temizle
+        if (sessionAge > 60 * 60 * 1000) {
+            clearChatSession();
+        } else {
+            // Oturumu geri yükle
+            console.log('📝 Kayıtlı sohbet oturumu bulundu');
+        }
+    }
+}        
           // Şirket Analizi Oluştur - DOMAIN DÜZELTİLDİ
         async function generateCompanyAnalysis() {
             try {
@@ -2370,81 +2543,375 @@ Vermiş olduğunuz bilgiler doğrultusunda ihtiyaçlarınız analiz edilmiştir.
             return [...new Set(matches)]; // Benzersiz değerler
         }
 
-        // Dinamik Form Alanlarını Oluştur - AKORDİYON MENÜ
-        function createDynamicFormFields(variables) {
-            const container = document.getElementById('dynamic-form-fields');
-            container.innerHTML = '';
-            formData = {};
 
-            const fieldTitles = {
-                dil: 'Rapor Dili',
-                ulke: 'Hedef Ülke',
-                sektor: 'Sektör',
-                urun: 'Ürün/Hizmet',
-                bolge: 'Bölge',
-                gtip: 'GTIP Kodu',
-                zaman: 'Zaman Aralığı',
-                amac: 'Analiz Amacı',
-                derinlik: 'Derinlik Düzeyi',
-                rapor_turu: 'Rapor Türü'
-            };
+// Dropdown verilerini yükle
+async function loadDropdownData() {
+    try {
+        console.log('📊 Dropdown verileri yükleniyor...');
+        
+        // 1. Dilleri yükle
+        const { data: languages, error: langError } = await supabase
+            .from('languages')
+            .select('id, name, code')
+            .order('name');
+        
+        if (!langError && languages) {
+            window.languages = languages;
+            console.log(`✅ ${languages.length} dil yüklendi`);
+        }
+        
+        // 2. Ülkeleri yükle
+        const { data: countries, error: countryError } = await supabase
+            .from('country')
+            .select('id, name, code')
+            .order('name');
+        
+        if (!countryError && countries) {
+            window.countries = countries;
+            console.log(`✅ ${countries.length} ülke yüklendi`);
+        }
+        
+        // 3. Sektörleri yükle
+        const { data: sectors, error: sectorError } = await supabase
+            .from('sector')
+            .select('id, name, code')
+            .order('name');
+        
+        if (!sectorError && sectors) {
+            window.sectors = sectors;
+            console.log(`✅ ${sectors.length} sektör yüklendi`);
+        }
+        
+        // 4. GTIP kodlarını yükle
+        const { data: gtipCodes, error: gtipError } = await supabase
+            .from('gtip')
+            .select('id, code, name, description')
+            .order('code');
+        
+        if (!gtipError && gtipCodes) {
+            window.gtipCodes = gtipCodes;
+            console.log(`✅ ${gtipCodes.length} GTIP kodu yüklendi`);
+        }
+        
+        // 5. Rapor şablonlarını yükle
+        const { data: reportTemplates, error: templateError } = await supabase
+            .from('ai_report_templates')
+            .select('id, report_name, report_type, report_description, report_price, report_currency')
+            .order('report_name');
+        
+        if (!templateError && reportTemplates) {
+            window.reportTemplates = reportTemplates;
+            console.log(`✅ ${reportTemplates.length} rapor şablonu yüklendi`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Dropdown verileri yüklenirken hata:', error);
+    }
+}
 
-            variables.forEach(variable => {
-                const fieldHTML = `
-                    <div class="accordion-item">
-                        <div class="accordion-header" data-field="${variable}">
-                            <span>${fieldTitles[variable] || variable}</span>
-                            <i class="fas fa-chevron-down accordion-icon"></i>
-                        </div>
-                        <div class="accordion-content">
-                            <input type="text" 
-                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 form-field"
-                                   data-field="${variable}"
-                                   placeholder="${fieldTitles[variable] || variable}">
-                        </div>
+// Dinamik form alanlarını oluştur - GÜNCELLENMİŞ
+function createDynamicFormFields(variables) {
+    const container = document.getElementById('dynamic-form-fields');
+    container.innerHTML = '';
+    formData = {};
+
+    const fieldConfigs = {
+        dil: {
+            title: 'Rapor Dili',
+            type: 'dropdown',
+            data: window.languages,
+            displayField: 'name',
+            valueField: 'name'
+        },
+        ulke: {
+            title: 'Hedef Ülke',
+            type: 'dropdown', 
+            data: window.countries,
+            displayField: 'name',
+            valueField: 'name'
+        },
+        sektor: {
+            title: 'Sektör',
+            type: 'dropdown',
+            data: window.sectors,
+            displayField: 'name', 
+            valueField: 'name'
+        },
+        urun: {
+            title: 'Ürün/Hizmet',
+            type: 'text',
+            placeholder: 'Domates Salçası, Biber Salçası, Konserve vs'
+        },
+        bolge: {
+            title: 'Bölge',
+            type: 'dropdown',
+            data: [
+                { id: 'east', name: 'Doğu' },
+                { id: 'west', name: 'Batı' },
+                { id: 'north', name: 'Kuzey' },
+                { id: 'south', name: 'Güney' }
+            ],
+            displayField: 'name',
+            valueField: 'name'
+        },
+        gtip: {
+            title: 'GTIP Kodu',
+            type: 'searchable-dropdown',
+            data: window.gtipCodes,
+            displayField: 'name',
+            valueField: 'code',
+            searchFields: ['code', 'name']
+        },
+        zaman: {
+            title: 'Zaman Aralığı',
+            type: 'text',
+            placeholder: '2023-2025'
+        },
+        amac: {
+            title: 'Analiz Amacı', 
+            type: 'text',
+            placeholder: 'Analiz amacınızı belirtin'
+        },
+        derinlik: {
+            title: 'Derinlik Düzeyi',
+            type: 'text',
+            placeholder: 'Çıktıyı yönetim sunumuna uygun şekilde 5-6 başlık altında rapor formatında hazırla.'
+        },
+        rapor_turu: {
+            title: 'Rapor Türü',
+            type: 'template-dropdown',
+            data: window.reportTemplates,
+            displayField: 'report_name', 
+            valueField: 'report_type'
+        }
+    };
+
+    variables.forEach(variable => {
+        const config = fieldConfigs[variable];
+        if (!config) return;
+
+        let fieldHTML = '';
+        
+        if (config.type === 'dropdown') {
+            fieldHTML = createDropdownField(variable, config);
+        } else if (config.type === 'searchable-dropdown') {
+            fieldHTML = createSearchableDropdownField(variable, config);
+        } else if (config.type === 'template-dropdown') {
+            fieldHTML = createTemplateDropdownField(variable, config);
+        } else {
+            fieldHTML = createTextField(variable, config);
+        }
+
+        container.innerHTML += fieldHTML;
+        formData[variable] = '';
+    });
+
+    // Event listener'ları ekle
+    setupFieldEventListeners();
+    container.classList.remove('hidden');
+}
+
+// Dropdown alanı oluştur
+function createDropdownField(field, config) {
+    return `
+        <div class="accordion-item">
+            <div class="accordion-header" data-field="${field}">
+                <span>${config.title}</span>
+                <i class="fas fa-chevron-down accordion-icon"></i>
+            </div>
+            <div class="accordion-content">
+                <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 form-field dropdown-field"
+                        data-field="${field}">
+                    <option value="">Seçiniz</option>
+                    ${config.data ? config.data.map(item => 
+                        `<option value="${item[config.valueField]}">${item[config.displayField]}</option>`
+                    ).join('') : ''}
+                </select>
+            </div>
+        </div>
+    `;
+}
+
+// Arama yapılabilir dropdown (GTIP için)
+function createSearchableDropdownField(field, config) {
+    return `
+        <div class="accordion-item">
+            <div class="accordion-header" data-field="${field}">
+                <span>${config.title}</span>
+                <i class="fas fa-chevron-down accordion-icon"></i>
+            </div>
+            <div class="accordion-content">
+                <div class="searchable-dropdown">
+                    <input type="text" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 search-input"
+                           placeholder="GTIP kodu veya ürün adı yazın..."
+                           data-field="${field}">
+                    <div class="dropdown-results hidden absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-60 overflow-y-auto"></div>
+                </div>
+                <div class="selected-value mt-2 hidden">
+                    <span class="text-sm text-gray-600">Seçilen: </span>
+                    <span class="selected-text font-medium"></span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Rapor şablonu dropdown
+function createTemplateDropdownField(field, config) {
+    return `
+        <div class="accordion-item">
+            <div class="accordion-header" data-field="${field}">
+                <span>${config.title}</span>
+                <i class="fas fa-chevron-down accordion-icon"></i>
+            </div>
+            <div class="accordion-content">
+                <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 form-field template-field"
+                        data-field="${field}">
+                    <option value="">Rapor türü seçin</option>
+                    ${config.data ? config.data.map(item => 
+                        `<option value="${item[config.valueField]}" 
+                                data-description="${item.report_description}"
+                                data-price="${item.report_price}"
+                                data-currency="${item.report_currency}">
+                            ${item[config.displayField]} - $${item.report_price} ${item.report_currency}
+                        </option>`
+                    ).join('') : ''}
+                </select>
+                <div class="template-description mt-2 text-sm text-gray-600 hidden"></div>
+            </div>
+        </div>
+    `;
+}
+
+// Text alanı oluştur
+function createTextField(field, config) {
+    return `
+        <div class="accordion-item">
+            <div class="accordion-header" data-field="${field}">
+                <span>${config.title}</span>
+                <i class="fas fa-chevron-down accordion-icon"></i>
+            </div>
+            <div class="accordion-content">
+                <input type="text" 
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 form-field"
+                       data-field="${field}"
+                       placeholder="${config.placeholder || ''}">
+            </div>
+        </div>
+    `;
+}
+
+// Field event listener'larını kur
+function setupFieldEventListeners() {
+    // Normal dropdown'lar
+    document.querySelectorAll('.dropdown-field').forEach(select => {
+        select.addEventListener('change', function() {
+            const field = this.getAttribute('data-field');
+            formData[field] = this.value;
+            updateCriteriaList();
+        });
+    });
+    
+    // Rapor şablonu dropdown'ı
+    document.querySelectorAll('.template-field').forEach(select => {
+        select.addEventListener('change', function() {
+            const field = this.getAttribute('data-field');
+            const selectedOption = this.options[this.selectedIndex];
+            const description = selectedOption.getAttribute('data-description');
+            const price = selectedOption.getAttribute('data-price');
+            const currency = selectedOption.getAttribute('data-currency');
+            
+            formData[field] = this.value;
+            
+            // Açıklamayı göster
+            const descContainer = this.parentElement.querySelector('.template-description');
+            if (description && descContainer) {
+                descContainer.textContent = description;
+                descContainer.classList.remove('hidden');
+            }
+            
+            updateCriteriaList();
+        });
+    });
+    
+    // Arama yapılabilir dropdown'lar (GTIP)
+    document.querySelectorAll('.search-input').forEach(input => {
+        input.addEventListener('input', debounce(function() {
+            const field = this.getAttribute('data-field');
+            const searchTerm = this.value.trim();
+            const resultsContainer = this.parentElement.querySelector('.dropdown-results');
+            const selectedContainer = this.parentElement.querySelector('.selected-value');
+            
+            if (searchTerm.length < 2) {
+                resultsContainer.classList.add('hidden');
+                return;
+            }
+            
+            // GTIP kodlarında ara
+            const filteredResults = window.gtipCodes.filter(item => 
+                item.code.startsWith(searchTerm) || 
+                item.name.toLowerCase().includes(searchTerm.toLowerCase())
+            ).slice(0, 10); // İlk 10 sonuç
+            
+            if (filteredResults.length > 0) {
+                resultsContainer.innerHTML = filteredResults.map(item => `
+                    <div class="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200" 
+                         data-value="${item.code}" 
+                         data-display="${item.code} - ${item.name}">
+                        <div class="font-medium">${item.code}</div>
+                        <div class="text-sm text-gray-600">${item.name}</div>
                     </div>
-                `;
-                container.innerHTML += fieldHTML;
-                formData[variable] = '';
-            });
-
-            // Akordiyon event listener'larını ekle
-            container.querySelectorAll('.accordion-header').forEach(header => {
-                header.addEventListener('click', function() {
-                    const field = this.getAttribute('data-field');
-                    const content = this.nextElementSibling;
+                `).join('');
+                resultsContainer.classList.remove('hidden');
+            } else {
+                resultsContainer.innerHTML = '<div class="p-2 text-gray-500">Sonuç bulunamadı</div>';
+                resultsContainer.classList.remove('hidden');
+            }
+            
+            // Sonuçlara tıklama event'i
+            resultsContainer.querySelectorAll('div[data-value]').forEach(result => {
+                result.addEventListener('click', function() {
+                    const value = this.getAttribute('data-value');
+                    const display = this.getAttribute('data-display');
                     
-                    // Eğer tıklanan zaten açıksa kapat
-                    if (this.classList.contains('active')) {
-                        this.classList.remove('active');
-                        content.classList.remove('open');
-                        activeAccordion = null;
-                    } else {
-                        // Önceki açık akordiyonu kapat
-                        if (activeAccordion) {
-                            activeAccordion.classList.remove('active');
-                            activeAccordion.nextElementSibling.classList.remove('open');
-                        }
-                        
-                        // Yeni akordiyonu aç
-                        this.classList.add('active');
-                        content.classList.add('open');
-                        activeAccordion = this;
-                    }
-                });
-            });
-
-            // Input event listener'larını ekle
-            container.querySelectorAll('.form-field').forEach(input => {
-                input.addEventListener('input', function() {
-                    const field = this.getAttribute('data-field');
-                    formData[field] = this.value;
+                    formData[field] = value;
+                    input.value = display;
+                    resultsContainer.classList.add('hidden');
+                    
+                    // Seçilen değeri göster
+                    selectedContainer.querySelector('.selected-text').textContent = display;
+                    selectedContainer.classList.remove('hidden');
+                    
                     updateCriteriaList();
                 });
             });
+            
+        }, 300));
+    });
+    
+    // Text input'lar
+    document.querySelectorAll('.form-field[type="text"]').forEach(input => {
+        input.addEventListener('input', function() {
+            const field = this.getAttribute('data-field');
+            formData[field] = this.value;
+            updateCriteriaList();
+        });
+    });
+}
 
-            container.classList.remove('hidden');
-        }
+// Debounce fonksiyonu
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
 
         // Kriter Listesini Güncelle
         function updateCriteriaList() {
