@@ -1118,6 +1118,230 @@
         let isInitialized = false;
         let activeAccordion = null;
 
+
+
+// ÖNCE: Tüm yardımcı fonksiyonları tanımla
+// ==============================================
+
+// Hata modal'ı göster
+function showErrorModal(title, message) {
+    // Modal HTML'i
+    const errorHTML = `
+        <div id="error-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+                <div class="flex items-center mb-4">
+                    <div class="bg-red-100 p-3 rounded-full mr-4">
+                        <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-red-700">${title}</h3>
+                </div>
+                <div class="mb-6">
+                    <div class="prose prose-sm max-w-none">
+                        ${message}
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button onclick="closeErrorModal()" class="bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-400 transition duration-300">
+                        Kapat
+                    </button>
+                    <button onclick="contactSupport()" class="bg-red-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-red-700 transition duration-300">
+                        Destek Al
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Eğer zaten bir hata modal'ı varsa kaldır
+    const existingModal = document.getElementById('error-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Yeni modal'ı ekle
+    document.body.insertAdjacentHTML('beforeend', errorHTML);
+}
+
+// Hata modal'ını kapat
+function closeErrorModal() {
+    const errorModal = document.getElementById('error-modal');
+    if (errorModal) {
+        errorModal.remove();
+    }
+}       
+
+// Destek butonu fonksiyonu
+function contactSupport() {
+    window.location.href = 'mailto:info@parenatrade.com?subject=ParenaTrade Destek&body=Merhaba, AI rapor servisi ile ilgili yardıma ihtiyacım var.';
+}
+        
+// API test fonksiyonu - GELİŞTİRİLMİŞ
+async function testAPIEndpoint() {
+    try {
+        console.log('🧪 API test ediliyor...');
+        
+        const response = await fetch('https://parenatrade.vercel.app/api/generate-report', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                prompt: "Test connection - please ignore",
+                template: "Connection Test",
+                parameters: { test: true }
+            }),
+            signal: AbortSignal.timeout(15000) // 15 saniye timeout
+        });
+        
+        console.log('📡 API Response Status:', response.status);
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ API çalışıyor:', result);
+            return true;
+        } else {
+            console.warn('⚠️ API hata kodu:', response.status);
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('❌ API bağlantı hatası:', error);
+        return false;
+    }
+}
+
+        // API durum kontrolü
+async function checkAPIStatus() {
+    return await testAPIEndpoint();
+}
+
+// API durumuna göre uyarı göster
+async function showAPIStatusAlert() {
+    const apiStatus = await testAPIEndpoint();
+    
+    if (!apiStatus) {
+        // Sadece bir kere göster (spam'ı önle)
+        if (!localStorage.getItem('api_alert_shown')) {
+            setTimeout(() => {
+                showErrorModal(
+                    'AI Servisi Geçici Olarak Kullanılamıyor',
+                    'AI rapor oluşturma servisi şu an teknik bir sorun nedeniyle kullanılamıyor.<br><br>' +
+                    '• Lütfen birkaç dakika sonra tekrar deneyin<br>' +
+                    '• Rapor oluşturma butonuna tıkladığınızda bu uyarıyı tekrar göreceksiniz<br>' +
+                    '• Acil ihtiyaçlarınız için: info@parenatrade.com<br><br>' +
+                    '<small>Bu mesaj sadece bir kere gösterilecektir.</small>'
+                );
+                localStorage.setItem('api_alert_shown', 'true');
+            }, 2000);
+        }
+    } else {
+        console.log('✅ API çalışıyor, normal işleme devam');
+        // Çalışıyorsa alert kaydını temizle
+        localStorage.removeItem('api_alert_shown');
+    }
+    
+    return apiStatus;
+}
+
+        
+
+ // API uyarı sistemini güncelle
+function setupReportWarning() {
+    const generateBtn = document.getElementById('generate-report-btn');
+    if (generateBtn && !document.getElementById('api-warning')) {
+        generateBtn.insertAdjacentHTML('beforebegin', `
+            <div id="api-warning" class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                    <span class="text-blue-800 text-sm">
+                        <strong>Bilgi:</strong> Rapor oluşturmadan önce AI servisi test edilecektir. 
+                        Servis kullanılamazsa size bilgi verilecektir.
+                    </span>
+                </div>
+            </div>
+        `);
+    }
+}
+
+        // Modal İşlevselliği
+function setupModalFunctionality() {
+    // Modal kapatma
+    const closeServiceModal = document.getElementById('close-service-modal');
+    const cancelServiceOrder = document.getElementById('cancel-service-order');
+    const submitServiceOrder = document.getElementById('submit-service-order');
+    const closeConfirmation = document.getElementById('close-confirmation');
+
+    if (closeServiceModal) {
+        closeServiceModal.addEventListener('click', closeModal);
+    }
+    
+    if (cancelServiceOrder) {
+        cancelServiceOrder.addEventListener('click', closeModal);
+    }
+
+    // Sipariş gönderme
+    if (submitServiceOrder) {
+        submitServiceOrder.addEventListener('click', function() {
+            // Burada ödeme sayfasına yönlendirme yapılacak
+            window.location.href = 'https://parenatrade.vercel.app/ai/login.html';
+        });
+    }
+
+    // Onay kapatma
+    if (closeConfirmation) {
+        closeConfirmation.addEventListener('click', closeModal);
+    }
+}
+
+function closeModal() {
+    const modal = document.getElementById('service-order-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+ // Uygulama başlatmayı güncelle
+async function initializeApp() {
+    if (isInitialized) {
+        console.log('ℹ️ Uygulama zaten başlatılmış');
+        return;
+    }
+    isInitialized = true;
+    
+    try {
+        console.log('🔧 Temel sistemler başlatılıyor...');
+        
+        // 1. API durumunu kontrol et ve alert göster
+        await showAPIStatusAlert();
+        
+        // 2. Temel sistemleri başlat
+        initializeAuthSystem();
+        setupProfileTabs();
+        
+        // 3. Verileri yükle
+        console.log('📥 Veriler yükleniyor...');
+        await loadServiceTypesSimple();
+        await loadReportTemplates();
+        
+        // 4. UI bileşenlerini kur
+        console.log('🎨 UI bileşenleri kuruluyor...');
+        setupCompanyAnalysisChat();
+        setupQuickReportForm();
+        setupCartFunctionality();
+        setupModalFunctionality();
+        setupReportWarning();
+        
+        console.log('✅ ParenaTrade uygulaması başarıyla başlatıldı');
+        
+    } catch (error) {
+        console.error('❌ Uygulama başlatma hatası:', error);
+        showErrorModal(
+            'Sistem Hatası', 
+            'Uygulama başlatılırken bir hata oluştu. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.'
+        );
+    }
+}
+       
         
         // Tüm başlatma işlemleri tek bir DOMContentLoaded içinde
 document.addEventListener('DOMContentLoaded', function() {
@@ -1160,128 +1384,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2500);
 });
 
-// Uygulama başlatmayı güncelle
-async function initializeApp() {
-    if (isInitialized) {
-        console.log('ℹ️ Uygulama zaten başlatılmış');
-        return;
-    }
-    isInitialized = true;
     
-    try {
-        console.log('🔧 Temel sistemler başlatılıyor...');
-        
-        // 1. API durumunu kontrol et ve alert göster
-        await showAPIStatusAlert();
-        
-        // 2. Temel sistemleri başlat
-        initializeAuthSystem();
-        setupProfileTabs();
-        
-        // 3. Verileri yükle
-        console.log('📥 Veriler yükleniyor...');
-        await loadServiceTypesSimple();
-        await loadReportTemplates();
-        
-        // 4. UI bileşenlerini kur
-        console.log('🎨 UI bileşenleri kuruluyor...');
-        setupCompanyAnalysisChat();
-        setupQuickReportForm();
-        setupCartFunctionality();
-        setupModalFunctionality();
-        setupReportWarning();
-        
-        console.log('✅ ParenaTrade uygulaması başarıyla başlatıldı');
-        
-    } catch (error) {
-        console.error('❌ Uygulama başlatma hatası:', error);
-        showErrorModal(
-            'Sistem Hatası', 
-            'Uygulama başlatılırken bir hata oluştu. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.'
-        );
-    }
-}
-        
-// API uyarı sistemini güncelle
-function setupReportWarning() {
-    const generateBtn = document.getElementById('generate-report-btn');
-    if (generateBtn && !document.getElementById('api-warning')) {
-        generateBtn.insertAdjacentHTML('beforebegin', `
-            <div id="api-warning" class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <div class="flex items-center">
-                    <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-                    <span class="text-blue-800 text-sm">
-                        <strong>Bilgi:</strong> Rapor oluşturmadan önce AI servisi test edilecektir. 
-                        Servis kullanılamazsa size bilgi verilecektir.
-                    </span>
-                </div>
-            </div>
-        `);
-    }
-}
-
-// API test fonksiyonu - GELİŞTİRİLMİŞ
-async function testAPIEndpoint() {
-    try {
-        console.log('🧪 API test ediliyor...');
-        
-        const response = await fetch('https://parenatrade.vercel.app/api/generate-report', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                prompt: "Test connection - please ignore",
-                template: "Connection Test",
-                parameters: { test: true }
-            }),
-            signal: AbortSignal.timeout(15000) // 15 saniye timeout
-        });
-        
-        console.log('📡 API Response Status:', response.status);
-        
-        if (response.ok) {
-            const result = await response.json();
-            console.log('✅ API çalışıyor:', result);
-            return true;
-        } else {
-            console.warn('⚠️ API hata kodu:', response.status);
-            return false;
-        }
-        
-    } catch (error) {
-        console.error('❌ API bağlantı hatası:', error);
-        return false;
-    }
-}
-
-// API durumuna göre uyarı göster
-async function showAPIStatusAlert() {
-    const apiStatus = await testAPIEndpoint();
-    
-    if (!apiStatus) {
-        // Sadece bir kere göster (spam'ı önle)
-        if (!localStorage.getItem('api_alert_shown')) {
-            setTimeout(() => {
-                showErrorModal(
-                    'AI Servisi Geçici Olarak Kullanılamıyor',
-                    'AI rapor oluşturma servisi şu an teknik bir sorun nedeniyle kullanılamıyor.<br><br>' +
-                    '• Lütfen birkaç dakika sonra tekrar deneyin<br>' +
-                    '• Rapor oluşturma butonuna tıkladığınızda bu uyarıyı tekrar göreceksiniz<br>' +
-                    '• Acil ihtiyaçlarınız için: info@parenatrade.com<br><br>' +
-                    '<small>Bu mesaj sadece bir kere gösterilecektir.</small>'
-                );
-                localStorage.setItem('api_alert_shown', 'true');
-            }, 2000);
-        }
-    } else {
-        console.log('✅ API çalışıyor, normal işleme devam');
-        // Çalışıyorsa alert kaydını temizle
-        localStorage.removeItem('api_alert_shown');
-    }
-    
-    return apiStatus;
-}
 
         
 // Sistem durumunu kontrol et - GÜNCELLENMİŞ
@@ -3248,26 +3351,6 @@ function updateAICart() {
             document.addEventListener('DOMContentLoaded', initializeApp);
         }
         
-        // Modal İşlevselliği
-        function setupModalFunctionality() {
-            // Modal kapatma
-            document.getElementById('close-service-modal').addEventListener('click', closeModal);
-            document.getElementById('cancel-service-order').addEventListener('click', closeModal);
-
-            // Sipariş gönderme
-            document.getElementById('submit-service-order').addEventListener('click', function() {
-                // Burada ödeme sayfasına yönlendirme yapılacak
-                window.location.href = 'https://parenatrade.vercel.app/ai/login.html';
-            });
-
-            // Onay kapatma
-            document.getElementById('close-confirmation').addEventListener('click', closeModal);
-        }
-
-        function closeModal() {
-            document.getElementById('service-order-modal').classList.add('hidden');
-        }
-
         // İletişim formu
         document.getElementById('contact-form').addEventListener('submit', function(e) {
             e.preventDefault();
