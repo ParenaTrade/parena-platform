@@ -1613,13 +1613,16 @@ function closeModal() {
     }
 }
 
-// Ana uygulama başlatma - GÜNCELLENMİŞ
+// Ana uygulama başlatma - FORM DATA INITIALIZATION EKLENDİ
 async function initializeApp() {
     if (isInitialized) return;
     isInitialized = true;
     
     try {
         console.log('🔧 Temel sistemler başlatılıyor...');
+        
+        // 0. ÖNCE CRITICAL GLOBAL DEĞİŞKENLERİ INITIALIZE ET
+        initializeGlobalVariables();
         
         // 1. ÖNCE verileri yükle
         await loadDropdownData();
@@ -1651,10 +1654,148 @@ async function initializeApp() {
         console.error('❌ Uygulama başlatma hatası:', error);
     }
 }
+
+// GLOBAL DEĞİŞKENLERİ INITIALIZE ET
+function initializeGlobalVariables() {
+    console.log('🔧 Global değişkenler initialize ediliyor...');
+    
+    // FORM DATA - CRITICAL
+    if (!window.formData || typeof window.formData !== 'object') {
+        window.formData = {};
+        console.log('✅ window.formData initialized:', window.formData);
+    }
+    
+    // SELECTED TEMPLATE
+    if (!window.selectedTemplate) {
+        window.selectedTemplate = null;
+        console.log('✅ window.selectedTemplate initialized');
+    }
+    
+    // SERVICE CART
+    if (!window.serviceCart || !Array.isArray(window.serviceCart)) {
+        window.serviceCart = [];
+        console.log('✅ window.serviceCart initialized:', window.serviceCart);
+    }
+    
+    // CURRENT USER
+    if (!window.currentUser) {
+        window.currentUser = null;
+        console.log('✅ window.currentUser initialized');
+    }
+    
+    // REPORT TEMPLATES
+    if (!window.reportTemplates) {
+        window.reportTemplates = [];
+        console.log('✅ window.reportTemplates initialized');
+    }
+    
+    console.log('🎯 Global değişkenler başarıyla initialize edildi');
+}
+
+// FORM DATA INITIALIZATION İÇİN EXTRA GÜVENLİK
+function initializeFormData() {
+    // Mevcut formData'yı koru, yoksa oluştur
+    if (!window.formData || typeof window.formData !== 'object') {
+        window.formData = {};
+    }
+    
+    // Required fields için default değerler
+    const defaultFields = ['ulke', 'sektor', 'urun', 'dil', 'bolge', 'gtip', 'zaman', 'amac', 'derinlik'];
+    
+    defaultFields.forEach(field => {
+        if (window.formData[field] === undefined) {
+            window.formData[field] = '';
+        }
+    });
+    
+    console.log('✅ FormData güvenli initialize edildi:', window.formData);
+    return window.formData;
+}
+
+// SETUP QUICK REPORT FORM'U GÜNCELLE
+function setupQuickReportForm() {
+    // Önce formData'yı initialize et
+    initializeFormData();
+    
+    const templateSelect = document.getElementById('report-template-select');
+    const generateBtn = document.getElementById('generate-report-btn');
+    
+    if (!templateSelect) {
+        console.error('❌ Template select bulunamadı');
+        return;
+    }
+    
+    // Template değişim event'i
+    templateSelect.addEventListener('change', function() {
+        const templateId = this.value;
+        console.log('🎯 Seçilen template:', templateId);
         
+        if (!templateId) {
+            // Temizleme
+            window.selectedTemplate = null;
+            document.getElementById('dynamic-form-fields').classList.add('hidden');
+            document.getElementById('criteria-list').classList.add('hidden');
+            if (generateBtn) generateBtn.classList.add('hidden');
+            return;
+        }
+        
+        // Global selectedTemplate'i güncelle
+        window.selectedTemplate = window.reportTemplates?.find(t => t.id === templateId);
+        console.log('🎯 Global selectedTemplate güncellendi:', window.selectedTemplate);
+        
+        if (window.selectedTemplate) {
+            console.log('📊 Seçilen rapor:', window.selectedTemplate.report_name);
+            
+            // Template açıklamasını göster
+            const descriptionElement = document.getElementById('template-description');
+            if (descriptionElement && window.selectedTemplate.report_description) {
+                descriptionElement.textContent = window.selectedTemplate.report_description;
+                descriptionElement.classList.remove('hidden');
+            }
+            
+            // FormData'yı temizle ve yeniden başlat
+            initializeFormData();
+            
+            // Değişkenleri çıkar ve form oluştur
+            const variables = extractVariables(window.selectedTemplate.report_prompt);
+            createDynamicFormFields(variables);
+            
+            // Butonu göster
+            if (generateBtn) {
+                generateBtn.classList.remove('hidden');
+                // Event listener'ı temizle ve yeniden ekle
+                generateBtn.onclick = null;
+                generateBtn.addEventListener('click', generateAIReport);
+            }
+            
+        } else {
+            console.error('❌ Template bulunamadı:', templateId);
+        }
+    });
+    
+    // Generate butonuna event listener ekle
+    if (generateBtn) {
+        generateBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Son formData kontrolü
+            if (!window.formData) {
+                initializeFormData();
+            }
+            
+            generateAIReport();
+        });
+    }
+    
+    console.log('✅ Quick report form kuruldu');
+}
+
 // Tüm başlatma işlemleri tek bir DOMContentLoaded içinde
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 ParenaTrade - Uygulama başlatılıyor...');
+    
+    // ÖNCE global değişkenleri initialize et
+    initializeGlobalVariables();
     
     // Ana uygulamayı başlat
     initializeApp();
@@ -1691,8 +1832,51 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }, 2500);
+    
+    // EXTRA: Sayfa yüklendikten sonra formData kontrolü
+    setTimeout(() => {
+        console.log('🔍 Final FormData Check:', {
+            formData: window.formData,
+            formDataType: typeof window.formData,
+            selectedTemplate: window.selectedTemplate,
+            serviceCart: window.serviceCart
+        });
+    }, 3000);
 });
 
+// ACİL DÜZELTME - Konsolda çalıştırılabilir
+function emergencyFormDataFix() {
+    console.log('🔄 Acil FormData düzeltmesi uygulanıyor...');
+    
+    window.formData = {};
+    window.selectedTemplate = window.selectedTemplate || null;
+    window.serviceCart = window.serviceCart || [];
+    
+    console.log('✅ Acil düzeltme tamamlandı:', {
+        formData: window.formData,
+        selectedTemplate: window.selectedTemplate,
+        serviceCart: window.serviceCart
+    });
+    
+    return 'FormData başarıyla initialize edildi!';
+}
+
+// Konsolda test için
+function testFormData() {
+    console.log('🧪 FormData Test:');
+    console.log('- formData:', window.formData);
+    console.log('- selectedTemplate:', window.selectedTemplate);
+    console.log('- serviceCart:', window.serviceCart);
+    console.log('- reportTemplates:', window.reportTemplates);
+    
+    if (!window.formData || typeof window.formData !== 'object') {
+        console.log('❌ FormData hatalı! emergencyFormDataFix() çalıştırın.');
+        return false;
+    }
+    
+    console.log('✅ FormData testi başarılı!');
+    return true;
+}
     
 
         
@@ -4261,22 +4445,29 @@ Stratejik pozisyonlama, potansiyel giriş stratejileri, farklılaşma noktaları
     return advancedPrompt;
 }
 
-// Rapor oluşturma fonksiyonunu düzelt - SUPABASE KAYIT EKLE
 async function generateAIReport() {
     console.log('🚀 Rapor oluşturma başlatılıyor...');
     
-    // Validasyon
+    // Validasyon - GÜVENLİ FORM DATA KONTROLÜ
     if (!window.selectedTemplate) {
         alert('❌ Lütfen rapor türü seçin.');
         return;
     }
     
-    // Form validasyonu
+    // Form data kontrolü - KESİN ÇÖZÜM
+    if (!window.formData || typeof window.formData !== 'object') {
+        console.error('❌ FormData tanımlı değil:', window.formData);
+        alert('❌ Form verileri yüklenemedi. Lütfen sayfayı yenileyin.');
+        return;
+    }
+    
+    // Form validasyonu - GÜVENLİ
     const requiredFields = ['ulke', 'sektor', 'urun'];
     const missingFields = [];
     
     requiredFields.forEach(field => {
-        if (!window.formData[field] || window.formData[field].trim() === '') {
+        // Güvenli erişim
+        if (!window.formData[field] || String(window.formData[field]).trim() === '') {
             missingFields.push(getFieldTitle(field));
         }
     });
@@ -4290,13 +4481,15 @@ async function generateAIReport() {
     const progressSection = document.getElementById('report-progress');
     
     // UI durumunu güncelle
-    generateBtn.disabled = true;
-    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Oluşturuluyor...';
+    if (generateBtn) {
+        generateBtn.disabled = true;
+        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Oluşturuluyor...';
+    }
     if (progressSection) progressSection.classList.remove('hidden');
     updateProgress(20);
 
     try {
-        // 1. Prompt'u doldur
+        // 1. Prompt'u doldur - GÜVENLİ
         const finalPrompt = fillPromptTemplate(window.selectedTemplate, window.formData);
         console.log('📝 Doldurulmuş prompt:', finalPrompt);
         
@@ -4332,7 +4525,7 @@ async function generateAIReport() {
 
         updateProgress(60);
 
-        // 3. SUPABASE'E KAYDET
+        // 3. SUPABASE'E KAYDET - GÜVENLİ
         console.log('💾 Supabase\'e kaydediliyor...');
         const reportData = {
             template_id: window.selectedTemplate.id,
@@ -4373,14 +4566,12 @@ async function generateAIReport() {
 
         updateProgress(80);
 
-        // 4. SEPETE EKLE - GELİŞTİRİLMİŞ
+        // 4. SEPETE EKLE - GÜVENLİ
         console.log('🎯 Selected Template Detayları:', {
             id: window.selectedTemplate.id,
             name: window.selectedTemplate.report_name,
             price: window.selectedTemplate.report_price,
-            currency: window.selectedTemplate.report_currency,
-            hasPrice: !!window.selectedTemplate.report_price,
-            priceType: typeof window.selectedTemplate.report_price
+            currency: window.selectedTemplate.report_currency
         });
 
         // Fiyat kontrolü - kesin çözüm
@@ -4400,7 +4591,7 @@ async function generateAIReport() {
             currency: itemCurrency,
             reportId: report?.id,
             type: 'report',
-            template_data: window.selectedTemplate // Template verisini de sakla
+            template_data: window.selectedTemplate
         };
 
         console.log('🛒 Sepete eklenecek öğe:', cartItem);
@@ -4409,25 +4600,16 @@ async function generateAIReport() {
         updateProgress(100);
 
         // 5. Sonuçları göster
-        document.getElementById('quick-analysis-result').classList.remove('hidden');
+        const quickResult = document.getElementById('quick-analysis-result');
+        if (quickResult) quickResult.classList.remove('hidden');
         
         // Başarı mesajı
         setTimeout(() => {
             if (progressSection) progressSection.classList.add('hidden');
-            generateBtn.disabled = false;
-            generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
-            
-            // Kriter listesini temizle
-            document.getElementById('criteria-items').innerHTML = '';
-            document.getElementById('criteria-list').classList.add('hidden');
-            
-            // Form alanlarını temizle
-            document.getElementById('dynamic-form-fields').innerHTML = '';
-            document.getElementById('dynamic-form-fields').classList.add('hidden');
-            
-            // Template seçimini sıfırla
-            document.getElementById('report-template-select').value = '';
-            window.selectedTemplate = null;
+            if (generateBtn) {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
+            }
             
             console.log('✅ Rapor oluşturma işlemi tamamlandı');
             
@@ -4437,29 +4619,25 @@ async function generateAIReport() {
         console.error('❌ Rapor oluşturma hatası:', error);
         
         // UI'ı eski haline getir
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
+        if (generateBtn) {
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
+        }
         if (progressSection) progressSection.classList.add('hidden');
         
         // Hata mesajını göster
         let errorMessage = 'Rapor oluşturulurken hata: ' + error.message;
         
-        if (error.message.includes('API hatası: 500') || error.message.includes('Failed to fetch')) {
-            errorMessage = 'AI servisi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
-        } else if (error.message.includes('Network Error')) {
+        if (error.message.includes('API hatası: 405')) {
+            errorMessage = 'API endpoint\'i geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
+        } else if (error.message.includes('Failed to fetch')) {
             errorMessage = 'İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
         }
         
         alert('❌ ' + errorMessage);
-        
-        // Hata log'u
-        await logError(error, {
-            template: window.selectedTemplate?.report_name,
-            formData: window.formData
-        });
     }
 }
-
+        
 // Hata göster - BASİT
 function showError(message) {
     alert('❌ ' + message);
