@@ -1118,6 +1118,30 @@
         let isInitialized = false;
         let activeAccordion = null;
 
+
+        
+// Prompt'taki değişkenleri çıkar - EKSİK FONKSİYON
+function extractVariables(prompt) {
+    if (!prompt) {
+        console.warn('⚠️ Prompt boş, değişken çıkarılamıyor');
+        return [];
+    }
+    
+    const regex = /\{\{(\w+)\}\}/g;
+    const matches = [];
+    let match;
+    
+    while ((match = regex.exec(prompt)) !== null) {
+        matches.push(match[1]);
+    }
+    
+    // Benzersiz değerler
+    const uniqueVariables = [...new Set(matches)];
+    
+    console.log('🔍 Prompt değişkenleri çıkarıldı:', uniqueVariables);
+    return uniqueVariables;
+}
+        
 // Sepet fonksiyonlarını tamir edelim
 function addToAICart(item) {
     console.log('➕ Sepete ekleniyor:', item);
@@ -2680,11 +2704,7 @@ function setupQuickReportForm() {
         const templateId = this.value;
         console.log('🎯 Seçilen template ID:', templateId);
         
-        // ✅ DOĞRU ŞEKİLDE BULALIM
-        selectedTemplate = window.reportTemplates?.find(t => {
-            console.log('🔍 Template kontrol:', t.id, '==', templateId, 'sonuç:', t.id === templateId);
-            return t.id === templateId;
-        });
+        selectedTemplate = window.reportTemplates?.find(t => t.id === templateId);
         
         console.log('📊 Seçilen rapor:', selectedTemplate);
         
@@ -2696,7 +2716,7 @@ function setupQuickReportForm() {
                 descElement.classList.remove('hidden');
             }
             
-            // Prompt'taki değişkenleri çıkar ve form alanlarını oluştur
+            // ✅ extractVariables FONKSİYONU ARTIK TANIMLI
             const variables = extractVariables(selectedTemplate.report_prompt);
             console.log('🔍 Çıkarılan değişkenler:', variables);
             createDynamicFormFields(variables);
@@ -2722,7 +2742,6 @@ function setupQuickReportForm() {
         }
     }, 500);
 }
-
 
 // Dropdown verilerini düzeltelim - tablo isimleri yanlış
 async function loadDropdownData() {
