@@ -1118,7 +1118,95 @@
         let isInitialized = false;
         let activeAccordion = null;
 
+// BU FONKSİYONU KODUNUZA EKLEYİN - EN BAŞA YAKIN BİR YERE
+function updateAICart() {
+    console.log('🛒 Sepet güncelleniyor, ürün sayısı:', serviceCart.length);
+    
+    const cartItems = document.getElementById('ai-report-cart-items');
+    const cartTotal = document.getElementById('ai-report-cart-total');
+    const completeBtn = document.getElementById('complete-ai-report-order');
 
+    if (!cartItems) {
+        console.error('❌ Sepet elementi bulunamadı');
+        return;
+    }
+
+    if (serviceCart.length === 0) {
+        cartItems.innerHTML = '<p class="text-gray-500 text-center py-4">Sepetinizde ürün bulunmamaktadır</p>';
+        if (cartTotal) cartTotal.textContent = '0 USD';
+        if (completeBtn) completeBtn.disabled = true;
+        return;
+    }
+
+    let cartHTML = '';
+    let total = 0;
+
+    serviceCart.forEach((item, index) => {
+        const itemTotal = item.price * (item.quantity || 1);
+        total += itemTotal;
+
+        const isService = item.type === 'service';
+        
+        cartHTML += `
+            <div class="cart-item">
+                <div class="flex justify-between items-center">
+                    <div class="flex-1">
+                        <h4 class="font-semibold">${item.name}</h4>
+                        <p class="text-gray-600 text-sm">
+                            ${item.price} ${item.currency} 
+                        </p>
+                        ${isService ? `
+                            <p class="text-blue-600 text-xs mt-1">
+                                <i class="fas fa-cog mr-1"></i>Hizmet
+                            </p>
+                        ` : `
+                            <p class="text-green-600 text-xs mt-1">
+                                <i class="fas fa-file-pdf mr-1"></i>Rapor
+                            </p>
+                        `}
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="font-bold">${itemTotal} ${item.currency}</span>
+                        <button class="text-red-500 remove-ai-item hover:text-red-700" data-index="${index}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    cartItems.innerHTML = cartHTML;
+    if (cartTotal) cartTotal.textContent = `${total.toFixed(2)} USD`;
+    if (completeBtn) completeBtn.disabled = false;
+
+    // Kaldırma butonlarına event listener ekle
+    document.querySelectorAll('.remove-ai-item').forEach(button => {
+        button.addEventListener('click', function() {
+            const itemIndex = parseInt(this.getAttribute('data-index'));
+            serviceCart.splice(itemIndex, 1);
+            updateAICart();
+        });
+    });
+}
+
+// Sepete ekle fonksiyonunu da ekleyelim
+function addToAICart(item) {
+    console.log('➕ Sepete ekleniyor:', item);
+    
+    // Çift eklemeyi önle
+    const existingIndex = serviceCart.findIndex(cartItem => 
+        cartItem.id === item.id && cartItem.type === item.type
+    );
+    
+    if (existingIndex === -1) {
+        serviceCart.push(item);
+    } else {
+        serviceCart[existingIndex] = item;
+    }
+    
+    updateAICart();
+}
 
 // ÖNCE: Tüm yardımcı fonksiyonları tanımla
 // ==============================================
@@ -3841,85 +3929,6 @@ document.getElementById('complete-ai-report-order').addEventListener('click', fu
     proceedToPayment();
 });
 
-// BU FONKSİYONU KODUNUZA EKLEYİN
-function updateAICart() {
-    console.log('🛒 Sepet güncelleniyor...', serviceCart);
-    
-    const cartItems = document.getElementById('ai-report-cart-items');
-    const cartTotal = document.getElementById('ai-report-cart-total');
-    const completeBtn = document.getElementById('complete-ai-report-order');
-
-    if (!cartItems) {
-        console.error('❌ Sepet elementi bulunamadı');
-        return;
-    }
-
-    if (serviceCart.length === 0) {
-        cartItems.innerHTML = '<p class="text-gray-500 text-center py-4">Sepetinizde ürün bulunmamaktadır</p>';
-        if (cartTotal) cartTotal.textContent = '0 USD';
-        if (completeBtn) completeBtn.disabled = true;
-        return;
-    }
-
-    let cartHTML = '';
-    let total = 0;
-
-    serviceCart.forEach((item, index) => {
-        const itemTotal = item.price * (item.quantity || 1);
-        total += itemTotal;
-
-        const isService = item.type === 'service';
-        
-        cartHTML += `
-            <div class="cart-item">
-                <div class="flex justify-between items-center">
-                    <div class="flex-1">
-                        <h4 class="font-semibold">${item.name}</h4>
-                        <p class="text-gray-600 text-sm">
-                            ${item.price} ${item.currency} 
-                        </p>
-                        ${isService ? `
-                            <p class="text-blue-600 text-xs mt-1">
-                                <i class="fas fa-cog mr-1"></i>Hizmet
-                            </p>
-                        ` : `
-                            <p class="text-green-600 text-xs mt-1">
-                                <i class="fas fa-file-pdf mr-1"></i>Rapor
-                            </p>
-                        `}
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        <span class="font-bold">${itemTotal} ${item.currency}</span>
-                        <button class="text-red-500 remove-ai-item hover:text-red-700" data-index="${index}">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-
-    cartItems.innerHTML = cartHTML;
-    if (cartTotal) cartTotal.textContent = `${total.toFixed(2)} USD`;
-    if (completeBtn) completeBtn.disabled = false;
-
-    // Kaldırma butonları
-    document.querySelectorAll('.remove-ai-item').forEach(button => {
-        button.addEventListener('click', function() {
-            const itemIndex = parseInt(this.getAttribute('data-index'));
-            serviceCart.splice(itemIndex, 1);
-            updateAICart();
-        });
-    });
-}
-
-// Sepete ekle fonksiyonunu da basitleştirelim
-function addToAICart(item) {
-    console.log('➕ Sepete ekleniyor:', item);
-    serviceCart.push(item);
-    updateAICart();
-}
-            
             // Hata ayıklama için Supabase bağlantısını kontrol et
         async function checkSupabaseConnection() {
             try {
