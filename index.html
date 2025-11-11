@@ -2993,7 +2993,7 @@ function setupAccordionListeners() {
 }
 
         
-// Dinamik form alanlarını oluştur - GERÇEKÇİ
+// Dinamik form alanlarını oluştur - TAM BİRLEŞTİRİLMİŞ
 function createDynamicFormFields(variables) {
     const container = document.getElementById('dynamic-form-fields');
     if (!container) {
@@ -3006,7 +3006,7 @@ function createDynamicFormFields(variables) {
     
     console.log('🔧 Form alanları oluşturuluyor:', variables);
     
-    // Field konfigürasyonları - GERÇEK
+    // Field konfigürasyonları - GERÇEK (ÜSTTEKİ KODDAN)
     const fieldConfigs = {
         dil: {
             title: 'Rapor Dili',
@@ -3084,11 +3084,18 @@ function createDynamicFormFields(variables) {
         },
         rapor_turu: {
             title: 'Rapor Türü',
-            type: 'hidden' // Bu zaten seçili, gizli tut
+            type: 'hidden'
         }
     };
     
-    // Değişkenleri işle
+    // ALTTAKİ KODDAN GELEN MANTIK:
+    if (!variables || variables.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 p-4">Bu rapor için ek bilgi gerekmemektedir.</p>';
+        container.classList.remove('hidden');
+        return;
+    }
+    
+    // Değişkenleri işle - İKİ KODUN BİRLEŞİMİ
     variables.forEach(variable => {
         const config = fieldConfigs[variable];
         if (!config) {
@@ -3096,16 +3103,12 @@ function createDynamicFormFields(variables) {
             return;
         }
         
-        let fieldHTML = '';
-        
         if (config.type === 'hidden') {
-            // Gizli alan - sadece formData'ya ekle
             formData[variable] = selectedTemplate?.report_name || '';
             return;
         }
         
-        // Akordiyon item oluştur
-        fieldHTML = `
+        const fieldHTML = `
             <div class="accordion-item">
                 <div class="accordion-header" data-field="${variable}">
                     <span>${config.title}</span>
@@ -3121,23 +3124,30 @@ function createDynamicFormFields(variables) {
         formData[variable] = ''; // Başlangıç değeri
     });
     
+    // ALTTAKİ KODDAN GELEN İYİLEŞTİRME:
+    if (selectedTemplate) {
+        formData.rapor_turu = selectedTemplate.report_name;
+    }
+    
     container.classList.remove('hidden');
     
-    // ✅ BURASI ÖNEMLİ: Form alanları oluştuktan SONRA listener'ları kur
+    // İKİ KODDAN GELEN LISTENER'LAR:
     setTimeout(() => {
         setupAccordionListeners();
-        setupFieldEventListeners(); // Mevcut kodunuz burada çağrılacak
+        setupFieldEventListeners(); // YENİ TAM FONKSİYON
+        updateCriteriaList();       // ALTTAKİ KODDAN GELEN
     }, 100);
     
     console.log('✅ Form alanları oluşturuldu');
 }
-
-// Field HTML oluştur - YENİ FONKSİYON
+// Form alanı oluştur
 function createFieldHTML(field, config) {
+    const baseClasses = "w-full px-4 py-2 border border-gray-300 rounded-lg form-field";
+    
     switch (config.type) {
         case 'dropdown':
             return `
-                <select class="w-full px-4 py-2 border border-gray-300 rounded-lg form-field" data-field="${field}">
+                <select class="${baseClasses}" data-field="${field}">
                     <option value="">Seçiniz</option>
                     ${config.data.map(item => 
                         `<option value="${item[config.valueField]}">${item[config.displayField]}</option>`
@@ -3145,24 +3155,42 @@ function createFieldHTML(field, config) {
                 </select>
             `;
         
+        case 'searchable-dropdown':
+            return `
+                <div class="searchable-dropdown relative">
+                    <input type="text" 
+                           class="${baseClasses} search-input"
+                           placeholder="${config.placeholder || 'Arama yapın...'}"
+                           data-field="${field}"
+                           id="${field}-search-input">
+                    <div class="dropdown-results hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-60 overflow-y-auto shadow-xl"></div>
+                </div>
+                <div class="selected-value mt-2 hidden">
+                    <span class="text-sm text-gray-600">Seçilen: </span>
+                    <span class="selected-text font-medium"></span>
+                    <button class="text-red-500 hover:text-red-700 clear-selection ml-2" data-field="${field}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        
         case 'textarea':
             return `
-                <textarea class="w-full px-4 py-2 border border-gray-300 rounded-lg form-field" 
+                <textarea class="${baseClasses}" 
                           data-field="${field}" 
                           placeholder="${config.placeholder || ''}"
                           rows="3"></textarea>
             `;
         
-        default: // text
+        default:
             return `
                 <input type="text" 
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg form-field"
+                       class="${baseClasses}"
                        data-field="${field}"
                        placeholder="${config.placeholder || ''}">
             `;
     }
 }
-
 // Field HTML oluştur - YENİ FONKSİYON
 function createFieldHTML(field, config) {
     switch (config.type) {
@@ -3302,42 +3330,39 @@ function createTextField(field, config) {
     `;
 }
 
-// Field event listener'larını kur - MEVCUT KODUNUZ KALSIN (BU KORUNACAK)
+// Field event listener'larını kur - TAM KOD
 function setupFieldEventListeners() {
     console.log('🔧 Field event listenerları kuruluyor...');
     
-    // Normal dropdown'lar
-    document.querySelectorAll('.dropdown-field').forEach(select => {
-        select.addEventListener('change', function() {
-            const field = this.getAttribute('data-field');
-            formData[field] = this.value;
-            console.log(`📝 ${field} değişti:`, this.value);
-            updateCriteriaList();
-        });
-    });
-    
-    // Rapor şablonu dropdown'ı
-    document.querySelectorAll('.template-field').forEach(select => {
-        select.addEventListener('change', function() {
-            const field = this.getAttribute('data-field');
-            const selectedOption = this.options[this.selectedIndex];
-            
-            formData[field] = this.value;
-            selectedTemplate = window.reportTemplates?.find(t => t.report_type === this.value);
-            
-            // Template bilgilerini göster
-            const descContainer = this.parentElement.querySelector('.template-description');
-            if (selectedOption.getAttribute('data-description') && descContainer) {
-                descContainer.textContent = selectedOption.getAttribute('data-description');
-                descContainer.classList.remove('hidden');
+    // 1. TÜM form alanlarını dinle
+    document.addEventListener('input', function(e) {
+        const target = e.target;
+        if (target.classList.contains('form-field') || target.hasAttribute('data-field')) {
+            const fieldName = target.getAttribute('data-field');
+            const value = target.value;
+            if (fieldName && !target.classList.contains('search-input')) {
+                formData[fieldName] = value;
+                console.log(`📝 ${fieldName} değişti:`, value);
+                updateCriteriaList();
             }
-            
-            console.log(`📊 Rapor türü seçildi:`, this.value);
-            updateCriteriaList();
-        });
+        }
     });
     
-    // Arama yapılabilir dropdown'lar (GTIP, amaç, derinlik)
+    // 2. Select değişimlerini dinle
+    document.addEventListener('change', function(e) {
+        const target = e.target;
+        if (target.tagName === 'SELECT' && (target.classList.contains('form-field') || target.hasAttribute('data-field'))) {
+            const fieldName = target.getAttribute('data-field');
+            const value = target.value;
+            if (fieldName) {
+                formData[fieldName] = value;
+                console.log(`📝 ${fieldName} seçildi:`, value);
+                updateCriteriaList();
+            }
+        }
+    });
+    
+    // 3. Arama yapılabilir dropdown'lar
     document.querySelectorAll('.search-input').forEach(input => {
         input.addEventListener('input', debounce(function() {
             const field = this.getAttribute('data-field');
@@ -3388,7 +3413,6 @@ function setupFieldEventListeners() {
                                  data-display="${item.code} - ${item.name}">
                                 <div class="font-bold text-blue-700">${item.code}</div>
                                 <div class="text-sm text-gray-700">${item.name}</div>
-                                ${item.description ? `<div class="text-xs text-gray-500 mt-1">${item.description}</div>` : ''}
                             </div>
                         `;
                     } else {
@@ -3406,10 +3430,8 @@ function setupFieldEventListeners() {
                 resultsContainer.innerHTML = '<div class="p-3 text-gray-500">Sonuç bulunamadı</div>';
                 resultsContainer.classList.remove('hidden');
             }
-            
         }, 300));
         
-        // Input focus olduğunda sonuçları göster
         input.addEventListener('focus', function() {
             const resultsContainer = this.parentElement.querySelector('.dropdown-results');
             if (this.value.trim().length > 0) {
@@ -3418,7 +3440,7 @@ function setupFieldEventListeners() {
         });
     });
     
-    // Sonuçlara tıklama event'i - TEK BİR EVENT LISTENER
+    // 4. Sonuçlara tıklama event'i
     document.addEventListener('click', function(e) {
         if (e.target.closest('.search-result-item')) {
             const resultItem = e.target.closest('.search-result-item');
@@ -3431,26 +3453,18 @@ function setupFieldEventListeners() {
             
             console.log(`✅ ${field} seçildi:`, value);
             
-            // Form verisini güncelle
             formData[field] = value;
-            
-            // Input'u güncelle
             input.value = display;
             
-            // Seçilen değeri göster
             if (selectedContainer) {
                 selectedContainer.querySelector('.selected-text').textContent = display;
                 selectedContainer.classList.remove('hidden');
             }
             
-            // Sonuçları gizle
             resultsContainer.classList.add('hidden');
-            
-            // Kriter listesini güncelle
             updateCriteriaList();
         }
         
-        // Temizleme butonları
         if (e.target.closest('.clear-selection')) {
             const button = e.target.closest('.clear-selection');
             const field = button.getAttribute('data-field');
@@ -3463,21 +3477,11 @@ function setupFieldEventListeners() {
             updateCriteriaList();
         }
         
-        // Dışarı tıklayınca dropdown'ları kapat
         if (!e.target.closest('.search-input') && !e.target.closest('.dropdown-results')) {
             document.querySelectorAll('.dropdown-results').forEach(container => {
                 container.classList.add('hidden');
             });
         }
-    });
-    
-    // Text input'lar
-    document.querySelectorAll('.form-field[type="text"]').forEach(input => {
-        input.addEventListener('input', function() {
-            const field = this.getAttribute('data-field');
-            formData[field] = this.value;
-            updateCriteriaList();
-        });
     });
     
     console.log('✅ Tüm field listenerları kuruldu');
@@ -3495,6 +3499,119 @@ function debounce(func, wait) {
         timeout = setTimeout(later, wait);
     };
 }
+        // Field config getter
+function getFieldConfig(field) {
+    const fieldConfigs = {
+        amac: {
+            data: [
+                { id: 1, name: 'Yeni bir girişim pazara giriş stratejisi için kullanacağım' },
+                { id: 2, name: 'Mevcut ürün/hizmeti geliştirmek için pazar analizi' },
+                { id: 3, name: 'Yatırım kararı ve risk değerlendirmesi' },
+                { id: 4, name: 'Rekabet analizi ve stratejik pozisyon belirleme' },
+                { id: 5, name: 'Ürün fiyatlandırma ve pazarlama stratejisi geliştirme' }
+            ]
+        },
+        derinlik: {
+            data: [
+                { id: 1, name: 'Çıktıyı yönetim sunumuna uygun şekilde 5-6 başlık altında rapor formatında hazırla' },
+                { id: 2, name: 'Stratejik yönetim için detaylı analiz ve öneriler' },
+                { id: 3, name: 'Yatırımcı sunumu için özet rapor ve finansal projeksiyonlar' },
+                { id: 4, name: 'Operasyonel ekip için detaylı pazar ve rekabet analizi' }
+            ]
+        }
+    };
+    return fieldConfigs[field];
+}
+
+        // Field konfigürasyonları
+const fieldConfigs = {
+    dil: {
+        title: 'Rapor Dili',
+        type: 'dropdown',
+        data: window.languages || [
+            { id: 1, name: 'Türkçe', code: 'tr' },
+            { id: 2, name: 'İngilizce', code: 'en' }
+        ],
+        displayField: 'name',
+        valueField: 'code'
+    },
+    ulke: {
+        title: 'Hedef Ülke',
+        type: 'dropdown',
+        data: window.countries || [
+            { id: 1, name: 'Türkiye', code: 'TR' },
+            { id: 2, name: 'Almanya', code: 'DE' }
+        ],
+        displayField: 'name',
+        valueField: 'name'
+    },
+    sektor: {
+        title: 'Sektör',
+        type: 'dropdown',
+        data: window.sectors || [
+            { id: 1, name: 'Gıda', code: 'FOOD' },
+            { id: 2, name: 'Tekstil', code: 'TEXTILE' }
+        ],
+        displayField: 'name',
+        valueField: 'name'
+    },
+    urun: {
+        title: 'Ürün/Hizmet',
+        type: 'text',
+        placeholder: 'Örn: Domates Salçası, Tekstil Ürünleri...'
+    },
+    bolge: {
+        title: 'Bölge',
+        type: 'dropdown',
+        data: [
+            { name: 'Tüm Bölgeler' },
+            { name: 'Doğu' },
+            { name: 'Batı' },
+            { name: 'Kuzey' },
+            { name: 'Güney' }
+        ],
+        displayField: 'name',
+        valueField: 'name'
+    },
+    gtip: {
+        title: 'GTIP Kodu',
+        type: 'searchable-dropdown',
+        data: window.gtipCodes || [],
+        displayField: 'name',
+        valueField: 'code'
+    },
+    zaman: {
+        title: 'Zaman Aralığı',
+        type: 'text',
+        placeholder: 'Örn: 2020-2024, Son 5 yıl...'
+    },
+    amac: {
+        title: 'Analiz Amacı',
+        type: 'searchable-dropdown',
+        data: [
+            { id: 1, name: 'Yeni bir girişim pazara giriş stratejisi için kullanacağım' },
+            { id: 2, name: 'Mevcut ürün/hizmeti geliştirmek için pazar analizi' },
+            { id: 3, name: 'Yatırım kararı ve risk değerlendirmesi' }
+        ],
+        displayField: 'name',
+        valueField: 'name'
+    },
+    derinlik: {
+        title: 'Analiz Derinliği',
+        type: 'searchable-dropdown',
+        data: [
+            { id: 1, name: 'Çıktıyı yönetim sunumuna uygun şekilde 5-6 başlık altında rapor formatında hazırla' },
+            { id: 2, name: 'Stratejik yönetim için detaylı analiz ve öneriler' },
+            { id: 3, name: 'Yatırımcı sunumu için özet rapor ve finansal projeksiyonlar' }
+        ],
+        displayField: 'name',
+        valueField: 'name'
+    },
+    rapor_turu: {
+        title: 'Rapor Türü',
+        type: 'hidden'
+    }
+};
 
         // Kriter listesini güncelle - DÜZELTİLMİŞ
 function updateCriteriaList() {
