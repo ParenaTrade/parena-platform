@@ -1118,9 +1118,48 @@
         let isInitialized = false;
         let activeAccordion = null;
 
-// BU FONKSİYONU KODUNUZA EKLEYİN - EN BAŞA YAKIN BİR YERE
+// Sepet fonksiyonlarını tamir edelim
+function addToAICart(item) {
+    console.log('➕ Sepete ekleniyor:', item);
+    
+    // VERİ DOĞRULAMA ve TEMİZLEME
+    const validatedItem = {
+        id: item.id || 'unknown_' + Date.now(),
+        name: item.name || 'İsimsiz Ürün',
+        price: parseFloat(item.price) || 0,
+        currency: item.currency || 'USD',
+        type: item.type || 'product',
+        quantity: parseInt(item.quantity) || 1,
+        profile: item.profile || null,
+        service_type: item.service_type || null,
+        reportId: item.reportId || null,
+        created_at: item.created_at || new Date().toISOString()
+    };
+
+    // Fiyat kontrolü
+    if (isNaN(validatedItem.price) || validatedItem.price <= 0) {
+        console.error('❌ Geçersiz fiyat:', item.price);
+        validatedItem.price = 0;
+    }
+
+    console.log('✅ Doğrulanmış öğe:', validatedItem);
+    
+    // Çift eklemeyi önle
+    const existingIndex = serviceCart.findIndex(cartItem => 
+        cartItem.id === validatedItem.id && cartItem.type === validatedItem.type
+    );
+    
+    if (existingIndex === -1) {
+        serviceCart.push(validatedItem);
+    } else {
+        serviceCart[existingIndex] = validatedItem;
+    }
+    
+    updateAICart();
+}
+
 function updateAICart() {
-    console.log('🛒 Sepet güncelleniyor, ürün sayısı:', serviceCart.length);
+    console.log('🛒 Sepet güncelleniyor:', serviceCart);
     
     const cartItems = document.getElementById('ai-report-cart-items');
     const cartTotal = document.getElementById('ai-report-cart-total');
@@ -1142,18 +1181,24 @@ function updateAICart() {
     let total = 0;
 
     serviceCart.forEach((item, index) => {
-        const itemTotal = item.price * (item.quantity || 1);
+        // GÜVENLİ DEĞER ALMA
+        const itemName = item.name || 'İsimsiz Ürün';
+        const itemPrice = parseFloat(item.price) || 0;
+        const itemCurrency = item.currency || 'USD';
+        const itemQuantity = parseInt(item.quantity) || 1;
+        
+        const itemTotal = itemPrice * itemQuantity;
         total += itemTotal;
 
         const isService = item.type === 'service';
         
         cartHTML += `
-            <div class="cart-item">
-                <div class="flex justify-between items-center">
+            <div class="cart-item border-b border-gray-200 pb-4 mb-4">
+                <div class="flex justify-between items-start">
                     <div class="flex-1">
-                        <h4 class="font-semibold">${item.name}</h4>
-                        <p class="text-gray-600 text-sm">
-                            ${item.price} ${item.currency} 
+                        <h4 class="font-semibold text-gray-800">${itemName}</h4>
+                        <p class="text-gray-600 text-sm mt-1">
+                            ${itemPrice} ${itemCurrency} 
                         </p>
                         ${isService ? `
                             <p class="text-blue-600 text-xs mt-1">
@@ -1166,48 +1211,46 @@ function updateAICart() {
                         `}
                     </div>
                     <div class="flex items-center space-x-3">
-                        <span class="font-bold">${itemTotal} ${item.currency}</span>
-                        <button class="text-red-500 remove-ai-item hover:text-red-700" data-index="${index}">
+                        <span class="font-bold text-gray-900">${itemTotal.toFixed(2)} ${itemCurrency}</span>
+                        <button class="text-red-500 remove-ai-item hover:text-red-700 transition duration-200" data-index="${index}">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 </div>
+                ${isService && item.profile ? `
+                    <div class="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <strong class="text-blue-800 text-sm">Toplanan Bilgiler:</strong>
+                        <div class="mt-2 space-y-1">
+                            ${Object.entries(item.profile).map(([question, answer]) => 
+                                `<div class="text-xs text-blue-700">• ${question}: ${answer}</div>`
+                            ).join('')}
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
     });
 
     cartItems.innerHTML = cartHTML;
-    if (cartTotal) cartTotal.textContent = `${total.toFixed(2)} USD`;
+    
+    // TOPLAM GÖSTERİMİ - GÜVENLİ
+    const displayTotal = isNaN(total) ? 0 : total;
+    const displayCurrency = serviceCart[0]?.currency || 'USD';
+    
+    if (cartTotal) cartTotal.textContent = `${displayTotal.toFixed(2)} ${displayCurrency}`;
     if (completeBtn) completeBtn.disabled = false;
 
-    // Kaldırma butonlarına event listener ekle
+    // Kaldırma butonları
     document.querySelectorAll('.remove-ai-item').forEach(button => {
         button.addEventListener('click', function() {
             const itemIndex = parseInt(this.getAttribute('data-index'));
-            serviceCart.splice(itemIndex, 1);
-            updateAICart();
+            if (!isNaN(itemIndex) && itemIndex >= 0 && itemIndex < serviceCart.length) {
+                serviceCart.splice(itemIndex, 1);
+                updateAICart();
+            }
         });
     });
 }
-
-// Sepete ekle fonksiyonunu da ekleyelim
-function addToAICart(item) {
-    console.log('➕ Sepete ekleniyor:', item);
-    
-    // Çift eklemeyi önle
-    const existingIndex = serviceCart.findIndex(cartItem => 
-        cartItem.id === item.id && cartItem.type === item.type
-    );
-    
-    if (existingIndex === -1) {
-        serviceCart.push(item);
-    } else {
-        serviceCart[existingIndex] = item;
-    }
-    
-    updateAICart();
-}
-
 // ÖNCE: Tüm yardımcı fonksiyonları tanımla
 // ==============================================
 
@@ -2612,34 +2655,39 @@ function checkChatSession() {
         }
 
         
-        // Hızlı Rapor Formu Kurulumu
-        function setupQuickReportForm() {
-            const templateSelect = document.getElementById('report-template-select');
+        // Rapor şablonu seçimini düzelt
+function setupQuickReportForm() {
+    const templateSelect = document.getElementById('report-template-select');
+    
+    if (!templateSelect) {
+        console.error('❌ Rapor template select bulunamadı');
+        return;
+    }
+
+    templateSelect.addEventListener('change', function() {
+        const templateId = this.value;
+        selectedTemplate = window.reportTemplates?.find(t => t.id === templateId);
+        
+        console.log('📊 Seçilen rapor:', selectedTemplate);
+        
+        if (selectedTemplate) {
+            // Template description göster
+            document.getElementById('template-description').textContent = selectedTemplate.report_description;
+            document.getElementById('template-description').classList.remove('hidden');
             
-            templateSelect.addEventListener('change', function() {
-                const templateId = this.value;
-                selectedTemplate = aiReportTemplates.find(t => t.id === templateId);
-                
-                if (selectedTemplate) {
-                    document.getElementById('template-description').textContent = selectedTemplate.report_description;
-                    document.getElementById('template-description').classList.remove('hidden');
-                    
-                    // Prompt'taki değişkenleri çıkar ve form alanlarını oluştur
-                    const variables = extractVariables(selectedTemplate.report_prompt);
-                    createDynamicFormFields(variables);
-                    
-                    document.getElementById('generate-report-btn').classList.remove('hidden');
-                } else {
-                    document.getElementById('dynamic-form-fields').classList.add('hidden');
-                    document.getElementById('generate-report-btn').classList.add('hidden');
-                    document.getElementById('criteria-list').classList.add('hidden');
-                }
-            });
-
-            // Rapor oluşturma butonu
-            document.getElementById('generate-report-btn').addEventListener('click', generateAIReport);
+            // Prompt'taki değişkenleri çıkar ve form alanlarını oluştur
+            const variables = extractVariables(selectedTemplate.report_prompt);
+            createDynamicFormFields(variables);
+            
+            document.getElementById('generate-report-btn').classList.remove('hidden');
+        } else {
+            document.getElementById('dynamic-form-fields').classList.add('hidden');
+            document.getElementById('generate-report-btn').classList.add('hidden');
+            document.getElementById('criteria-list').classList.add('hidden');
         }
-
+    });
+}
+        
         // Prompt'taki değişkenleri çıkar
         function extractVariables(prompt) {
             const regex = /\{\{(\w+)\}\}/g;
@@ -2852,21 +2900,14 @@ function setupAccordionListeners() {
     });
 }
 
-// Dinamik form alanlarını oluştur - GÜNCELLENMİŞ SIRALAMA
+// Dinamik form alanlarını oluştur - GTIP'i kontrol edelim
 function createDynamicFormFields(variables) {
     const container = document.getElementById('dynamic-form-fields');
     container.innerHTML = '';
     formData = {};
 
     const fieldConfigs = {
-        // ✅ RAPOR TÜRÜ EN BAŞTA
-        rapor_turu: {
-            title: 'Rapor Türü',
-            type: 'template-dropdown',
-            data: window.reportTemplates,
-            displayField: 'report_name', 
-            valueField: 'report_type'
-        },
+        // ✅ Rapor türü artık akordiyonda DEĞİL
         dil: {
             title: 'Rapor Dili',
             type: 'dropdown',
@@ -2952,12 +2993,15 @@ function createDynamicFormFields(variables) {
         }
     };
 
-    // ✅ Rapor türü her zaman ilk sırada
-    const orderedVariables = ['rapor_turu', ...variables.filter(v => v !== 'rapor_turu')];
+    // ✅ Tüm değişkenleri göster (rapor_turu hariç)
+    const filteredVariables = variables.filter(v => v !== 'rapor_turu');
     
-    orderedVariables.forEach(variable => {
+    filteredVariables.forEach(variable => {
         const config = fieldConfigs[variable];
-        if (!config) return;
+        if (!config) {
+            console.warn(`⚠️ ${variable} için config bulunamadı`);
+            return;
+        }
 
         let fieldHTML = '';
         
@@ -2969,8 +3013,6 @@ function createDynamicFormFields(variables) {
             } else {
                 fieldHTML = createSearchableDropdownField(variable, config);
             }
-        } else if (config.type === 'template-dropdown') {
-            fieldHTML = createTemplateDropdownField(variable, config);
         } else {
             fieldHTML = createTextField(variable, config);
         }
@@ -2979,15 +3021,11 @@ function createDynamicFormFields(variables) {
         formData[variable] = '';
     });
 
-     // AKORDİYON EVENT LİSTENER'LARINI EKLE
-    setTimeout(() => {
-        setupAccordionListeners();
-    }, 100);
-
+    console.log('✅ Form alanları oluşturuldu:', filteredVariables);
     setupFieldEventListeners();
     container.classList.remove('hidden');
 }
-     
+        
 
 // Dropdown alanı oluştur
 function createDropdownField(field, config) {
