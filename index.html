@@ -1280,12 +1280,10 @@ function updateAICart() {
     let total = 0;
 
     serviceCart.forEach((item, index) => {
-        // DINAMIK VERI KONTROLÜ - Template'den veya item'dan
-        const itemTemplate = item.template_data || window.reportTemplates?.find(t => t.id === item.id) || item;
-        
-        const itemName = itemTemplate.report_name || item.name || 'Rapor';
-        const itemPrice = parseFloat(itemTemplate.report_price || item.price || 0);
-        const itemCurrency = itemTemplate.report_currency || item.currency || 'USD';
+        // GÜVENLİ DEĞER ALMA
+        const itemName = item.name || 'İsimsiz Ürün';
+        const itemPrice = parseFloat(item.price) || 0;
+        const itemCurrency = item.currency || 'USD';
         const itemQuantity = parseInt(item.quantity) || 1;
         
         const itemTotal = itemPrice * itemQuantity;
@@ -1299,8 +1297,7 @@ function updateAICart() {
                     <div class="flex-1">
                         <h4 class="font-semibold text-gray-800">${itemName}</h4>
                         <p class="text-gray-600 text-sm mt-1">
-                            ${itemPrice.toFixed(2)} ${itemCurrency} 
-                            ${itemQuantity > 1 ? `× ${itemQuantity}` : ''}
+                            ${itemPrice} ${itemCurrency} 
                         </p>
                         ${isService ? `
                             <p class="text-blue-600 text-xs mt-1">
@@ -1311,9 +1308,6 @@ function updateAICart() {
                                 <i class="fas fa-file-pdf mr-1"></i>Rapor
                             </p>
                         `}
-                        ${itemTemplate.report_description ? `
-                            <p class="text-gray-500 text-xs mt-1">${itemTemplate.report_description}</p>
-                        ` : ''}
                     </div>
                     <div class="flex items-center space-x-3">
                         <span class="font-bold text-gray-900">${itemTotal.toFixed(2)} ${itemCurrency}</span>
@@ -1338,8 +1332,8 @@ function updateAICart() {
 
     cartItems.innerHTML = cartHTML;
     
-    // TOPLAM HESAPLAMA - DINAMIK
-    const displayTotal = (!isNaN(total) && isFinite(total)) ? total : 0;
+    // TOPLAM GÖSTERİMİ - GÜVENLİ
+    const displayTotal = isNaN(total) ? 0 : total;
     const displayCurrency = serviceCart[0]?.currency || 'USD';
     
     if (cartTotal) cartTotal.textContent = `${displayTotal.toFixed(2)} ${displayCurrency}`;
@@ -1355,7 +1349,10 @@ function updateAICart() {
             }
         });
     });
-}        
+}
+
+
+        
 // ÖNCE: Tüm yardımcı fonksiyonları tanımla
 // ==============================================
 
