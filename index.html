@@ -3349,39 +3349,46 @@ function createTextField(field, config) {
     `;
 }
 
-// Field event listener'larını kur - TAM KOD
+// Field event listener'larını GÜNCELLE - dil dropdown'ını ekle
 function setupFieldEventListeners() {
     console.log('🔧 Field event listenerları kuruluyor...');
     
-    // 1. TÜM form alanlarını dinle
-    document.addEventListener('input', function(e) {
-        const target = e.target;
-        if (target.classList.contains('form-field') || target.hasAttribute('data-field')) {
-            const fieldName = target.getAttribute('data-field');
-            const value = target.value;
-            if (fieldName && !target.classList.contains('search-input')) {
-                formData[fieldName] = value;
-                console.log(`📝 ${fieldName} değişti:`, value);
-                updateCriteriaList();
-            }
-        }
-    });
-    
-    // 2. Select değişimlerini dinle
+    // 1. TÜM dropdown'ları dinle (dil dahil)
     document.addEventListener('change', function(e) {
         const target = e.target;
-        if (target.tagName === 'SELECT' && (target.classList.contains('form-field') || target.hasAttribute('data-field'))) {
+        
+        // Tüm select elementlerini dinle
+        if (target.tagName === 'SELECT' && target.hasAttribute('data-field')) {
             const fieldName = target.getAttribute('data-field');
             const value = target.value;
+            
             if (fieldName) {
                 formData[fieldName] = value;
-                console.log(`📝 ${fieldName} seçildi:`, value);
+                console.log(`📝 DROPDOWN ${fieldName} seçildi:`, value);
                 updateCriteriaList();
             }
         }
     });
     
-    // 3. Arama yapılabilir dropdown'lar
+    // 2. TÜM text input'ları dinle
+    document.addEventListener('input', function(e) {
+        const target = e.target;
+        
+        if ((target.classList.contains('form-field') || target.hasAttribute('data-field')) && 
+            !target.classList.contains('search-input')) {
+            
+            const fieldName = target.getAttribute('data-field');
+            const value = target.value;
+            
+            if (fieldName) {
+                formData[fieldName] = value;
+                console.log(`📝 INPUT ${fieldName} değişti:`, value);
+                updateCriteriaList();
+            }
+        }
+    });
+    
+    // 3. Arama yapılabilir dropdown'lar (mevcut kodunuz)
     document.querySelectorAll('.search-input').forEach(input => {
         input.addEventListener('input', debounce(function() {
             const field = this.getAttribute('data-field');
@@ -3398,7 +3405,6 @@ function setupFieldEventListeners() {
             
             let filteredResults = [];
             
-            // GTIP için özel arama
             if (field === 'gtip') {
                 if (!window.gtipCodes || window.gtipCodes.length === 0) {
                     resultsContainer.innerHTML = '<div class="p-3 text-red-500">GTIP verileri yüklenemedi</div>';
@@ -3411,9 +3417,7 @@ function setupFieldEventListeners() {
                     item.name.toLowerCase().includes(searchTerm.toLowerCase())
                 ).slice(0, 8);
                 
-            } 
-            // Amaç ve derinlik için arama
-            else if (field === 'amac' || field === 'derinlik') {
+            } else if (field === 'amac' || field === 'derinlik') {
                 const config = getFieldConfig(field);
                 if (config && config.data) {
                     filteredResults = config.data.filter(item => 
@@ -3422,7 +3426,6 @@ function setupFieldEventListeners() {
                 }
             }
             
-            // Sonuçları göster
             if (filteredResults.length > 0) {
                 resultsContainer.innerHTML = filteredResults.map(item => {
                     if (field === 'gtip') {
@@ -3459,7 +3462,7 @@ function setupFieldEventListeners() {
         });
     });
     
-    // 4. Sonuçlara tıklama event'i
+    // 4. Dropdown sonuç tıklama (mevcut kodunuz)
     document.addEventListener('click', function(e) {
         if (e.target.closest('.search-result-item')) {
             const resultItem = e.target.closest('.search-result-item');
@@ -3504,8 +3507,7 @@ function setupFieldEventListeners() {
     });
     
     console.log('✅ Tüm field listenerları kuruldu');
-}
-        
+}        
 // Debounce fonksiyonu
 function debounce(func, wait) {
     let timeout;
@@ -3632,7 +3634,7 @@ const fieldConfigs = {
     }
 };
 
-        // Kriter listesini güncelle - DÜZELTİLMİŞ
+ // Kriter listesini güncelle - DEBUG için
 function updateCriteriaList() {
     const criteriaContainer = document.getElementById('criteria-items');
     const criteriaList = document.getElementById('criteria-list');
@@ -3643,11 +3645,14 @@ function updateCriteriaList() {
     }
     
     criteriaContainer.innerHTML = '';
-
+    
+    console.log('🔍 DEBUG - FormData durumu:', formData);
+    console.log('🔍 DEBUG - dil değeri:', formData.dil);
+    
     let hasData = false;
     
     Object.entries(formData).forEach(([key, value]) => {
-        if (value && value.trim() !== '') {
+        if (value !== undefined && value !== null && value.toString().trim() !== '') {
             hasData = true;
             const title = getFieldTitle(key);
             criteriaContainer.innerHTML += `
@@ -3655,17 +3660,18 @@ function updateCriteriaList() {
                     <strong>${title}:</strong> ${value}
                 </div>
             `;
+            console.log(`✅ Kriter eklendi: ${title} = ${value}`);
         }
     });
-
+    
     if (hasData) {
         criteriaList.classList.remove('hidden');
-        console.log('✅ Kriter listesi güncellendi:', formData);
+        console.log('✅ Kriter listesi güncellendi');
     } else {
         criteriaList.classList.add('hidden');
+        console.log('ℹ️ Kriter listesi boş');
     }
 }
-
 // Field title'ları güncelle
 function getFieldTitle(field) {
     const titles = {
