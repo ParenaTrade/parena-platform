@@ -3519,29 +3519,21 @@ async function saveReportsToDatabase() {
 }
 
 // Güncellenmiş rapor oluşturma fonksiyonu - TESTLİ
+// Rapor oluşturma fonksiyonunu güncelle
 async function generateAIReport() {
-    // ÖNCE: API durumunu kontrol et
-    const apiStatus = await testAPIEndpoint();
-    
-    if (!apiStatus) {
-        showErrorModal(
-            'AI Servisi Kullanılamıyor',
-            'AI rapor oluşturma servisi şu an kullanılamıyor.<br><br>' +
-            '• Lütfen birkaç dakika sonra tekrar deneyin<br>' +
-            '• Sayfayı yenileyip tekrar deneyebilirsiniz<br>' +
-            '• Sorun devam ederse: info@parenatrade.com<br><br>' +
-            'Özür dileriz, en kısa sürede çözülecektir.'
-        );
+    // ÖNCE: Kullanıcı girişi kontrol et
+    if (!currentUser) {
+        alert('Lütfen önce giriş yapın!');
+        document.getElementById('login-modal').classList.remove('hidden');
         return;
     }
 
-    // API çalışıyorsa normal işleme devam et
     const generateBtn = document.getElementById('generate-report-btn');
     const progressSection = document.getElementById('report-progress');
     
     generateBtn.disabled = true;
     generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Oluşturuluyor...';
-    progressSection.classList.remove('hidden');
+    if (progressSection) progressSection.classList.remove('hidden');
 
     try {
         updateProgress(10);
@@ -3564,8 +3556,7 @@ async function generateAIReport() {
                 prompt: finalPrompt,
                 template: selectedTemplate.report_name,
                 parameters: formData
-            }),
-            signal: AbortSignal.timeout(30000)
+            })
         });
 
         if (!response.ok) {
@@ -3579,12 +3570,17 @@ async function generateAIReport() {
         if (result.success) {
             reportContent = result.result;
         } else {
-            throw new Error(result.error || 'Rapor oluşturulamadı');
+            // PDF hatası durumunda sadece metin içerik kullan
+            if (result.error && result.error.includes('switchToPage')) {
+                reportContent = result.result || "Rapor içeriği oluşturuldu ancak PDF formatında kaydedilemedi.";
+            } else {
+                throw new Error(result.error || 'Rapor oluşturulamadı');
+            }
         }
 
         updateProgress(70);
 
-        // 3. SUPABASE'E KAYDET
+        // 3. SUPABASE'E KAYDET (PDF OLMADAN)
         const reportData = {
             template_id: selectedTemplate.id,
             report_title: selectedTemplate.report_name,
@@ -3619,13 +3615,21 @@ async function generateAIReport() {
         updateProgress(100);
 
         // 4. SEPETE EKLE
-        addToAICart(selectedTemplate, report.id);
+        addToAICart({
+            id: selectedTemplate.id,
+            name: selectedTemplate.report_name,
+            price: selectedTemplate.report_price,
+            currency: selectedTemplate.report_currency,
+            reportId: report.id,
+            type: 'report'
+        });
 
         // 5. SONUÇLARI GÖSTER
-        document.getElementById('quick-analysis-result').classList.remove('hidden');
+        const resultSection = document.getElementById('quick-analysis-result');
+        if (resultSection) resultSection.classList.remove('hidden');
         
         setTimeout(() => {
-            progressSection.classList.add('hidden');
+            if (progressSection) progressSection.classList.add('hidden');
             generateBtn.disabled = false;
             generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
         }, 2000);
@@ -3635,18 +3639,17 @@ async function generateAIReport() {
         
         generateBtn.disabled = false;
         generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
-        progressSection.classList.add('hidden');
+        if (progressSection) progressSection.classList.add('hidden');
         
-        showErrorModal(
-            'Rapor Oluşturulamadı',
-            'Rapor oluşturulurken bir hata oluştu:<br><br>' +
-            '• Hata: ' + error.message + '<br>' +
-            '• Lütfen tekrar deneyin<br>' +
-            '• Sorun devam ederse destek ekibimizle iletişime geçin'
-        );
+        // Daha iyi hata mesajı
+        let errorMessage = 'Rapor oluşturulurken hata: ' + error.message;
+        if (error.message.includes('switchToPage')) {
+            errorMessage = 'PDF oluşturma hatası. Rapor metin olarak kaydedildi.';
+        }
+        
+        alert(errorMessage);
     }
-}
-        
+}        
 // Giriş işlemi - GÜNCELLENMİŞ
 async function handleLogin(e) {
     e.preventDefault();
@@ -3838,16 +3841,23 @@ document.getElementById('complete-ai-report-order').addEventListener('click', fu
     proceedToPayment();
 });
 
-// AI Sepetini Güncelle - EKSİK FONKSİYON
+// BU FONKSİYONU KODUNUZA EKLEYİN
 function updateAICart() {
+    console.log('🛒 Sepet güncelleniyor...', serviceCart);
+    
     const cartItems = document.getElementById('ai-report-cart-items');
     const cartTotal = document.getElementById('ai-report-cart-total');
     const completeBtn = document.getElementById('complete-ai-report-order');
 
+    if (!cartItems) {
+        console.error('❌ Sepet elementi bulunamadı');
+        return;
+    }
+
     if (serviceCart.length === 0) {
         cartItems.innerHTML = '<p class="text-gray-500 text-center py-4">Sepetinizde ürün bulunmamaktadır</p>';
-        cartTotal.textContent = '0 USD';
-        completeBtn.disabled = true;
+        if (cartTotal) cartTotal.textContent = '0 USD';
+        if (completeBtn) completeBtn.disabled = true;
         return;
     }
 
@@ -3872,7 +3882,11 @@ function updateAICart() {
                             <p class="text-blue-600 text-xs mt-1">
                                 <i class="fas fa-cog mr-1"></i>Hizmet
                             </p>
-                        ` : ''}
+                        ` : `
+                            <p class="text-green-600 text-xs mt-1">
+                                <i class="fas fa-file-pdf mr-1"></i>Rapor
+                            </p>
+                        `}
                     </div>
                     <div class="flex items-center space-x-3">
                         <span class="font-bold">${itemTotal} ${item.currency}</span>
@@ -3886,8 +3900,8 @@ function updateAICart() {
     });
 
     cartItems.innerHTML = cartHTML;
-    cartTotal.textContent = `${total.toFixed(2)} USD`;
-    completeBtn.disabled = false;
+    if (cartTotal) cartTotal.textContent = `${total.toFixed(2)} USD`;
+    if (completeBtn) completeBtn.disabled = false;
 
     // Kaldırma butonları
     document.querySelectorAll('.remove-ai-item').forEach(button => {
@@ -3899,11 +3913,13 @@ function updateAICart() {
     });
 }
 
-// Sepete Ekle - BASİT VERSİYON
+// Sepete ekle fonksiyonunu da basitleştirelim
 function addToAICart(item) {
+    console.log('➕ Sepete ekleniyor:', item);
     serviceCart.push(item);
     updateAICart();
-}            
+}
+            
             // Hata ayıklama için Supabase bağlantısını kontrol et
         async function checkSupabaseConnection() {
             try {
