@@ -1159,17 +1159,41 @@ function extractVariables(prompt) {
     return uniqueVariables;
 }
         
-// Sepet fonksiyonlarını tamir edelim
+// Sepete ekle fonksiyonunu düzelt - FİYAT KONTROLÜ
 function addToAICart(item) {
     console.log('➕ Sepete ekleniyor:', item);
     
-    // VERİ DOĞRULAMA ve TEMİZLEME
+    // FİYAT KONTROLÜ - KESİN ÇÖZÜM
+    let price = 0;
+    
+    if (item.price !== undefined && item.price !== null) {
+        price = parseFloat(item.price);
+    } else if (selectedTemplate && selectedTemplate.report_price) {
+        price = parseFloat(selectedTemplate.report_price);
+    } else {
+        // Varsayılan fiyatlar
+        const defaultPrices = {
+            'Kapsamlı Pazar Raporu': 199,
+            'Firma Bazlı Pazar Raporu': 129, 
+            'GTIP Bazlı Ticaret Raporu': 159
+        };
+        price = defaultPrices[item.name] || 99;
+    }
+    
+    // Eğer hala 0 ise, template'den kontrol et
+    if (price === 0 && window.reportTemplates) {
+        const template = window.reportTemplates.find(t => t.id === item.id);
+        if (template && template.report_price) {
+            price = parseFloat(template.report_price);
+        }
+    }
+    
     const validatedItem = {
         id: item.id || 'unknown_' + Date.now(),
-        name: item.name || 'İsimsiz Ürün',
-        price: parseFloat(item.price) || 0,
+        name: item.name || 'İsimsiz Rapor',
+        price: price,
         currency: item.currency || 'USD',
-        type: item.type || 'product',
+        type: item.type || 'report',
         quantity: parseInt(item.quantity) || 1,
         profile: item.profile || null,
         service_type: item.service_type || null,
@@ -1177,13 +1201,7 @@ function addToAICart(item) {
         created_at: item.created_at || new Date().toISOString()
     };
 
-    // Fiyat kontrolü
-    if (isNaN(validatedItem.price) || validatedItem.price <= 0) {
-        console.error('❌ Geçersiz fiyat:', item.price);
-        validatedItem.price = 0;
-    }
-
-    console.log('✅ Doğrulanmış öğe:', validatedItem);
+    console.log('✅ Doğrulanmış öğe (FİYATLI):', validatedItem);
     
     // Çift eklemeyi önle
     const existingIndex = serviceCart.findIndex(cartItem => 
@@ -1198,7 +1216,7 @@ function addToAICart(item) {
     
     updateAICart();
 }
-
+        
 function updateAICart() {
     console.log('🛒 Sepet güncelleniyor:', serviceCart);
     
@@ -1867,7 +1885,7 @@ if (window.parenaTradeInitialized) {
         }        
   
 
-// Rapor şablonlarını Supabase'den çek - DÜZELTİLMİŞ
+// Rapor şablonlarını yükle - FİYAT KONTROLÜ
 async function loadReportTemplates() {
     try {
         console.log('📊 Rapor şablonları yükleniyor...');
@@ -1879,14 +1897,11 @@ async function loadReportTemplates() {
         
         if (error) {
             console.error('❌ Rapor şablonları yüklenemedi:', error);
-            // Fallback değil - hata göster
-            showError('Rapor şablonları yüklenemedi. Lütfen sayfayı yenileyin.');
             return;
         }
         
         if (!templates || templates.length === 0) {
             console.error('❌ Rapor şablonu bulunamadı');
-            showError('Rapor şablonları bulunamadı.');
             return;
         }
         
@@ -1900,19 +1915,23 @@ async function loadReportTemplates() {
         templates.forEach(template => {
             const option = document.createElement('option');
             option.value = template.id;
-            option.textContent = `${template.report_name} - $${template.report_price}`;
+            option.textContent = `${template.report_name} - $${template.report_price || 0} ${template.report_currency || 'USD'}`;
             option.setAttribute('data-description', template.report_description);
             templateSelect.appendChild(option);
         });
         
-        console.log(`✅ ${templates.length} rapor şablonu yüklendi`);
+        console.log(`✅ ${templates.length} rapor şablonu yüklendi:`, templates.map(t => ({
+            name: t.report_name,
+            price: t.report_price,
+            currency: t.report_currency
+        })));
         
     } catch (error) {
         console.error('❌ Rapor şablonları yüklenirken hata:', error);
-        showError('Sistem hatası: Rapor şablonları yüklenemedi.');
     }
-}        
-        // Hizmet paketlerini yükle - GÜNCELLENMİŞ
+}
+        
+// Hizmet paketlerini yükle - GÜNCELLENMİŞ
 function loadServicePackages() {
     const packagesContainer = document.getElementById('ai-report-templates');
     
@@ -3349,40 +3368,33 @@ function createTextField(field, config) {
     `;
 }
 
-// Field event listener'larını GÜNCELLE - dil dropdown'ını ekle
+// Field event listener'larını KESİN ÇÖZÜM
 function setupFieldEventListeners() {
     console.log('🔧 Field event listenerları kuruluyor...');
     
-    // 1. TÜM dropdown'ları dinle (dil dahil)
+    // 1. TÜM select elementlerini dinle - KESİN ÇÖZÜM
     document.addEventListener('change', function(e) {
         const target = e.target;
         
-        // Tüm select elementlerini dinle
-        if (target.tagName === 'SELECT' && target.hasAttribute('data-field')) {
+        if (target.tagName === 'SELECT') {
             const fieldName = target.getAttribute('data-field');
-            const value = target.value;
-            
             if (fieldName) {
-                formData[fieldName] = value;
-                console.log(`📝 DROPDOWN ${fieldName} seçildi:`, value);
+                formData[fieldName] = target.value;
+                console.log(`✅ SELECT ${fieldName} seçildi:`, target.value);
                 updateCriteriaList();
             }
         }
     });
     
-    // 2. TÜM text input'ları dinle
+    // 2. TÜM input ve textarea'ları dinle
     document.addEventListener('input', function(e) {
         const target = e.target;
         
-        if ((target.classList.contains('form-field') || target.hasAttribute('data-field')) && 
-            !target.classList.contains('search-input')) {
-            
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
             const fieldName = target.getAttribute('data-field');
-            const value = target.value;
-            
-            if (fieldName) {
-                formData[fieldName] = value;
-                console.log(`📝 INPUT ${fieldName} değişti:`, value);
+            if (fieldName && !target.classList.contains('search-input')) {
+                formData[fieldName] = target.value;
+                console.log(`✅ INPUT ${fieldName} değişti:`, target.value);
                 updateCriteriaList();
             }
         }
@@ -4170,20 +4182,13 @@ Stratejik pozisyonlama, potansiyel giriş stratejileri, farklılaşma noktaları
     return advancedPrompt;
 }
 
-// Rapor oluşturma fonksiyonunu basitleştir
+// Rapor oluşturma fonksiyonunu düzelt - SUPABASE KAYIT EKLE
 async function generateAIReport() {
     console.log('🚀 Rapor oluşturma başlatılıyor...');
     
     // Validasyon
     if (!selectedTemplate) {
         alert('❌ Lütfen rapor türü seçin.');
-        return;
-    }
-    
-    // Form verilerini kontrol et
-    const filledFields = Object.values(formData).filter(value => value && value.trim() !== '').length;
-    if (filledFields === 0) {
-        alert('❌ Lütfen en az bir alanı doldurun.');
         return;
     }
     
@@ -4230,23 +4235,62 @@ async function generateAIReport() {
             throw new Error(result.error || 'Rapor oluşturulamadı');
         }
 
+        updateProgress(60);
+
+        // 3. ✅ SUPABASE'E KAYDET - KESİN ÇÖZÜM
+        console.log('💾 Supabase\'e kaydediliyor...');
+        const reportData = {
+            template_id: selectedTemplate.id,
+            report_title: selectedTemplate.report_name,
+            report_prompt: finalPrompt,
+            report_content: result.result,
+            country: formData.ulke || null,
+            sector: formData.sektor || null,
+            product: formData.urun || null,
+            region: formData.bolge || null,
+            gtip: formData.gtip || null,
+            period: formData.zaman || null,
+            purpose: formData.amac || null,
+            language: formData.dil || 'TR', // ✅ dil alanını ekle
+            depth: formData.derinlik || null,
+            report_type: selectedTemplate.report_type,
+            status: 'completed',
+            user_id: currentUser?.id || null,
+            created_at: new Date().toISOString()
+        };
+
+        console.log('📊 Kaydedilecek rapor verisi:', reportData);
+
+        const { data: report, error } = await supabase
+            .from('ai_reports')
+            .insert(reportData)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ Supabase kayıt hatası:', error);
+            throw new Error('Rapor veritabanına kaydedilemedi: ' + error.message);
+        }
+
+        console.log('✅ Rapor Supabase\'e kaydedildi:', report);
+
         updateProgress(80);
 
-        // 3. Sonuçları göster
-        document.getElementById('quick-analysis-result').classList.remove('hidden');
-        
-        // Sepete ekle
+        // 4. Sepete ekle - FİYATI DÜZELT
         addToAICart({
             id: selectedTemplate.id,
             name: selectedTemplate.report_name,
-            price: selectedTemplate.report_price,
-            currency: selectedTemplate.report_currency,
-            reportId: 'temp-' + Date.now(), // Geçici ID
+            price: selectedTemplate.report_price || 199, // ✅ Fiyat kontrolü
+            currency: selectedTemplate.report_currency || 'USD',
+            reportId: report.id, // ✅ Kayıt ID'sini kullan
             type: 'report'
         });
 
         updateProgress(100);
 
+        // 5. Sonuçları göster
+        document.getElementById('quick-analysis-result').classList.remove('hidden');
+        
         setTimeout(() => {
             if (progressSection) progressSection.classList.add('hidden');
             generateBtn.disabled = false;
@@ -4263,7 +4307,6 @@ async function generateAIReport() {
         alert('❌ Rapor oluşturulurken hata: ' + error.message);
     }
 }
-
 // Hata göster - BASİT
 function showError(message) {
     alert('❌ ' + message);
