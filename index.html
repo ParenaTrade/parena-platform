@@ -3297,10 +3297,13 @@ function createDynamicFormFields(variables) {
         return;
     }
     
-    container.innerHTML = '';
-    formData = {};
+     container.innerHTML = '';
     
-    console.log('🔧 Form alanları oluşturuluyor:', variables);
+    // FORM DATA INITIALIZATION - BURAYA DA EKLE
+    if (!window.formData) {
+        window.formData = {};
+        console.log('✅ window.formData createDynamicFormFields içinde initialize edildi');
+    }
     
     // Field konfigürasyonları - GERÇEK (ÜSTTEKİ KODDAN)
     const fieldConfigs = {
@@ -3396,8 +3399,7 @@ function createDynamicFormFields(variables) {
         return;
     }
     
-    // Değişkenleri işle - İKİ KODUN BİRLEŞİMİ
-    variables.forEach(variable => {
+     variables.forEach(variable => {
         const config = fieldConfigs[variable];
         if (!config) {
             console.warn(`⚠️ ${variable} için config bulunamadı`);
@@ -3405,7 +3407,7 @@ function createDynamicFormFields(variables) {
         }
         
         if (config.type === 'hidden') {
-            formData[variable] = selectedTemplate?.report_name || '';
+            window.formData[variable] = window.selectedTemplate?.report_name || ''; // formData -> window.formData
             return;
         }
         
@@ -3422,7 +3424,7 @@ function createDynamicFormFields(variables) {
         `;
         
         container.innerHTML += fieldHTML;
-        formData[variable] = ''; // Başlangıç değeri
+        window.formData[variable] = ''; // formData -> window.formData // Başlangıç değeri
     });
     
     // ALTTAKİ KODDAN GELEN İYİLEŞTİRME:
@@ -3631,9 +3633,15 @@ function createTextField(field, config) {
     `;
 }
 
-// Field event listener'larını KESİN ÇÖZÜM
+// Field event listener'larını KESİN ÇÖZÜM - SADECE GEREKLİ DÜZELTMELER
 function setupFieldEventListeners() {
     console.log('🔧 Field event listenerları kuruluyor...');
+    
+    // FORM DATA INITIALIZATION - SADECE BURAYA EKLE
+    if (!window.formData) {
+        window.formData = {};
+        console.log('✅ window.formData setupFieldEventListeners içinde initialize edildi');
+    }
     
     // 1. TÜM select elementlerini dinle - KESİN ÇÖZÜM
     document.addEventListener('change', function(e) {
@@ -3642,7 +3650,7 @@ function setupFieldEventListeners() {
         if (target.tagName === 'SELECT') {
             const fieldName = target.getAttribute('data-field');
             if (fieldName) {
-                formData[fieldName] = target.value;
+                window.formData[fieldName] = target.value; // SADECE formData -> window.formData
                 console.log(`✅ SELECT ${fieldName} seçildi:`, target.value);
                 updateCriteriaList();
             }
@@ -3656,14 +3664,14 @@ function setupFieldEventListeners() {
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
             const fieldName = target.getAttribute('data-field');
             if (fieldName && !target.classList.contains('search-input')) {
-                formData[fieldName] = target.value;
+                window.formData[fieldName] = target.value; // SADECE formData -> window.formData
                 console.log(`✅ INPUT ${fieldName} değişti:`, target.value);
                 updateCriteriaList();
             }
         }
     });
     
-    // 3. Arama yapılabilir dropdown'lar (mevcut kodunuz)
+    // 3. Arama yapılabilir dropdown'lar (mevcut kodunuz - DEĞİŞİKLİK YOK)
     document.querySelectorAll('.search-input').forEach(input => {
         input.addEventListener('input', debounce(function() {
             const field = this.getAttribute('data-field');
@@ -3737,7 +3745,7 @@ function setupFieldEventListeners() {
         });
     });
     
-    // 4. Dropdown sonuç tıklama (mevcut kodunuz)
+    // 4. Dropdown sonuç tıklama (mevcut kodunuz - SADECE formData -> window.formData)
     document.addEventListener('click', function(e) {
         if (e.target.closest('.search-result-item')) {
             const resultItem = e.target.closest('.search-result-item');
@@ -3750,7 +3758,7 @@ function setupFieldEventListeners() {
             
             console.log(`✅ ${field} seçildi:`, value);
             
-            formData[field] = value;
+            window.formData[field] = value; // SADECE formData -> window.formData
             input.value = display;
             
             if (selectedContainer) {
@@ -3768,7 +3776,7 @@ function setupFieldEventListeners() {
             const input = document.getElementById(`${field}-search-input`);
             const selectedContainer = button.closest('.selected-value');
             
-            formData[field] = '';
+            window.formData[field] = ''; // SADECE formData -> window.formData
             if (input) input.value = '';
             if (selectedContainer) selectedContainer.classList.add('hidden');
             updateCriteriaList();
@@ -3782,7 +3790,8 @@ function setupFieldEventListeners() {
     });
     
     console.log('✅ Tüm field listenerları kuruldu');
-}        
+}
+        
 // Debounce fonksiyonu
 function debounce(func, wait) {
     let timeout;
@@ -3910,6 +3919,7 @@ const fieldConfigs = {
 };
 
  // Kriter listesini güncelle - DEBUG için
+// Kriter listesini güncelle - DEBUG için
 function updateCriteriaList() {
     const criteriaContainer = document.getElementById('criteria-items');
     const criteriaList = document.getElementById('criteria-list');
@@ -3921,23 +3931,26 @@ function updateCriteriaList() {
     
     criteriaContainer.innerHTML = '';
     
-    console.log('🔍 DEBUG - FormData durumu:', formData);
-    console.log('🔍 DEBUG - dil değeri:', formData.dil);
+    console.log('🔍 DEBUG - FormData durumu:', window.formData);
+    console.log('🔍 DEBUG - dil değeri:', window.formData?.dil);
     
     let hasData = false;
     
-    Object.entries(formData).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value.toString().trim() !== '') {
-            hasData = true;
-            const title = getFieldTitle(key);
-            criteriaContainer.innerHTML += `
-                <div class="criteria-item">
-                    <strong>${title}:</strong> ${value}
-                </div>
-            `;
-            console.log(`✅ Kriter eklendi: ${title} = ${value}`);
-        }
-    });
+    // GÜVENLİ ERİŞİM - window.formData kullan
+    if (window.formData && typeof window.formData === 'object') {
+        Object.entries(window.formData).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value.toString().trim() !== '') {
+                hasData = true;
+                const title = getFieldTitle(key);
+                criteriaContainer.innerHTML += `
+                    <div class="criteria-item">
+                        <strong>${title}:</strong> ${value}
+                    </div>
+                `;
+                console.log(`✅ Kriter eklendi: ${title} = ${value}`);
+            }
+        });
+    }
     
     if (hasData) {
         criteriaList.classList.remove('hidden');
@@ -3947,7 +3960,7 @@ function updateCriteriaList() {
         console.log('ℹ️ Kriter listesi boş');
     }
 }
-// Field title'ları güncelle
+        // Field title'ları güncelle
 function getFieldTitle(field) {
     const titles = {
         dil: 'Rapor Dili',
