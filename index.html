@@ -1119,7 +1119,7 @@
         let activeAccordion = null;
 
 
-// extractVariables fonksiyonunu güncelle
+// Değişken çıkarma fonksiyonunu güncelle
 function extractVariables(prompt) {
     if (!prompt || typeof prompt !== 'string') {
         console.warn('⚠️ Geçersiz prompt:', prompt);
@@ -1138,10 +1138,18 @@ function extractVariables(prompt) {
     regexPatterns.forEach(pattern => {
         let match;
         while ((match = pattern.exec(prompt)) !== null) {
-            // current_year'i filtrele (otomatik doldurulacak)
+            // current_year'i filtrele
             if (match[1] !== 'current_year') {
                 matches.push(match[1]);
             }
+        }
+    });
+    
+    // Firma bazlı rapor için özel değişkenler
+    const knownVariables = ['dil', 'ulke', 'sektor', 'urun', 'firma_adi', 'bolge', 'gtip', 'zaman', 'amac', 'derinlik', 'rapor_turu'];
+    knownVariables.forEach(variable => {
+        if (prompt.includes(variable) && !matches.includes(variable)) {
+            matches.push(variable);
         }
     });
     
@@ -2743,7 +2751,7 @@ async function getTemplateDetails(templateId) {
     }
 }
 
-// Prompt'u değişkenlerle doldur - GÜNCELLENMİŞ
+// Prompt doldurma fonksiyonunu güncelle
 function fillPromptTemplate(template, formData) {
     if (!template || !template.report_prompt) {
         console.error('❌ Geçersiz template veya prompt');
@@ -2752,12 +2760,14 @@ function fillPromptTemplate(template, formData) {
     
     let filledPrompt = template.report_prompt;
     
+    console.log('🔍 FormData durumu:', formData);
+    
     // current_year'i otomatik ekle
     const currentYear = new Date().getFullYear();
     filledPrompt = filledPrompt.replace(/\{\{current_year\}\}/g, currentYear);
     filledPrompt = filledPrompt.replace(/%current_year%/g, currentYear);
     
-    // Tüm değişkenleri işle
+    // Tüm değişkenleri işle - ÖNEMLİ: Doğru eşleştirme
     Object.entries(formData).forEach(([key, value]) => {
         if (value && value.trim() !== '') {
             // Tüm olası formatlarda değiştir
@@ -2773,7 +2783,11 @@ function fillPromptTemplate(template, formData) {
         }
     });
     
-    console.log('✅ Prompt dolduruldu, uzunluk:', filledPrompt.length);
+    // Eksik değişkenleri temizle
+    filledPrompt = filledPrompt.replace(/\{\{\w+\}\}/g, 'Bilgi verilmemiş');
+    filledPrompt = filledPrompt.replace(/%\w+%/g, 'Bilgi verilmemiş');
+    
+    console.log('✅ Prompt dolduruldu, ilk 200 karakter:', filledPrompt.substring(0, 200));
     return filledPrompt;
 }
         
@@ -3038,6 +3052,11 @@ function createDynamicFormFields(variables) {
             displayField: 'name',
             valueField: 'name'
         },
+        firma_adi: {
+        title: 'Firma Adı',
+        type: 'text',
+        placeholder: 'Analiz edilecek firma veya marka adı...'
+    },
         urun: {
             title: 'Ürün/Hizmet',
             type: 'text',
@@ -3647,20 +3666,20 @@ function updateCriteriaList() {
     }
 }
 
-// Field title'ları - EKSİK OLANLARI EKLE
+// Field title'ları güncelle
 function getFieldTitle(field) {
     const titles = {
         dil: 'Rapor Dili',
-        ulke: 'Hedef Ülke',
+        ulke: 'Hedef Pazar Ülkesi', // Güncellendi
         sektor: 'Sektör',
         urun: 'Ürün/Hizmet',
+        firma_adi: 'Firma Adı', // Eklendi
         bolge: 'Bölge',
         gtip: 'GTIP Kodu',
         zaman: 'Zaman Aralığı',
         amac: 'Analiz Amacı',
         derinlik: 'Analiz Derinliği',
-        rapor_turu: 'Rapor Türü',
-        firma_adi: 'Firma Adı'
+        rapor_turu: 'Rapor Türü'
     };
     return titles[field] || field;
 }
