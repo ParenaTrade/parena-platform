@@ -1280,12 +1280,12 @@ function updateAICart() {
     let total = 0;
 
     serviceCart.forEach((item, index) => {
-        // GÜVENLİ DEĞER ALMA - EXTRA KONTROL
-        const itemName = (item.name && item.name !== 'undefined') ? item.name : 'İsimsiz Ürün';
-        const itemPrice = (item.price !== undefined && item.price !== null && !isNaN(parseFloat(item.price))) 
-            ? parseFloat(item.price) 
-            : 0;
-        const itemCurrency = (item.currency && item.currency !== 'undefined') ? item.currency : 'USD';
+        // DINAMIK VERI KONTROLÜ - Template'den veya item'dan
+        const itemTemplate = item.template_data || window.reportTemplates?.find(t => t.id === item.id) || item;
+        
+        const itemName = itemTemplate.report_name || item.name || 'Rapor';
+        const itemPrice = parseFloat(itemTemplate.report_price || item.price || 0);
+        const itemCurrency = itemTemplate.report_currency || item.currency || 'USD';
         const itemQuantity = parseInt(item.quantity) || 1;
         
         const itemTotal = itemPrice * itemQuantity;
@@ -1311,6 +1311,9 @@ function updateAICart() {
                                 <i class="fas fa-file-pdf mr-1"></i>Rapor
                             </p>
                         `}
+                        ${itemTemplate.report_description ? `
+                            <p class="text-gray-500 text-xs mt-1">${itemTemplate.report_description}</p>
+                        ` : ''}
                     </div>
                     <div class="flex items-center space-x-3">
                         <span class="font-bold text-gray-900">${itemTotal.toFixed(2)} ${itemCurrency}</span>
@@ -1335,11 +1338,9 @@ function updateAICart() {
 
     cartItems.innerHTML = cartHTML;
     
-    // TOPLAM GÖSTERİMİ - EXTRA GÜVENLİ
+    // TOPLAM HESAPLAMA - DINAMIK
     const displayTotal = (!isNaN(total) && isFinite(total)) ? total : 0;
-    const displayCurrency = (serviceCart[0]?.currency && serviceCart[0].currency !== 'undefined') 
-        ? serviceCart[0].currency 
-        : 'USD';
+    const displayCurrency = serviceCart[0]?.currency || 'USD';
     
     if (cartTotal) cartTotal.textContent = `${displayTotal.toFixed(2)} ${displayCurrency}`;
     if (completeBtn) completeBtn.disabled = false;
@@ -1354,8 +1355,7 @@ function updateAICart() {
             }
         });
     });
-}
-        
+}        
 // ÖNCE: Tüm yardımcı fonksiyonları tanımla
 // ==============================================
 
