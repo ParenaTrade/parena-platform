@@ -98,7 +98,7 @@ export default async function handler(req, res) {
   }
 }
 
-// Gelişmiş PDF oluşturma
+// Gelişmiş PDF oluşturma - DÜZELTİLMİŞ VERSİYON
 async function createPDF(content, templateName = "Pazar Analiz Raporu") {
   return new Promise((resolve, reject) => {
     try {
@@ -110,8 +110,22 @@ async function createPDF(content, templateName = "Pazar Analiz Raporu") {
       const buffers = [];
       doc.on("data", (chunk) => buffers.push(chunk));
       doc.on("end", () => resolve(Buffer.concat(buffers)));
+      doc.on("error", reject);
 
-      // Başlık
+      // Manuel sayfa takibi
+      let currentPage = 1;
+      
+      // Footer ekleme fonksiyonu
+      const addFooter = () => {
+        doc.fontSize(8)
+           .font('Helvetica')
+           .text(`ParenaTrade - Akıllı Pazar Analiz Platformu - Sayfa ${currentPage}`, 50, 800, {
+             align: "center",
+             width: 500
+           });
+      };
+
+      // İlk sayfa içeriği
       doc.fontSize(20).font('Helvetica-Bold')
          .text(`📊 ${templateName}`, { align: "center" });
       
@@ -125,31 +139,29 @@ async function createPDF(content, templateName = "Pazar Analiz Raporu") {
       
       doc.moveDown();
 
-      // İçerik
+      // İlk sayfa footer'ı
+      addFooter();
+      
+      // İçerik işleme
       const lines = content.split('\n');
       doc.fontSize(12).font('Helvetica');
       
       lines.forEach(line => {
         if (line.startsWith('# ')) {
-          // Ana başlık
           doc.fontSize(16).font('Helvetica-Bold')
              .text(line.replace('# ', ''), { align: "left" });
           doc.moveDown(0.5);
         } else if (line.startsWith('## ')) {
-          // Alt başlık
           doc.fontSize(14).font('Helvetica-Bold')
              .text(line.replace('## ', ''), { align: "left" });
           doc.moveDown(0.3);
         } else if (line.startsWith('### ')) {
-          // Alt-alt başlık
           doc.fontSize(12).font('Helvetica-Bold')
              .text(line.replace('### ', ''), { align: "left" });
           doc.moveDown(0.2);
         } else if (line.trim() === '') {
-          // Boş satır
           doc.moveDown(0.5);
         } else {
-          // Normal metin
           doc.fontSize(11).font('Helvetica')
              .text(line, { 
                align: "left",
@@ -159,24 +171,17 @@ async function createPDF(content, templateName = "Pazar Analiz Raporu") {
           doc.moveDown(0.3);
         }
         
-        // Sayfa sonu kontrolü
+        // Sayfa sonu kontrolü - YENİ SAYFA EKLE
         if (doc.y > 700) {
+          currentPage++;
           doc.addPage();
+          
+          // Yeni sayfa footer'ı
+          addFooter();
+          
           doc.fontSize(11).font('Helvetica');
         }
       });
-
-      // Footer
-      const pageCount = doc.bufferedPageRange().count;
-      for (let i = 0; i < pageCount; i++) {
-        doc.switchToPage(i);
-        
-        doc.fontSize(8).font('Helvetica')
-           .text('ParenaTrade - Akıllı Pazar Analiz Platformu', 50, 800, {
-             align: "center",
-             width: 500
-           });
-      }
 
       doc.end();
     } catch (err) {
