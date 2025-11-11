@@ -2852,13 +2852,21 @@ function setupAccordionListeners() {
     });
 }
 
-// Dinamik form alanlarını oluştur - GÜNCELLENMİŞ
+// Dinamik form alanlarını oluştur - GÜNCELLENMİŞ SIRALAMA
 function createDynamicFormFields(variables) {
     const container = document.getElementById('dynamic-form-fields');
     container.innerHTML = '';
     formData = {};
 
     const fieldConfigs = {
+        // ✅ RAPOR TÜRÜ EN BAŞTA
+        rapor_turu: {
+            title: 'Rapor Türü',
+            type: 'template-dropdown',
+            data: window.reportTemplates,
+            displayField: 'report_name', 
+            valueField: 'report_type'
+        },
         dil: {
             title: 'Rapor Dili',
             type: 'dropdown',
@@ -2890,10 +2898,11 @@ function createDynamicFormFields(variables) {
             type: 'dropdown',
             data: [
                 { id: 'all', name: 'Tüm Bölgeler' },
-                    { id: 'east', name: 'Doğu' },
+                { id: 'east', name: 'Doğu' },
                 { id: 'west', name: 'Batı' },
                 { id: 'north', name: 'Kuzey' },
-                { id: 'south', name: 'Güney' }
+                { id: 'south', name: 'Güney' },
+                { id: 'central', name: 'Merkez' }
             ],
             displayField: 'name',
             valueField: 'name'
@@ -2909,28 +2918,44 @@ function createDynamicFormFields(variables) {
         zaman: {
             title: 'Zaman Aralığı',
             type: 'text',
-            placeholder: '2023-2025'
+            placeholder: '2020-2025 ve güncel yıl'
         },
         amac: {
             title: 'Analiz Amacı', 
-            type: 'text',
-            placeholder: 'Analiz amacınızı belirtin'
+            type: 'searchable-dropdown',
+            data: [
+                { id: 1, name: 'Yeni bir girişim pazara giriş stratejisi için kullanacağım' },
+                { id: 2, name: 'Mevcut ürün/hizmeti geliştirmek için pazar analizi' },
+                { id: 3, name: 'Yatırım kararı ve risk değerlendirmesi' },
+                { id: 4, name: 'Rekabet analizi ve stratejik pozisyon belirleme' },
+                { id: 5, name: 'Ürün fiyatlandırma ve pazarlama stratejisi geliştirme' },
+                { id: 6, name: 'İhracat/ithalat potansiyelini değerlendirme' }
+            ],
+            displayField: 'name',
+            valueField: 'name',
+            allowCustom: true
         },
         derinlik: {
             title: 'Derinlik Düzeyi',
-            type: 'text',
-            placeholder: 'Çıktıyı yönetim sunumuna uygun şekilde 5-6 başlık altında rapor formatında hazırla.'
-        },
-        rapor_turu: {
-            title: 'Rapor Türü',
-            type: 'template-dropdown',
-            data: window.reportTemplates,
-            displayField: 'report_name', 
-            valueField: 'report_type'
+            type: 'searchable-dropdown',
+            data: [
+                { id: 1, name: 'Çıktıyı yönetim sunumuna uygun şekilde 5-6 başlık altında rapor formatında hazırla' },
+                { id: 2, name: 'Stratejik yönetim için detaylı analiz ve öneriler' },
+                { id: 3, name: 'Yatırımcı sunumu için özet rapor ve finansal projeksiyonlar' },
+                { id: 4, name: 'Operasyonel ekip için detaylı pazar ve rekabet analizi' },
+                { id: 5, name: 'Üst düzey yönetim için stratejik özet ve karar destek raporu' },
+                { id: 6, name: 'Kapsamlı pazar araştırması ve detaylı segment analizi' }
+            ],
+            displayField: 'name',
+            valueField: 'name',
+            allowCustom: true
         }
     };
 
-    variables.forEach(variable => {
+    // ✅ Rapor türü her zaman ilk sırada
+    const orderedVariables = ['rapor_turu', ...variables.filter(v => v !== 'rapor_turu')];
+    
+    orderedVariables.forEach(variable => {
         const config = fieldConfigs[variable];
         if (!config) return;
 
@@ -2939,7 +2964,11 @@ function createDynamicFormFields(variables) {
         if (config.type === 'dropdown') {
             fieldHTML = createDropdownField(variable, config);
         } else if (config.type === 'searchable-dropdown') {
-            fieldHTML = createSearchableDropdownField(variable, config);
+            if (variable === 'gtip') {
+                fieldHTML = createGtipField(variable, config);
+            } else {
+                fieldHTML = createSearchableDropdownField(variable, config);
+            }
         } else if (config.type === 'template-dropdown') {
             fieldHTML = createTemplateDropdownField(variable, config);
         } else {
@@ -2950,13 +2979,15 @@ function createDynamicFormFields(variables) {
         formData[variable] = '';
     });
 
-  // AKORDİYON EVENT LİSTENER'LARINI EKLE
+     // AKORDİYON EVENT LİSTENER'LARINI EKLE
     setTimeout(() => {
         setupAccordionListeners();
     }, 100);
 
+    setupFieldEventListeners();
     container.classList.remove('hidden');
 }
+     
 
 // Dropdown alanı oluştur
 function createDropdownField(field, config) {
@@ -3709,8 +3740,80 @@ async function saveReportsToDatabase() {
     }
 }
 
-// Güncellenmiş rapor oluşturma fonksiyonu - TESTLİ
-// Rapor oluşturma fonksiyonunu güncelle
+
+// ✅ YENİ - Gelişmiş prompt hazırlama (Sizin tasarımınıza uygun)
+function prepareAdvancedPrompt(template, formData) {
+    console.log('🎯 Gelişmiş prompt hazırlanıyor:', { template: template.report_name, formData });
+    
+    // Değişken mapping
+    const variables = {
+        dil: formData.dil?.trim() || 'Türkçe',
+        ulke: formData.ulke?.trim() || 'Belirtilmemiş',
+        sektor: formData.sektor?.trim() || 'Belirtilmemiş',
+        urun: formData.urun?.trim() || 'Belirtilmemiş',
+        bolge: formData.bolge?.trim() || 'Tüm Bölgeler',
+        gtip: formData.gtip?.trim() || 'Belirtilmemiş',
+        zaman: formData.zaman?.trim() || '2020-2025 ve güncel yıl',
+        amac: formData.amac?.trim() || 'pazar analizi ve yatırım değerlendirmesi',
+        derinlik: formData.derinlik?.trim() || 'yönetim sunumuna uygun şekilde hazırla',
+        rapor_turu: formData.rapor_turu?.trim() || template.report_name
+    };
+
+    // ✅ SİZİN TASARIMINIZA UYGUN PROFESYONEL PROMPT
+    const advancedPrompt = `
+Sen bir uluslararası ticaret ve pazar araştırma uzmanısın. Benimle birlikte ${variables.urun} için detaylı pazar araştırması yapmak istiyorum.
+
+Aşağıdaki başlıklar kapsamında derinlemesine analiz yapmanı istiyorum:
+
+## Pazar Tanımı ve Genel Görünüm: 
+Pazarın boyutu, büyüme oranları, tarihsel gelişimi ve geleceğe yönelik projeksiyonlar.
+
+## Pazar Segmentasyonu: 
+Coğrafi, demografik, psikografik ve davranışsal segmentler.
+
+## Hedef Müşteri Profilleri (Buyer Persona): 
+Temel ihtiyaçlar, karar alma davranışları, satın alma kriterleri.
+
+## Rakip Analizi: 
+Ana rakipler, pazardaki konumları, güçlü/zayıf yönleri, fiyatlama, dağıtım kanalları, farklılaştırıcı stratejiler.
+
+## Trendler ve Fırsatlar: 
+Teknolojik gelişmeler, regülasyon değişiklikleri, kültür/sosyal eğilimler, yeni iş modelleri.
+
+## Tehditler ve Giriş Engelleri: 
+Regülasyonlar, rekabet yoğunluğu, ikame ürünler, müşteri sadakati.
+
+## Fiyatlandırma Dinamikleri: 
+Ortalama fiyat aralıkları, fiyatlandırma modelleri, müşteri ödeme istekliliği.
+
+## SWOT Analizi: 
+Genel pazar için güçlü yönler, zayıf yönler, fırsatlar ve tehditler.
+
+## Sonuç ve Öneriler: 
+Stratejik pozisyonlama, potansiyel giriş stratejileri, farklılaşma noktaları.
+
+**Araştırma Parametreleri:**
+- Ülke/Bölge: ${variables.ulke} / ${variables.bolge}
+- Sektör: ${variables.sektor}
+- Ürün: ${variables.urun}
+- GTIP: ${variables.gtip}
+- Zaman Aralığı: ${variables.zaman}
+- Analiz Amacı: ${variables.amac}
+- Derinlik Düzeyi: ${variables.derinlik}
+
+**Önemli Talimatlar:**
+- Bilgileri mümkün olduğunca güncel kaynaklara dayanarak hazırla
+- Gerektiğinde tablo ve madde işaretleri kullan
+- Profesyonel, veri odaklı ve rapor formatında yaz
+- Kullanılan kaynakları ve veri yıllarını belirt
+- ${variables.derinlik}
+    `.trim();
+
+    console.log('✅ Gelişmiş Prompt Hazırlandı');
+    return advancedPrompt;
+}
+
+// Rapor oluşturma fonksiyonunu güncelle - YENİ PROMPT SİSTEMİ İLE
 async function generateAIReport() {
     // ÖNCE: Kullanıcı girişi kontrol et
     if (!currentUser) {
@@ -3719,9 +3822,16 @@ async function generateAIReport() {
         return;
     }
 
+    // Validasyon
+    if (!selectedTemplate || !formData) {
+        alert('Lütfen tüm alanları doldurun ve rapor şablonu seçin.');
+        return;
+    }
+
     const generateBtn = document.getElementById('generate-report-btn');
     const progressSection = document.getElementById('report-progress');
     
+    // UI durumunu güncelle
     generateBtn.disabled = true;
     generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Oluşturuluyor...';
     if (progressSection) progressSection.classList.remove('hidden');
@@ -3729,15 +3839,13 @@ async function generateAIReport() {
     try {
         updateProgress(10);
 
-        // 1. PROMPT HAZIRLA
-        const finalPrompt = selectedTemplate.report_prompt.replace(
-            /\{\{(\w+)\}\}/g, 
-            (match, variable) => formData[variable] || ''
-        );
-
-        // 2. API ÇAĞRISI
+        // ✅ ESKİ: const finalPrompt = selectedTemplate.report_prompt.replace(...)
+        // ✅ YENİ: Gelişmiş prompt sistemini kullan
+        const finalPrompt = prepareAdvancedPrompt(selectedTemplate, formData);
+        
         updateProgress(30);
 
+        // 2. API ÇAĞRISI (Aynı kalıyor)
         const response = await fetch('https://parenatrade.vercel.app/api/generate-report', {
             method: 'POST',
             headers: { 
@@ -3761,21 +3869,16 @@ async function generateAIReport() {
         if (result.success) {
             reportContent = result.result;
         } else {
-            // PDF hatası durumunda sadece metin içerik kullan
-            if (result.error && result.error.includes('switchToPage')) {
-                reportContent = result.result || "Rapor içeriği oluşturuldu ancak PDF formatında kaydedilemedi.";
-            } else {
-                throw new Error(result.error || 'Rapor oluşturulamadı');
-            }
+            throw new Error(result.error || 'Rapor oluşturulamadı');
         }
 
         updateProgress(70);
 
-        // 3. SUPABASE'E KAYDET (PDF OLMADAN)
+        // 3. SUPABASE'E KAYDET (Aynı kalıyor)
         const reportData = {
             template_id: selectedTemplate.id,
             report_title: selectedTemplate.report_name,
-            report_prompt: finalPrompt,
+            report_prompt: finalPrompt, // ✅ Yeni prompt kaydedilecek
             report_content: reportContent,
             country: formData.ulke || null,
             sector: formData.sektor || null,
@@ -3805,7 +3908,7 @@ async function generateAIReport() {
 
         updateProgress(100);
 
-        // 4. SEPETE EKLE
+        // 4. SEPETE EKLE (Aynı kalıyor)
         addToAICart({
             id: selectedTemplate.id,
             name: selectedTemplate.report_name,
@@ -3815,12 +3918,11 @@ async function generateAIReport() {
             type: 'report'
         });
 
-        // 5. SONUÇLARI GÖSTER
-        const resultSection = document.getElementById('quick-analysis-result');
-        if (resultSection) resultSection.classList.remove('hidden');
+        // 5. SONUÇLARI GÖSTER (Aynı kalıyor)
+        document.getElementById('quick-analysis-result').classList.remove('hidden');
         
         setTimeout(() => {
-            if (progressSection) progressSection.classList.add('hidden');
+            progressSection.classList.add('hidden');
             generateBtn.disabled = false;
             generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
         }, 2000);
@@ -3830,18 +3932,12 @@ async function generateAIReport() {
         
         generateBtn.disabled = false;
         generateBtn.innerHTML = '<i class="fas fa-search mr-2"></i> Rapor Oluştur';
-        if (progressSection) progressSection.classList.add('hidden');
+        progressSection.classList.add('hidden');
         
-        // Daha iyi hata mesajı
-        let errorMessage = 'Rapor oluşturulurken hata: ' + error.message;
-        if (error.message.includes('switchToPage')) {
-            errorMessage = 'PDF oluşturma hatası. Rapor metin olarak kaydedildi.';
-        }
-        
-        alert(errorMessage);
+        alert('Rapor oluşturulurken hata: ' + error.message);
     }
-}        
-// Giriş işlemi - GÜNCELLENMİŞ
+}
+        // Giriş işlemi - GÜNCELLENMİŞ
 async function handleLogin(e) {
     e.preventDefault();
     
