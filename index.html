@@ -2979,7 +2979,7 @@ function createDropdownField(field, config) {
     `;
 }
 
-// Arama yapılabilir dropdown (GTIP için)
+// Arama yapılabilir dropdown (GTIP için) - MEVCUT FONKSİYONU DÜZELTELİM
 function createSearchableDropdownField(field, config) {
     return `
         <div class="accordion-item">
@@ -2988,22 +2988,36 @@ function createSearchableDropdownField(field, config) {
                 <i class="fas fa-chevron-down accordion-icon"></i>
             </div>
             <div class="accordion-content">
-                <div class="searchable-dropdown">
+                <div class="searchable-dropdown relative">
                     <input type="text" 
                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 search-input"
-                           placeholder="GTIP kodu veya ürün adı yazın..."
-                           data-field="${field}">
-                    <div class="dropdown-results hidden absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-60 overflow-y-auto"></div>
+                           placeholder="${field === 'gtip' ? 'GTIP kodu yazın (örn: 2002.90) veya ürün adı arayın...' : 'Arama yapın...'}"
+                           data-field="${field}"
+                           id="${field}-search-input">
+                    <div class="dropdown-results hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-60 overflow-y-auto shadow-xl"></div>
                 </div>
+                ${field === 'gtip' ? `
+                <div class="selected-value mt-3 p-3 bg-green-50 rounded-lg border border-green-200 hidden">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="text-sm text-green-700 font-medium">Seçilen GTIP:</span>
+                            <div class="selected-text font-semibold text-green-800"></div>
+                        </div>
+                        <button class="text-red-500 hover:text-red-700 clear-selection" data-field="${field}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                ` : `
                 <div class="selected-value mt-2 hidden">
                     <span class="text-sm text-gray-600">Seçilen: </span>
                     <span class="selected-text font-medium"></span>
                 </div>
+                `}
             </div>
         </div>
     `;
 }
-
 // Rapor şablonu dropdown
 function createTemplateDropdownField(field, config) {
     return `
@@ -3049,13 +3063,16 @@ function createTextField(field, config) {
     `;
 }
 
-// Field event listener'larını kur
+// Field event listener'larını kur - MEVCUT SİSTEMİ DÜZELTELİM
 function setupFieldEventListeners() {
+    console.log('🔧 Field event listenerları kuruluyor...');
+    
     // Normal dropdown'lar
     document.querySelectorAll('.dropdown-field').forEach(select => {
         select.addEventListener('change', function() {
             const field = this.getAttribute('data-field');
             formData[field] = this.value;
+            console.log(`📝 ${field} değişti:`, this.value);
             updateCriteriaList();
         });
     });
@@ -3065,76 +3082,154 @@ function setupFieldEventListeners() {
         select.addEventListener('change', function() {
             const field = this.getAttribute('data-field');
             const selectedOption = this.options[this.selectedIndex];
-            const description = selectedOption.getAttribute('data-description');
-            const price = selectedOption.getAttribute('data-price');
-            const currency = selectedOption.getAttribute('data-currency');
             
             formData[field] = this.value;
+            selectedTemplate = window.reportTemplates?.find(t => t.report_type === this.value);
             
-            // Açıklamayı göster
+            // Template bilgilerini göster
             const descContainer = this.parentElement.querySelector('.template-description');
-            if (description && descContainer) {
-                descContainer.textContent = description;
+            if (selectedOption.getAttribute('data-description') && descContainer) {
+                descContainer.textContent = selectedOption.getAttribute('data-description');
                 descContainer.classList.remove('hidden');
             }
             
+            console.log(`📊 Rapor türü seçildi:`, this.value);
             updateCriteriaList();
         });
     });
     
-    // Arama yapılabilir dropdown'lar (GTIP)
+    // Arama yapılabilir dropdown'lar (GTIP, amaç, derinlik)
     document.querySelectorAll('.search-input').forEach(input => {
         input.addEventListener('input', debounce(function() {
             const field = this.getAttribute('data-field');
             const searchTerm = this.value.trim();
             const resultsContainer = this.parentElement.querySelector('.dropdown-results');
-            const selectedContainer = this.parentElement.querySelector('.selected-value');
+            const selectedContainer = this.closest('.accordion-content').querySelector('.selected-value');
+            
+            console.log(`🔍 ${field} arama:`, searchTerm);
             
             if (searchTerm.length < 2) {
                 resultsContainer.classList.add('hidden');
                 return;
             }
             
-            // GTIP kodlarında ara
-            const filteredResults = window.gtipCodes.filter(item => 
-                item.code.startsWith(searchTerm) || 
-                item.name.toLowerCase().includes(searchTerm.toLowerCase())
-            ).slice(0, 10); // İlk 10 sonuç
+            let filteredResults = [];
             
+            // GTIP için özel arama
+            if (field === 'gtip') {
+                if (!window.gtipCodes || window.gtipCodes.length === 0) {
+                    resultsContainer.innerHTML = '<div class="p-3 text-red-500">GTIP verileri yüklenemedi</div>';
+                    resultsContainer.classList.remove('hidden');
+                    return;
+                }
+                
+                filteredResults = window.gtipCodes.filter(item => 
+                    item.code.toString().includes(searchTerm) || 
+                    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+                ).slice(0, 8);
+                
+            } 
+            // Amaç ve derinlik için arama
+            else if (field === 'amac' || field === 'derinlik') {
+                const config = getFieldConfig(field);
+                if (config && config.data) {
+                    filteredResults = config.data.filter(item => 
+                        item.name.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).slice(0, 6);
+                }
+            }
+            
+            // Sonuçları göster
             if (filteredResults.length > 0) {
-                resultsContainer.innerHTML = filteredResults.map(item => `
-                    <div class="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200" 
-                         data-value="${item.code}" 
-                         data-display="${item.code} - ${item.name}">
-                        <div class="font-medium">${item.code}</div>
-                        <div class="text-sm text-gray-600">${item.name}</div>
-                    </div>
-                `).join('');
+                resultsContainer.innerHTML = filteredResults.map(item => {
+                    if (field === 'gtip') {
+                        return `
+                            <div class="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 search-result-item" 
+                                 data-value="${item.code}" 
+                                 data-display="${item.code} - ${item.name}">
+                                <div class="font-bold text-blue-700">${item.code}</div>
+                                <div class="text-sm text-gray-700">${item.name}</div>
+                                ${item.description ? `<div class="text-xs text-gray-500 mt-1">${item.description}</div>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 search-result-item" 
+                                 data-value="${item.name}" 
+                                 data-display="${item.name}">
+                                <div class="font-medium">${item.name}</div>
+                            </div>
+                        `;
+                    }
+                }).join('');
                 resultsContainer.classList.remove('hidden');
             } else {
-                resultsContainer.innerHTML = '<div class="p-2 text-gray-500">Sonuç bulunamadı</div>';
+                resultsContainer.innerHTML = '<div class="p-3 text-gray-500">Sonuç bulunamadı</div>';
                 resultsContainer.classList.remove('hidden');
             }
             
-            // Sonuçlara tıklama event'i
-            resultsContainer.querySelectorAll('div[data-value]').forEach(result => {
-                result.addEventListener('click', function() {
-                    const value = this.getAttribute('data-value');
-                    const display = this.getAttribute('data-display');
-                    
-                    formData[field] = value;
-                    input.value = display;
-                    resultsContainer.classList.add('hidden');
-                    
-                    // Seçilen değeri göster
-                    selectedContainer.querySelector('.selected-text').textContent = display;
-                    selectedContainer.classList.remove('hidden');
-                    
-                    updateCriteriaList();
-                });
-            });
-            
         }, 300));
+        
+        // Input focus olduğunda sonuçları göster
+        input.addEventListener('focus', function() {
+            const resultsContainer = this.parentElement.querySelector('.dropdown-results');
+            if (this.value.trim().length > 0) {
+                resultsContainer.classList.remove('hidden');
+            }
+        });
+    });
+    
+    // Sonuçlara tıklama event'i - TEK BİR EVENT LISTENER
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.search-result-item')) {
+            const resultItem = e.target.closest('.search-result-item');
+            const value = resultItem.getAttribute('data-value');
+            const display = resultItem.getAttribute('data-display');
+            const resultsContainer = resultItem.closest('.dropdown-results');
+            const input = resultsContainer.previousElementSibling;
+            const field = input.getAttribute('data-field');
+            const selectedContainer = input.closest('.accordion-content').querySelector('.selected-value');
+            
+            console.log(`✅ ${field} seçildi:`, value);
+            
+            // Form verisini güncelle
+            formData[field] = value;
+            
+            // Input'u güncelle
+            input.value = display;
+            
+            // Seçilen değeri göster
+            if (selectedContainer) {
+                selectedContainer.querySelector('.selected-text').textContent = display;
+                selectedContainer.classList.remove('hidden');
+            }
+            
+            // Sonuçları gizle
+            resultsContainer.classList.add('hidden');
+            
+            // Kriter listesini güncelle
+            updateCriteriaList();
+        }
+        
+        // Temizleme butonları
+        if (e.target.closest('.clear-selection')) {
+            const button = e.target.closest('.clear-selection');
+            const field = button.getAttribute('data-field');
+            const input = document.getElementById(`${field}-search-input`);
+            const selectedContainer = button.closest('.selected-value');
+            
+            formData[field] = '';
+            if (input) input.value = '';
+            if (selectedContainer) selectedContainer.classList.add('hidden');
+            updateCriteriaList();
+        }
+        
+        // Dışarı tıklayınca dropdown'ları kapat
+        if (!e.target.closest('.search-input') && !e.target.closest('.dropdown-results')) {
+            document.querySelectorAll('.dropdown-results').forEach(container => {
+                container.classList.add('hidden');
+            });
+        }
     });
     
     // Text input'lar
@@ -3145,8 +3240,11 @@ function setupFieldEventListeners() {
             updateCriteriaList();
         });
     });
+    
+    console.log('✅ Tüm field listenerları kuruldu');
 }
 
+        
 // Debounce fonksiyonu
 function debounce(func, wait) {
     let timeout;
