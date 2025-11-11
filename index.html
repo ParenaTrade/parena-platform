@@ -1831,123 +1831,133 @@ if (window.parenaTradeInitialized) {
         }        
   
          // Rapor Şablonlarını Yükle - GÜNCELLENDİ (çift eklemeyi önle)
-        async function loadReportTemplates() {
-            try {
-                const templateSelect = document.getElementById('report-template-select');
-                
-                // Eğer zaten yüklenmişse tekrar yükleme
-                if (templateSelect.children.length > 1) {
-                    console.log('Rapor şablonları zaten yüklenmiş');
-                    return;
-                }
-                
-                // Burada Supabase'den şablonları çekeceğiz
-                // Şimdilik mock data kullanıyoruz
-                aiReportTemplates = [
-                    {
-                        id: 'kapsamli',
-                        report_name: 'Kapsamlı Pazar Raporu',
-                        report_type: 'kapsamli',
-                        report_description: 'Ürün, sektör ve ülke bazında derin pazar analizi, fiyat trendleri, rakip ve stratejik fırsat raporu.',
-                        report_price: 199.00,
-                        report_currency: 'USD',
-                        report_prompt: 'Sen bir uluslararası ticaret ve pazar araştırma uzmanısın. Aşağıdaki parametrelere göre profesyonel, veri odaklı ve yönetim sunumuna uygun bir "Kapsamlı Pazar Raporu" hazırla. Rapor dili: {{dil}}. Ülke: {{ulke}} Sektör: {{sektor}} Ürün: {{urun}} Bölge: {{bolge}} GTIP: {{gtip}} Zaman Aralığı: {{zaman}} Amaç: {{amac}} Derinlik Düzeyi: {{derinlik}} Rapor Türü: {{rapor_turu}}'
-                    },
-                    {
-                        id: 'firma_bazli',
-                        report_name: 'Firma Bazlı Pazar Raporu',
-                        report_type: 'firma_bazli',
-                        report_description: 'Belirli üretici veya marka için pazar, fiyat ve rekabet analizi raporu.',
-                        report_price: 129.00,
-                        report_currency: 'USD',
-                        report_prompt: 'Sen bir uluslararası ticaret analisti ve finans danışmanısın. Belirli bir üretici veya markaya ait veriler doğrultusunda "Firma Bazlı Pazar Raporu" hazırla. Rapor dili: {{dil}}. Firma Adı: {{urun}} Ülke: {{ulke}} Sektör: {{sektor}} Bölge: {{bolge}} Zaman Aralığı: {{zaman}} Amaç: {{amac}}'
-                    },
-                    {
-                        id: 'gtip_bazli',
-                        report_name: 'GTIP Bazlı Ticaret Raporu',
-                        report_type: 'gtip_bazli',
-                        report_description: 'GTIP (HS kodu) bazında ithalat/ihracat verileri, fiyat trendleri ve fırsat analizi raporu.',
-                        report_price: 159.00,
-                        report_currency: 'USD',
-                        report_prompt: 'Sen bir dış ticaret ve gümrük veri analisti olarak çalışıyorsun. Belirli bir GTIP (HS) koduna göre uluslararası ticaret raporu oluştur. Rapor dili: {{dil}}. GTIP Kodu: {{gtip}} Ürün Adı: {{urun}} Ülke: {{ulke}} Zaman Aralığı: {{zaman}} Amaç: {{amac}}'
-                    }
-                ];
+        // Rapor şablonlarını yükle - GÜNCELLENMİŞ
+async function loadReportTemplates() {
+    try {
+        const templateSelect = document.getElementById('report-template-select');
+        
+        if (!templateSelect) {
+            console.error('❌ Template select elementi bulunamadı');
+            return;
+        }
 
-                // Rapor şablonlarını select'e yükle - TEMİZLE ve EKLE
-                templateSelect.innerHTML = '<option value="">Rapor türü seçin</option>';
-                aiReportTemplates.forEach(template => {
-                    const option = document.createElement('option');
-                    option.value = template.id;
-                    option.textContent = `${template.report_name} - $${template.report_price}`;
-                    templateSelect.appendChild(option);
-                });
-
-                // Hizmet paketlerini yükle - BİR KERE
-                loadServicePackages();
-
-                console.log(`${aiReportTemplates.length} rapor şablonu yüklendi`);
-
-            } catch (error) {
-                console.error('Rapor şablonları yüklenirken hata:', error);
+        // ✅ GÜNCELLENMİŞ ŞABLONLARI KULLANALIM
+        aiReportTemplates = [
+            {
+                id: 'kapsamli',
+                report_name: 'Kapsamlı Pazar Raporu',
+                report_type: 'kapsamli',
+                report_description: 'Ürün, sektör ve ülke bazında derin pazar analizi, fiyat trendleri, rakip ve stratejik fırsat raporu.',
+                report_price: 199.00,
+                report_currency: 'USD',
+                report_prompt: 'KAPSAMLI_PAZAR_RAPORU_PROMPT'
+            },
+            {
+                id: 'firma_bazli',
+                report_name: 'Firma Bazlı Pazar Raporu', 
+                report_type: 'firma_bazli',
+                report_description: 'Belirli üretici veya marka için pazar, fiyat ve rekabet analizi raporu.',
+                report_price: 129.00,
+                report_currency: 'USD',
+                report_prompt: 'KAPSAMLI_PAZAR_RAPORU_PROMPT'
+            },
+            {
+                id: 'gtip_bazli',
+                report_name: 'GTIP Bazlı Ticaret Raporu',
+                report_type: 'gtip_bazli',
+                report_description: 'GTIP (HS kodu) bazında ithalat/ihracat verileri, fiyat trendleri ve fırsat analizi raporu.',
+                report_price: 159.00,
+                report_currency: 'USD',
+                report_prompt: 'KAPSAMLI_PAZAR_RAPORU_PROMPT'
             }
-        }
-         // Hizmet Paketlerini Yükle - GÜNCELLENDİ (çift eklemeyi önle)
-        function loadServicePackages() {
-            const packagesContainer = document.getElementById('ai-report-templates');
-            
-            // Eğer zaten yüklenmişse temizle
-            packagesContainer.innerHTML = '';
-            
-            aiReportTemplates.forEach(template => {
-                const packageHTML = `
-                    <div class="bg-white rounded-xl shadow-md service-card">
-                        <div class="p-6 border-b border-gray-200">
-                            <div class="sector-icon text-center">
-                                <i class="fas fa-chart-line"></i>
-                            </div>
-                            <h3 class="text-xl font-bold mb-2 text-center">${template.report_name}</h3>
-                            <p class="text-gray-600 text-center mb-4">${template.report_description}</p>
-                            <div class="text-center mb-4">
-                                <span class="text-3xl font-bold text-indigo-600">$${template.report_price}</span>
-                                <span class="text-gray-500">${template.report_currency}</span>
-                            </div>
-                        </div>
-                        <div class="p-6">
-                            <ul class="space-y-3 mb-6">
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>AI destekli analiz</span>
-                                </li>
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>Detaylı pazar verileri</span>
-                                </li>
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>Rakip analizi</span>
-                                </li>
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>Fiyat trendleri</span>
-                                </li>
-                                <li class="flex items-center">
-                                    <i class="fas fa-check text-green-500 mr-2"></i>
-                                    <span>Stratejik öneriler</span>
-                                </li>
-                            </ul>
-                            <button class="w-full bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300 add-ai-report" 
-                                    data-id="${template.id}" 
-                                    data-name="${template.report_name}" 
-                                    data-price="${template.report_price}">
-                                Sepete Ekle
-                            </button>
-                        </div>
-                    </div>
-                `;
-                packagesContainer.innerHTML += packageHTML;
-            });
-        }
+        ];
 
+        window.reportTemplates = aiReportTemplates;
+
+        // Select'i temizle ve doldur
+        templateSelect.innerHTML = '<option value="">Rapor türü seçin</option>';
+        
+        aiReportTemplates.forEach(template => {
+            const option = document.createElement('option');
+            option.value = template.id; // ✅ ID'yi kullan
+            option.textContent = `${template.report_name} - $${template.report_price}`;
+            option.setAttribute('data-description', template.report_description);
+            templateSelect.appendChild(option);
+        });
+
+        // Hizmet paketlerini yükle
+        loadServicePackages();
+
+        console.log(`✅ ${aiReportTemplates.length} rapor şablonu yüklendi:`, aiReportTemplates.map(t => t.id));
+
+    } catch (error) {
+        console.error('❌ Rapor şablonları yüklenirken hata:', error);
+    }
+}
+        
+        // Hizmet paketlerini yükle - GÜNCELLENMİŞ
+function loadServicePackages() {
+    const packagesContainer = document.getElementById('ai-report-templates');
+    
+    if (!packagesContainer) {
+        console.error('❌ Packages container bulunamadı');
+        return;
+    }
+
+    // Eğer zaten yüklenmişse temizle
+    packagesContainer.innerHTML = '';
+    
+    aiReportTemplates.forEach(template => {
+        const packageHTML = `
+            <div class="bg-white rounded-xl shadow-md service-card">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="sector-icon text-center">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2 text-center">${template.report_name}</h3>
+                    <p class="text-gray-600 text-center mb-4">${template.report_description}</p>
+                    <div class="text-center mb-4">
+                        <span class="text-3xl font-bold text-indigo-600">$${template.report_price}</span>
+                        <span class="text-gray-500">${template.report_currency}</span>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <ul class="space-y-3 mb-6">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>AI destekli analiz</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>Detaylı pazar verileri</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>Rakip analizi</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>Fiyat trendleri</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            <span>Stratejik öneriler</span>
+                        </li>
+                    </ul>
+                    <button class="w-full bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300 add-ai-report" 
+                            data-id="${template.id}" 
+                            data-name="${template.report_name}" 
+                            data-price="${template.report_price}">
+                        Sepete Ekle
+                    </button>
+                </div>
+            </div>
+        `;
+        packagesContainer.innerHTML += packageHTML;
+    });
+
+    console.log('✅ Hizmet paketleri yüklendi');
+}
 
 
         
@@ -2655,7 +2665,7 @@ function checkChatSession() {
         }
 
         
-        // Rapor şablonu seçimini düzelt
+// Rapor şablonu seçimini düzelt - GÜNCELLENMİŞ
 function setupQuickReportForm() {
     const templateSelect = document.getElementById('report-template-select');
     
@@ -2664,40 +2674,54 @@ function setupQuickReportForm() {
         return;
     }
 
+    console.log('📊 Rapor şablonları yükleniyor:', window.reportTemplates?.length);
+
     templateSelect.addEventListener('change', function() {
         const templateId = this.value;
-        selectedTemplate = window.reportTemplates?.find(t => t.id === templateId);
+        console.log('🎯 Seçilen template ID:', templateId);
+        
+        // ✅ DOĞRU ŞEKİLDE BULALIM
+        selectedTemplate = window.reportTemplates?.find(t => {
+            console.log('🔍 Template kontrol:', t.id, '==', templateId, 'sonuç:', t.id === templateId);
+            return t.id === templateId;
+        });
         
         console.log('📊 Seçilen rapor:', selectedTemplate);
         
         if (selectedTemplate) {
             // Template description göster
-            document.getElementById('template-description').textContent = selectedTemplate.report_description;
-            document.getElementById('template-description').classList.remove('hidden');
+            const descElement = document.getElementById('template-description');
+            if (descElement) {
+                descElement.textContent = selectedTemplate.report_description;
+                descElement.classList.remove('hidden');
+            }
             
             // Prompt'taki değişkenleri çıkar ve form alanlarını oluştur
             const variables = extractVariables(selectedTemplate.report_prompt);
+            console.log('🔍 Çıkarılan değişkenler:', variables);
             createDynamicFormFields(variables);
             
-            document.getElementById('generate-report-btn').classList.remove('hidden');
+            const generateBtn = document.getElementById('generate-report-btn');
+            if (generateBtn) generateBtn.classList.remove('hidden');
         } else {
-            document.getElementById('dynamic-form-fields').classList.add('hidden');
-            document.getElementById('generate-report-btn').classList.add('hidden');
-            document.getElementById('criteria-list').classList.add('hidden');
+            console.error('❌ Seçilen template bulunamadı:', templateId);
+            const dynamicForm = document.getElementById('dynamic-form-fields');
+            const generateBtn = document.getElementById('generate-report-btn');
+            const criteriaList = document.getElementById('criteria-list');
+            
+            if (dynamicForm) dynamicForm.classList.add('hidden');
+            if (generateBtn) generateBtn.classList.add('hidden');
+            if (criteriaList) criteriaList.classList.add('hidden');
         }
     });
-}
-        
-        // Prompt'taki değişkenleri çıkar
-        function extractVariables(prompt) {
-            const regex = /\{\{(\w+)\}\}/g;
-            const matches = [];
-            let match;
-            while ((match = regex.exec(prompt)) !== null) {
-                matches.push(match[1]);
-            }
-            return [...new Set(matches)]; // Benzersiz değerler
+
+    // İlk yüklemede kontrol
+    setTimeout(() => {
+        if (templateSelect.value && window.reportTemplates) {
+            templateSelect.dispatchEvent(new Event('change'));
         }
+    }, 500);
+}
 
 
 // Dropdown verilerini düzeltelim - tablo isimleri yanlış
