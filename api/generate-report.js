@@ -18,8 +18,7 @@ function parseGtipReport(gtipReportContent) {
   data.roi = roiMatch ? roiMatch[1].trim() : "araştırma tabanlı tahmini ROI aralığı";
   data.rekabetDurumu = rekabetMatch ? rekabetMatch[1].trim() : "araştırma tabanlı düşük rekabet";
 
-  // Sabit verinin gelip gelmediğini kontrol etmek için basit bir kontrol
-  // Kodu, kesinleşen verilerimizle eşleşecek şekilde güncelledik.
+  // Sabit verinin gelip gelmediğini kontrol etmek için kesinleşen verilerimizle kontrol (392321 ve %66.30)
   if (data.roi.includes('12-18 ay') && data.maliyetAvantaji.includes('%66.30')) {
       data.maliyetAvantaji = "Kanıtlanmış %66.30 Brüt Kâr Potansiyeli";
       data.roi = "12-18 ay (Yüksek Marj ve Hızlı ROI)";
@@ -33,7 +32,7 @@ function parseGtipReport(gtipReportContent) {
   return data;
 }
 
-// 2. GTIP Raporu Prompt Şablonu (REVİZE EDİLDİ)
+// 2. GTIP Raporu Prompt Şablonu (KESİNLEŞEN VERİLERLE REVİZE EDİLDİ)
 // GTIP Kodu 392321 ve kesinleşen %66.30 kâr potansiyeli entegre edildi.
 const gtipReportPromptTemplate = (params) => {
     // Sadece Fizibilite bölümünün mantığı basitleştirilmiştir.
