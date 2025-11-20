@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesli Sipariş - Dinamik Sistem</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+       :root {
+            --primary: #6d4cff; /* Daha açık ve parlak ton */
+            --primary-light: #8c6dff;
+            --secondary: #ffd900; /* Daha parlak sarı */
+            --accent: #ff7b00; /* Daha parlak turuncu */
+            --dark: #1a1a1a;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+            --gray-light: #e9ecef;
+            --success: #28a745;
+            --danger: #dc3545;
+            --border-radius: 12px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light);
+            color: var(--dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.6;
+        }
+        
+        /* Header Styles - Sıkışıklık Düzenlemesi */
+        header {
+            background-color: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px; /* Daha kompakt padding */
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 20px; /* Biraz daha küçük */
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .logo-icon {
+            width: 36px; /* Daha küçük */
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 8px; /* Daha az boşluk */
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .logo-icon::after {
+            content: "";
+            position: absolute;
+            width: 10px; /* Daha küçük */
+            height: 10px;
+            background: var(--secondary);
+            border-radius: 50%;
+            bottom: 4px;
+            right: 4px;
+        }
+        
+        /* HEADER ACTIONS - Daha kompakt */
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px !important; /* Daha az boşluk */
+            height: 100%;
+        }
+        
+        .action-btn {
+            background: none;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 6px; /* Daha az boşluk */
+            cursor: pointer;
+            padding: 6px 10px; /* Daha kompakt */
+            border-radius: 8px;
+            transition: var(--transition);
+            color: var(--dark);
+            font-weight: 500;
+            font-size: 13px; /* Biraz daha küçük */
+        }
+        
+        .action-btn:hover {
+            background: var(--gray-light);
+        }
+
+        /* Profil Alanı */
+        .profile-section {
+            position: relative;
+        }
+        
+        .profile-btn {
+            background: none;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 8px;
+            transition: var(--transition);
+            color: var(--dark);
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .profile-btn:hover {
+            background: var(--gray-light);
+        }
+        
+        .profile-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 10px 0;
+            width: 220px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+            z-index: 10;
+        }
+        
+        .profile-dropdown.show {
+            display: block;
+        }
+        
+        .profile-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--gray-light);
+            text-align: center;
+        }
+        
+        .profile-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin: 0 auto 10px;
+        }
+        
+        .profile-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        
+        .profile-details {
+            font-size: 12px;
+            color: var(--gray);
+        }
+        
+        .profile-menu {
+            list-style: none;
+            padding: 10px 0;
+        }
+        
+        .profile-menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .profile-menu-item:hover {
+            background: var(--gray-light);
+        }
+        
+        .profile-menu-item i {
+            width: 20px;
+            text-align: center;
+            color: var(--primary);
+        }
+        
+        .profile-bonus {
+            background: var(--secondary);
+            color: var(--dark);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 12px;
+            margin: 10px 15px;
+            text-align: center;
+        }
+        
+        /* Banner Styles - Simülasyon Entegrasyonu */
+        .banner {
+            position: relative;
+            height: 300px;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 0 20px;
+        }
+        
+        .banner-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.2;
+        }
+        
+        .banner-content {
+            position: relative;
+            z-index: 2;
+            max-width: 600px;
+        }
+        
+        .banner h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        
+        .banner p {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        
+        .simulation-section {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: var(--shadow);
+        }
+        
+        .simulation-title {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .simulation-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .simulation-btn {
+            padding: 10px 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+        
+        .simulation-btn:hover {
+            background: var(--primary-light);
+            transform: translateY(-2px);
+        }
+        
+        /* Diğer stiller mevcut içerikteki gibi kalacak */
+        /* ... (mevcut CSS içeriği) ... */
+        
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-container">
+            <a href="#" class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <span>Sesli Sipariş</span>
+            </a>
+            
+            <div class="header-actions">
+                <div class="language-selector">
+                    <button class="language-btn" id="languageBtn">
+                        <i class="fas fa-globe"></i>
+                        <span id="currentLanguage">TR</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="language-dropdown" id="languageDropdown"></div>
+                </div>
+                
+                <div class="location-marker action-btn" id="locationMarker">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span id="locationText">Konum Seçin</span>
+                </div>
+                
+                <div class="order-summary" id="orderSummary">
+                    <div class="order-count" id="orderCount">0</div>
+                    <div>Sipariş: <span id="orderTotal">0 ₺</span></div>
+                </div>
+               
+                <button id="microphoneToggle" class="action-btn">
+                    <i class="fas fa-microphone-slash"></i>
+                    <span>Mikrofon (Kapalı)</span>
+                </button>
+                
+                <!-- Profil Alanı -->
+                <div class="profile-section">
+                    <button class="profile-btn" id="profileBtn">
+                        <i class="fas fa-user-circle"></i>
+                        <span>Profilim</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="profile-dropdown" id="profileDropdown">
+                        <div class="profile-header">
+                            <div class="profile-avatar" id="profileAvatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="profile-name" id="profileName">Misafir</div>
+                            <div class="profile-details">
+                                <div id="profilePhone">Telefon: -</div>
+                                <div id="profileCity">Şehir: -</div>
+                            </div>
+                        </div>
+                        
+                        <ul class="profile-menu">
+                            <li class="profile-menu-item" id="profileInfo">
+                                <i class="fas fa-user"></i>
+                                <span>Bilgilerim</span>
+                            </li>
+                            <li class="profile-menu-item" id="profileOrders">
+                                <i class="fas fa-shopping-bag"></i>
+                                <span>Siparişlerim</span>
+                            </li>
+                            <li class="profile-menu-item" id="profilePayments">
+                                <i class="fas fa-credit-card"></i>
+                                <span>Ödemelerim</span>
+                            </li>
+                            <li class="profile-menu-item" id="profileBonusDetails">
+                                <i class="fas fa-star"></i>
+                                <span>Bonus Detayları</span>
+                            </li>
+                            <li class="profile-menu-item" id="inviteFriend">
+                                <i class="fas fa-user-plus"></i>
+                                <span>Arkadaşını Davet Et</span>
+                            </li>
+                        </ul>
+                        
+                        <div class="profile-bonus" id="profileBonus">
+                            Bonus Puanım: 0
+                        </div>
+                        
+                        <button class="profile-menu-item" id="logoutBtn" style="width: 100%; text-align: left; border: none; background: none;">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Çıkış Yap</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Banner - Simülasyon Entegrasyonu -->
+    <div class="banner" id="banner">
+        <video class="banner-video" id="bannerVideo" loop muted autoplay></video>
+        <div class="banner-content">
+            <h1 id="bannerTitle">Sesli Sipariş ile Kolay Alışveriş</h1>
+            <p id="bannerDescription">Sadece konuşun, siparişiniz kapınızda!</p>
+            
+            <!-- Simülasyon Entegrasyonu -->
+            <div class="simulation-section">
+                <h3 class="simulation-title">Sanal Market Simülasyonu</h3>
+                <div class="simulation-buttons">
+                    <button class="simulation-btn" id="startSimulation">
+                        <i class="fas fa-play"></i> Simülasyonu Başlat
+                    </button>
+                    <button class="simulation-btn" id="loadOrderData">
+                        <i class="fas fa-download"></i> Sipariş Verilerini Yükle
+                    </button>
+                    <button class="simulation-btn" id="viewProducts">
+                        <i class="fas fa-boxes"></i> Ürünleri Görüntüle
+                    </button>
+                </div>
+                <div id="simulationStatus" style="margin-top: 10px; font-size: 14px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mevcut içerik aynı kalacak -->
+    <!-- ... (mevcut HTML içeriği) ... -->
+
+    <script>
+        // Simülasyon entegrasyonu için JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            // Simülasyon butonları
+            const startSimulationBtn = document.getElementById('startSimulation');
+            const loadOrderDataBtn = document.getElementById('loadOrderData');
+            const viewProductsBtn = document.getElementById('viewProducts');
+            const simulationStatus = document.getElementById('simulationStatus');
+            
+            // Simülasyon başlatma
+            startSimulationBtn.addEventListener('click', function() {
+                simulationStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Simülasyon başlatılıyor...';
+                
+                // API çağrısı - örnek
+                fetchSimulationData()
+                    .then(data => {
+                        simulationStatus.innerHTML = '<i class="fas fa-check" style="color: green;"></i> Simülasyon başlatıldı!';
+                        initializeSimulation(data);
+                    })
+                    .catch(error => {
+                        simulationStatus.innerHTML = '<i class="fas fa-times" style="color: red;"></i> Simülasyon başlatılamadı: ' + error.message;
+                    });
+            });
+            
+            // Sipariş verilerini yükleme
+            loadOrderDataBtn.addEventListener('click', function() {
+                simulationStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sipariş verileri yükleniyor...';
+                
+                // API çağrısı - örnek
+                fetchOrderData()
+                    .then(data => {
+                        simulationStatus.innerHTML = '<i class="fas fa-check" style="color: green;"></i> ' + data.orders.length + ' sipariş yüklendi!';
+                        displayOrderData(data);
+                    })
+                    .catch(error => {
+                        simulationStatus.innerHTML = '<i class="fas fa-times" style="color: red;"></i> Veri yüklenemedi: ' + error.message;
+                    });
+            });
+            
+            // Ürünleri görüntüleme
+            viewProductsBtn.addEventListener('click', function() {
+                simulationStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ürünler yükleniyor...';
+                
+                // API çağrısı - örnek
+                fetchProductData()
+                    .then(data => {
+                        simulationStatus.innerHTML = '<i class="fas fa-check" style="color: green;"></i> ' + data.products.length + ' ürün yüklendi!';
+                        displayProductData(data);
+                    })
+                    .catch(error => {
+                        simulationStatus.innerHTML = '<i class="fas fa-times" style="color: red;"></i> Ürünler yüklenemedi: ' + error.message;
+                    });
+            });
+            
+            // Profil dropdown kontrolü
+            const profileBtn = document.getElementById('profileBtn');
+            const profileDropdown = document.getElementById('profileDropdown');
+            
+            profileBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                profileDropdown.classList.toggle('show');
+            });
+            
+            // Sayfa tıklanınca dropdown'ı kapat
+            document.addEventListener('click', function() {
+                profileDropdown.classList.remove('show');
+            });
+            
+            // Profil menü öğeleri
+            document.getElementById('profileInfo').addEventListener('click', function() {
+                alert('Bilgilerim sayfasına yönlendiriliyorsunuz...');
+                // Burada bilgilerim sayfasına yönlendirme yapılabilir
+            });
+            
+            document.getElementById('profileOrders').addEventListener('click', function() {
+                alert('Siparişlerim sayfasına yönlendiriliyorsunuz...');
+                // Burada siparişlerim sayfasına yönlendirme yapılabilir
+            });
+            
+            document.getElementById('profilePayments').addEventListener('click', function() {
+                alert('Ödemelerim sayfasına yönlendiriliyorsunuz...');
+                // Burada ödemelerim sayfasına yönlendirme yapılabilir
+            });
+            
+            document.getElementById('profileBonusDetails').addEventListener('click', function() {
+                alert('Bonus detayları sayfasına yönlendiriliyorsunuz...');
+                // Burada bonus detayları sayfasına yönlendirme yapılabilir
+            });
+            
+            document.getElementById('inviteFriend').addEventListener('click', function() {
+                alert('Arkadaşınızı davet etmek için link kopyalandı!');
+                // Burada referral link paylaşımı yapılabilir
+            });
+        });
+        
+        // API çağrıları için örnek fonksiyonlar
+        async function fetchSimulationData() {
+            // Burada gerçek API endpoint'i kullanılacak
+            const response = await fetch('/api/simulation/start');
+            if (!response.ok) {
+                throw new Error('Simülasyon başlatılamadı');
+            }
+            return await response.json();
+        }
+        
+        async function fetchOrderData() {
+            // Burada gerçek API endpoint'i kullanılacak
+            const response = await fetch('/api/orders');
+            if (!response.ok) {
+                throw new Error('Sipariş verileri alınamadı');
+            }
+            return await response.json();
+        }
+        
+        async function fetchProductData() {
+            // Burada gerçek API endpoint'i kullanılacak
+            const response = await fetch('/api/products');
+            if (!response.ok) {
+                throw new Error('Ürün verileri alınamadı');
+            }
+            return await response.json();
+        }
+        
+        function initializeSimulation(data) {
+            // 3D simülasyon başlatma kodu buraya gelecek
+            console.log('Simülasyon başlatıldı:', data);
+            // Unity/Unreal Engine entegrasyonu burada yapılacak
+        }
+        
+        function displayOrderData(data) {
+            // Sipariş verilerini görüntüleme
+            console.log('Sipariş verileri:', data);
+            // Bu verileri arayüzde göstermek için kod buraya gelecek
+        }
+        
+        function displayProductData(data) {
+            // Ürün verilerini görüntüleme
+            console.log('Ürün verileri:', data);
+            // Bu verileri arayüzde göstermek için kod buraya gelecek
+        }
+        
+        // Mevcut JavaScript kodunun geri kalanı
+        // ... (mevcut JavaScript kodu) ...
+    </script>
+</body>
+</html>

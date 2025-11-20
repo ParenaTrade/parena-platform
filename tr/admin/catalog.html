@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dijital Katalog</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-indigo-600 text-white p-4 flex justify-between items-center">
+    <h1 class="text-2xl font-bold">Dijital Katalog</h1>
+    <button onclick="toggleCart()" class="bg-white text-indigo-600 px-4 py-2 rounded-lg shadow hover:bg-gray-100">
+      🛒 Sepetim (<span id="cartCount">0</span>)
+    </button>
+  </header>
+
+  <!-- Filtre Alanı -->
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="flex flex-col sm:flex-row gap-4 p-4 bg-white rounded-lg shadow mb-6">
+      <div class="flex-1">
+        <label class="block text-sm font-medium text-gray-600">Kategori</label>
+        <select id="filterCategory" class="form-control w-full border rounded-lg p-2">
+          <option value="">Tümü</option>
+        </select>
+      </div>
+      <div class="flex-1">
+        <label class="block text-sm font-medium text-gray-600">Marka</label>
+        <select id="filterBrand" class="form-control w-full border rounded-lg p-2">
+          <option value="">Tümü</option>
+        </select>
+      </div>
+      <div class="flex-1">
+        <label class="block text-sm font-medium text-gray-600">Ürün Ara</label>
+        <input id="filterSearch" type="text" placeholder="Ürün adı..." class="form-control w-full border rounded-lg p-2" />
+      </div>
+    </div>
+
+    <!-- Ürün Grid -->
+    <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+  </div>
+
+  <!-- Sepet Modal -->
+  <div id="cartModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex justify-center items-center z-50">
+    <div class="bg-white rounded-lg shadow-lg w-11/12 max-w-3xl p-6 relative">
+      <button onclick="toggleCart()" class="absolute top-3 right-3 text-gray-600 hover:text-red-500">✖</button>
+      <h2 class="text-xl font-semibold mb-4">Sepetim</h2>
+      <div id="cartItems" class="space-y-4"></div>
+      <div class="flex justify-between items-center mt-6">
+        <p class="text-lg font-bold">Toplam: <span id="cartTotal">0 TL</span></p>
+        <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Siparişi Tamamla</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Supabase Bağlantısı ---
+    const supabaseUrl = "https://YOUR-PROJECT.supabase.co";
+    const supabaseKey = "YOUR-ANON-KEY";
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    // --- Global ---
+    let allProducts = [];
+
+    // --- Ürünleri Yükle ---
+    async function loadPublicProducts() {
+      let query = supabase
+        .from("products")
+        .select("id, name, price, stock, currency, imgurl, category_id, categories(name), brand, category");
+
+      const selectedCategory = document.getElementById("filterCategory").value;
+      const searchText = document.getElementById("filterSearch").value.toLowerCase();
+
+      if (selectedCategory) query = query.eq("category_id", selectedCategory);
+
+      const { data, error } = await query;
+      if (error) {
+        console.error("Ürünler alınamadı:", error);
+        return;
+      }
+
+      allProducts = data || [];
+
+      let filtered = allProducts;
+      if (searchText) {
+        filtered = filtered.filter(p => p.name.toLowerCase().includes(searchText));
+      }
+
+      renderProducts(filtered);
+    }
+
+    // --- Ürünleri Render Et ---
+    function renderProducts(products) {
+      const productGrid = document.getElementById("productGrid");
+      productGrid.innerHTML = "";
+
+      if (products.length === 0) {
+        productGrid.innerHTML = `<p class="text-gray-500 col-span-full text-center">Ürün bulunamadı.</p>`;
+        return;
+      }
+
+      products.forEach(prod => {
+        const images = prod.imgurl ? JSON.parse(prod.imgurl) : [];
+        const firstImage = images.length > 0 ? images[0] : "https://via.placeholder.com/200";
+
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition";
+
+        card.innerHTML = `
+          <img src="${firstImage}" alt="${prod.name}" class="w-full h-48 object-cover">
+          <div class="p-4">
+            <h3 class="text-lg font-semibold text-gray-800">${prod.name}</h3>
+            <p class="text-sm text-gray-500">${prod.categories?.name || "-"}</p>
+            <p class="text-xl font-bold text-indigo-600 mt-2">${prod.price} ${prod.currency}</p>
+            <p class="text-sm text-gray-500">Stok: ${prod.stock}</p>
+            <div class="mt-3">
+              <button onclick="addToCart('${prod.id}')" class="w-full px-3 py-2 text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600">Sepete Ekle</button>
+            </div>
+          </div>
+        `;
+        productGrid.appendChild(card);
+      });
+    }
+
+    // --- Sepete Ekle ---
+    function addToCart(productId) {
+      let cart = JSON.parse(localStorage.getItem("cart")) || [];
+      const existing = cart.find(item => item.id === productId);
+
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        cart.push({ id: productId, quantity: 1 });
+      }
+
+      localStorage.setItem("cart", JSON.stringify(cart));
+      updateCartCount();
+    }
+
+    // --- Sepeti Aç/Kapat ---
+    function toggleCart() {
+      const modal = document.getElementById("cartModal");
+      modal.classList.toggle("hidden");
+      renderCart();
+    }
+
+    // --- Sepeti Render Et ---
+    function renderCart() {
+      const cart = JSON.parse(localStorage.getItem("cart")) || [];
+      const cartItems = document.getElementById("cartItems");
+      cartItems.innerHTML = "";
+
+      if (cart.length === 0) {
+        cartItems.innerHTML = `<p class="text-gray-500">Sepetiniz boş.</p>`;
+        document.getElementById("cartTotal").textContent = "0 TL";
+        return;
+      }
+
+      let total = 0;
+      cart.forEach(item => {
+        const product = allProducts.find(p => p.id === item.id);
+        if (!product) return;
+
+        const lineTotal = item.quantity * product.price;
+        total += lineTotal;
+
+        const div = document.createElement("div");
+        div.className = "flex justify-between items-center border-b pb-2";
+
+        div.innerHTML = `
+          <div>
+            <p class="font-semibold">${product.name}</p>
+            <p class="text-sm text-gray-500">${product.price} ${product.currency} x ${item.quantity}</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="updateQuantity('${item.id}', -1)" class="px-2 bg-gray-200 rounded">-</button>
+            <span>${item.quantity}</span>
+            <button onclick="updateQuantity('${item.id}', 1)" class="px-2 bg-gray-200 rounded">+</button>
+            <button onclick="removeFromCart('${item.id}')" class="text-red-500 ml-3">Sil</button>
+          </div>
+        `;
+        cartItems.appendChild(div);
+      });
+
+      document.getElementById("cartTotal").textContent = total.toFixed(2) + " TL";
+    }
+
+    // --- Miktar Güncelle ---
+    function updateQuantity(productId, change) {
+      let cart = JSON.parse(localStorage.getItem("cart")) || [];
+      const item = cart.find(i => i.id === productId);
+
+      if (!item) return;
+      item.quantity += change;
+      if (item.quantity <= 0) {
+        cart = cart.filter(i => i.id !== productId);
+      }
+
+      localStorage.setItem("cart", JSON.stringify(cart));
+      renderCart();
+      updateCartCount();
+    }
+
+    // --- Sepetten Sil ---
+    function removeFromCart(productId) {
+      let cart = JSON.parse(localStorage.getItem("cart")) || [];
+      cart = cart.filter(i => i.id !== productId);
+      localStorage.setItem("cart", JSON.stringify(cart));
+      renderCart();
+      updateCartCount();
+    }
+
+    // --- Sepet Sayacı ---
+    function updateCartCount() {
+      const cart = JSON.parse(localStorage.getItem("cart")) || [];
+      document.getElementById("cartCount").textContent = cart.reduce((sum, i) => sum + i.quantity, 0);
+    }
+
+    // --- Event Listeners ---
+    document.getElementById("filterCategory").addEventListener("change", loadPublicProducts);
+    document.getElementById("filterSearch").addEventListener("input", loadPublicProducts);
+
+    // İlk yükleme
+    loadPublicProducts();
+    updateCartCount();
+  </script>
+</body>
+</html>

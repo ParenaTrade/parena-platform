@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parena AI - Satıcı Hedef ve Lead Yönetim Sistemi</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #3b82f6;
+            --accent: #10b981;
+            --dark: #1f2937;
+            --light: #f9fafb;
+            --gray: #9ca3af;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1e3a8a 0%, #0ea5e9 100%);
+            color: var(--light);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        header p {
+            font-size: 1.2rem;
+            color: #e5e7eb;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background-color: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        .card-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 1rem;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary);
+        }
+        
+        .btn-success {
+            background-color: var(--success);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #16a34a;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        
+        .btn-warning {
+            background-color: var(--warning);
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background-color: #d97706;
+        }
+        
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        
+        .leads-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .lead-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .lead-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .lead-card h3 {
+            margin-bottom: 10px;
+            color: white;
+        }
+        
+        .lead-card p {
+            margin-bottom: 8px;
+            color: #e5e7eb;
+            font-size: 0.9rem;
+        }
+        
+        .priority {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        
+        .priority-high {
+            background-color: var(--danger);
+            color: white;
+        }
+        
+        .priority-medium {
+            background-color: var(--warning);
+            color: white;
+        }
+        
+        .priority-low {
+            background-color: var(--success);
+            color: white;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 10px;
+            margin-left: 10px;
+        }
+        
+        .status-new {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .status-contact {
+            background-color: #8b5cf6;
+            color: white;
+        }
+        
+        .status-qualified {
+            background-color: var(--accent);
+            color: white;
+        }
+        
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .progress-container {
+            margin-top: 15px;
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 5px;
+        }
+        
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .search-results {
+            margin-top: 30px;
+        }
+        
+        .search-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .search-criteria {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .search-criteria h4 {
+            margin-bottom: 10px;
+            color: white;
+        }
+        
+        .search-criteria ul {
+            list-style: none;
+        }
+        
+        .search-criteria li {
+            margin-bottom: 5px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .search-criteria li span:first-child {
+            font-weight: 600;
+            min-width: 120px;
+        }
+        
+        .lead-match {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: var(--accent);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            background: var(--success);
+            color: white;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.error {
+            background: var(--danger);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+            }
+            
+            .leads-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-robot"></i> Parena AI - Satıcı Hedef ve Lead Yönetim Sistemi</h1>
+            <p>Yapay zeka destekli potansiyel müşteri bulma sistemi. Satıcı hedeflerine göre otomatik lead keşfi.</p>
+        </header>
+        
+        <div class="card">
+            <h2 class="card-title"><i class="fas fa-bullseye"></i> Satıcı Hedef Seçimi</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="sellerSelect">Satıcı Seçin</label>
+                    <select id="sellerSelect" class="form-control">
+                        <option value="">Lütfen bir satıcı seçin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="targetSelect">Hedef Seçin</label>
+                    <select id="targetSelect" class="form-control" disabled>
+                        <option value="">Önce satıcı seçin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                    <button id="loadTargetBtn" class="btn btn-primary" disabled><i class="fas fa-download"></i> Hedefi Yükle</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 class="card-title"><i class="fas fa-sliders-h"></i> Hedef Kriterleri</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="targetCountry">Hedef Ülke</label>
+                    <input type="text" id="targetCountry" class="form-control" placeholder="Ülke adı" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="targetProduct">Hedef Ürün</label>
+                    <input type="text" id="targetProduct" class="form-control" placeholder="Ürün adı" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="targetSector">Sektör</label>
+                    <input type="text" id="targetSector" class="form-control" placeholder="Sektör" readonly>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="targetGtip">GTIP Numarası</label>
+                    <input type="text" id="targetGtip" class="form-control" placeholder="GTIP No" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="targetQuantity">Hedef Miktar</label>
+                    <input type="text" id="targetQuantity" class="form-control" placeholder="Miktar" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="targetRevenue">Hedef Ciro (USD)</label>
+                    <input type="text" id="targetRevenue" class="form-control" placeholder="Ciro" readonly>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group" style="display: flex; align-items: center; gap: 20px;">
+                    <button id="searchLeadsBtn" class="btn btn-success" disabled><i class="fas fa-search"></i> Potansiyel Lead'leri Ara</button>
+                    <div id="searchProgress" style="display: none;">
+                        <div class="loading"></div> <span id="progressText">Aranıyor...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card search-results" style="display: none;" id="resultsCard">
+            <h2 class="card-title"><i class="fas fa-users"></i> Bulunan Potansiyel Lead'ler</h2>
+            
+            <div class="search-info">
+                <div class="search-criteria">
+                    <h4>Arama Kriterleri:</h4>
+                    <ul id="criteriaList">
+                        <li><span>Ülke:</span> <span id="criteriaCountry">-</span></li>
+                        <li><span>Ürün:</span> <span id="criteriaProduct">-</span></li>
+                        <li><span>Sektör:</span> <span id="criteriaSector">-</span></li>
+                        <li><span>GTIP:</span> <span id="criteriaGtip">-</span></li>
+                    </ul>
+                </div>
+                
+                <div class="actions">
+                    <button id="selectAllBtn" class="btn btn-primary"><i class="fas fa-check-square"></i> Tümünü Seç</button>
+                    <button id="saveSupabaseBtn" class="btn btn-success"><i class="fas fa-database"></i> Supabase'e Kaydet</button>
+                    <button id="saveSheetsBtn" class="btn btn-warning"><i class="fas fa-table"></i> Google Sheets'a Kaydet</button>
+                </div>
+            </div>
+            
+            <div class="leads-container" id="leadsContainer">
+                <!-- Lead kartları buraya dinamik olarak eklenecek -->
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification">
+        <i class="fas fa-check-circle"></i>
+        <span id="notificationText">İşlem başarıyla tamamlandı</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM elementleri
+            const sellerSelect = document.getElementById('sellerSelect');
+            const targetSelect = document.getElementById('targetSelect');
+            const loadTargetBtn = document.getElementById('loadTargetBtn');
+            const searchLeadsBtn = document.getElementById('searchLeadsBtn');
+            const resultsCard = document.getElementById('resultsCard');
+            const leadsContainer = document.getElementById('leadsContainer');
+            const selectAllBtn = document.getElementById('selectAllBtn');
+            const saveSupabaseBtn = document.getElementById('saveSupabaseBtn');
+            const saveSheetsBtn = document.getElementById('saveSheetsBtn');
+            const searchProgress = document.getElementById('searchProgress');
+            const progressText = document.getElementById('progressText');
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notificationText');
+            
+            // Form alanları
+            const targetCountry = document.getElementById('targetCountry');
+            const targetProduct = document.getElementById('targetProduct');
+            const targetSector = document.getElementById('targetSector');
+            const targetGtip = document.getElementById('targetGtip');
+            const targetQuantity = document.getElementById('targetQuantity');
+            const targetRevenue = document.getElementById('targetRevenue');
+            
+            // Kriter gösterim alanları
+            const criteriaCountry = document.getElementById('criteriaCountry');
+            const criteriaProduct = document.getElementById('criteriaProduct');
+            const criteriaSector = document.getElementById('criteriaSector');
+            const criteriaGtip = document.getElementById('criteriaGtip');
+            
+            // Supabase bağlantı ayarları (Bu bilgileri kendi projenizle değiştirin)
+           const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+            
+            // Sayfa yüklendiğinde satıcıları çek
+            loadSellers();
+            
+            // Satıcıları yükleme fonksiyonu
+            async function loadSellers() {
+                try {
+                    sellerSelect.innerHTML = '<option value="">Yükleniyor...</option>';
+                    
+                    // Supabase'den satıcıları çek
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('id, full_name, sector')
+                        .order('full_name');
+                    
+                    if (error) {
+                        throw error;
+                    }
+                    
+                    // Eğer veri yoksa örnek veri kullan
+                    if (!data || data.length === 0) {
+                        sellerSelect.innerHTML = '<option value="">Satıcı bulunamadı</option>';
+                        showNotification('Supabase bağlantısı başarılı ancak satıcı bulunamadı. Örnek veriler kullanılıyor.', true);
+                        loadSampleSellers();
+                        return;
+                    }
+                    
+                    // Satıcıları dropdown'a ekle
+                    sellerSelect.innerHTML = '<option value="">Lütfen bir satıcı seçin</option>';
+                    data.forEach(seller => {
+                        const option = document.createElement('option');
+                        option.value = seller.id;
+                        option.textContent = seller.full_name || `Satıcı-${seller.id.substring(0, 8)}`;
+                        sellerSelect.appendChild(option);
+                    });
+                    
+                    showNotification('Satıcılar başarıyla yüklendi');
+                } catch (error) {
+                    console.error('Satıcı yükleme hatası:', error);
+                    sellerSelect.innerHTML = '<option value="">Yükleme hatası</option>';
+                    showNotification('Satıcılar yüklenirken hata oluştu. Örnek veriler kullanılıyor.', true);
+                    loadSampleSellers();
+                }
+            }
+            
+            // Örnek satıcı yükleme (Supabase bağlantısı başarısız olursa)
+            function loadSampleSellers() {
+                const sampleSellers = [
+                    { id: 'seller1', company_name: 'ABC Gıda Ltd. Şti.', sector: 'Gıda' },
+                    { id: 'seller2', company_name: 'XYZ Tarım Ürünleri', sector: 'Tarım' },
+                    { id: 'seller3', company_name: 'MNO İhracat A.Ş.', sector: 'İhracat' }
+                ];
+                
+                sampleSellers.forEach(seller => {
+                    const option = document.createElement('option');
+                    option.value = seller.id;
+                    option.textContent = seller.company_name;
+                    sellerSelect.appendChild(option);
+                });
+            }
+            
+            // Satıcı seçimi değiştiğinde
+            sellerSelect.addEventListener('change', async function() {
+                const sellerId = this.value;
+                
+                if (sellerId) {
+                    targetSelect.disabled = true;
+                    loadTargetBtn.disabled = true;
+                    targetSelect.innerHTML = '<option value="">Hedefler yükleniyor...</option>';
+                    
+                    try {
+                        // Supabase'den satıcı hedeflerini çek
+                        const { data, error } = await supabase
+                            .from('seller_targets')
+                            .select('*')
+                            .eq('seller_id', sellerId)
+                            .order('created_at', { ascending: false });
+                        
+                        if (error) {
+                            throw error;
+                        }
+                        
+                        // Hedefleri doldur
+                        targetSelect.innerHTML = '<option value="">Lütfen bir hedef seçin</option>';
+                        
+                        if (!data || data.length === 0) {
+                            targetSelect.innerHTML = '<option value="">Bu satıcı için hedef bulunamadı</option>';
+                            showNotification('Bu satıcı için hedef bulunamadı', true);
+                            return;
+                        }
+                        
+                        data.forEach(target => {
+                            const option = document.createElement('option');
+                            option.value = target.id;
+                            option.textContent = `${target.product_name} - ${target.target_quantity} ${target.quantity_unit}`;
+                            option.dataset.target = JSON.stringify(target);
+                            targetSelect.appendChild(option);
+                        });
+                        
+                        targetSelect.disabled = false;
+                        loadTargetBtn.disabled = false;
+                        
+                    } catch (error) {
+                        console.error('Hedef yükleme hatası:', error);
+                        targetSelect.innerHTML = '<option value="">Hedef yükleme hatası</option>';
+                        showNotification('Hedefler yüklenirken hata oluştu', true);
+                    }
+                } else {
+                    targetSelect.disabled = true;
+                    loadTargetBtn.disabled = true;
+                    targetSelect.innerHTML = '<option value="">Önce satıcı seçin</option>';
+                }
+            });
+            
+            // Hedef yükleme butonu
+            loadTargetBtn.addEventListener('click', function() {
+                const selectedOption = targetSelect.options[targetSelect.selectedIndex];
+                
+                if (selectedOption && selectedOption.value) {
+                    const target = JSON.parse(selectedOption.dataset.target);
+                    
+                    // Form alanlarını doldur
+                    targetCountry.value = target.country || 'Belirtilmemiş';
+                    targetProduct.value = target.product_name;
+                    targetSector.value = target.sector || 'Belirtilmemiş';
+                    targetGtip.value = target.gtip_code || 'Belirtilmemiş';
+                    targetQuantity.value = `${target.target_quantity} ${target.quantity_unit}`;
+                    targetRevenue.value = `$${target.target_revenue?.toLocaleString('tr-TR') || '0'}`;
+                    
+                    // Arama butonunu aktif et
+                    searchLeadsBtn.disabled = false;
+                    
+                    showNotification('Hedef bilgileri yüklendi');
+                }
+            });
+            
+            // Lead arama butonu
+            searchLeadsBtn.addEventListener('click', function() {
+                const country = targetCountry.value;
+                const product = targetProduct.value;
+                const sector = targetSector.value;
+                const gtip = targetGtip.value;
+                
+                // Arama kriterlerini göster
+                criteriaCountry.textContent = country;
+                criteriaProduct.textContent = product;
+                criteriaSector.textContent = sector;
+                criteriaGtip.textContent = gtip;
+                
+                // Arama işlemini başlat
+                searchProgress.style.display = 'flex';
+                progressText.textContent = 'İnternet üzerinde potansiyel lead\'ler aranıyor...';
+                
+                // Simüle edilmiş arama işlemi
+                setTimeout(() => {
+                    findPotentialLeads(country, product, sector, gtip);
+                    searchProgress.style.display = 'none';
+                    resultsCard.style.display = 'block';
+                }, 3000);
+            });
+            
+            // Tümünü seç butonu
+            selectAllBtn.addEventListener('click', function() {
+                const checkboxes = document.querySelectorAll('.lead-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+                
+                showNotification('Tüm lead\'ler seçildi');
+            });
+            
+            // Supabase'e kaydet butonu
+            saveSupabaseBtn.addEventListener('click', async function() {
+                const selectedLeads = getSelectedLeads();
+                
+                if (selectedLeads.length === 0) {
+                    showNotification('Lütfen kaydetmek için en az bir lead seçin', true);
+                    return;
+                }
+                
+                saveSupabaseBtn.disabled = true;
+                saveSupabaseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...';
+                
+                try {
+                    // Supabase'e kaydetme işlemi
+                    const { data, error } = await supabase
+                        .from('leads')
+                        .insert(selectedLeads);
+                    
+                    if (error) {
+                        throw error;
+                    }
+                    
+                    showNotification(selectedLeads.length + ' lead Supabase\'e başarıyla kaydedildi');
+                } catch (error) {
+                    console.error('Supabase kaydetme hatası:', error);
+                    showNotification('Kayıt işlemi sırasında bir hata oluştu: ' + error.message, true);
+                } finally {
+                    saveSupabaseBtn.disabled = false;
+                    saveSupabaseBtn.innerHTML = '<i class="fas fa-database"></i> Supabase\'e Kaydet';
+                }
+            });
+            
+            // Google Sheets'a kaydet butonu
+            saveSheetsBtn.addEventListener('click', function() {
+                const selectedLeads = getSelectedLeads();
+                
+                if (selectedLeads.length === 0) {
+                    showNotification('Lütfen kaydetmek için en az bir lead seçin', true);
+                    return;
+                }
+                
+                saveSheetsBtn.disabled = true;
+                saveSheetsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Kaydediliyor...';
+                
+                // Google Sheets'a kaydetme işlemi
+                exportToGoogleSheets(selectedLeads)
+                    .then(() => {
+                        showNotification(selectedLeads.length + ' lead Google Sheets\'a başarıyla kaydedildi');
+                    })
+                    .catch(error => {
+                        console.error('Google Sheets kaydetme hatası:', error);
+                        showNotification('Google Sheets kayıt işlemi sırasında bir hata oluştu', true);
+                    })
+                    .finally(() => {
+                        saveSheetsBtn.disabled = false;
+                        saveSheetsBtn.innerHTML = '<i class="fas fa-table"></i> Google Sheets\'a Kaydet';
+                    });
+            });
+            
+            // Potansiyel lead'leri bulma fonksiyonu
+            function findPotentialLeads(country, product, sector, gtip) {
+                // Örnek lead verileri - Gerçek uygulamada API'den çekilecek
+                const sampleLeads = [
+                    {
+                        id: 'lead1',
+                        company_name: 'Fuchs Gruppe GmbH',
+                        contact_name: 'Hans Müller',
+                        email: 'hans.muller@fuchs-gruppe.de',
+                        phone: '+49 123 456 789',
+                        website: 'www.fuchs-gruppe.de',
+                        industry: 'Gıda İthalatı',
+                        company_size: 'Büyük Ölçekli',
+                        country: 'Almanya',
+                        city: 'Berlin',
+                        address: 'Hauptstraße 123, Berlin',
+                        status: 'new',
+                        source: 'web',
+                        priority: 'high',
+                        score: 92,
+                        description: 'Salça ve domates ürünleri ithalatı yapan büyük ölçekli firma',
+                        notes: 'Yıllık 500.000 USD üzeri alım yapıyor',
+                        budget: 550000,
+                        timeline: '3 ay',
+                        match_percentage: 95,
+                        priceUSD: 4.50
+                    },
+                    {
+                        id: 'lead2',
+                        company_name: 'Global Food Importers',
+                        contact_name: 'Maria Schmidt',
+                        email: 'maria.schmidt@globalfood.de',
+                        phone: '+49 987 654 321',
+                        website: 'www.globalfoodimporters.de',
+                        industry: 'Gıda Dağıtım',
+                        company_size: 'Orta Ölçekli',
+                        country: 'Almanya',
+                        city: 'Hamburg',
+                        address: 'Handelskai 45, Hamburg',
+                        status: 'new',
+                        source: 'web',
+                        priority: 'medium',
+                        score: 78,
+                        description: 'Organik gıda ürünleri ithalatı yapan distribütör',
+                        notes: 'Önümüzdeki ay Türkiye\'ye ziyaret planlıyor',
+                        budget: 250000,
+                        timeline: '2 ay',
+                        match_percentage: 85,
+                        priceUSD: 4.20
+                    }
+                ];
+                
+                // Lead'leri göster
+                displayLeads(sampleLeads);
+            }
+            
+            // Lead'leri görüntüleme fonksiyonu
+            function displayLeads(leads) {
+                leadsContainer.innerHTML = '';
+                
+                if (leads.length === 0) {
+                    leadsContainer.innerHTML = '<p class="no-results">Hiç lead bulunamadı. Lütfen farklı bir filtre deneyin.</p>';
+                    return;
+                }
+                
+                leads.forEach(lead => {
+                    const leadCard = document.createElement('div');
+                    leadCard.className = 'lead-card';
+                    
+                    let priorityClass = '';
+                    if (lead.priority === 'high') priorityClass = 'priority-high';
+                    else if (lead.priority === 'medium') priorityClass = 'priority-medium';
+                    else if (lead.priority === 'low') priorityClass = 'priority-low';
+                    
+                    let statusClass = '';
+                    if (lead.status === 'new') statusClass = 'status-new';
+                    else if (lead.status === 'contacted') statusClass = 'status-contact';
+                    else if (lead.status === 'qualified') statusClass = 'status-qualified';
+                    
+                    leadCard.innerHTML = `
+                        <span class="lead-match">${lead.match_percentage}% Eşleşme</span>
+                        <h3>${lead.company_name}</h3>
+                        <p><i class="fas fa-user"></i> <strong>İlgili Kişi:</strong> ${lead.contact_name}</p>
+                        <p><i class="fas fa-envelope"></i> <strong>E-posta:</strong> ${lead.email}</p>
+                        <p><i class="fas fa-phone"></i> <strong>Telefon:</strong> ${lead.phone}</p>
+                        <p><i class="fas fa-globe"></i> <strong>Ülke:</strong> ${lead.country}, ${lead.city}</p>
+                        <p><i class="fas fa-industry"></i> <strong>Sektör:</strong> ${lead.industry}</p>
+                        <p><i class="fas fa-money-bill-wave"></i> <strong>Bütçe:</strong> $${lead.budget.toLocaleString('tr-TR')}</p>
+                        <p><i class="fas fa-dollar-sign"></i> <strong>Fiyat (USD):</strong> ${lead.priceUSD}</p>
+                        <span class="priority ${priorityClass}">${lead.priority === 'high' ? 'Yüksek Öncelik' : lead.priority === 'medium' ? 'Orta Öncelik' : 'Düşük Öncelik'}</span>
+                        <span class="status ${statusClass}">${lead.status === 'new' ? 'Yeni' : lead.status === 'contacted' ? 'İletişimde' : 'Kalifiye'}</span>
+                        
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${lead.score}%;"></div>
+                            </div>
+                            <div class="progress-text">
+                                <span>Potansiyel Skor</span>
+                                <span>${lead.score}%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="checkbox-container">
+                            <input type="checkbox" class="lead-checkbox" data-lead-id="${lead.id}">
+                            <label>Seç</label>
+                        </div>
+                    `;
+                    
+                    leadsContainer.appendChild(leadCard);
+                });
+            }
+            
+            // Seçili lead'leri alma fonksiyonu
+            function getSelectedLeads() {
+                const selectedLeads = [];
+                const checkboxes = document.querySelectorAll('.lead-checkbox:checked');
+                
+                checkboxes.forEach(checkbox => {
+                    const leadId = checkbox.getAttribute('data-lead-id');
+                    // Gerçek uygulamada lead verileri daha detaylı alınır
+                    selectedLeads.push({
+                        id: leadId,
+                        selected_at: new Date().toISOString(),
+                        seller_id: sellerSelect.value,
+                        target_id: targetSelect.value
+                    });
+                });
+                
+                return selectedLeads;
+            }
+            
+            // Google Sheets'a aktarma fonksiyonu
+            async function exportToGoogleSheets(leads) {
+                // Bu fonksiyon Google Apps Script veya Sheets API ile entegre edilecek
+                // Şimdilik simüle edilmiş bir işlem
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        // Simüle edilmiş başarılı kayıt
+                        if (Math.random() > 0.2) { // %80 başarı şansı
+                            resolve();
+                        } else {
+                            reject('Google Sheets bağlantı hatası');
+                        }
+                    }, 2000);
+                });
+            }
+            
+            // Bildirim gösterme fonksiyonu
+            function showNotification(message, isError = false) {
+                notificationText.textContent = message;
+                
+                if (isError) {
+                    notification.className = 'notification error';
+                } else {
+                    notification.className = 'notification';
+                }
+                
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Panel — Satıcı Yönetim Sistemi</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .status-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; }
+    .status-pending { background-color: #f59e0b; color: white; }
+    .status-approved { background-color: #10b981; color: white; }
+    .status-rejected { background-color: #ef4444; color: white; }
+    .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-loading { position: relative; color: transparent; }
+    .btn-loading::after { content: ''; position: absolute; width: 20px; height: 20px; top: 50%; left: 50%; margin: -10px 0 0 -10px; border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+<div class="max-w-7xl mx-auto p-6 space-y-6">
+
+  <header class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-indigo-600">Admin Panel</h1>
+      <p class="text-sm text-gray-500">Satıcı Yönetimi</p>
+    </div>
+    <div class="flex items-center space-x-3">
+      <span id="userName" class="font-semibold text-sm">Yükleniyor...</span>
+      <span id="userRole" class="text-gray-500 text-xs">Rol: Yükleniyor...</span>
+      <span id="userStatus" class="w-3 h-3 rounded-full bg-gray-400 animate-pulse"></span>
+      <button id="signOut" class="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors">Çıkış</button>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="flex space-x-2" id="tabs">
+    <button data-page="page1" class="tab-btn bg-indigo-600 text-white px-4 py-2 rounded">Satıcı Onay</button>
+    <button data-page="page2" class="tab-btn bg-gray-200 px-4 py-2 rounded hover:bg-gray-300 transition-colors">Ürünler</button>
+    <button data-page="page3" class="tab-btn bg-gray-200 px-4 py-2 rounded hover:bg-gray-300 transition-colors">Belgeler</button>
+  </nav>
+
+  <main id="pages" class="space-y-6">
+
+    <!-- PAGE1 -->
+    <section id="page1" class="page">
+      <div class="bg-white shadow rounded-lg p-5">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-semibold text-indigo-600">Satıcı Onay Yönetimi</h2>
+          <div class="flex space-x-2">
+            <button id="refreshUsers" class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">
+              <i class="fas fa-sync-alt mr-1"></i>Yenile
+            </button>
+            <button id="addSeller" class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
+              <i class="fas fa-plus mr-1"></i>Yeni Satıcı
+            </button>
+          </div>
+        </div>
+
+        <div class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+          <p class="text-sm text-blue-700">
+            <i class="fas fa-info-circle mr-1"></i>
+            Onay bekleyen ve onaylı satıcılar listelenmektedir.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <div>
+            <h3 class="font-medium mb-2">Onay Bekleyen Satıcılar</h3>
+            <div class="overflow-x-auto border rounded">
+              <table class="min-w-full text-sm">
+                <thead class="bg-indigo-50">
+                  <tr>
+                    <th class="p-2 border">Firma Adı</th>
+                    <th class="p-2 border">Email</th>
+                    <th class="p-2 border">Durum</th>
+                    <th class="p-2 border">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="pendingUsersList">
+                  <tr>
+                    <td colspan="4" class="p-4 text-center text-gray-500">
+                      <div class="loading-spinner mx-auto mb-2" style="border-top-color: #4f46e5;"></div>
+                      Yükleniyor...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="font-medium mb-2">Onaylı Satıcılar</h3>
+            <div class="overflow-x-auto border rounded">
+              <table class="min-w-full text-sm">
+                <thead class="bg-indigo-50">
+                  <tr>
+                    <th class="p-2 border">Firma Adı</th>
+                    <th class="p-2 border">Email</th>
+                    <th class="p-2 border">Durum</th>
+                    <th class="p-2 border">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="approvedUsersList">
+                  <tr>
+                    <td colspan="4" class="p-4 text-center text-gray-500">
+                      <div class="loading-spinner mx-auto mb-2" style="border-top-color: #4f46e5;"></div>
+                      Yükleniyor...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Diğer sayfalar -->
+    <section id="page2" class="page hidden">
+      <div class="bg-white shadow rounded-lg p-5">
+        <h2 class="text-xl font-semibold text-indigo-600 mb-4">Satıcı Ürün Yönetimi</h2>
+        <p class="text-gray-500">Bu bölüm yakında eklenecek.</p>
+      </div>
+    </section>
+
+    <section id="page3" class="page hidden">
+      <div class="bg-white shadow rounded-lg p-5">
+        <h2 class="text-xl font-semibold text-indigo-600 mb-4">Satıcı Belgeleri</h2>
+        <p class="text-gray-500">Bu bölüm yakında eklenecek.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Satıcı Detay Modal -->
+<div id="modalUser" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-3 p-5 border-b">
+      <h3 class="text-lg font-medium">Satıcı Detayları</h3>
+      <button id="closeModalUser" class="text-gray-500 hover:text-gray-700 transition-colors">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+
+    <form id="formUser" class="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
+      <div class="md:col-span-2 bg-indigo-50 p-3 rounded">
+        <h4 class="font-medium text-indigo-700 mb-2">Temel Bilgiler</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Firma Adı *</label>
+            <input id="u_name" placeholder="Firma Adı" class="w-full p-2 border rounded" required />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">E-posta *</label>
+            <input id="u_email" type="email" placeholder="E-posta" class="w-full p-2 border rounded" required />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Telefon *</label>
+            <input id="u_phone" placeholder="Telefon" class="w-full p-2 border rounded" required />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Onay Durumu</label>
+            <div class="flex items-center mt-2">
+              <input id="u_confirm" type="checkbox" class="h-5 w-5 rounded" />
+              <span class="ml-2">Onaylı</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 bg-indigo-50 p-3 rounded">
+        <h4 class="font-medium text-indigo-700 mb-2">İletişim Bilgileri</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="md:col-span-2">
+            <label class="block text-sm text-gray-600 mb-1">Adres *</label>
+            <textarea id="u_address" placeholder="Adres" class="w-full p-2 border rounded" rows="2" required></textarea>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Şehir *</label>
+            <input id="u_city" placeholder="Şehir" class="w-full p-2 border rounded" required />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Ülke *</label>
+            <input id="u_country" placeholder="Ülke" class="w-full p-2 border rounded" required />
+          </div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 bg-indigo-50 p-3 rounded">
+        <h4 class="font-medium text-indigo-700 mb-2">İş Bilgileri</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Sektör *</label>
+            <select id="u_sector" class="w-full p-2 border rounded" required>
+              <option value="">Seçiniz</option>
+              <option value="Gıda">Gıda</option>
+              <option value="Tekstil">Tekstil</option>
+              <option value="Teknoloji">Teknoloji</option>
+              <option value="Otomotiv">Otomotiv</option>
+              <option value="Kimya">Kimya</option>
+              <option value="Diğer">Diğer</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Durum</label>
+            <select id="u_status" class="w-full p-2 border rounded">
+              <option value="Active">Aktif</option>
+              <option value="Passive">Pasif</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Vergi No *</label>
+            <input id="u_taxnumber" placeholder="Vergi No" class="w-full p-2 border rounded" required />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Vergi Dairesi *</label>
+            <input id="u_taxoffice" placeholder="Vergi Dairesi" class="w-full p-2 border rounded" required />
+          </div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 flex justify-between pt-4 border-t">
+        <div class="space-x-2">
+          <button id="deleteUserBtn" type="button" class="px-4 py-2 border rounded text-red-600 hover:bg-red-50 transition-colors">
+            <i class="fas fa-trash mr-1"></i>Sil
+          </button>
+        </div>
+        <div class="space-x-2">
+          <button id="cancelUserBtn" type="button" class="px-4 py-2 border rounded hover:bg-gray-100 transition-colors">
+            <i class="fas fa-times mr-1"></i>İptal
+          </button>
+          <button id="saveUserBtn" type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">
+            <i class="fas fa-save mr-1"></i>Kaydet
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast Bildirimi -->
+<div id="toast" class="fixed right-6 bottom-6 invisible bg-gray-900 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300"></div>
+
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+  // DOM elementlerini seçme
+  const $ = id => document.getElementById(id);
+
+  let currentUser = null;
+  let isAdmin = false;
+  let currentEditingUserId = null;
+
+  // Toast bildirimi gösterme
+  function showToast(msg, isError = false, ms = 3000) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = `fixed right-6 bottom-6 px-4 py-2 rounded shadow-lg transition-opacity duration-300 ${isError ? 'bg-red-600' : 'bg-gray-900'} text-white`;
+    t.classList.remove('invisible');
+    t.style.opacity = '1';
+    setTimeout(() => { 
+      t.style.opacity = '0'; 
+      setTimeout(() => t.classList.add('invisible'), 300); 
+    }, ms);
+  }
+
+  function escapeHtml(unsafe) {
+    if (unsafe === null || unsafe === undefined) return '';
+    return String(unsafe)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  // Kullanıcı bilgilerini ve rolünü yükle
+  async function loadSellerUserInfo() {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('Oturum kontrol hatası:', sessionError);
+        return;
+      }
+      if (session && session.user) {
+        currentUser = session.user;
+        // Kullanıcı bilgilerini Supabase'den çek
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', session.user.id)
+          .single();
+        if (userError) {
+          console.error('Kullanıcı bilgileri getirme hatası:', userError);
+          return;
+        }
+        if (userData) {
+          isAdmin = userData.role === "admin";
+          // Kullanıcı bilgilerini göster
+          $('userName').textContent = userData.full_name || 'Kullanıcı';
+          $('userRole').textContent = 'Rol: ' + (userData.role || 'Belirtilmemiş');
+          $('userStatus').classList.remove('bg-gray-400', 'animate-pulse');
+          $('userStatus').classList.add('bg-green-500');
+        }
+      } else {
+        window.location.href = "login.html";
+      }
+    } catch (error) {
+      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+    }
+  }
+
+  // Kullanıcıları Supabase'den çek ve listele
+  async function loadUsers() {
+    try {
+      const pendingList = $('pendingUsersList');
+      const approvedList = $('approvedUsersList');
+      pendingList.innerHTML = '';
+      approvedList.innerHTML = '';
+
+      // Sadece admin tüm kullanıcıları görsün, normal kullanıcı sadece kendi verisini görsün
+      let users = [];
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'seller')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        users = data;
+      } else {
+        // Sadece kendi verisini çek
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id);
+        if (error) throw error;
+        users = data;
+      }
+
+      let hasPending = false;
+      let hasApproved = false;
+
+      users.forEach((user) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50';
+        tr.innerHTML = `
+          <td class="p-2 border">${escapeHtml(user.full_name || '')}</td>
+          <td class="p-2 border">${escapeHtml(user.email || '')}</td>
+          <td class="p-2 border">
+            <span class="status-badge ${user.confirm ? 'status-approved' : 'status-pending'}">
+              ${user.confirm ? 'Onaylı' : 'Beklemede'}
+            </span>
+          </td>
+          <td class="p-2 border">
+            <button class="btnEditUser px-3 py-1 ${user.confirm ? 'bg-green-400' : 'bg-yellow-400'} rounded text-white hover:opacity-80 transition-opacity">
+              <i class="fas fa-edit mr-1"></i>Detay
+            </button>
+          </td>
+        `;
+        tr.querySelector('.btnEditUser').addEventListener('click', () => {
+          openUserModal(user);
+        });
+        if (user.confirm) {
+          approvedList.appendChild(tr);
+          hasApproved = true;
+        } else {
+          pendingList.appendChild(tr);
+          hasPending = true;
+        }
+      });
+
+      if (!hasPending) {
+        pendingList.innerHTML = `
+          <tr>
+            <td colspan="4" class="p-4 text-center text-gray-500">
+              Onay bekleyen satıcı bulunamadı
+            </td>
+          </tr>
+        `;
+      }
+      if (!hasApproved) {
+        approvedList.innerHTML = `
+          <tr>
+            <td colspan="4" class="p-4 text-center text-gray-500">
+              Onaylı satıcı bulunamadı
+            </td>
+          </tr>
+        `;
+      }
+    } catch (error) {
+      console.error('Satıcılar yüklenirken hata:', error);
+      showToast('Satıcılar yüklenirken hata oluştu', true);
+    }
+  }
+
+  // Kullanıcı modalını aç
+  function openUserModal(userData = null) {
+    if (userData) {
+      $('u_name').value = userData.full_name || '';
+      $('u_email').value = userData.email || '';
+      $('u_phone').value = userData.phone || '';
+      $('u_address').value = userData.address || '';
+      $('u_city').value = userData.city || '';
+      $('u_country').value = userData.country || '';
+      $('u_sector').value = userData.sector || '';
+      $('u_status').value = userData.status || 'Active';
+      $('u_taxnumber').value = userData.taxnumber || '';
+      $('u_taxoffice').value = userData.taxoffice || '';
+      $('u_confirm').checked = userData.confirm || false;
+      currentEditingUserId = userData.id;
+    } else {
+      $('formUser').reset();
+      currentEditingUserId = null;
+    }
+
+    // Admin değilse: sadece kendi verisini düzenleyebilir, sil/değiştir butonları kapalı, yeni kullanıcı ekleyemez
+    if (!isAdmin) {
+      // Ekleme yok, sadece kendi detayına Edit ile gelir
+      $('u_name').readOnly = true;
+      $('u_email').readOnly = true;
+      $('u_confirm').disabled = true;
+      $('addSeller').classList.add('hidden');
+      $('deleteUserBtn').classList.add('hidden');
+      // E-posta readonly, onay checkbox disable, sil butonu gizli
+    } else {
+      $('u_name').readOnly = false;
+      $('u_email').readOnly = false;
+      $('u_confirm').disabled = false;
+      $('addSeller').classList.remove('hidden');
+      $('deleteUserBtn').classList.remove('hidden');
+    }
+
+    $('modalUser').classList.remove('hidden');
+  }
+
+  function closeUserModal() {
+    $('modalUser').classList.add('hidden');
+    currentEditingUserId = null;
+  }
+
+  async function deleteUser(userId) {
+    try {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+      if (profileError) {
+        console.error('Profile silme hatası:', profileError);
+        throw new Error('Kullanıcı profili silinemedi: ' + profileError.message);
+      }
+      showToast('Satıcı başarıyla silindi!');
+      return true;
+    } catch (error) {
+      console.error('Silme hatası:', error);
+      showToast('Silme işlemi başarısız: ' + error.message, true);
+      return false;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', async function() {
+    await loadSellerUserInfo();
+    // Oturum kontrolü
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      window.location.href = "login.html";
+      return;
+    }
+    await loadUsers();
+
+    // Admin değilse: satırda sadece kendi verisi için "Detay" butonu gözüksün, diğerleri gizli
+    if (!isAdmin) {
+      $('addSeller').classList.add('hidden');
+      // Yenile butonu gereksiz normal kullanıcıya, isterse kaldır
+      $('refreshUsers').classList.add('hidden');
+    }
+
+    // Gerçek zamanlı oturum değişikliklerini dinle
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        window.location.href = "..login.html";
+      }
+    });
+
+    // Çıkış butonu
+    $('signOut').addEventListener('click', async () => {
+      $('signOut').classList.add('btn-loading');
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        showToast('Çıkış yapılırken hata oluştu', true);
+        $('signOut').classList.remove('btn-loading');
+      } else {
+        window.location.href = "..login.html";
+      }
+    });
+
+    // Tab değiştirme işlevselliği
+    const tabs = document.querySelectorAll('.tab-btn');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', function() {
+        tabs.forEach(t => t.classList.remove('bg-indigo-600', 'text-white'));
+        tabs.forEach(t => t.classList.add('bg-gray-200'));
+        this.classList.remove('bg-gray-200');
+        this.classList.add('bg-indigo-600', 'text-white');
+        document.querySelectorAll('.page').forEach(page => {
+          page.classList.add('hidden');
+        });
+        $(this.dataset.page).classList.remove('hidden');
+      });
+    });
+
+    // Yeni satıcı butonu
+    $('addSeller').addEventListener('click', () => {
+      openUserModal();
+    });
+
+    // Modal kapatma düğmeleri
+    $('closeModalUser').addEventListener('click', closeUserModal);
+    $('cancelUserBtn').addEventListener('click', closeUserModal);
+
+    // Yenile butonu
+    $('refreshUsers').addEventListener('click', () => {
+      $('refreshUsers').classList.add('btn-loading');
+      loadUsers();
+      setTimeout(() => {
+        $('refreshUsers').classList.remove('btn-loading');
+        showToast('Satıcı listesi yenilendi');
+      }, 1000);
+    });
+
+    // Form gönderme
+    $('formUser').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('saveUserBtn').classList.add('btn-loading');
+      try {
+        if (currentEditingUserId) {
+          // Sadece admin veya kendi id'si ise güncelleyebilir!
+          if (isAdmin || currentEditingUserId === currentUser.id) {
+            const updateFields = {
+              full_name: $('u_name').value,
+              email: $('u_email').value,
+              phone: $('u_phone').value,
+              address: $('u_address').value,
+              city: $('u_city').value,
+              country: $('u_country').value,
+              sector: $('u_sector').value,
+              status: $('u_status').value,
+              taxnumber: $('u_taxnumber').value,
+              taxoffice: $('u_taxoffice').value,
+              updated_at: new Date().toISOString()
+            };
+            // Sadece admin onay durumunu değiştirebilir
+            if (isAdmin) {
+              updateFields.confirm = $('u_confirm').checked;
+            }
+            const { error } = await supabase
+              .from('profiles')
+              .update(updateFields)
+              .eq('id', currentEditingUserId);
+            if (error) throw error;
+            showToast('Satıcı bilgileri başarıyla güncellendi!');
+          } else {
+            showToast('Bu işlemi yapmaya yetkiniz yok.', true);
+          }
+        } else {
+          // Yalnızca admin yeni kullanıcı ekleyebilir
+          if (!isAdmin) {
+            showToast('Yeni kullanıcı ekleme yetkiniz yok.', true);
+            return;
+          }
+          const email = $('u_email').value;
+          const password = Math.random().toString(36).slice(-8);
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                full_name: $('u_name').value,
+                role: 'seller'
+              }
+            }
+          });
+          if (authError) throw authError;
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: authData.user.id,
+              full_name: $('u_name').value,
+              email: $('u_email').value,
+              phone: $('u_phone').value,
+              address: $('u_address').value,
+              city: $('u_city').value,
+              country: $('u_country').value,
+              sector: $('u_sector').value,
+              status: $('u_status').value,
+              taxnumber: $('u_taxnumber').value,
+              taxoffice: $('u_taxoffice').value,
+              role: 'seller',
+              confirm: $('u_confirm').checked,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          if (profileError) throw profileError;
+          showToast('Yeni satıcı başarıyla oluşturuldu!');
+        }
+        closeUserModal();
+        loadUsers();
+      } catch (error) {
+        console.error('İşlem hatası:', error);
+        showToast('İşlem sırasında hata oluştu: ' + error.message, true);
+      } finally {
+        $('saveUserBtn').classList.remove('btn-loading');
+      }
+    });
+
+    // Kullanıcı silme
+    $('deleteUserBtn').addEventListener('click', async () => {
+      if (!currentEditingUserId) return;
+      // Sadece admin silebilir
+      if (!isAdmin) {
+        showToast('Silme yetkiniz yok.', true);
+        return;
+      }
+      if (confirm('Bu satıcıyı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) {
+        $('deleteUserBtn').classList.add('btn-loading');
+        try {
+          const success = await deleteUser(currentEditingUserId);
+          if (success) {
+            closeUserModal();
+            loadUsers();
+          }
+        } catch (error) {
+          console.error('Silme hatası:', error);
+          showToast('Silme sırasında hata oluştu: ' + error.message, true);
+        } finally {
+          $('deleteUserBtn').classList.remove('btn-loading');
+        }
+      }
+    });
+  });
+</script>
+</body>
+</html>

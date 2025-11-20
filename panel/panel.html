@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesli Sipariş - Panel</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h1><i class="fas fa-utensils"></i> Sesli Sipariş</h1>
+            <small>Yönetim Paneli</small>
+        </div>
+
+        <div class="user-info">
+            <div class="user-avatar" id="userAvatar">U</div>
+            <div class="user-details">
+                <h3 id="userName">Kullanıcı</h3>
+                <span class="role-badge" id="userRole">Admin</span>
+            </div>
+        </div>
+
+        <nav class="nav-menu">
+            <!-- Admin Menüsü -->
+            <div id="adminMenu" class="role-menu">
+                <a href="#" class="nav-item" data-section="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-section="sellerManagement">
+                    <i class="fas fa-store"></i>
+                    <span>Satıcı Yönetimi</span>
+                </a>
+                <a href="#" class="nav-item" data-section="courierManagement">
+                    <i class="fas fa-motorcycle"></i>
+                    <span>Kurye Yönetimi</span>
+                </a>
+                <a href="#" class="nav-item" data-section="allOrders">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Tüm Siparişler</span>
+                </a>
+                <a href="#" class="nav-item" data-section="reports">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Raporlar</span>
+                </a>
+            </div>
+
+            <!-- Satıcı Menüsü -->
+            <div id="sellerMenu" class="role-menu">
+                <a href="#" class="nav-item active" data-section="sellerDashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-section="sellerInfo">
+                    <i class="fas fa-store"></i>
+                    <span>İşletme Bilgileri</span>
+                </a>
+                <a href="#" class="nav-item" data-section="deliveryAreas">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>Teslimat Bölgeleri</span>
+                </a>
+                <a href="#" class="nav-item" data-section="products">
+                    <i class="fas fa-box"></i>
+                    <span>Ürün Yönetimi</span>
+                </a>
+                <a href="#" class="nav-item" data-section="orders">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Siparişlerim</span>
+                </a>
+                <a href="#" class="nav-item" data-section="sellerReports">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Satış Raporları</span>
+                </a>
+            </div>
+
+            <!-- Kurye Menüsü -->
+            <div id="courierMenu" class="role-menu">
+                <a href="#" class="nav-item active" data-section="courierDashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-section="courierInfo">
+                    <i class="fas fa-user"></i>
+                    <span>Profilim</span>
+                </a>
+                <a href="#" class="nav-item" data-section="courierDeliveries">
+                    <i class="fas fa-truck"></i>
+                    <span>Teslimatlarım</span>
+                </a>
+                <a href="#" class="nav-item" data-section="courierEarnings">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>Kazançlarım</span>
+                </a>
+                <a href="#" class="nav-item" data-section="performance">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Performans</span>
+                </a>
+            </div>
+
+            <!-- Ortak Menüler -->
+            <div class="nav-divider"></div>
+            
+            <a href="#" class="nav-item" data-section="integrations">
+                <i class="fas fa-plug"></i>
+                <span>Entegrasyonlar</span>
+            </a>
+            
+            <a href="#" class="nav-item" data-section="settings">
+                <i class="fas fa-cog"></i>
+                <span>Ayarlar</span>
+            </a>
+            
+            <a href="#" class="nav-item" id="logoutBtn">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Çıkış</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header">
+            <div class="header-left">
+                <button class="mobile-menu-btn" id="mobileMenuBtn">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h2 id="pageTitle">Dashboard</h2>
+            </div>
+            <div class="header-actions">
+                <div class="notification-bell">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-count">3</span>
+                </div>
+                <div class="online-status" id="onlineStatus">
+                    <i class="fas fa-circle"></i>
+                    <span>Çevrimiçi</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Sections -->
+        <div id="contentSections">
+            
+            <!-- ADMIN SECTIONS -->
+            
+            <!-- Admin Dashboard -->
+            <div class="content-section" id="dashboardSection">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-store"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalSellers">0</h3>
+                            <p>Toplam Satıcı</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-motorcycle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalCouriers">0</h3>
+                            <p>Toplam Kurye</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalOrders">0</h3>
+                            <p>Toplam Sipariş</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalRevenue">0 ₺</h3>
+                            <p>Toplam Ciro</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-row">
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Son Siparişler</h3>
+                                <a href="#" class="view-all">Tümünü Gör</a>
+                            </div>
+                            <div class="card-body">
+                                <div id="recentOrdersList">
+                                    <!-- Dinamik olarak doldurulacak -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Onay Bekleyenler</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="pendingApprovals">
+                                    <!-- Onay bekleyen satıcı ve kuryeler -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Satıcı Yönetimi -->
+            <div class="content-section" id="sellerManagementSection">
+                <div class="section-header">
+                    <h2>Satıcı Yönetimi</h2>
+                    <button class="btn btn-primary" id="addSellerBtn">
+                        <i class="fas fa-plus"></i> Yeni Satıcı
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="data-table" id="sellersTable">
+                                <thead>
+                                    <tr>
+                                        <th>İşletme Adı</th>
+                                        <th>Telefon</th>
+                                        <th>Şehir</th>
+                                        <th>Durum</th>
+                                        <th>Kayıt Tarihi</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dinamik olarak doldurulacak -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kurye Yönetimi -->
+            <div class="content-section" id="courierManagementSection">
+                <div class="section-header">
+                    <h2>Kurye Yönetimi</h2>
+                    <button class="btn btn-primary" id="addCourierBtn">
+                        <i class="fas fa-plus"></i> Yeni Kurye
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="filters">
+                            <select id="courierStatusFilter">
+                                <option value="">Tüm Durumlar</option>
+                                <option value="active">Aktif</option>
+                                <option value="inactive">Pasif</option>
+                                <option value="busy">Meşgul</option>
+                            </select>
+                            <select id="vehicleTypeFilter">
+                                <option value="">Tüm Araçlar</option>
+                                <option value="motorcycle">Motosiklet</option>
+                                <option value="car">Araba</option>
+                                <option value="bicycle">Bisiklet</option>
+                            </select>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table" id="couriersTable">
+                                <thead>
+                                    <tr>
+                                        <th>Kurye Adı</th>
+                                        <th>Telefon</th>
+                                        <th>Araç Tipi</th>
+                                        <th>Durum</th>
+                                        <th>Rating</th>
+                                        <th>Toplam Teslimat</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dinamik olarak doldurulacak -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tüm Siparişler -->
+            <div class="content-section" id="allOrdersSection">
+                <div class="section-header">
+                    <h2>Tüm Siparişler</h2>
+                    <div class="header-actions">
+                        <input type="date" id="orderDateFilter" class="form-control">
+                        <select id="orderStatusFilter" class="form-control">
+                            <option value="">Tüm Durumlar</option>
+                            <option value="pending">Bekliyor</option>
+                            <option value="confirmed">Onaylandı</option>
+                            <option value="preparing">Hazırlanıyor</option>
+                            <option value="ready">Hazır</option>
+                            <option value="on_the_way">Yolda</option>
+                            <option value="delivered">Teslim Edildi</option>
+                            <option value="cancelled">İptal Edildi</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="data-table" id="allOrdersTable">
+                                <thead>
+                                    <tr>
+                                        <th>Sipariş No</th>
+                                        <th>Müşteri</th>
+                                        <th>Satıcı</th>
+                                        <th>Tutar</th>
+                                        <th>Durum</th>
+                                        <th>Ödeme</th>
+                                        <th>Tarih</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dinamik olarak doldurulacak -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Raporlar -->
+            <div class="content-section" id="reportsSection">
+                <div class="section-header">
+                    <h2>Sistem Raporları</h2>
+                    <div class="report-period">
+                        <input type="date" id="reportStartDate" class="form-control">
+                        <span> - </span>
+                        <input type="date" id="reportEndDate" class="form-control">
+                        <button class="btn btn-primary" id="generateReportBtn">
+                            <i class="fas fa-download"></i> Rapor Al
+                        </button>
+                    </div>
+                </div>
+                <div class="content-row">
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Satış Grafiği</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="salesChart">
+                                    <!-- Chart.js grafiği -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>En Çok Satanlar</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="topProducts">
+                                    <!-- En çok satan ürünler -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SATICI SECTIONS -->
+            
+            <!-- Satıcı Dashboard -->
+            <div class="content-section" id="sellerDashboardSection">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="sellerTodayOrders">0</h3>
+                            <p>Bugünkü Sipariş</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="sellerTodayRevenue">0 ₺</h3>
+                            <p>Bugünkü Ciro</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="sellerPendingOrders">0</h3>
+                            <p>Bekleyen Sipariş</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="sellerRating">0.0</h3>
+                            <p>Ortalama Puan</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-row">
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Son Siparişler</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="sellerRecentOrders">
+                                    <!-- Satıcının son siparişleri -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>En Çok Satan Ürünler</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="sellerTopProducts">
+                                    <!-- Satıcının en çok satan ürünleri -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- İşletme Bilgileri -->
+            <div class="content-section" id="sellerInfoSection">
+                <div class="section-header">
+                    <h2>İşletme Bilgileri</h2>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form id="sellerInfoForm">
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="businessName">İşletme Adı *</label>
+                                    <input type="text" id="businessName" class="form-control" required>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="sellerPhone">Telefon *</label>
+                                    <input type="text" id="sellerPhone" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="sellerEmail">E-posta</label>
+                                    <input type="email" id="sellerEmail" class="form-control">
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="sellerCity">Şehir</label>
+                                    <input type="text" id="sellerCity" class="form-control">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="sellerAddress">Adres</label>
+                                <textarea id="sellerAddress" class="form-control" rows="3"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="taxOffice">Vergi Dairesi</label>
+                                    <input type="text" id="taxOffice" class="form-control">
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="taxNumber">Vergi Numarası</label>
+                                    <input type="text" id="taxNumber" class="form-control">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="openingTime">Açılış Saati</label>
+                                    <input type="time" id="openingTime" class="form-control">
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="closingTime">Kapanış Saati</label>
+                                    <input type="time" id="closingTime" class="form-control">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="businessDescription">İşletme Açıklaması</label>
+                                <textarea id="businessDescription" class="form-control" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Bilgileri Güncelle
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Teslimat Bölgeleri -->
+            <div class="content-section" id="deliveryAreasSection">
+                <!-- Daha önce yazdığımız teslimat bölgeleri yönetimi buraya gelecek -->
+            </div>
+
+            <!-- Ürün Yönetimi -->
+            <div class="content-section" id="productsSection">
+                <div class="section-header">
+                    <h2>Ürün Yönetimi</h2>
+                    <button class="btn btn-primary" id="addProductBtn">
+                        <i class="fas fa-plus"></i> Yeni Ürün
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="filters">
+                            <select id="categoryFilter">
+                                <option value="">Tüm Kategoriler</option>
+                            </select>
+                            <select id="productStatusFilter">
+                                <option value="">Tüm Durumlar</option>
+                                <option value="active">Aktif</option>
+                                <option value="inactive">Pasif</option>
+                            </select>
+                            <input type="text" id="productSearch" placeholder="Ürün ara..." class="form-control">
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table" id="productsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Ürün Görseli</th>
+                                        <th>Ürün Adı</th>
+                                        <th>Kategori</th>
+                                        <th>Fiyat</th>
+                                        <th>Stok</th>
+                                        <th>Durum</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dinamik olarak doldurulacak -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Satıcı Siparişleri -->
+            <div class="content-section" id="ordersSection">
+                <div class="section-header">
+                    <h2>Siparişlerim</h2>
+                    <div class="order-filters">
+                        <select id="sellerOrderStatusFilter">
+                            <option value="">Tüm Siparişler</option>
+                            <option value="pending">Bekleyen</option>
+                            <option value="confirmed">Onaylandı</option>
+                            <option value="preparing">Hazırlanıyor</option>
+                            <option value="ready">Hazır</option>
+                            <option value="completed">Tamamlandı</option>
+                        </select>
+                        <input type="date" id="sellerOrderDate" class="form-control">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="orders-list" id="sellerOrdersList">
+                            <!-- Satıcı siparişleri listesi -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Satıcı Raporları -->
+            <div class="content-section" id="sellerReportsSection">
+                <div class="section-header">
+                    <h2>Satış Raporları</h2>
+                    <div class="report-period">
+                        <input type="date" id="sellerReportStart" class="form-control">
+                        <span> - </span>
+                        <input type="date" id="sellerReportEnd" class="form-control">
+                        <button class="btn btn-primary" id="generateSellerReport">
+                            <i class="fas fa-chart-line"></i> Raporu Görüntüle
+                        </button>
+                    </div>
+                </div>
+                <div class="content-row">
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Günlük Satışlar</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="sellerSalesChart">
+                                    <!-- Satıcı satış grafiği -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Kategori Bazlı Satış</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="categorySalesChart">
+                                    <!-- Kategori bazlı satış grafiği -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KURYE SECTIONS -->
+            
+            <!-- Kurye Dashboard -->
+            <div class="content-section" id="courierDashboardSection">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-truck"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="todayDeliveries">0</h3>
+                            <p>Bugünkü Teslimat</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="todayEarnings">0 ₺</h3>
+                            <p>Bugünkü Kazanç</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="activeDeliveries">0</h3>
+                            <p>Aktif Teslimat</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="courierRating">0.0</h3>
+                            <p>Puanım</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="online-toggle-container">
+                    <button class="btn btn-lg" id="onlineToggle">
+                        <i class="fas fa-toggle-off"></i>
+                        <span>Çevrimdışı</span>
+                    </button>
+                    <div class="current-location" id="currentLocation">
+                        Konum bilgisi yükleniyor...
+                    </div>
+                </div>
+
+                <div class="content-row">
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Yeni Teslimatlar</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="availableDeliveries">
+                                    <!-- Mevcut teslimatlar -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Aktif Teslimatlarım</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="activeCourierDeliveries">
+                                    <!-- Kuryenin aktif teslimatları -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kurye Profili -->
+            <div class="content-section" id="courierInfoSection">
+                <div class="section-header">
+                    <h2>Profil Bilgilerim</h2>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form id="courierInfoForm">
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="courierFullName">Ad Soyad *</label>
+                                    <input type="text" id="courierFullName" class="form-control" required>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="courierPhone">Telefon *</label>
+                                    <input type="text" id="courierPhone" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="courierEmail">E-posta</label>
+                                    <input type="email" id="courierEmail" class="form-control">
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="courierIdentity">TC Kimlik No</label>
+                                    <input type="text" id="courierIdentity" class="form-control">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="vehicleType">Araç Tipi</label>
+                                    <select id="vehicleType" class="form-control">
+                                        <option value="motorcycle">Motosiklet</option>
+                                        <option value="car">Araba</option>
+                                        <option value="bicycle">Bisiklet</option>
+                                        <option value="foot">Yaya</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="vehiclePlate">Plaka</label>
+                                    <input type="text" id="vehiclePlate" class="form-control">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="courierAddress">Adres</label>
+                                <textarea id="courierAddress" class="form-control" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Bilgileri Güncelle
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kurye Teslimatları -->
+            <div class="content-section" id="courierDeliveriesSection">
+                <div class="section-header">
+                    <h2>Teslimatlarım</h2>
+                    <div class="delivery-filters">
+                        <select id="deliveryStatusFilter">
+                            <option value="">Tüm Teslimatlar</option>
+                            <option value="assigned">Atanmış</option>
+                            <option value="picked_up">Alındı</option>
+                            <option value="on_the_way">Yolda</option>
+                            <option value="delivered">Teslim Edildi</option>
+                        </select>
+                        <input type="date" id="deliveryDate" class="form-control">
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="data-table" id="courierDeliveriesTable">
+                                <thead>
+                                    <tr>
+                                        <th>Teslimat No</th>
+                                        <th>Müşteri</th>
+                                        <th>Adres</th>
+                                        <th>Ücret</th>
+                                        <th>Durum</th>
+                                        <th>Tarih</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dinamik olarak doldurulacak -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kurye Kazançları -->
+            <div class="content-section" id="courierEarningsSection">
+                <div class="section-header">
+                    <h2>Kazançlarım</h2>
+                    <div class="earning-period">
+                        <input type="month" id="earningMonth" class="form-control">
+                        <button class="btn btn-primary" id="viewEarningsBtn">
+                            <i class="fas fa-search"></i> Göster
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="earnings-summary">
+                            <div class="earning-item">
+                                <span>Toplam Kazanç:</span>
+                                <strong id="totalEarnings">0 ₺</strong>
+                            </div>
+                            <div class="earning-item">
+                                <span>Bu Ay:</span>
+                                <strong id="monthlyEarnings">0 ₺</strong>
+                            </div>
+                            <div class="earning-item">
+                                <span>Ödenen:</span>
+                                <strong id="paidEarnings">0 ₺</strong>
+                            </div>
+                            <div class="earning-item">
+                                <span>Bekleyen:</span>
+                                <strong id="pendingEarnings">0 ₺</strong>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table" id="earningsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Tarih</th>
+                                        <th>Teslimat No</th>
+                                        <th>Tutar</th>
+                                        <th>Tür</th>
+                                        <th>Durum</th>
+                                        <th>Açıklama</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dinamik olarak doldurulacak -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kurye Performans -->
+            <div class="content-section" id="performanceSection">
+                <div class="section-header">
+                    <h2>Performans İstatistikleri</h2>
+                </div>
+                <div class="content-row">
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Performans Özeti</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="performance-stats">
+                                    <div class="perf-stat">
+                                        <i class="fas fa-truck"></i>
+                                        <div>
+                                            <h4 id="totalCompletedDeliveries">0</h4>
+                                            <span>Toplam Teslimat</span>
+                                        </div>
+                                    </div>
+                                    <div class="perf-stat">
+                                        <i class="fas fa-clock"></i>
+                                        <div>
+                                            <h4 id="avgDeliveryTime">0 dk</h4>
+                                            <span>Ort. Teslimat Süresi</span>
+                                        </div>
+                                    </div>
+                                    <div class="perf-stat">
+                                        <i class="fas fa-star"></i>
+                                        <div>
+                                            <h4 id="customerRating">0.0</h4>
+                                            <span>Müşteri Puanı</span>
+                                        </div>
+                                    </div>
+                                    <div class="perf-stat">
+                                        <i class="fas fa-percentage"></i>
+                                        <div>
+                                            <h4 id="successRate">100%</h4>
+                                            <span>Başarı Oranı</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="content-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Performans Grafiği</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="performanceChart">
+                                    <!-- Performans grafiği -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ORTAK SECTIONS -->
+            
+            <!-- Entegrasyonlar -->
+            <div class="content-section" id="integrationsSection">
+                <div class="section-header">
+                    <h2>Entegrasyonlar</h2>
+                    <button class="btn btn-primary" id="addIntegrationBtn">
+                        <i class="fas fa-plus"></i> Yeni Entegrasyon
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="integrations-grid">
+                            <div class="integration-card">
+                                <div class="integration-icon">
+                                    <i class="fas fa-credit-card"></i>
+                                </div>
+                                <div class="integration-info">
+                                    <h4>Ödeme Sistemleri</h4>
+                                    <p>Stripe, PayPal, Iyzico entegrasyonu</p>
+                                    <div class="integration-status">
+                                        <span class="status-badge status-active">Aktif</span>
+                                    </div>
+                                </div>
+                                <div class="integration-actions">
+                                    <button class="btn btn-sm btn-primary">Yapılandır</button>
+                                </div>
+                            </div>
+                            <!-- Diğer entegrasyon kartları -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ayarlar -->
+            <div class="content-section" id="settingsSection">
+                <div class="section-header">
+                    <h2>Hesap Ayarları</h2>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="settings-tabs">
+                            <div class="tab-nav">
+                                <button class="tab-btn active" data-tab="profile">Profil</button>
+                                <button class="tab-btn" data-tab="security">Güvenlik</button>
+                                <button class="tab-btn" data-tab="notifications">Bildirimler</button>
+                                <button class="tab-btn" data-tab="preferences">Tercihler</button>
+                            </div>
+                            <div class="tab-content">
+                                <div class="tab-pane active" id="profileTab">
+                                    <!-- Profil ayarları formu -->
+                                </div>
+                                <div class="tab-pane" id="securityTab">
+                                    <!-- Şifre değiştirme formu -->
+                                </div>
+                                <div class="tab-pane" id="notificationsTab">
+                                    <!-- Bildirim ayarları -->
+                                </div>
+                                <div class="tab-pane" id="preferencesTab">
+                                    <!-- Dil ve tema tercihleri -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal'lar -->
+    <div id="modalsContainer">
+        <!-- Çeşitli modal'lar burada olacak -->
+    </div>
+
+    <script src="panel.js"></script>
+</body>
+</html>

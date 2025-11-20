@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Panel — Gelişmiş Ürün Yönetimi</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #4f46e5;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .product-image {
+      max-width: 100px;
+      max-height: 100px;
+      object-fit: contain;
+      cursor: pointer;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+    }
+    .search-box {
+      transition: all 0.3s ease;
+    }
+    .search-box:focus {
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .status-active {
+      background-color: #10b981;
+      color: white;
+    }
+    .status-inactive {
+      background-color: #ef4444;
+      color: white;
+    }
+    .error-message {
+      color: #ef4444;
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      display: none;
+    }
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    .image-preview-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .image-preview {
+      position: relative;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      overflow: hidden;
+      height: 100px;
+    }
+    .image-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .image-preview .remove-image {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .upload-progress {
+      height: 5px;
+      background-color: #f3f4f6;
+      margin-top: 5px;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background-color: #3b82f6;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    /* GTIP arama sonuçları için stil */
+    .gtip-results {
+      position: absolute;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      width: 100%;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .gtip-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f1f1;
+    }
+    .gtip-item:hover {
+      background-color: #f5f5f5;
+    }
+    .gtip-code {
+      font-weight: bold;
+      color: #4f46e5;
+    }
+    .gtip-name {
+      font-size: 0.9em;
+      color: #666;
+    }
+    /* Ürün arama sonuçları */
+    .product-results {
+      position: absolute;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+      width: 100%;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .product-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f1f1;
+    }
+    .product-item:hover {
+      background-color: #f5f5f5;
+    }
+    /* Modal için stiller */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-container {
+      background-color: white;
+      border-radius: 8px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow: auto;
+      padding: 20px;
+    }
+    /* Kullanıcı bilgileri için stiller */
+    .user-info-container {
+      display: flex;
+      align-items: center;
+      background-color: rgba(55, 65, 81, 0.5);
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .user-avatar {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background-color: #4f46e5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.875rem;
+    }
+    .user-details {
+      margin-left: 0.75rem;
+      text-align: right;
+    }
+    .user-name {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+    .user-role {
+      color: #d1d5db;
+      font-size: 0.75rem;
+    }
+    .user-status {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      margin-right: 0.5rem;
+    }
+    .user-status-online {
+      background-color: #10b981;
+    }
+    /* Ürün sayacı */
+    .product-counter {
+      background-color: #4f46e5;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4">
+
+<!-- Kullanıcı Bilgileri -->
+<div class="user-info-container">
+  <div class="flex items-center">
+    <div class="user-status user-status-online"></div>
+    <div class="user-avatar">
+      <i class="fas fa-user"></i>
+    </div>
+  </div>
+  <div class="user-details">
+    <div id="userName" class="user-name">Yükleniyor...</div>
+    <div id="userRole" class="user-role">Rol: Yükleniyor...</div>
+  </div>
+</div>
+
+<div class="bg-white shadow rounded-lg p-5">
+  <div class="flex justify-between items-center mb-4">
+    <h2 class="text-xl font-semibold text-indigo-600">Ürün Yönetimi <span id="productCount" class="product-counter">0</span></h2>
+    <div>
+      <button id="refreshProducts" class="px-3 py-1 border rounded mr-2">
+        <i class="fas fa-sync-alt mr-1"></i>Yenile
+      </button>
+      <button id="btnNewProduct" class="px-3 py-1 bg-indigo-600 text-white rounded">
+        <i class="fas fa-plus mr-1"></i>Yeni Ürün
+      </button>
+    </div>
+  </div>
+
+  <!-- Satıcı Filtreleme (Sadece Admin için) -->
+  <div id="adminBuyerFilter" class="hidden mb-4">
+    <div class="flex items-center space-x-4 p-3 bg-gray-100 rounded-lg">
+      <span class="font-medium text-gray-700">Satıcı Filtrele:</span>
+      <div class="relative flex-1">
+        <input type="text" id="buyerSearch" placeholder="Satıcı ara..." 
+               class="w-full p-2 border rounded search-box">
+        <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+      </div>
+      <select id="buyerSelect" class="p-2 border rounded">
+        <option value="">Tüm Alıcılar</option>
+        <!-- Dinamik olarak doldurulacak -->
+      </select>
+      <button id="clearBuyerFilter" class="px-3 py-2 bg-gray-200 rounded-md text-gray-700 hover:bg-gray-300">
+        <i class="fas fa-times"></i> Filtreyi Temizle
+      </button>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto border rounded">
+    <table class="min-w-full text-sm">
+      <thead class="bg-indigo-50">
+        <tr>
+          <th class="p-3 border">Görsel</th>
+          <th class="p-3 border">Ürün Adı</th>
+          <th class="p-3 border">Satıcı</th>
+          <th class="p-3 border">Barkod</th>
+          <th class="p-3 border">GTIP No</th>
+          <th class="p-3 border">Fiyat</th>
+          <th class="p-3 border">Stok</th>
+          <th class="p-3 border">Durum</th>
+          <th class="p-3 border">İşlemler</th>
+        </tr>
+      </thead>
+      <tbody id="productsList">
+        <tr>
+          <td colspan="9" class="p-4 text-center text-gray-500">
+            <div class="loading-spinner mx-auto mb-2"></div>
+            Ürünler yükleniyor...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Ürün Düzenleme Modal -->
+<div id="modalProduct" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-3 p-5 border-b">
+      <h3 class="text-lg font-medium" id="modalProductTitle">Yeni Ürün Ekle</h3>
+      <button id="closeModalProduct" class="text-gray-500">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+
+    <form id="formProduct" class="grid grid-cols-1 md:grid-cols-2 gap-4 p-5" novalidate>
+      <!-- Admin için Satıcı Seçme Alanı -->
+      <div id="adminBuyerContainer" class="md:col-span-2 bg-indigo-50 p-3 rounded hidden">
+        <h4 class="font-medium text-indigo-700 mb-2">Alıcı Seçimi (Admin)</h4>
+        <div class="flex items-center space-x-3">
+          <div class="relative flex-1">
+            <input type="text" id="modalBuyerSearch" placeholder="Alıcı ara..." 
+                   class="w-full p-2 border rounded search-box">
+            <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+          </div>
+          <div class="form-group flex-1">
+            <select id="modalBuyerSelect" class="p-2 border rounded w-full">
+              <option value="" selected disabled>Alıcı Seçin</option>
+              <!-- Dinamik olarak doldurulacak -->
+            </select>
+            <div id="modalBuyerSelectError" class="error-message">Lütfen bir alıcı seçin</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 bg-indigo-50 p-3 rounded">
+        <h4 class="font-medium text-indigo-700 mb-2">Temel Bilgiler</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="md:col-span-2 form-group">
+            <label class="block text-sm text-gray-600 mb-1">Ürün Adı *</label>
+            <div class="relative">
+              <input id="p_name" placeholder="Ürün Adı veya mevcut ürün ara" class="w-full p-2 border rounded" />
+              <div id="productSearchResults" class="product-results hidden"></div>
+            </div>
+            <div id="p_nameError" class="error-message">Ürün adı gereklidir</div>
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">Barkod No</label>
+            <input id="p_barcod_no" placeholder="Barkod No" class="w-full p-2 border rounded" />
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">GTIP No</label>
+            <div class="relative">
+              <input id="p_gtipno" placeholder="GTIP No veya açıklama ara" class="w-full p-2 border rounded" />
+              <div id="gtipDropdown" class="gtip-results hidden"></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">SKU</label>
+            <input id="p_sku" placeholder="SKU" class="w-full p-2 border rounded" />
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">Marka</label>
+            <input id="p_brand" placeholder="Marka" class="w-full p-2 border rounded" />
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">Kategori</label>
+            <input id="p_categories" placeholder="Kategori" class="w-full p-2 border rounded" />
+          </div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 bg-indigo-50 p-3 rounded">
+        <h4 class="font-medium text-indigo-700 mb-2">Fiyat ve Stok Bilgileri</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">Fiyat *</label>
+            <input id="p_price" type="number" step="0.01" placeholder="Fiyat" class="w-full p-2 border rounded" />
+            <div id="p_priceError" class="error-message">Geçerli bir fiyat giriniz</div>
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">Para Birimi</label>
+            <select id="p_currency" class="w-full p-2 border rounded">
+              <option value="TRY">TL</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">Stok *</label>
+            <input id="p_stock" type="number" placeholder="Stok" class="w-full p-2 border rounded" />
+            <div id="p_stockError" class="error-message">Geçerli bir stok değeri giriniz</div>
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">KDV Oranı (%)</label>
+            <input id="p_vat" type="number" step="0.01" placeholder="KDV" class="w-full p-2 border rounded" />
+          </div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 bg-indigo-50 p-3 rounded">
+        <h4 class="font-medium text-indigo-700 mb-2">Detaylar</h4>
+        <div class="grid grid-cols-1 gap-3">
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">Açıklama</label>
+            <textarea id="p_description" placeholder="Ürün Açıklaması" class="w-full p-2 border rounded" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">Durum</label>
+            <select id="p_isActive" class="w-full p-2 border rounded">
+              <option value="true">Aktif</option>
+              <option value="false">Pasif</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="block text-sm text-gray-600 mb-1">Ürün Görselleri</label>
+            <input id="p_images" type="file" multiple accept="image/*" class="w-full p-2 border rounded" />
+            <div id="imagePreview" class="image-preview-container mt-2"></div>
+            <div id="uploadProgress" class="upload-progress hidden">
+              <div id="progressBar" class="progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="md:col-span-2 flex justify-between pt-4 border-t">
+        <div class="space-x-2">
+          <button id="deleteProductBtn" type="button" class="px-4 py-2 border rounded text-red-600 hidden">
+            <i class="fas fa-trash mr-1"></i>Ürünü Sil
+          </button>
+        </div>
+        <div class="space-x-2">
+          <button id="cancelProductBtn" type="button" class="px-4 py-2 border rounded">
+            <i class="fas fa-times mr-1"></i>İptal
+          </button>
+          <button id="saveProductBtn" type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded">
+            <i class="fas fa-save mr-1"></i>Kaydet
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Görsel Görüntüleme Modal -->
+<div id="imageViewModal" class="modal-overlay hidden">
+  <div class="modal-container">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-medium">Ürün Görseli</h3>
+      <button id="closeImageViewModal" class="text-gray-500">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+    <iframe id="imageViewFrame" class="w-full h-96 border rounded"></iframe>
+  </div>
+</div>
+
+<!-- Toast bildirimi -->
+<div id="toast" class="toast"></div>
+
+<script>
+  // Supabase yapılandırması
+  const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+  
+  // Supabase'i başlat
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
+  // ImgBB API anahtarı
+  const IMGBB_API_KEY = 'c00ea54c5a96d5ed9279a26801c37e3f';
+
+  // DOM elementlerini seçme
+  const $ = id => document.getElementById(id);
+
+  // Kullanıcı ve satıcı bilgileri
+  let currentUser = null;
+  let currentUserRole = null;
+  let currentUserData = null;
+  let buyers = [];
+  let selectedBuyerId = null;
+  let imageFiles = [];
+  let existingImages = [];
+  let gtipData = [];
+  let allProducts = [];
+  let currentEditingProductId = null;
+
+  // GTIP verilerini yükle
+  async function loadGtipData() {
+    try {
+      const { data, error } = await supabase
+        .from('gtip')
+        .select('*');
+        
+      if (error) throw error;
+      
+      gtipData = data || [];
+    } catch (error) {
+      console.error('GTIP verileri yüklenirken hata:', error);
+    }
+  }
+
+  // GTIP arama fonksiyonu
+  function searchGtip(searchTerm) {
+    if (!searchTerm || searchTerm.length < 2) {
+      $('gtipDropdown').classList.add('hidden');
+      return;
+    }
+    
+    // Sayısal mı kontrol et (sadece rakamlardan oluşuyorsa)
+    const isNumeric = /^\d+$/.test(searchTerm);
+    
+    const results = gtipData.filter(item => {
+      if (isNumeric) {
+        // Sayısal ise code alanında başlayanları ara
+        return item.code && item.code.startsWith(searchTerm);
+      } else {
+        // Metin ise name alanında içerenleri ara
+        return item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase());
+      }
+    });
+    
+    displayGtipResults(results);
+  }
+
+  // GTIP sonuçlarını göster
+  function displayGtipResults(results) {
+    const dropdown = $('gtipDropdown');
+    dropdown.innerHTML = '';
+    
+    if (results.length === 0) {
+      dropdown.innerHTML = '<div class="gtip-item">Sonuç bulunamadı</div>';
+    } else {
+      results.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'gtip-item';
+        div.innerHTML = `
+          <div class="gtip-code">${item.code || ''}</div>
+          <div class="gtip-name">${item.name || ''}</div>
+        `;
+        div.addEventListener('click', () => {
+          $('p_gtipno').value = item.code || '';
+          dropdown.classList.add('hidden');
+        });
+        dropdown.appendChild(div);
+      });
+    }
+    
+    dropdown.classList.remove('hidden');
+  }
+
+  // Ürün arama fonksiyonu
+  function searchProducts(searchTerm) {
+    if (!searchTerm || searchTerm.length < 2) {
+      $('productSearchResults').classList.add('hidden');
+      return;
+    }
+    
+    const results = allProducts.filter(product => 
+      product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    displayProductSearchResults(results);
+  }
+
+  // Ürün arama sonuçlarını göster
+  function displayProductSearchResults(results) {
+    const dropdown = $('productSearchResults');
+    dropdown.innerHTML = '';
+    
+    if (results.length === 0) {
+      dropdown.innerHTML = '<div class="product-item">Sonuç bulunamadı</div>';
+    } else {
+      results.forEach(product => {
+        const div = document.createElement('div');
+        div.className = 'product-item';
+        div.innerHTML = `
+          <div class="font-medium">${product.name || ''}</div>
+          <div class="text-sm text-gray-600">${product.gtipno || ''} - ${product.barcod_no || ''}</div>
+        `;
+        div.addEventListener('click', () => {
+          fillFormWithProductData(product);
+          dropdown.classList.add('hidden');
+        });
+        dropdown.appendChild(div);
+      });
+    }
+    
+    dropdown.classList.remove('hidden');
+  }
+
+  // Form doğrulama fonksiyonu
+  function validateForm() {
+    let isValid = true;
+    
+    // Ürün adı doğrulama
+    if (!$('p_name').value.trim()) {
+      $('p_nameError').style.display = 'block';
+      isValid = false;
+    } else {
+      $('p_nameError').style.display = 'none';
+    }
+    
+    // Fiyat doğrulama
+    const price = parseFloat($('p_price').value);
+    if (isNaN(price) || price <= 0) {
+      $('p_priceError').style.display = 'block';
+      isValid = false;
+    } else {
+      $('p_priceError').style.display = 'none';
+    }
+    
+    // Stok doğrulama
+    const stock = parseInt($('p_stock').value);
+    if (isNaN(stock) || stock < 0) {
+      $('p_stockError').style.display = 'block';
+      isValid = false;
+    } else {
+      $('p_stockError').style.display = 'none';
+    }
+    
+    // Admin modunda satıcı seçimi doğrulama
+    if ($('adminBuyerContainer') && !$('adminBuyerContainer').classList.contains('hidden')) {
+      if (!$('modalBuyerSelect').value) {
+        $('modalBuyerSelectError').style.display = 'block';
+        isValid = false;
+      } else {
+        $('modalBuyerSelectError').style.display = 'none';
+      }
+    }
+    
+    return isValid;
+  }
+
+  // Toast bildirimi gösterme
+  function showToast(msg, isError = false, ms = 3000) {
+    // Basit bir alert kullanalım
+    alert(msg);
+  }
+
+  // HTML escape function
+  function escapeHtml(unsafe) {
+    if (unsafe === null || unsafe === undefined) return '';
+    return String(unsafe)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  // Görsel önizleme oluştur
+  function createImagePreview(file, index, isExisting = false, url = null) {
+    const previewContainer = document.createElement('div');
+    previewContainer.className = 'image-preview';
+    
+    const img = document.createElement('img');
+    if (isExisting) {
+      img.src = url;
+      img.onclick = () => openImageModal(url);
+    } else {
+      img.src = URL.createObjectURL(file);
+    }
+    img.alt = 'Ürün görseli';
+    img.className = 'cursor-pointer';
+    
+    const removeBtn = document.createElement('div');
+    removeBtn.className = 'remove-image';
+    removeBtn.innerHTML = '<i class="fas fa-times text-red-500"></i>';
+    removeBtn.onclick = () => {
+      if (isExisting) {
+        // Mevcut görseli kaldır
+        existingImages = existingImages.filter(img => img !== url);
+      } else {
+        // Yeni yüklenen görseli kaldır
+        imageFiles.splice(index, 1);
+      }
+      previewContainer.remove();
+      updateImageInputText();
+    };
+    
+    previewContainer.appendChild(img);
+    previewContainer.appendChild(removeBtn);
+    
+    $('imagePreview').appendChild(previewContainer);
+  }
+
+  // Görsel modalını aç
+  function openImageModal(imageUrl) {
+    $('imageViewFrame').src = imageUrl;
+    $('imageViewModal').classList.remove('hidden');
+  }
+
+  // Dosya input metnini güncelle
+  function updateImageInputText() {
+    const totalImages = imageFiles.length + existingImages.length;
+    if (totalImages > 0) {
+      $('p_images').nextElementSibling.textContent = `Ürün Görselleri (${totalImages} seçili)`;
+    } else {
+      $('p_images').nextElementSibling.textContent = 'Ürün Görselleri';
+    }
+  }
+
+  // Görselleri ImgBB'ye yükle
+  async function uploadImages() {
+    const imageUrls = [...existingImages]; // Mevcut görselleri koru
+    
+    if (imageFiles.length === 0) {
+      return imageUrls;
+    }
+    
+    $('uploadProgress').classList.remove('hidden');
+    
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      try {
+        const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          imageUrls.push(data.data.url);
+        } else {
+          throw new Error('ImgBB yükleme başarısız');
+        }
+      } catch (error) {
+        console.error('Görsel yüklenirken hata:', error);
+        showToast('Görsel yüklenirken hata oluştu: ' + error.message, true);
+      }
+      
+      // İlerleme çubuğunu güncelle
+      const progress = ((i + 1) / imageFiles.length) * 100;
+      $('progressBar').style.width = progress + '%';
+    }
+    
+    $('uploadProgress').classList.add('hidden');
+    return imageUrls;
+  }
+
+  // Satıcıları yükle
+  async function loadBuyers() {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'buyer');
+        
+      if (error) throw error;
+      
+      buyers = data || [];
+      
+      // Alıcı seçim dropdown'larını doldur
+      populateBuyerDropdowns();
+      
+    } catch (error) {
+      console.error('Alıcılar yüklenirken hata:', error);
+      showToast('Alıcılar yüklenirken hata oluştu', true);
+    }
+  }
+
+  // Alıcı dropdown'larını doldur
+  function populateBuyerDropdowns() {
+    const buyerSelect = $('buyerSelect');
+    const modalBuyerSelect = $('modalBuyerSelect');
+    
+    // Mevcut seçenekleri temizle (ilk seçenek hariç)
+    while (buyerSelect.options.length > 1) buyerSelect.remove(1);
+    while (modalBuyerSelect.options.length > 1) modalBuyerSelect.remove(1);
+    
+    // Alıcıları ekle
+    buyers.forEach(buyer => {
+      const option1 = document.createElement('option');
+      option1.value = buyer.id;
+      option1.textContent = buyer.company_name || buyer.name || buyer.email;
+      buyerSelect.appendChild(option1);
+      
+      const option2 = document.createElement('option');
+      option2.value = buyer.id;
+      option2.textContent = buyer.company_name || buyer.name || buyer.email;
+      modalBuyerSelect.appendChild(option2);
+    });
+  }
+
+  // Ürünleri Supabase'den çek ve listele
+  async function loadProducts(buyerId = null) {
+    try {
+      let query = supabase
+        .from('products')
+        .select('*');
+      
+      if (buyerId) {
+        // Belirli bir alıcının ürünlerini getir
+        query = query.eq('buyer_id', buyerId);
+      } else if (currentUserRole === 'admin') {
+        // Admin ise tüm ürünleri getir
+        // Filtre uygulanmaz
+      } else {
+        // Alıcı ise sadece kendi ürünlerini getir
+        query = query.eq('buyer_id', currentUser.id);
+      }
+      
+      const { data: products, error } = await query;
+      if (error) throw error;
+      
+      const productsList = $('productsList');
+      productsList.innerHTML = '';
+      allProducts = products || [];
+      
+      // Ürün sayacını güncelle
+      $('productCount').textContent = allProducts.length;
+      
+      if (allProducts.length === 0) {
+        productsList.innerHTML = `
+          <tr>
+            <td colspan="9" class="p-4 text-center text-gray-500">
+              Henüz ürün bulunmamaktadır
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      
+      allProducts.forEach((product) => {
+        const buyer = buyers.find(s => s.id === product.buyer_id) || {};
+        
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50';
+        
+        // Görsel hücresi - ilk görseli küçük resim olarak göster
+        let imageCellContent = '';
+        if (product.images && product.images.length > 0) {
+          imageCellContent = `
+            <img src="${product.images[0]}" class="product-image" 
+                 alt="${escapeHtml(product.name || '')}"
+                 onclick="openImageModal('${product.images[0]}')">
+          `;
+        } else {
+          imageCellContent = `
+            <button class="px-2 py-1 bg-gray-300 rounded text-gray-600 text-sm opacity-50 cursor-not-allowed" disabled>
+              <i class="fas fa-image mr-1"></i>Yok
+            </button>
+          `;
+        }
+        
+        tr.innerHTML = `
+          <td class="p-3 border">${imageCellContent}</td>
+          <td class="p-3 border">${escapeHtml(product.name || '')}</td>
+          <td class="p-3 border">${escapeHtml(buyer.company_name || buyer.name || 'Bilinmiyor')}</td>
+          <td class="p-3 border">${escapeHtml(product.barcod_no || '')}</td>
+          <td class="p-3 border">${escapeHtml(product.gtipno || '')}</td>
+          <td class="p-3 border">${product.price || 0} ${product.currency || 'TL'}</td>
+          <td class="p-3 border">${product.stock || 0}</td>
+          <td class="p-3 border">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+              ${product.is_active ? 'Aktif' : 'Pasif'}
+            </span>
+          </td>
+          <td class="p-3 border">
+            <button class="btnEditProduct px-2 py-1 bg-blue-400 rounded text-white text-sm mr-1">
+              <i class="fas fa-edit mr-1"></i>Düzenle
+            </button>
+            <button class="btnDeleteProduct px-2 py-1 bg-red-500 rounded text-white text-sm">
+              <i class="fas fa-trash mr-1"></i>Sil
+            </button>
+          </td>
+        `;
+        
+        // Düzenleme butonuna event listener ekle
+        tr.querySelector('.btnEditProduct').addEventListener('click', () => {
+          openProductModal(product);
+        });
+        
+        // Silme butonuna event listener ekle
+        tr.querySelector('.btnDeleteProduct').addEventListener('click', () => {
+          deleteProduct(product.id);
+        });
+        
+        productsList.appendChild(tr);
+      });
+      
+    } catch (error) {
+      console.error('Ürünler yüklenirken hata:', error);
+      showToast('Ürünler yüklenirken hata oluştu: ' + error.message, true);
+    }
+  }
+
+  // Formu ürün verileriyle doldur
+  function fillFormWithProductData(product) {
+    $('p_name').value = product.name || '';
+    $('p_barcod_no').value = product.barcod_no || '';
+    $('p_gtipno').value = product.gtipno || '';
+    $('p_sku').value = product.sku || '';
+    $('p_brand').value = product.brand || '';
+    $('p_categories').value = product.categories || '';
+    $('p_price').value = product.price || '';
+    $('p_currency').value = product.currency || 'TRY';
+    $('p_stock').value = product.stock || '';
+    $('p_vat').value = product.vat || '';
+    $('p_description').value = product.description || '';
+    $('p_isActive').value = product.is_active ? 'true' : 'false';
+    
+    // Mevcut görselleri yükle
+    if (product.images && product.images.length > 0) {
+      existingImages = product.images;
+      $('imagePreview').innerHTML = '';
+      product.images.forEach((url, index) => {
+        createImagePreview(null, index, true, url);
+      });
+      updateImageInputText();
+    }
+    
+    // Alıcı seçimi
+    if (currentUserRole === 'admin') {
+      $('modalBuyerSelect').value = product.buyer_id || '';
+    }
+    
+    currentEditingProductId = product.id;
+    $('modalProductTitle').textContent = 'Ürünü Düzenle';
+    $('deleteProductBtn').classList.remove('hidden');
+  }
+
+  // Ürün modalını aç
+  function openProductModal(product = null) {
+    // Kullanıcı giriş yapmamışsa uyarı ver
+    if (!currentUser) {
+      showToast('Lütfen önce giriş yapın', true);
+      return;
+    }
+    
+    const adminContainer = $('adminBuyerContainer');
+    
+    // Tüm hata mesajlarını temizle
+    document.querySelectorAll('.error-message').forEach(el => {
+      el.style.display = 'none';
+    });
+    
+    // Admin ise satıcı seçim alanını göster
+    if (currentUserRole === 'admin') {
+      adminContainer.classList.remove('hidden');
+    } else {
+      adminContainer.classList.add('hidden');
+    }
+    
+    // Görsel durumunu sıfırla
+    imageFiles = [];
+    existingImages = [];
+    $('imagePreview').innerHTML = '';
+    updateImageInputText();
+    
+    if (product) {
+      // Düzenleme modu
+      fillFormWithProductData(product);
+    } else {
+      // Yeni ürün modu
+      $('modalProductTitle').textContent = 'Yeni Ürün Ekle';
+      $('deleteProductBtn').classList.add('hidden');
+      
+      // Formu temizle
+      $('formProduct').reset();
+      
+      // Varsayılan satıcıyı ayarla
+      if (currentUserRole === 'admin') {
+        $('modalBuyerSelect').value = selectedBuyerId || '';
+      }
+      
+      currentEditingProductId = null;
+    }
+    
+    $('modalProduct').classList.remove('hidden');
+  }
+
+  // Ürün modalını kapat
+  function closeProductModal() {
+    $('modalProduct').classList.add('hidden');
+    currentEditingProductId = null;
+    imageFiles = [];
+    existingImages = [];
+  }
+
+  // Ürün sil
+  async function deleteProduct(productId) {
+    if (!confirm('Bu ürünü silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+        
+      if (error) throw error;
+      
+      showToast('Ürün başarıyla silindi');
+      loadProducts(selectedBuyerId);
+    } catch (error) {
+      console.error('Ürün silinirken hata:', error);
+      showToast('Ürün silinirken hata oluştu: ' + error.message, true);
+    }
+  }
+
+  // Sayfa yüklendiğinde
+  document.addEventListener('DOMContentLoaded', function() {
+    // Yeni ürün butonuna event listener ekle
+    $('btnNewProduct').addEventListener('click', function(e) {
+      e.preventDefault();
+      openProductModal();
+    });
+
+    // GTIP arama işlevselliği
+    $('p_gtipno').addEventListener('input', function() {
+      searchGtip(this.value);
+    });
+
+    // Ürün arama işlevselliği
+    $('p_name').addEventListener('input', function() {
+      searchProducts(this.value);
+    });
+
+    // GTIP dropdown dışına tıklanınca kapat
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.relative')) {
+        $('gtipDropdown').classList.add('hidden');
+        $('productSearchResults').classList.add('hidden');
+      }
+    });
+
+    // Satıcı filtreleme temizleme butonu
+    $('clearBuyerFilter')?.addEventListener('click', function() {
+      $('buyerSelect').value = '';
+      selectedBuyerId = null;
+      loadProducts();
+    });
+
+    // Oturum durumunu kontrol et
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        currentUser = session.user;
+        
+        // Kullanıcı bilgilerini göster
+        $('userName').textContent = session.user.user_metadata?.name || session.user.email || 'Kullanıcı';
+        
+        // Kullanıcı rolünü belirle
+        supabase.from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: userData, error }) => {
+            if (error) throw error;
+            
+            currentUserData = userData;
+            currentUserRole = userData.role || 'buyer';
+            $('userRole').textContent = `Rol: ${currentUserRole}`;
+            
+            console.log('Kullanıcı rolü:', currentUserRole);
+            
+            // Admin ise satıcı filtreleme alanını göster
+            if (currentUserRole === 'admin') {
+              $('adminBuyerFilter').classList.remove('hidden');
+              // Alıcı yükle
+              loadBuyers();
+            }
+            
+            // GTIP verilerini yükle
+            loadGtipData();
+            
+            // Ürünleri yükle
+            loadProducts(selectedBuyerId);
+          })
+          .catch((error) => {
+            console.error('Kullanıcı verisi bulunamadı:', error);
+            $('userRole').textContent = 'Rol: Veri yok';
+          });
+      } else {
+        // Kullanıcı giriş yapmamışsa
+        console.log('Kullanıcı giriş yapmamış');
+        $('userName').textContent = 'Misafir';
+        $('userRole').textContent = 'Rol: Giriş yapılmamış';
+        
+        // Giriş yapılmadıysa ürün ekleme butonunu devre dışı bırak
+        $('btnNewProduct').disabled = true;
+        $('btnNewProduct').classList.add('opacity-50', 'cursor-not-allowed');
+      }
+    });
+
+    // Auth state değişikliğini dinle
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        window.location.href = "..login.html";
+      }
+    });
+    
+    // Görsel yükleme işlemi
+    $('p_images').addEventListener('change', (e) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+          imageFiles.push(file);
+          createImagePreview(file, imageFiles.length - 1);
+        }
+      }
+      
+      updateImageInputText();
+      // Input'u sıfırla ki aynı dosyayı tekrar seçebilsin
+      $('p_images').value = '';
+    });
+    
+    // Satıcı seçim dropdown'u değiştiğinde
+    $('buyerSelect').addEventListener('change', (e) => {
+      selectedBuyerId = e.target.value || null;
+      loadProducts(selectedBuyerId);
+    });
+    
+    // Satıcı arama kutusu
+    $('buyerSearch').addEventListener('input', (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      const options = $('buyerSelect').options;
+      
+      for (let i = 1; i < options.length; i++) {
+        const option = options[i];
+        const text = option.textContent.toLowerCase();
+        option.style.display = text.includes(searchTerm) ? '' : 'none';
+      }
+    });
+    
+    // Modal satıcı arama kutusu
+    $('modalBuyerSearch').addEventListener('input', (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      const options = $('modalBuyerSelect').options;
+      
+      for (let i = 1; i < options.length; i++) {
+        const option = options[i];
+        const text = option.textContent.toLowerCase();
+        option.style.display = text.includes(searchTerm) ? '' : 'none';
+      }
+    });
+    
+    // Modal kapatma düğmeleri
+    $('closeModalProduct').addEventListener('click', closeProductModal);
+    $('cancelProductBtn').addEventListener('click', closeProductModal);
+    $('closeImageViewModal').addEventListener('click', () => {
+      $('imageViewModal').classList.add('hidden');
+    });
+    
+    // Yenile butonu
+    $('refreshProducts').addEventListener('click', () => {
+      if (currentUserRole === 'admin') {
+        loadBuyers().then(() => loadProducts(selectedBuyerId));
+      } else {
+        loadProducts(selectedBuyerId);
+      }
+      showToast('Ürün listesi yenileniyor...');
+    });
+    
+    // Form gönderme
+    $('formProduct').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      // Form doğrulama
+      if (!validateForm()) {
+        return;
+      }
+      
+      // Doğru buyerId'yi belirle
+      let buyerId, buyerName, buyerRole;
+      if (currentUserRole === 'admin') {
+        buyerId = $('modalBuyerSelect').value;
+        if (!buyerId) {
+          showToast('Lütfen bir alıcı seçin', true);
+          return;
+        }
+        
+        // Seçilen alıcının bilgilerini al
+        const selectedBuyer = buyers.find(s => s.id === buyerId);
+        buyerName = selectedBuyer?.company_name || selectedBuyer?.name || '';
+        buyerRole = selectedBuyer?.role || 'buyer';
+      } else {
+        buyerId = currentUser.id;
+        buyerName = currentUserData?.company_name || currentUserData?.name || currentUser.email;
+        buyerRole = currentUserRole;
+      }
+      
+      // Kaydet butonunu devre dışı bırak
+      $('saveProductBtn').disabled = true;
+      $('saveProductBtn').innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Kaydediliyor...';
+      
+      try {
+        // Görselleri yükle
+        const imageUrls = await uploadImages();
+        
+        let productData = {
+          name: String($('p_name').value || ''),
+          barcod_no: String($('p_barcod_no').value || ''),
+          gtipno: String($('p_gtipno').value || ''),
+          sku: String($('p_sku').value || ''),
+          brand: String($('p_brand').value || ''),
+          categories: String($('p_categories').value || ''),
+          price: parseFloat($('p_price').value) || 0,
+          currency: $('p_currency').value,
+          stock: parseInt($('p_stock').value) || 0,
+          vat: parseFloat($('p_vat').value) || 0,
+          description: String($('p_description').value || ''),
+          is_active: $('p_isActive').value === 'true',
+          buyer_id: buyerId,
+          buyer_name: buyerName,
+          role: buyerRole,
+          uid: buyerId,
+          images: imageUrls,
+          updated_at: new Date()
+        };
+        
+        if (currentEditingProductId) {
+          // Mevcut ürünü güncelle
+          const { error } = await supabase
+            .from('products')
+            .update(productData)
+            .eq('id', currentEditingProductId);
+            
+          if (error) throw error;
+          
+          showToast('Ürün başarıyla güncellendi');
+        } else {
+          // Yeni ürün ekle
+          productData.created_at = new Date();
+          const { error } = await supabase
+            .from('products')
+            .insert(productData);
+            
+          if (error) throw error;
+          
+          showToast('Ürün başarıyla eklendi');
+        }
+        
+        closeProductModal();
+        loadProducts(selectedBuyerId);
+      } catch (error) { 
+        console.error('Ürün kaydedilirken hata:', error); 
+        showToast('Ürün kaydedilirken hata oluştu: ' + error.message, true); 
+      } finally {
+        // Kaydet butonunu tekrar etkinleştir
+        $('saveProductBtn').disabled = false;
+        $('saveProductBtn').innerHTML = '<i class="fas fa-save mr-1"></i>Kaydet';
+      }
+    });
+    
+    // Ürün silme butonu
+    $('deleteProductBtn').addEventListener('click', () => {
+      if (currentEditingProductId) {
+        deleteProduct(currentEditingProductId);
+        closeProductModal();
+      }
+    });
+  });
+</script>
+</body>
+
+</html>

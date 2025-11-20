@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sesli Market — Demo (2.5D Animasyon & Sepet)</title>
+<style>
+  :root{
+    --bg:#fbfbfd; --card:#fff; --accent:#0ea5a4; --muted:#6b7280;
+  }
+  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;padding:0;margin:0;background:linear-gradient(180deg,#f3f7fa, #fbfbfd); color:#111}
+  header{height:120px; display:flex; align-items:center; justify-content:center; position:relative; overflow:visible}
+  .branding{font-weight:800; font-size:22px; color:#0f172a; letter-spacing:0.3px}
+  .slogan{font-size:14px;color:var(--muted); margin-top:6px}
+  #micContainer{position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:1000; text-align:center}
+  #micBtn{width:84px;height:84px;border-radius:50%;background:linear-gradient(180deg,var(--accent),#0891b2);border:4px solid rgba(255,255,255,0.25);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 30px rgba(2,6,23,0.08);cursor:pointer}
+  #micPulse{position:absolute;left:50%;transform:translateX(-50%);top:110%;width:180px;height:40px;pointer-events:none;opacity:0}
+  .pulseBar{height:8px;background:linear-gradient(90deg,#34d399,#06b6d4);border-radius:99px;display:inline-block;margin:0 4px;opacity:.9}
+  main{max-width:1100px;margin:28px auto;padding:20px;display:grid;grid-template-columns:2fr 360px;gap:20px}
+  #stage{background:var(--card);border-radius:14px;padding:18px;min-height:540px;box-shadow:0 6px 30px rgba(2,6,23,0.04);position:relative;overflow:hidden}
+  #reyonWrap{width:100%;height:420px;display:flex;align-items:center;justify-content:center;position:relative; perspective:1200px}
+  .reyonCard{width:560px;height:320px;border-radius:12px;background:linear-gradient(180deg,#fff,#f8fafc); box-shadow: 0 10px 30px rgba(2,6,23,0.06); transform-origin:center; transform:translateZ(0); display:flex; align-items:center; justify-content:center; position:relative}
+  #priceTag{position:absolute; top:18px; left:50%; transform:translateX(-50%) scale(0); background:gold; padding:10px 18px; border-radius:999px; font-weight:700; color:#111}
+  #reyonLabel{position:absolute; bottom:18px; left:18px; font-weight:700; color:#0f172a}
+  /* product fly */
+  .fly{position:fixed; width:96px;height:96px;border-radius:12px; z-index:1200; transition:all 850ms cubic-bezier(.2,.9,.25,1)}
+  /* cart */
+  #cart{background:#fff;border-radius:14px;padding:12px;box-shadow:0 8px 30px rgba(2,6,23,0.06); position:relative; display:flex;flex-direction:column; gap:8px}
+  #cartIcon{width:60px;height:60px;border-radius:50%;background:#0ea5a4;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer}
+  #cartItems{max-height:420px;overflow:auto;padding:6px;border-radius:8px}
+  .cartItem{padding:8px;border-radius:8px;margin-bottom:8px;background:#fafafa; display:flex;justify-content:space-between;align-items:center;font-size:14px}
+  /* controls */
+  .controls{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+  select,input[type=text]{padding:8px;border-radius:8px;border:1px solid #e6e6f0}
+  button.small{padding:8px 12px;border-radius:8px;border:0;background:#111;color:#fff}
+  .welcome{position:absolute; left:20px; top:20px; background:linear-gradient(90deg,#fff,#f7fdfd); padding:12px;border-radius:10px; box-shadow:0 6px 20px rgba(2,6,23,0.04)}
+  .bigTitle{font-size:20px;font-weight:800}
+  footer{max-width:1100px;margin:10px auto;padding:6px;text-align:center;color:var(--muted); font-size:13px}
+  /* theme variations (age) */
+  .theme-young{--accent:#7c3aed}
+  .theme-elder{--accent:#0ea5a4}
+  /* small responsive */
+  @media (max-width:880px){main{grid-template-columns:1fr; padding:12px} #reyonWrap{height:300px} #cart{position:sticky; top:120px}}
+</style>
+</head>
+<body>
+
+<!-- MIC TOP -->
+<div id="micContainer">
+  <div id="micBtn" title="Sesle Başlat (veya butona tıkla)">🎙️</div>
+  <div id="micPulse" aria-hidden>
+    <div class="pulseBar" style="width:20px"></div>
+    <div class="pulseBar" style="width:40px"></div>
+    <div class="pulseBar" style="width:30px"></div>
+    <div class="pulseBar" style="width:50px"></div>
+  </div>
+</div>
+
+<header>
+  <div class="branding">
+    <div>Hayat İçinde Hayat</div>
+    <div class="slogan">Sesli Market — Eğlenceli, Hızlı, Kazançlı</div>
+  </div>
+</header>
+
+<main id="app">
+  <!-- STAGE -->
+  <section id="stage">
+    <div class="welcome" id="welcomeCard">
+      <div class="bigTitle" id="welcomeTitle">Hoşgeldin!</div>
+      <div id="welcomeSub">Ayşe teyze demeyi dene veya "başla" de</div>
+    </div>
+
+    <div id="reyonWrap">
+      <div class="reyonCard" id="reyonCard" style="transform: translateZ(0) rotateX(6deg) rotateY(-6deg);">
+        <!-- Reyon art (SVG placeholder) -->
+        <svg id="reyonArt" width="240" height="180" viewBox="0 0 240 180" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+          <rect x="6" y="26" width="228" height="120" rx="10" fill="#fffbe6" stroke="#f5d08f" />
+          <g id="productIcons"></g>
+        </svg>
+
+        <div id="reyonLabel">Reyon</div>
+        <div id="priceTag"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT PANEL (SEPET + KONTROLLER) -->
+  <aside id="cart" role="complementary">
+    <div style="display:flex;align-items:center;gap:12px;justify-content:space-between">
+      <div style="display:flex;gap:8px;align-items:center">
+        <div id="cartIcon" title="Sepet">🛒</div>
+        <div style="font-weight:700">Sepetiniz</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="themeSelect" title="Tema">
+          <option value="young">Genç / Renkli</option>
+          <option value="elder">Teyze / Rahat</option>
+        </select>
+        <button id="clearBtn" class="small">Temizle</button>
+      </div>
+    </div>
+
+    <div style="margin:10px 0;">
+      <div style="font-size:13px;color:var(--muted)">Profil</div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <input type="text" id="profileName" placeholder="İsim (örn. Ayşe)" />
+        <button id="saveProfile" class="small">Kaydet</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <select id="ageGroup">
+          <option value="elder">Teyze/Amca</option>
+          <option value="young">Genç</option>
+        </select>
+        <button id="getLoc" class="small">Konum Al</button>
+      </div>
+      <input type="text" id="addressField" placeholder="Adres (otomatik alınabilir)" style="margin-top:8px" />
+    </div>
+
+    <div id="cartItems">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Ürünler</div>
+      <div id="cartList"></div>
+    </div>
+
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button id="checkout" class="small">Siparişi Kaydet</button>
+      <button id="export" class="small">Yedekle</button>
+    </div>
+  </aside>
+</main>
+
+<footer>Demo prototip — istersen ürün/kategori listesini direkt vereyim, DB entegrasyonu yapalım</footer>
+
+<script>
+/* ---------------------------
+   Bas-konuş + 3s bekleme + fallback
+   + Normalize + dictionary + products demo
+   + Fly-to-cart animasyon
+   + profile + geolocation
+---------------------------- */
+(() => {
+  // ---------- CONFIG ----------
+  const PROCESS_DELAY_MS = 3000; // konuşma sonrası bekleme
+  const FALLBACK_PROMPT = "Anlayamadım Ayşe teyze, tekrar eder misiniz?";
+  // products db (örnek) -> gerçek DB yerine localStorage demo
+  const PRODUCTS = {
+    "domates": { reyon: "manav", price: "40 TL", color: "#ff6b6b" },
+    "soğan": { reyon: "manav", price: "30 TL", color: "#f59e0b" },
+    "elma": { reyon: "manav", price: "25 TL", color: "#34d399" },
+    "zeytin": { reyon: "sarkuteri", price: "120 TL", color: "#6b7280" },
+    "peynir": { reyon: "sarkuteri", price: "150 TL", color: "#fde68a" },
+    "yoğurt": { reyon: "sut", price: "60 TL", color: "#e0f2fe" },
+    "kuru fasulye": { reyon: "bakliyat", price: "35 TL", color: "#b4462d" },
+    "bisküvi": { reyon: "atik", price: "20 TL", color: "#fce7f3" }
+  };
+
+  // normalize dictionary (normalize -> canonical)
+  const DICT = {
+    "sogan":"soğan","yogurt":"yoğurt","patlican":"patlıcan","domates":"domates","zeytin":"zeytin",
+    "peynir":"peynir","elma":"elma","kuru fasulye":"kuru fasulye","bisküvi":"bisküvi","fasulye":"kuru fasulye"
+  };
+
+  // DOM
+  const micBtn = document.getElementById("micBtn");
+  const micPulse = document.getElementById("micPulse");
+  const reyonArt = document.getElementById("reyonArt");
+  const reyonCard = document.getElementById("reyonCard");
+  const priceTag = document.getElementById("priceTag");
+  const cartList = document.getElementById("cartList");
+  const cartIcon = document.getElementById("cartIcon");
+  const addressField = document.getElementById("addressField");
+  const profileName = document.getElementById("profileName");
+  const saveProfile = document.getElementById("saveProfile");
+  const ageGroup = document.getElementById("ageGroup");
+  const getLocBtn = document.getElementById("getLoc");
+  const themeSelect = document.getElementById("themeSelect");
+  const clearBtn = document.getElementById("clearBtn");
+  const checkout = document.getElementById("checkout");
+  const exportBtn = document.getElementById("export");
+  const welcomeTitle = document.getElementById("welcomeTitle");
+  const welcomeSub = document.getElementById("welcomeSub");
+
+  // state
+  let speechTimer = null;
+  let lastTranscript = "";
+  let processing = false;
+  let recognition;
+  let cart = JSON.parse(localStorage.getItem("demo_cart")||"[]");
+  let profile = JSON.parse(localStorage.getItem("demo_profile")||"{}");
+
+  // init UI from storage
+  function renderCart(){
+    cartList.innerHTML = "";
+    if(cart.length===0){ cartList.innerHTML = '<div style="color:#9ca3af">Sepet boş</div>'; return; }
+    cart.forEach((it,i)=>{
+      const el = document.createElement("div");
+      el.className = "cartItem";
+      el.innerHTML = `<div>${it.name} <small style="color:#6b7280">(${it.qty})</small></div><div style="font-weight:700">${it.price}</div>`;
+      cartList.appendChild(el);
+    });
+  }
+  function saveCart(){ localStorage.setItem("demo_cart", JSON.stringify(cart)); renderCart(); }
+
+  renderCart();
+  if(profile.name) profileName.value = profile.name;
+  if(profile.address) addressField.value = profile.address;
+  if(profile.ageGroup) ageGroup.value = profile.ageGroup;
+
+  // THEME
+  function applyTheme(t){
+    document.documentElement.classList.remove("theme-young","theme-elder");
+    if(t==="young"){ document.documentElement.classList.add("theme-young"); }
+    else { document.documentElement.classList.add("theme-elder"); }
+  }
+  applyTheme("elder");
+  themeSelect.value = "elder";
+  themeSelect.addEventListener("change", e => { applyTheme(e.target.value); });
+
+  // ----------------- Geolocation -----------------
+  getLocBtn.onclick = async () => {
+    if(!navigator.geolocation){ alert("Konum API desteklenmiyor"); return; }
+    getLocBtn.disabled = true; getLocBtn.textContent = "Alınıyor..."
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      const {latitude,longitude} = pos.coords;
+      // basit: lat/lng göster; (isteğe göre reverse geocode entegre edilebilir)
+      addressField.value = `Konum: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      profile.address = addressField.value;
+      localStorage.setItem("demo_profile", JSON.stringify(profile));
+      getLocBtn.disabled=false; getLocBtn.textContent="Konum Al";
+    }, err=>{
+      alert("Konum alınamadı: "+err.message); getLocBtn.disabled=false; getLocBtn.textContent="Konum Al";
+    }, {timeout:10000});
+  };
+
+  saveProfile.onclick = ()=>{
+    profile.name = profileName.value || "Ziyaretçi";
+    profile.ageGroup = ageGroup.value;
+    profile.address = addressField.value || profile.address;
+    localStorage.setItem("demo_profile", JSON.stringify(profile));
+    alert("Profil kaydedildi: " + profile.name);
+  };
+
+  clearBtn.onclick = ()=>{ cart=[]; saveCart(); };
+
+  checkout.onclick = ()=>{
+    if(!profile.name) { alert("Önce profil kaydedin"); return; }
+    const order = { user:profile, items:cart, created:new Date().toISOString() };
+    // demo: localStorage 'orders' to save
+    const orders = JSON.parse(localStorage.getItem("demo_orders")||"[]");
+    orders.push(order); localStorage.setItem("demo_orders", JSON.stringify(orders));
+    alert("Sipariş kaydedildi. Teşekkürler " + (profile.name||""));
+    cart=[]; saveCart();
+  };
+
+  exportBtn.onclick = ()=>{
+    const data = {cart,profile,orders:JSON.parse(localStorage.getItem("demo_orders")||"[]")};
+    const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download="backup.json"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ---------- Normalize function ----------
+  function normalizeTurkish(text){
+    return (text||"").toString().toLowerCase()
+      .replace(/[ğ]/g,"g").replace(/[ü]/g,"u").replace(/[ş]/g,"s")
+      .replace(/[ı]/g,"i").replace(/[ö]/g,"o").replace(/[ç]/g,"c")
+      .replace(/[^a-z0-9\s]/g,"").trim();
+  }
+
+  // ---------- Reyon draw helper (simple icons) ----------
+  function drawProductIcons(names=[]){
+    const g = reyonArt.querySelector("#productIcons");
+    g.innerHTML = "";
+    names.slice(0,6).forEach((nm,i)=>{
+      const x = 28 + (i%3)*70;
+      const y = 36 + Math.floor(i/3)*70;
+      const rect = `<g transform="translate(${x},${y})"><rect x="0" y="0" width="56" height="56" rx="8" fill="${PRODUCTS[nm]?.color||'#ddd'}" stroke="#ffffff"/><text x="28" y="34" font-size="12" text-anchor="middle" fill="#1f2937">${nm.slice(0,3)}</text></g>`;
+      g.innerHTML += rect;
+    });
+  }
+
+  // ---------- Show reyon and animate price, flight-to-cart ----------
+  function showReyonFor(productName){
+    // choose canonical
+    const canonical = DICT[ normalizeTurkish(productName).split(/\s+/).slice(-2).join(" ") ] || DICT[ normalizeTurkish(productName).split(/\s+/).slice(-1).join(" ") ] || productName;
+    const info = PRODUCTS[canonical];
+    if(!info){ return null; }
+    // draw icons (nearby related)
+    drawProductIcons(Object.keys(PRODUCTS));
+    // show reyon card transform
+    reyonCard.style.transform = "translateZ(0) rotateX(0deg) rotateY(0deg) scale(1.03)";
+    reyonCard.style.opacity = 1;
+    // price tag animation
+    priceTag.textContent = info.price;
+    priceTag.style.transform = "translateX(-50%) scale(1)";
+    setTimeout(()=> priceTag.style.transform = "translateX(-50%) scale(0)", 1800);
+    return {canonical, info};
+  }
+
+  function flyToCart(productCanonical){
+    const info = PRODUCTS[productCanonical];
+    if(!info) return;
+    // create a fly element (use a colored box as image placeholder)
+    const box = document.createElement("div");
+    box.className = "fly";
+    box.style.background = info.color;
+    box.style.left = (window.innerWidth/2 - 48) + "px";
+    box.style.top = (window.innerHeight/2 - 48) + "px";
+    box.style.border = "2px solid rgba(255,255,255,0.5)";
+    document.body.appendChild(box);
+
+    // compute target coords (cartIcon)
+    const target = cartIcon.getBoundingClientRect();
+    setTimeout(()=>{
+      box.style.left = (target.left + target.width/2 - 12) + "px";
+      box.style.top = (target.top + target.height/2 - 12) + "px";
+      box.style.width = "28px"; box.style.height = "28px"; box.style.borderRadius = "8px";
+      box.style.transform = "rotate(360deg)";
+    }, 40);
+    setTimeout(()=> box.remove(), 950);
+  }
+
+  // ---------- Add item to cart (with animations) ----------
+  function addItemBySpoken(text){
+    // best-effort: try two-word and last-word mapping (e.g., "1 kilo domates" -> "domates")
+    const normalized = normalizeTurkish(text);
+    // try to find multiword product first
+    let found = null;
+    // match longest key
+    const keys = Object.keys(DICT).sort((a,b)=>b.length-a.length);
+    for(const k of keys){
+      if(normalized.includes(k)){ found = DICT[k]; break; }
+    }
+    // fallback: check single words
+    if(!found){
+      const parts = normalized.split(/\s+/).reverse();
+      for(const p of parts){
+        if(DICT[p]){ found = DICT[p]; break; }
+      }
+    }
+    if(!found){
+      // fallback prompt
+      speak(FALLBACK_PROMPT);
+      return;
+    }
+    const info = PRODUCTS[found];
+    if(!info){
+      speak("Ürün veritabanımızda yok, üzgünüm.");
+      return;
+    }
+    // animate
+    showReyonFor(found);
+    flyToCart(found);
+    // add to cart logic: parse qty from text if present
+    let qty = 1;
+    const qtyMatch = text.match(/(\d+)\s*(kg|kilo|adet|k|kg)?/i);
+    if(qtyMatch){ qty = parseInt(qtyMatch[1]) || 1; }
+    cart.push({name:found, price:info.price, qty});
+    saveCart();
+    speak(`${qty} ${found} sepete eklendi.`);
+  }
+
+  // ---------- Speech synth helper ----------
+  function speak(text){
+    if(!("speechSynthesis" in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    // voice selection based on profile age
+    const group = profile.ageGroup || ageGroup.value || "elder";
+    u.lang = "tr-TR";
+    if(group==="young") u.pitch = 1.2, u.rate=1.05; else u.pitch=1.0, u.rate=0.95;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  }
+
+  // ---------- Speech recognition setup ----------
+  if("webkitSpeechRecognition" in window || "SpeechRecognition" in window){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.lang = "tr-TR";
+    recognition.interimResults = true;
+    recognition.continuous = false; // we'll restart manually
+    // handle partial/interim results
+    recognition.onresult = (ev)=>{
+      // combine interim
+      let interim = "";
+      let final = "";
+      for(let i=ev.resultIndex;i<ev.results.length;i++){
+        const r = ev.results[i];
+        if(r.isFinal) final += r[0].transcript + " ";
+        else interim += r[0].transcript + " ";
+      }
+      lastTranscript = (final || interim).trim();
+      // show on welcome area
+      welcomeTitle.textContent = lastTranscript || "Dinleniyor...";
+      // reset processing timer
+      if(speechTimer) clearTimeout(speechTimer);
+      speechTimer = setTimeout(()=>{
+        // finalize
+        if(!lastTranscript || lastTranscript.length < 2){
+          speak("Sizi iyi duymadım, tekrar eder misiniz?");
+          // restart listening
+          startListening();
+          return;
+        }
+        // process text
+        processing = true;
+        addItemBySpoken(lastTranscript);
+        lastTranscript = "";
+        processing = false;
+      }, PROCESS_DELAY_MS);
+    };
+
+    recognition.onstart = ()=>{
+      micPulse.style.opacity = 1;
+      // animate pulse wide
+      micPulse.querySelectorAll(".pulseBar").forEach((b,i)=> b.style.transform = `scaleX(${1+Math.random()})`);
+    };
+    recognition.onend = ()=>{
+      micPulse.style.opacity = 0;
+      // if processing pending, restart maybe
+      if(!processing){
+        // keep ready, but do not auto-restart unless desired
+      }
+    };
+    recognition.onerror = (ev)=>{
+      console.warn("recognition error",ev.error);
+      micPulse.style.opacity = 0;
+      speak("Ses tanıma hatası oldu, tekrar deneyelim.");
+    };
+  } else {
+    alert("Tarayıcınız ses tanımayı desteklemiyor (Chrome mobil/desktop önerilir).");
+  }
+
+  // Start listening (via button or via "merhaba" keyword)
+  function startListening(){
+    if(!recognition) return;
+    try{
+      recognition.start();
+      welcomeTitle.textContent = "Dinleniyor...";
+      // show visual
+      micPulse.style.opacity = 1;
+    }catch(e){ console.error(e) }
+  }
+
+  // mic button behavior
+  micBtn.addEventListener("click", ()=> {
+    startListening();
+  });
+
+  // also support voice trigger "merhaba" via quick listen (simple)
+  // optional: listen continuously for a "wake word" if you implement long-running SR
+
+  // profile / theme hooks
+  themeSelect.addEventListener("change", e=>{
+    applyTheme(e.target.value==="young"?"young":"elder");
+  });
+
+  // preload some sample demo (simulate initial animation)
+  setTimeout(()=>{
+    welcomeTitle.textContent = "Merhaba Ayşe Teyze!";
+    welcomeSub.textContent = "Sesle söyle: 1 kilo domates";
+    speak("Merhaba Ayşe Teyze, hoş geldiniz. Alışverişe başlayabilirsiniz.");
+  },600);
+
+})(); // IIFE end
+</script>
+</body>
+</html>

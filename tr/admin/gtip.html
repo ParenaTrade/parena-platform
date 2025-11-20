@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTIP No Arama Sistemi</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        .suggestion-item:hover {
+            background-color: #f3f4f6;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #4f46e5;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h1 class="text-2xl font-bold text-indigo-600 mb-6 text-center">GTIP No Arama Sistemi</h1>
+            
+            <div class="mb-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <p class="text-blue-700"><i class="fas fa-info-circle mr-2"></i>GTIP numarası aramak için aşağıdaki arama kutusunu kullanın. Açılır listeden istediğiniz GTIP kodunu seçerek ilgili alana aktarabilirsiniz.</p>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-medium mb-2" for="gtipSearch">GTIP Numarası Ara:</label>
+                <div class="relative">
+                    <input type="text" id="gtipSearch" placeholder="GTIP no veya ürün adı yazın..." 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+                <div id="suggestions" class="absolute z-10 mt-1 w-full max-w-4xl bg-white border border-gray-300 rounded-lg shadow-lg hidden max-h-60 overflow-y-auto"></div>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-medium mb-2" for="selectedGtip">Seçilen GTIP No:</label>
+                <input type="text" id="selectedGtip" readonly 
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100">
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-medium mb-2" for="productDescription">Ürün Açıklaması:</label>
+                <textarea id="productDescription" readonly 
+                          class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 h-24"></textarea>
+            </div>
+            
+            <div class="bg-gray-100 p-4 rounded-lg mt-8">
+                <h2 class="text-lg font-semibold text-gray-800 mb-3">Nasıl Kullanılır?</h2>
+                <ol class="list-decimal list-inside text-gray-600 space-y-2">
+                    <li>GTIP Numarası Ara kutusuna bir GTIP kodu veya ürün adı yazın</li>
+                    <li>Açılır listeden istediğiniz GTIP koduna tıklayın</li>
+                    <li>Seçilen GTIP No alanına otomatik olarak aktarılacaktır</li>
+                    <li>İlgili ürün açıklaması da alt kısımda görünecektir</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const gtipSearch = document.getElementById('gtipSearch');
+            const suggestions = document.getElementById('suggestions');
+            const selectedGtip = document.getElementById('selectedGtip');
+            const productDescription = document.getElementById('productDescription');
+            
+            let allGtipData = []; // Tüm GTIP verilerini saklamak için
+            let debounceTimer; // Arama debounce için zamanlayıcı
+
+            // Google Sheets'ten GTIP verilerini çek
+            async function fetchGtipDataFromSheets() {
+                showLoadingIndicator();
+                
+                try {
+                    // Google Sheets URL'si - 'export?format=csv' parametresi ile
+                    const sheetId = '1XU12S_62_5MkuxMtfYMitCZ0CdKjWCYCbyDT62YlmO8';
+                    const sheetURL = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+                    
+                    // CSV verisini çek
+                    const response = await fetch(sheetURL);
+                    if (!response.ok) {
+                        throw new Error('Sheets verisi alınamadı');
+                    }
+                    
+                    const csvData = await response.text();
+                    allGtipData = parseCSVData(csvData);
+                    hideLoadingIndicator();
+                    console.log(`${allGtipData.length} GTIP kaydı başarıyla yüklendi`);
+                } catch (error) {
+                    console.error("GTIP verileri alınırken hata oluştu: ", error);
+                    hideLoadingIndicator();
+                    showError("Veriler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.");
+                }
+            }
+
+            // CSV verisini işle ve JSON'a dönüştür
+            function parseCSVData(csvData) {
+                const lines = csvData.split('\n');
+                const result = [];
+                
+                // Başlık satırını bul ve index'leri belirle
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                const codeIndex = headers.indexOf('code');
+                const nameIndex = headers.indexOf('name');
+                
+                if (codeIndex === -1 || nameIndex === -1) {
+                    throw new Error('CSV başlıklarında "code" veya "name" bulunamadı');
+                }
+                
+                // Veri satırlarını işle (ilk satır başlık olduğu için 1'den başlıyoruz)
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    // CSV satırını parse et
+                    const values = parseCSVLine(line);
+                    
+                    if (values.length > Math.max(codeIndex, nameIndex)) {
+                        result.push({
+                            code: values[codeIndex].trim(),
+                            description: values[nameIndex].trim()
+                        });
+                    }
+                }
+                
+                return result;
+            }
+
+            // Basit CSV satır parser - tırnak işaretlerini dikkate alır
+            function parseCSVLine(line) {
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current);
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                
+                values.push(current);
+                return values;
+            }
+
+            // Yükleme göstergesi ekle
+            function showLoadingIndicator() {
+                const loadingHtml = `
+                    <div class="p-3 text-center">
+                        <div class="loading-spinner mx-auto mb-2"></div>
+                        <div class="text-sm text-gray-600">GTIP verileri yükleniyor...</div>
+                    </div>
+                `;
+                suggestions.innerHTML = loadingHtml;
+                suggestions.classList.remove('hidden');
+            }
+
+            // Hata mesajı göster
+            function showError(message) {
+                suggestions.innerHTML = `<div class="p-3 text-center text-red-600">${message}</div>`;
+                suggestions.classList.remove('hidden');
+            }
+
+            // Yükleme göstergesini gizle
+            function hideLoadingIndicator() {
+                if (suggestions.innerHTML.includes('loading-spinner')) {
+                    suggestions.classList.add('hidden');
+                }
+            }
+
+            // Arama kutusu için olay dinleyicileri
+            gtipSearch.addEventListener('focus', function() {
+                if (allGtipData.length === 0) {
+                    fetchGtipDataFromSheets();
+                } else if (gtipSearch.value.length > 0) {
+                    showSuggestions(gtipSearch.value);
+                }
+            });
+            
+            gtipSearch.addEventListener('input', function() {
+                // Debounce uygula: Her tuş vuruşunda değil, kullanıcı yazmayı bitirdikten sonra arama yap
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    if (gtipSearch.value.length > 0) {
+                        showSuggestions(gtipSearch.value);
+                    } else {
+                        suggestions.classList.add('hidden');
+                    }
+                }, 300);
+            });
+            
+            gtipSearch.addEventListener('blur', function() {
+                // Açılır liste kaybolmadan önce küçük bir gecikme ekle
+                setTimeout(() => {
+                    suggestions.classList.add('hidden');
+                }, 200);
+            });
+
+            // Önerileri göster
+            function showSuggestions(searchText) {
+                const searchLower = searchText.toLowerCase();
+                
+                // Yerel veride ara
+                const localResults = allGtipData.filter(item => 
+                    item.code.includes(searchText) || 
+                    item.description.toLowerCase().includes(searchLower)
+                );
+                
+                if (localResults.length === 0) {
+                    suggestions.innerHTML = '<div class="p-4 text-gray-500">Sonuç bulunamadı</div>';
+                    suggestions.classList.remove('hidden');
+                    return;
+                }
+                
+                // En fazla 20 sonuç göster
+                const limitedResults = localResults.slice(0, 20);
+                displaySuggestions(limitedResults);
+            }
+            
+            // Öneri listesini görüntüle
+            function displaySuggestions(results) {
+                suggestions.innerHTML = '';
+                
+                results.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 border-b border-gray-200 cursor-pointer suggestion-item';
+                    div.innerHTML = `
+                        <div class="font-medium text-indigo-600">${item.code}</div>
+                        <div class="text-sm text-gray-600">${item.description}</div>
+                    `;
+                    
+                    div.addEventListener('mousedown', function(e) {
+                        e.preventDefault(); // Input'un blur olmasını engelle
+                        selectGtip(item);
+                    });
+                    
+                    suggestions.appendChild(div);
+                });
+                
+                suggestions.classList.remove('hidden');
+            }
+            
+            // GTIP seçme
+            function selectGtip(item) {
+                selectedGtip.value = item.code;
+                productDescription.value = item.description;
+                gtipSearch.value = '';
+                suggestions.classList.add('hidden');
+            }
+            
+            // Sayfa yüklendiğinde verileri çek
+            fetchGtipDataFromSheets();
+        });
+    </script>
+</body>
+</html>

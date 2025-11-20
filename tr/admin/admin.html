@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Global B2B Admin Panel</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --sidebar-bg: #1e293b;
+    --sidebar-hover: #334155;
+    --sidebar-active: #3b82f6;
+    --sidebar-text: #f8fafc;
+    --sidebar-icon: #cbd5e1;
+  }
+  
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .header-gradient {
+    background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+  }
+  .user-status-online {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #10B981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+  }
+  .language-select {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .language-select:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  .language-select option {
+    background: #1e293b;
+    color: white;
+  }
+  .logout-btn {
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3);
+  }
+  .logout-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px -1px rgba(239, 68, 68, 0.4);
+  }
+  
+  /* Sidebar Styling */
+  .sidebar {
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    transition: all 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .menu-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    margin: 4px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: var(--sidebar-text);
+  }
+  
+  .menu-item:hover {
+    background: var(--sidebar-hover);
+    transform: translateX(5px);
+  }
+  
+  .menu-item.active {
+    background: var(--sidebar-active);
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
+  }
+  
+  .menu-icon {
+    width: 20px;
+    margin-right: 12px;
+    color: var(--sidebar-icon);
+  }
+  
+  .menu-text {
+    flex: 1;
+    font-weight: 500;
+  }
+  
+  .menu-arrow {
+    transition: transform 0.3s ease;
+  }
+  
+  .submenu {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  
+  .submenu.open {
+    max-height: 500px;
+  }
+  
+  .submenu-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px 10px 48px;
+    margin: 2px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--sidebar-text);
+    font-size: 14px;
+  }
+  
+  .submenu-item:hover {
+    background: var(--sidebar-hover);
+  }
+  
+  .submenu-icon {
+    width: 16px;
+    margin-right: 10px;
+    color: var(--sidebar-icon);
+  }
+  
+  .company-brand {
+    display: flex;
+    align-items: center;
+    padding: 20px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .company-logo {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+  }
+  
+  .company-name {
+    font-weight: 600;
+    font-size: 18px;
+  }
+</style>
+</head>
+
+<body class="bg-gray-100 font-sans">
+  <!-- Navbar -->
+  <header class="header-gradient text-white h-16 flex items-center justify-between px-6 fixed top-0 left-0 right-0 z-50 shadow-lg">
+    <!-- Logo ve Başlık -->
+    <div class="flex items-center space-x-3">
+      <div class="bg-white p-2 rounded-lg shadow-md">
+        <i class="fas fa-globe-americas text-indigo-600 text-xl"></i>
+      </div>
+      <h1 class="text-xl font-bold">Global B2B Admin Panel</h1>
+    </div>
+
+    <!-- Dil Seçimi -->
+    <div class="flex items-center space-x-2">
+      <i class="fas fa-language text-gray-300"></i>
+      <select id="languageSelect" class="language-select">
+        <option value="tr">Türkçe</option>
+        <option value="en">English</option>
+        <option value="fr">Français</option>
+        <option value="it">Italiano</option>
+        <option value="zh">中文</option>
+        <option value="ru">Русский</option>
+        <option value="ar">العربية</option>
+      </select>
+    </div>
+
+    <!-- Kullanıcı Bilgileri -->
+    <div class="flex items-center space-x-4">
+      <!-- Kullanıcı Durumu + Adı -->
+      <div class="flex items-center space-x-3 bg-gray-700 bg-opacity-50 px-4 py-2 rounded-lg">
+        <div class="flex flex-col items-end">
+          <span id="userName" class="font-semibold text-sm">Yükleniyor...</span>
+          <span id="userRole" class="text-gray-300 text-xs">Rol: Yükleniyor...</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div id="userStatus" class="user-status-online animate-pulse"></div>
+          <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center">
+            <i class="fas fa-user text-white text-sm"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Çıkış Butonu -->
+      <button id="logoutBtn" class="logout-btn flex items-center space-x-2 text-white px-4 py-2 rounded-lg">
+        <span class="font-semibold">Çıkış</span>
+        <i class="fas fa-sign-out-alt"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Content wrapper -->
+  <div class="flex pt-16 h-screen">
+    <!-- Sidebar -->
+    <aside class="sidebar w-64 flex-shrink-0 flex flex-col">
+      <div class="company-brand">
+        <div class="company-logo">
+          <i class="fas fa-globe text-white"></i>
+        </div>
+        <div class="company-name">Global B2B</div>
+      </div>
+      
+      <nav class="flex-1 overflow-y-auto py-4">
+        <div class="space-y-1">
+          <div class="menu-item active" onclick="loadPage('dashboard.html')">
+            <i class="menu-icon fas fa-chart-line"></i>
+            <span class="menu-text">Dashboard</span>
+          </div>
+          
+          <!-- Satıcı Profilleri -->
+          <div>
+            <div class="menu-item" onclick="toggleMenu('menu-seller')">
+              <i class="menu-icon fas fa-industry"></i>
+              <span class="menu-text">Satıcı Profilleri</span>
+              <i class="menu-arrow fas fa-chevron-down"></i>
+            </div>
+            <div id="menu-seller" class="submenu">
+              <div class="submenu-item" onclick="loadPage('seller.html')">
+                <i class="submenu-icon fas fa-building"></i>
+                <span>Firma Bilgileri</span>
+              </div>
+              <div class="submenu-item" onclick="loadPage('sellertarget.html')">
+                <i class="submenu-icon fas fa-user-plus"></i>
+                <span>Satış Hedefleri</span>
+              </div>	 
+		
+		      <div class="submenu-item" onclick="loadPage('buyerprofiles.html')">
+                <i class="submenu-icon fas fa-box"></i>
+                <span>Müşleriler</span>
+		      </div>
+	       
+              <div class="submenu-item" onclick="loadPage('productseller.html')">
+                <i class="submenu-icon fas fa-box"></i>
+                <span>Ürünler</span>
+				  </div>
+				<div class="submenu-item" onclick="loadPage('productload.html')">
+                <i class="submenu-icon fas fa-box"></i>
+                <span>Ürün Yükle</span>
+              </div>
+              </div>
+              <div class="submenu-item" onclick="loadPage('orders.html')">
+                <i class="submenu-icon fas fa-file-alt"></i>
+                <span>Siparişler</span>
+              </div>
+              <div class="submenu-item" onclick="loadPage('sellerdocument.html')">
+                <i class="submenu-icon fas fa-receipt"></i>
+                <span>Belgeler</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alıcı Profilleri -->
+          <div>
+            <div class="menu-item" onclick="toggleMenu('menu-buyer')">
+              <i class="menu-icon fas fa-shopping-cart"></i>
+              <span class="menu-text">Alıcı Profilleri</span>
+              <i class="menu-arrow fas fa-chevron-down"></i>
+            </div>
+            <div id="menu-buyer" class="submenu">
+             <div class="submenu-item" onclick="loadPage('buyer.html')">
+                <i class="submenu-icon fas fa-building"></i>
+                <span>Firma Bilgileri</span>
+              </div>
+              <div class="submenu-item" onclick="loadPage('productbuyer.html')">
+                <i class="submenu-icon fas fa-list"></i>
+                <span>Talep Edilen Ürünler</span>
+              </div>
+              <div class="submenu-item" onclick="loadPage('buyerOrders.html')">
+                <i class="submenu-icon fas fa-history"></i>
+                <span>Sipariş Geçmişi</span>
+              </div>
+              <div class="submenu-item" onclick="loadPage('buyerContract.html')">
+                <i class="submenu-icon fas fa-file-contract"></i>
+                <span>Sözleşmeler</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Potansiyel Leadler -->
+          <div>
+            <div class="menu-item" onclick="toggleMenu('menu-leads')">
+              <i class="menu-icon fas fa-list-alt"></i>
+              <span class="menu-text">Potansiyel Leadler</span>
+              <i class="menu-arrow fas fa-chevron-down"></i>
+            </div>
+            <div id="menu-leads" class="submenu">
+              <div class="submenu-item" onclick="loadPage('leads.html')">
+                <i class="submenu-icon fas fa-folder"></i>
+                <span>Lead Havuzu</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-handshake"></i>
+                <span>Etkileşimler</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-file-import"></i>
+                <span>Konşimento / Dış Veri Entegrasyonu</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-chart-bar"></i>
+                <span>Teklif & Analiz</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-file-signature"></i>
+                <span>Sözleşmeler</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI İçerik -->
+          <div>
+            <div class="menu-item" onclick="toggleMenu('menu-aicontent')">
+              <i class="menu-icon fas fa-robot"></i>
+              <span class="menu-text">AI İçerik</span>
+              <i class="menu-arrow fas fa-chevron-down"></i>
+            </div>
+            <div id="menu-aicontent" class="submenu">
+              <div class="submenu-item" onclick="loadPage('ai_agent.html')">
+                <i class="submenu-icon fas fa-pen-fancy"></i>
+                <span>Agent-AI</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-envelope"></i>
+                <span>Mail & Mesaj Şablonları</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-share-alt"></i>
+                <span>Sosyal Medya İçerikleri</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-language"></i>
+                <span>Otomatik Çeviri</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Danışmanlar -->
+          <div>
+            <div class="menu-item" onclick="toggleMenu('menu-consultants')">
+              <i class="menu-icon fas fa-user-tie"></i>
+              <span class="menu-text">Danışmanlar</span>
+              <i class="menu-arrow fas fa-chevron-down"></i>
+            </div>
+            <div id="menu-consultants" class="submenu">
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-list"></i>
+                <span>Danışman Listesi</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-cogs"></i>
+                <span>Uzmanlık Alanları</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-folder"></i>
+                <span>Atanan Leadler</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-globe"></i>
+                <span>Dil Bilgileri</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lojistik Partnerler -->
+          <div>
+            <div class="menu-item" onclick="toggleMenu('menu-logistics')">
+              <i class="menu-icon fas fa-truck"></i>
+              <span class="menu-text">Lojistik Partnerler</span>
+              <i class="menu-arrow fas fa-chevron-down"></i>
+            </div>
+            <div id="menu-logistics" class="submenu">
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-handshake"></i>
+                <span>Partner Listesi</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-box"></i>
+                <span>Teslim Ayarları (Incoterms)</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-credit-card"></i>
+                <span>Ödeme Ayarları</span>
+              </div>
+              <div class="submenu-item" onclick="toggleMenu('menu-customs')">
+                <i class="submenu-icon fas fa-passport"></i>
+                <span>Gümrük İşlemleri</span>
+                <i class="menu-arrow fas fa-chevron-down ml-auto"></i>
+              </div>
+              <div id="menu-customs" class="submenu">
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-file-alt"></i>
+                  <span>Evrak Akış Planı</span>
+                </div>
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-folder"></i>
+                  <span>Gümrük Evrakları</span>
+                </div>
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-cog"></i>
+                  <span>GTİP Ayarları</span>
+                </div>
+                <div class="submenu-item" onclick="loadPage('gtip.html')">
+                  <i class="submenu-icon fas fa-barcode"></i>
+                  <span>GTİP Kodları</span>
+                </div>
+                <div class="submenu-item" onclick="loadPage('gtipinstal.html')">
+                  <i class="submenu-icon fas fa-align-left"></i>
+                  <span>GTİP İşleme</span>
+                </div>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-shipping-fast"></i>
+                <span>Nakliye / Sevkiyat Planı</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Marketplace İlanları -->
+          <div>
+            <div class="menu-item" onclick="toggleMenu('menu-marketplace')">
+              <i class="menu-icon fas fa-ad"></i>
+              <span class="menu-text">Marketplace İlanları</span>
+              <i class="menu-arrow fas fa-chevron-down"></i>
+            </div>
+            <div id="menu-marketplace" class="submenu">
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-list"></i>
+                <span>İlan Listesi</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-plus-circle"></i>
+                <span>İlan Ekle/Düzenle</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-store"></i>
+                <span>Platform Yönetimi</span>
+              </div>
+              <div class="submenu-item">
+                <i class="submenu-icon fas fa-chart-line"></i>
+                <span>Performans Raporları</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Site Ayarları -->
+          <div>
+            <div class="menu-item" onclick="toggleMenu('menu-settings')">
+              <i class="menu-icon fas fa-cog"></i>
+              <span class="menu-text">Site Ayarları</span>
+              <i class="menu-arrow fas fa-chevron-down"></i>
+            </div>
+            <div id="menu-settings" class="submenu">
+              <div class="submenu-item" onclick="toggleMenu('menu-general')">
+                <i class="submenu-icon fas fa-sliders-h"></i>
+                <span>Genel Ayarlar</span>
+                <i class="menu-arrow fas fa-chevron-down ml-auto"></i>
+              </div>
+              <div id="menu-general" class="submenu">
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-heading"></i>
+                  <span>Site Başlığı</span>
+                </div>
+                <div class="submenu-item" onclick="loadPage('dbd.html')">
+                  <i class="submenu-icon fas fa-align-left"></i>
+                  <span>Koleksiyon Yöneticisi</span>
+                </div>
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-image"></i>
+                  <span>Logo Yükleme</span>
+                </div>
+              </div>
+              
+              <div class="submenu-item" onclick="toggleMenu('menu-location')">
+                <i class="submenu-icon fas fa-map-marker-alt"></i>
+                <span>Konum Ayarları</span>
+                <i class="menu-arrow fas fa-chevron-down ml-auto"></i>
+              </div>
+              <div id="menu-location" class="submenu">
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-globe-americas"></i>
+                  <span>Ülke Seçimi</span>
+                </div>
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-city"></i>
+                  <span>Şehir / İlçe Dinamik Seçimi</span>
+                </div>
+              </div>
+              
+              <div class="submenu-item" onclick="loadPage('languages.html')">
+                <i class="submenu-icon fas fa-language"></i>
+                <span>Dil Ayarları</span>
+              </div>
+              
+              <div class="submenu-item" onclick="toggleMenu('menu-currency')">
+                <i class="submenu-icon fas fa-money-bill-wave"></i>
+                <span>Döviz Ayarları</span>
+                <i class="menu-arrow fas fa-chevron-down ml-auto"></i>
+              </div>
+              <div id="menu-currency" class="submenu">
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-coins"></i>
+                  <span>Desteklenen Para Birimleri</span>
+                </div>
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-dollar-sign"></i>
+                  <span>Varsayılan Döviz</span>
+                </div>
+              </div>
+              
+              <div class="submenu-item" onclick="toggleMenu('menu-tax')">
+                <i class="submenu-icon fas fa-receipt"></i>
+                <span>Vergi Ayarları</span>
+                <i class="menu-arrow fas fa-chevron-down ml-auto"></i>
+              </div>
+              <div id="menu-tax" class="submenu">
+                <div class="submenu-item" style="padding-left: 70px;">
+                  <i class="submenu-icon fas fa-chart-pie"></i>
+                  <span>Vergi Oranları Yönetimi</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kullanıcılar -->
+          <div>
+            <div class="menu-item" onclick="toggleMenu('menu-users')">
+              <i class="menu-icon fas fa-users"></i>
+              <span class="menu-text">Kullanıcılar</span>
+              <i class="menu-arrow fas fa-chevron-down"></i>
+            </div>
+			   <div id="menu-users" class="submenu">
+               <div class="submenu-item" onclick="loadPage('user-management.html')">
+                <i <i class="submenu-icon fas fa-user"></i>
+                <span>Kullanıcı Yönetimi</span>
+              </div>			  
+           </div>	
+		<div>  
+		<div>  	
+      </nav>
+      
+      <div class="p-4 border-t border-gray-700 text-xs text-gray-400 mt-auto">
+        v2.1.0 © 2023 Global B2B
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 p-4 overflow-auto">
+      <iframe id="contentFrame" src="" class="w-full h-full border-none rounded-lg shadow-lg"></iframe>
+    </main>
+  </div>
+
+<script>
+  const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w"; 
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+  // Çıkış
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem("userEmail");
+    window.location.href = "../login.html";
+  });
+
+  // Kullanıcı bilgilerini yükle
+  async function loadUserInfo() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session) {
+      window.location.href = "tr/admin/admin.html";
+
+      return;
+    }
+
+    const user = session.user;
+    currentUserId = user.id; // <<<<< burada id’yi saklıyoruz
+	  
+    // profiles tablosundan bilgileri çek
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("full_name, role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      console.error("Profil bilgisi alınamadı:", profileError);
+      document.getElementById("userName").textContent = user.email;
+      document.getElementById("userRole").textContent = "Rol: Bilinmiyor";
+    } else {
+      document.getElementById("userName").textContent = profile.full_name || user.email;
+      document.getElementById("userRole").textContent = "Rol: " + (profile.role || "Belirtilmemiş");
+    }
+
+    // Kullanıcı durumunu yeşil yap
+    const userStatus = document.getElementById("userStatus");
+    userStatus.classList.remove("animate-pulse");
+    userStatus.style.backgroundColor = "#10B981";
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadUserInfo();
+    loadPage('dashboard.html'); // ilk açılışta dashboard
+  });
+
+  // Menü fonksiyonları aynı kalabilir
+function loadPage(url) {
+  if (!currentUserId) {
+    console.warn("Kullanıcı ID henüz hazır değil, lütfen tekrar deneyin.");
+    return;
+  }
+
+  document.getElementById('contentFrame').src = `${url}?id=${currentUserId}`;
+
+  document.querySelectorAll('.menu-item, .submenu-item').forEach(i => i.classList.remove('active'));
+  const currentMenu = document.querySelector(`[onclick*="${url}"]`);
+  if (currentMenu) currentMenu.classList.add('active');
+}
+  function toggleMenu(menuId) {
+    const menu = document.getElementById(menuId);
+    const arrow = menu.previousElementSibling.querySelector('.menu-arrow');
+    menu.classList.toggle('open');
+    if (arrow) {
+      arrow.classList.toggle('fa-chevron-down');
+      arrow.classList.toggle('fa-chevron-up');
+    }
+  }
+</script>
+
+</body>
+</html>

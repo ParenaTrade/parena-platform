@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParenaTrade - Kullanıcı Yönetimi</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8fafc;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4f46e5;
+            color: white;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            border: none;
+            text-decoration: none;
+        }
+        .btn:hover {
+            background-color: #3730a3;
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #374151;
+        }
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+        .btn-success {
+            background-color: #10b981;
+        }
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        .btn-danger {
+            background-color: #ef4444;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .tab-container {
+            display: flex;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+        .tab.active {
+            border-bottom: 3px solid #4f46e5;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .status-active {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .status-pending {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .status-inactive {
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: white;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .notification.success {
+            background-color: #10b981;
+        }
+        .notification.error {
+            background-color: #ef4444;
+        }
+        .notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Üst Bilgi -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-indigo-800">ParenaTrade Kullanıcı Yönetimi</h1>
+            <div class="flex space-x-4">
+                <button id="refreshBtn" class="btn-secondary">
+                    <i class="fas fa-sync-alt mr-2"></i>Yenile
+                </button>
+                <button id="addUserBtn" class="btn">
+                    <i class="fas fa-plus mr-2"></i>Yeni Kullanıcı
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Container -->
+        <div class="tab-container">
+            <div class="tab active" data-tab="users">Kullanıcı Listesi</div>
+            <div class="tab" data-tab="add-user">Kullanıcı Ekle</div>
+            <div class="tab" data-tab="stats">İstatistikler</div>
+        </div>
+
+        <!-- Kullanıcı Listesi -->
+        <div class="tab-content active" id="usersTab">
+            <div class="card">
+                <h2 class="text-2xl font-semibold mb-4">Kullanıcılar</h2>
+                
+                <div class="mb-4 flex justify-between">
+                    <div class="flex space-x-2">
+                        <input type="text" id="searchInput" placeholder="Kullanıcı ara..." class="p-2 border rounded">
+                        <button id="searchBtn" class="btn-secondary">Ara</button>
+                    </div>
+                    <div>
+                        <select id="roleFilter" class="p-2 border rounded">
+                            <option value="">Tüm Roller</option>
+                            <option value="seller">Satıcı</option>
+                            <option value="buyer">Alıcı</option>
+                            <option value="admin">Yönetici</option>
+                            <option value="staff">Personel</option>
+                            <option value="consultant">Danışman</option>
+                            <option value="customs">Gümrük</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ad</th>
+                                <th>E-posta</th>
+                                <th>Şirket</th>
+                                <th>Telefon</th>
+                                <th>Rol</th>
+                                <th>Durum</th>
+                                <th>Oluşturulma</th>
+                                <th>İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <!-- Kullanıcılar buraya dinamik olarak eklenecek -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-4 flex justify-between items-center">
+                    <div id="paginationInfo" class="text-gray-600">Toplam 0 kullanıcı</div>
+                    <div class="flex space-x-2">
+                        <button id="prevPageBtn" class="btn-secondary" disabled>
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button id="nextPageBtn" class="btn-secondary" disabled>
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kullanıcı Ekleme Formu -->
+        <div class="tab-content" id="addUserTab">
+            <div class="card">
+                <h2 class="text-2xl font-semibold mb-4">Yeni Kullanıcı Ekle</h2>
+                
+                <form id="userForm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="form-group">
+                            <label for="name">Ad Soyad</label>
+                            <input type="text" id="name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">E-posta</label>
+                            <input type="email" id="email" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="company_name">Şirket Adı</label>
+                            <input type="text" id="company_name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="phone">Telefon</label>
+                            <input type="tel" id="phone">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="role">Rol</label>
+                            <select id="role" required>
+                                <option value="seller">Satıcı</option>
+                                <option value="buyer">Alıcı</option>
+                                <option value="admin">Yönetici</option>
+                                <option value="staff">Personel</option>
+                                <option value="consultant">Danışman</option>
+                                <option value="customs">Gümrük</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="seller_id">Satıcı ID (Opsiyonel)</label>
+                            <input type="text" id="seller_id" placeholder="UUID formatında">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group mt-6">
+                        <div class="flex items-center space-x-4">
+                            <input type="checkbox" id="config" class="w-5 h-5">
+                            <label for="config" class="mb-0">Yapılandırma izni</label>
+                            
+                            <input type="checkbox" id="confirm" class="w-5 h-5">
+                            <label for="confirm" class="mb-0">Onaylı kullanıcı</label>
+                            
+                            <input type="checkbox" id="company_assigned" class="w-5 h-5">
+                            <label for="company_assigned" class="mb-0">Şirket atanmış</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6">
+                        <button type="submit" class="btn">
+                            <span id="submitText">Kullanıcı Ekle</span>
+                            <span id="submitSpinner" class="loading hidden"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- İstatistikler -->
+        <div class="tab-content" id="statsTab">
+            <div class="card">
+                <h2 class="text-2xl font-semibold mb-4">Kullanıcı İstatistikleri</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-indigo-50 p-6 rounded-lg text-center">
+                        <div class="text-4xl font-bold text-indigo-600" id="totalUsers">0</div>
+                        <div class="text-gray-600">Toplam Kullanıcı</div>
+                    </div>
+                    
+                    <div class="bg-green-50 p-6 rounded-lg text-center">
+                        <div class="text-4xl font-bold text-green-600" id="confirmedUsers">0</div>
+                        <div class="text-gray-600">Onaylı Kullanıcı</div>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-6 rounded-lg text-center">
+                        <div class="text-4xl font-bold text-blue-600" id="sellersCount">0</div>
+                        <div class="text-gray-600">Toplam Satıcı</div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-xl font-semibold mb-4">Rol Dağılımı</h3>
+                    <div id="roleChart" class="h-64">
+                        <!-- Rol dağılım grafiği buraya eklenecek -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Düzenleme Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg w-11/12 md:w-2/3 lg:w-1/2 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold">Kullanıcı Düzenle</h3>
+                <button id="closeModal" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="editForm">
+                <input type="hidden" id="editId">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="form-group">
+                        <label for="editName">Ad Soyad</label>
+                        <input type="text" id="editName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editEmail">E-posta</label>
+                        <input type="email" id="editEmail" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editCompany">Şirket Adı</label>
+                        <input type="text" id="editCompany">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editPhone">Telefon</label>
+                        <input type="tel" id="editPhone">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editRole">Rol</label>
+                        <select id="editRole" required>
+                            <option value="seller">Satıcı</option>
+                            <option value="buyer">Alıcı</option>
+                            <option value="admin">Yönetici</option>
+                            <option value="staff">Personel</option>
+                            <option value="consultant">Danışman</option>
+                            <option value="customs">Gümrük</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editSellerId">Satıcı ID</label>
+                        <input type="text" id="editSellerId">
+                    </div>
+                </div>
+                
+                <div class="form-group mt-6">
+                    <div class="flex items-center space-x-4">
+                        <input type="checkbox" id="editConfig" class="w-5 h-5">
+                        <label for="editConfig" class="mb-0">Yapılandırma izni</label>
+                        
+                        <input type="checkbox" id="editConfirm" class="w-5 h-5">
+                        <label for="editConfirm" class="mb-0">Onaylı kullanıcı</label>
+                        
+                        <input type="checkbox" id="editCompanyAssigned" class="w-5 h-5">
+                        <label for="editCompanyAssigned" class="mb-0">Şirket atanmış</label>
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex justify-end space-x-4">
+                    <button type="button" id="cancelEdit" class="btn-secondary">İptal</button>
+                    <button type="submit" class="btn">Güncelle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bildirim -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // Supabase bağlantı bilgileri
+        const SUPABASE_URL = "https://xliutvspwodhoaxvysks.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+        
+        // Supabase client'ı oluştur
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Uygulama durumu
+        let currentPage = 1;
+        const usersPerPage = 10;
+        let allUsers = [];
+        let filteredUsers = [];
+        
+        // Sayfa yüklendiğinde
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+        
+        // Uygulamayı başlat
+        function initializeApp() {
+            setupEventListeners();
+            loadUsers();
+            loadStatistics();
+        }
+        
+        // Event listener'ları kur
+        function setupEventListeners() {
+            // Tab geçişleri
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    switchTab(this.dataset.tab);
+                });
+            });
+            
+            // Form gönderimi
+            document.getElementById('userForm').addEventListener('submit', handleAddUser);
+            document.getElementById('editForm').addEventListener('submit', handleEditUser);
+            
+            // Modal kapatma
+            document.getElementById('closeModal').addEventListener('click', closeModal);
+            document.getElementById('cancelEdit').addEventListener('click', closeModal);
+            
+            // Yenileme butonu
+            document.getElementById('refreshBtn').addEventListener('click', function() {
+                loadUsers();
+                loadStatistics();
+            });
+            
+            // Kullanıcı ekleme butonu
+            document.getElementById('addUserBtn').addEventListener('click', function() {
+                switchTab('add-user');
+            });
+            
+            // Arama ve filtreleme
+            document.getElementById('searchBtn').addEventListener('click', filterUsers);
+            document.getElementById('searchInput').addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') filterUsers();
+            });
+            document.getElementById('roleFilter').addEventListener('change', filterUsers);
+            
+            // Sayfalama
+            document.getElementById('prevPageBtn').addEventListener('click', function() {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderUsersTable();
+                }
+            });
+            
+            document.getElementById('nextPageBtn').addEventListener('click', function() {
+                const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderUsersTable();
+                }
+            });
+        }
+        
+        // Tab geçişi
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(`${tabName}Tab`).classList.add('active');
+            
+            if (tabName === 'stats') {
+                loadStatistics();
+            }
+        }
+        
+        // Kullanıcıları yükle
+        async function loadUsers() {
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    throw error;
+                }
+                
+                allUsers = data || [];
+                filteredUsers = [...allUsers];
+                currentPage = 1;
+                renderUsersTable();
+                
+            } catch (error) {
+                console.error('Kullanıcılar yüklenirken hata:', error);
+                showNotification('Kullanıcılar yüklenirken bir hata oluştu.', 'error');
+            }
+        }
+        
+        // Kullanıcıları filtrele
+        function filterUsers() {
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            const roleFilter = document.getElementById('roleFilter').value;
+            
+            filteredUsers = allUsers.filter(user => {
+                const matchesSearch = searchText === '' || 
+                    user.name?.toLowerCase().includes(searchText) ||
+                    user.email?.toLowerCase().includes(searchText) ||
+                    user.company_name?.toLowerCase().includes(searchText);
+                
+                const matchesRole = roleFilter === '' || user.role === roleFilter;
+                
+                return matchesSearch && matchesRole;
+            });
+            
+            currentPage = 1;
+            renderUsersTable();
+        }
+        
+        // Kullanıcı tablosunu render et
+        function renderUsersTable() {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            
+            // Sayfalama hesaplamaları
+            const startIndex = (currentPage - 1) * usersPerPage;
+            const endIndex = startIndex + usersPerPage;
+            const usersToShow = filteredUsers.slice(startIndex, endIndex);
+            const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+            
+            // Sayfalama bilgisi
+            document.getElementById('paginationInfo').textContent = 
+                `Toplam ${filteredUsers.length} kullanıcı, Sayfa ${currentPage} / ${totalPages}`;
+            
+            // Önceki/Sonraki butonları
+            document.getElementById('prevPageBtn').disabled = currentPage === 1;
+            document.getElementById('nextPageBtn').disabled = currentPage === totalPages || totalPages === 0;
+            
+            if (usersToShow.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-gray-500">
+                            Kullanıcı bulunamadı
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            usersToShow.forEach(user => {
+                const tr = document.createElement('tr');
+                
+                // Durum badge'ini belirle
+                let statusClass = 'status-inactive';
+                let statusText = 'Pasif';
+                
+                if (user.confirm) {
+                    statusClass = 'status-active';
+                    statusText = 'Aktif';
+                } else if (!user.confirm && user.company_assigned) {
+                    statusClass = 'status-pending';
+                    statusText = 'Beklemede';
+                }
+                
+                tr.innerHTML = `
+                    <td>${user.name || '-'}</td>
+                    <td>${user.email}</td>
+                    <td>${user.company_name || '-'}</td>
+                    <td>${user.phone || '-'}</td>
+                    <td>${getRoleDisplayName(user.role)}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>${formatDate(user.created_at)}</td>
+                    <td>
+                        <button class="text-blue-600 hover:text-blue-800 edit-user" data-id="${user.id}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="text-red-600 hover:text-red-800 ml-2 delete-user" data-id="${user.id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tbody.appendChild(tr);
+            });
+            
+            // Düzenleme ve silme butonlarına event listener ekle
+            document.querySelectorAll('.edit-user').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const userId = this.dataset.id;
+                    openEditModal(userId);
+                });
+            });
+            
+            document.querySelectorAll('.delete-user').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const userId = this.dataset.id;
+                    deleteUser(userId);
+                });
+            });
+        }
+        
+        // Rol görünen adını al
+        function getRoleDisplayName(role) {
+            const roleNames = {
+                'seller': 'Satıcı',
+                'buyer': 'Alıcı',
+                'admin': 'Yönetici',
+                'staff': 'Personel',
+                'consultant': 'Danışman',
+                'customs': 'Gümrük'
+            };
+            
+            return roleNames[role] || role;
+        }
+        
+        // Tarihi biçimlendir
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            
+            const date = new Date(dateString);
+            return date.toLocaleDateString('tr-TR');
+        }
+        
+        // İstatistikleri yükle
+        async function loadStatistics() {
+            try {
+                // Toplam kullanıcı sayısı
+                const { count: totalCount, error: countError } = await supabase
+                    .from('users')
+                    .select('*', { count: 'exact' });
+                
+                if (countError) throw countError;
+                
+                // Onaylı kullanıcı sayısı
+                const { count: confirmedCount, error: confirmedError } = await supabase
+                    .from('users')
+                    .select('*', { count: 'exact' })
+                    .eq('confirm', true);
+                
+                if (confirmedError) throw confirmedError;
+                
+                // Satıcı sayısı
+                const { count: sellersCount, error: sellersError } = await supabase
+                    .from('users')
+                    .select('*', { count: 'exact' })
+                    .eq('role', 'seller');
+                
+                if (sellersError) throw sellersError;
+                
+                // İstatistikleri göster
+                document.getElementById('totalUsers').textContent = totalCount || 0;
+                document.getElementById('confirmedUsers').textContent = confirmedCount || 0;
+                document.getElementById('sellersCount').textContent = sellersCount || 0;
+                
+                // Rol dağılımını yükle
+                loadRoleDistribution();
+                
+            } catch (error) {
+                console.error('İstatistikler yüklenirken hata:', error);
+            }
+        }
+        
+        // Rol dağılımını yükle
+        async function loadRoleDistribution() {
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('role');
+                
+                if (error) throw error;
+                
+                // Rol sayılarını hesapla
+                const roleCounts = {};
+                data.forEach(user => {
+                    roleCounts[user.role] = (roleCounts[user.role] || 0) + 1;
+                });
+                
+                // Basit bir grafik oluştur
+                const chartContainer = document.getElementById('roleChart');
+                chartContainer.innerHTML = '';
+                
+                for (const [role, count] of Object.entries(roleCounts)) {
+                    const percentage = (count / data.length) * 100;
+                    const displayName = getRoleDisplayName(role);
+                    
+                    const bar = document.createElement('div');
+                    bar.className = 'mb-2';
+                    bar.innerHTML = `
+                        <div class="flex justify-between mb-1">
+                            <span>${displayName}</span>
+                            <span>${count} (${percentage.toFixed(1)}%)</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${percentage}%"></div>
+                        </div>
+                    `;
+                    
+                    chartContainer.appendChild(bar);
+                }
+                
+            } catch (error) {
+                console.error('Rol dağılımı yüklenirken hata:', error);
+            }
+        }
+        
+        // Yeni kullanıcı ekle
+        async function handleAddUser(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const company_name = document.getElementById('company_name').value;
+            const phone = document.getElementById('phone').value;
+            const role = document.getElementById('role').value;
+            const seller_id = document.getElementById('seller_id').value;
+            const config = document.getElementById('config').checked;
+            const confirm = document.getElementById('confirm').checked;
+            const company_assigned = document.getElementById('company_assigned').checked;
+            
+            setLoading(true);
+            
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .insert([
+                        {
+                            name,
+                            email,
+                            company_name,
+                            phone,
+                            role,
+                            seller_id: seller_id || null,
+                            config,
+                            confirm,
+                            company_assigned
+                        }
+                    ])
+                    .select();
+                
+                if (error) {
+                    throw error;
+                }
+                
+                showNotification('Kullanıcı başarıyla eklendi.');
+                document.getElementById('userForm').reset();
+                
+                // Kullanıcı listesini yenile
+                await loadUsers();
+                await loadStatistics();
+                
+            } catch (error) {
+                console.error('Kullanıcı eklenirken hata:', error);
+                showNotification('Kullanıcı eklenirken bir hata oluştu: ' + error.message, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        // Düzenleme modalını aç
+        async function openEditModal(userId) {
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+                
+                if (error) throw error;
+                
+                // Formu doldur
+                document.getElementById('editId').value = data.id;
+                document.getElementById('editName').value = data.name || '';
+                document.getElementById('editEmail').value = data.email;
+                document.getElementById('editCompany').value = data.company_name || '';
+                document.getElementById('editPhone').value = data.phone || '';
+                document.getElementById('editRole').value = data.role;
+                document.getElementById('editSellerId').value = data.seller_id || '';
+                document.getElementById('editConfig').checked = data.config;
+                document.getElementById('editConfirm').checked = data.confirm;
+                document.getElementById('editCompanyAssigned').checked = data.company_assigned;
+                
+                // Modalı göster
+                document.getElementById('editModal').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+                showNotification('Kullanıcı bilgileri yüklenirken bir hata oluştu.', 'error');
+            }
+        }
+        
+        // Kullanıcı düzenle
+        async function handleEditUser(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('editId').value;
+            const name = document.getElementById('editName').value;
+            const email = document.getElementById('editEmail').value;
+            const company_name = document.getElementById('editCompany').value;
+            const phone = document.getElementById('editPhone').value;
+            const role = document.getElementById('editRole').value;
+            const seller_id = document.getElementById('editSellerId').value;
+            const config = document.getElementById('editConfig').checked;
+            const confirm = document.getElementById('editConfirm').checked;
+            const company_assigned = document.getElementById('editCompanyAssigned').checked;
+            
+            setLoading(true, 'editForm');
+            
+            try {
+                const { error } = await supabase
+                    .from('users')
+                    .update({
+                        name,
+                        email,
+                        company_name,
+                        phone,
+                        role,
+                        seller_id: seller_id || null,
+                        config,
+                        confirm,
+                        company_assigned,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', id);
+                
+                if (error) {
+                    throw error;
+                }
+                
+                showNotification('Kullanıcı başarıyla güncellendi.');
+                closeModal();
+                
+                // Kullanıcı listesini yenile
+                await loadUsers();
+                await loadStatistics();
+                
+            } catch (error) {
+                console.error('Kullanıcı güncellenirken hata:', error);
+                showNotification('Kullanıcı güncellenirken bir hata oluştu: ' + error.message, 'error');
+            } finally {
+                setLoading(false, 'editForm');
+            }
+        }
+        
+        // Kullanıcı sil
+        async function deleteUser(userId) {
+            if (!confirm('Bu kullanıcıyı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
+                return;
+            }
+            
+            try {
+                const { error } = await supabase
+                    .from('users')
+                    .delete()
+                    .eq('id', userId);
+                
+                if (error) {
+                    throw error;
+                }
+                
+                showNotification('Kullanıcı başarıyla silindi.');
+                
+                // Kullanıcı listesini yenile
+                await loadUsers();
+                await loadStatistics();
+                
+            } catch (error) {
+                console.error('Kullanıcı silinirken hata:', error);
+                showNotification('Kullanıcı silinirken bir hata oluştu: ' + error.message, 'error');
+            }
+        }
+        
+        // Modalı kapat
+        function closeModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+        
+        // Yükleniyor durumunu ayarla
+        function setLoading(isLoading, formId = 'userForm') {
+            const button = document.querySelector(`#${formId} button[type="submit"]`);
+            const buttonText = button.querySelector('span:first-child');
+            const buttonSpinner = button.querySelector('span:last-child');
+            
+            if (isLoading) {
+                button.disabled = true;
+                buttonText.classList.add('hidden');
+                buttonSpinner.classList.remove('hidden');
+            } else {
+                button.disabled = false;
+                buttonText.classList.remove('hidden');
+                buttonSpinner.classList.add('hidden');
+            }
+        }
+        
+        // Bildirim göster
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

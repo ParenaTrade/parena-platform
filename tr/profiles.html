@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parena Trade - Kullanıcı Profili</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --sidebar-bg: #1e293b;
+      --sidebar-hover: #334155;
+      --sidebar-active: #3b82f6;
+      --sidebar-text: #f8fafc;
+      --sidebar-icon: #cbd5e1;
+    }
+    
+    .sidebar {
+      background: var(--sidebar-bg);
+      color: var(--sidebar-text);
+      transition: all 0.3s ease;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .menu-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      margin: 4px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: var(--sidebar-text);
+    }
+    
+    .menu-item:hover {
+      background: var(--sidebar-hover);
+      transform: translateX(5px);
+    }
+    
+    .menu-item.active {
+      background: var(--sidebar-active);
+      box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
+    }
+    
+    .menu-icon {
+      width: 20px;
+      margin-right: 12px;
+      color: var(--sidebar-icon);
+    }
+    
+    .user-status-online {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #10B981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+    }
+    
+    .header-gradient {
+      background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+    }
+    
+    .stat-card {
+      transition: all 0.3s ease;
+    }
+    
+    .stat-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .profile-section {
+      transition: all 0.3s ease;
+    }
+    
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .btn-loading {
+      position: relative;
+      color: transparent;
+    }
+    
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      top: 50%;
+      left: 50%;
+      margin: -10px 0 0 -10px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <!-- Navbar -->
+  <header class="header-gradient text-white h-16 flex items-center justify-between px-6 fixed top-0 left-0 right-0 z-50 shadow-lg">
+    <div class="flex items-center space-x-3">
+      <div class="bg-white p-2 rounded-lg shadow-md">
+        <i class="fas fa-globe-americas text-indigo-600 text-xl"></i>
+      </div>
+      <h1 class="text-xl font-bold">Parena Trade Admin</h1>
+    </div>
+
+    <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-3 bg-gray-700 bg-opacity-50 px-4 py-2 rounded-lg">
+        <div class="flex flex-col items-end">
+          <span id="userRole" class="text-gray-300 text-xs">Yükleniyor...</span>
+          <span id="welcomeName" class="font-semibold text-sm">Hoş geldiniz, ...</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="user-status-online" id="userStatus"></div>
+          <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center">
+            <i class="fas fa-user text-white text-sm"></i>
+          </div>
+        </div>
+      </div>
+
+      <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors duration-200">
+        <span class="font-semibold">Çıkış</span>
+        <i class="fas fa-sign-out-alt"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Content wrapper -->
+  <div class="flex pt-16 h-screen">
+    <!-- Sidebar -->
+    <aside class="sidebar w-64 flex-shrink-0">
+      <div class="p-4 border-b border-gray-700">
+        <h2 class="text-lg font-semibold">Yönetim Paneli</h2>
+      </div>
+      
+      <nav class="p-4">
+        <div class="space-y-2">
+          <div class="menu-item" onclick="window.location.href='admin.html'">
+            <i class="menu-icon fas fa-chart-line"></i>
+            <span class="menu-text">Dashboard</span>
+          </div>
+          
+          <div class="menu-item active">
+            <i class="menu-icon fas fa-user-circle"></i>
+            <span class="menu-text">Profilim</span>
+          </div>
+          
+          <div class="menu-item" onclick="window.location.href='admin/productseller.html'">
+            <i class="menu-icon fas fa-box"></i>
+            <span class="menu-text">Ürünler</span>
+          </div>
+          
+          <div class="menu-item" onclick="window.location.href='admin/orders.html'">
+            <i class="menu-icon fas fa-shopping-cart"></i>
+            <span class="menu-text">Siparişler</span>
+          </div>
+          
+          <div class="menu-item" onclick="window.location.href='admin/settings.html'">
+            <i class="menu-icon fas fa-cog"></i>
+            <span class="menu-text">Ayarlar</span>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6 overflow-auto">
+      <div class="bg-white rounded-lg shadow-md p-6 profile-section">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Profil Bilgilerim</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div class="bg-blue-50 p-4 rounded-lg border border-blue-200 stat-card">
+            <div class="flex items-center">
+              <div class="bg-blue-100 p-3 rounded-full mr-4">
+                <i class="fas fa-user-clock text-blue-600"></i>
+              </div>
+              <div>
+                <p class="text-gray-600 text-sm">Son Giriş</p>
+                <p class="text-lg font-bold text-gray-800" id="lastLogin">Yükleniyor...</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-green-50 p-4 rounded-lg border border-green-200 stat-card">
+            <div class="flex items-center">
+              <div class="bg-green-100 p-3 rounded-full mr-4">
+                <i class="fas fa-calendar-alt text-green-600"></i>
+              </div>
+              <div>
+                <p class="text-gray-600 text-sm">Üyelik Tarihi</p>
+                <p class="text-lg font-bold text-gray-800" id="signupDate">Yükleniyor...</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-purple-50 p-4 rounded-lg border border-purple-200 stat-card">
+            <div class="flex items-center">
+              <div class="bg-purple-100 p-3 rounded-full mr-4">
+                <i class="fas fa-shield-alt text-purple-600"></i>
+              </div>
+              <div>
+                <p class="text-gray-600 text-sm">Hesap Durumu</p>
+                <p class="text-lg font-bold text-green-600" id="accountStatus">Aktif</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="bg-gray-50 p-6 rounded-lg mb-6">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">Kişisel Bilgiler</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <p class="text-sm text-gray-600">Kullanıcı Adı:</p>
+              <p class="font-medium" id="userFullName">Yükleniyor...</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">E-posta:</p>
+              <p class="font-medium" id="userEmail">Yükleniyor...</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Telefon:</p>
+              <p class="font-medium" id="userPhone">Belirtilmemiş</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Pozisyon:</p>
+              <p class="font-medium" id="userPosition">Belirtilmemiş</p>
+            </div>
+          </div>
+          <button id="editProfileBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg mt-2 transition-colors duration-200">
+            <i class="fas fa-edit mr-2"></i>Profili Düzenle
+          </button>
+        </div>
+        
+        <div class="bg-gray-50 p-6 rounded-lg">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">İşletme Bilgileri</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <p class="text-sm text-gray-600">Şirket Adı:</p>
+              <p class="font-medium" id="companyName">Yükleniyor...</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Vergi No:</p>
+              <p class="font-medium" id="taxNumber">Belirtilmemiş</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Sektör:</p>
+              <p class="font-medium" id="industry">Belirtilmemiş</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Çalışan Sayısı:</p>
+              <p class="font-medium" id="employeeCount">Belirtilmemiş</p>
+            </div>
+          </div>
+          <button id="editCompanyBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg mt-2 transition-colors duration-200">
+            <i class="fas fa-edit mr-2"></i>İşletme Bilgilerini Düzenle
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // Supabase bağlantı bilgileri
+      const supabaseUrl = "https://xliutvspwodhoaxvysks.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaXV0dnNwd29kaG9heHZ5c2tzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNTgyOTksImV4cCI6MjA3MjkzNDI5OX0.Zodisa_ifP8t2Q4X0ecnB56RiR_Bg4QS5gvPn5ZLK_w";
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    
+    // DOM elementleri
+    const userStatus = document.getElementById("userStatus");
+    const welcomeName = document.getElementById("welcomeName");
+    const userRole = document.getElementById("userRole");
+    const userFullName = document.getElementById("userFullName");
+    const userEmail = document.getElementById("userEmail");
+    const userPhone = document.getElementById("userPhone");
+    const userPosition = document.getElementById("userPosition");
+    const lastLogin = document.getElementById("lastLogin");
+    const signupDate = document.getElementById("signupDate");
+    const companyName = document.getElementById("companyName");
+    const taxNumber = document.getElementById("taxNumber");
+    const industry = document.getElementById("industry");
+    const employeeCount = document.getElementById("employeeCount");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const editProfileBtn = document.getElementById("editProfileBtn");
+    const editCompanyBtn = document.getElementById("editCompanyBtn");
+    
+    // Kullanıcı bilgilerini yükleme
+    async function loadUserData() {
+      try {
+        // Mevcut kullanıcıyı al
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+          console.error('Kullanıcı bilgisi alınamadı:', userError.message);
+          window.location.href = 'login.html';
+          return;
+        }
+        
+        if (user) {
+          // Kullanıcı profil bilgilerini al
+          const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("full_name, phone, position, company_name, tax_number, industry, employee_count, created_at, last_sign_in_at")
+            .eq("id", user.id)
+            .single();
+          
+          if (profileError) {
+            console.error('Profil bilgisi alınamadı:', profileError.message);
+          }
+          
+          // Kullanıcı rol bilgisini al
+          const { data: roleData, error: roleError } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .single();
+          
+          // Arayüzü güncelle
+          if (profile) {
+            welcomeName.textContent = `Hoş geldiniz, ${profile.full_name || user.email}`;
+            userFullName.textContent = profile.full_name || "Belirtilmemiş";
+            userEmail.textContent = user.email;
+            userPhone.textContent = profile.phone || "Belirtilmemiş";
+            userPosition.textContent = profile.position || "Belirtilmemiş";
+            companyName.textContent = profile.company_name || "Belirtilmemiş";
+            taxNumber.textContent = profile.tax_number || "Belirtilmemiş";
+            industry.textContent = profile.industry || "Belirtilmemiş";
+            employeeCount.textContent = profile.employee_count || "Belirtilmemiş";
+            
+            // Tarih formatlama
+            if (profile.last_sign_in_at) {
+              lastLogin.textContent = new Date(profile.last_sign_in_at).toLocaleString('tr-TR');
+            } else {
+              lastLogin.textContent = "İlk giriş";
+            }
+            
+            if (profile.created_at) {
+              signupDate.textContent = new Date(profile.created_at).toLocaleDateString('tr-TR');
+            } else {
+              signupDate.textContent = "Belirtilmemiş";
+            }
+          } else {
+            welcomeName.textContent = `Hoş geldiniz, ${user.email}`;
+            userFullName.textContent = "Belirtilmemiş";
+            userEmail.textContent = user.email;
+            lastLogin.textContent = new Date().toLocaleString('tr-TR');
+            signupDate.textContent = new Date(user.created_at).toLocaleDateString('tr-TR');
+          }
+          
+          // Rol bilgisini göster
+          if (roleData) {
+            userRole.textContent = formatRole(roleData.role);
+          } else {
+            userRole.textContent = "Kullanıcı";
+          }
+          
+          // Kullanıcı durumu animasyonu
+          userStatus.classList.add("animate-pulse");
+        } else {
+          // Kullanıcı oturumu yoksa login sayfasına yönlendir
+          window.location.href = 'login.html';
+        }
+      } catch (error) {
+        console.error('Beklenmeyen bir hata oluştu:', error);
+        window.location.href = 'login.html';
+      }
+    }
+    
+    // Rol formatlama
+    function formatRole(role) {
+      const roles = {
+        'admin': 'Yönetici',
+        'seller': 'Satıcı',
+        'buyer': 'Alıcı',
+        'logistics': 'Lojistik',
+        'consultant': 'Danışman'
+      };
+      return roles[role] || role;
+    }
+    
+    // Çıkış işlevi
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        logoutBtn.classList.add("btn-loading");
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error('Çıkış yapılamadı:', error.message);
+          alert('Çıkış yapılırken bir hata oluştu: ' + error.message);
+        } else {
+          window.location.href = 'login.html';
+        }
+      } catch (error) {
+        console.error('Çıkış sırasında hata oluştu:', error);
+        alert('Çıkış sırasında beklenmeyen bir hata oluştu.');
+      } finally {
+        logoutBtn.classList.remove("btn-loading");
+      }
+    });
+    
+    // Profil düzenleme butonu
+    editProfileBtn.addEventListener("click", () => {
+      alert('Profil düzenleme özelliği yakında eklenecek.');
+    });
+    
+    // İşletme bilgileri düzenleme butonu
+    editCompanyBtn.addEventListener("click", () => {
+      alert('İşletme bilgileri düzenleme özelliği yakında eklenecek.');
+    });
+    
+    // Sayfa yüklendiğinde kullanıcı verilerini yükle
+    document.addEventListener('DOMContentLoaded', loadUserData);
+  </script>
+</body>
+</html>
