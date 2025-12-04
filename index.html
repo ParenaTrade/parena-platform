@@ -1954,8 +1954,12 @@ function closeModal() {
 }
 
 // Ana uygulama başlatma - FORM DATA INITIALIZATION EKLENDİ
+// Ayrıca, initializeApp fonksiyonunu da güvenli hale getirelim:
 async function initializeApp() {
-    if (isInitialized) return;
+    if (isInitialized) {
+        console.log('ℹ️ Uygulama zaten başlatılmış');
+        return;
+    }
     isInitialized = true;
     
     try {
@@ -1965,21 +1969,29 @@ async function initializeApp() {
         initializeGlobalVariables();
         
         // 1. ÖNCE verileri yükle
+        console.log('📥 Veriler yükleniyor...');
         await loadDropdownData();
         await loadServiceTypesSimple();
         await loadReportTemplates();
         
-        // 2. SONRA UI bileşenlerini kur
+        // 2. SONRA UI bileşenlerini kur (elementlerin yüklendiğinden emin ol)
         console.log('🎨 UI bileşenleri kuruluyor...');
+        
+        // Önce elementlerin yüklendiğinden emin ol
+        await waitForElement('#service-select');
+        await waitForElement('#report-template-select');
+        
         setupCompanyAnalysisChat();
-        setupQuickReportForm();        // ✅ Bu form alanlarını oluşturur
+        setupQuickReportForm();
         setupCartFunctionality();
         setupModalFunctionality();
         
         // 3. FORM ALANLARI OLUŞTUKTAN SONRA listener'ları kur
         console.log('🔧 Event listenerlar kuruluyor...');
-        setupAccordionListeners();     // ✅ Artık çalışacak
-        setupFieldEventListeners();    // ✅ Bu da çalışacak
+        setTimeout(() => {
+            setupAccordionListeners();
+            setupFieldEventListeners();
+        }, 500);
         
         // 4. Diğer sistemler
         initializeAuthSystem();
@@ -1992,7 +2004,98 @@ async function initializeApp() {
         
     } catch (error) {
         console.error('❌ Uygulama başlatma hatası:', error);
+        // Hata durumunda kritik olmayan işlemleri yapmaya devam et
+        try {
+            initializeAuthSystem();
+            setupProfileTabs();
+        } catch (e) {
+            console.error('İkincil sistemlerde hata:', e);
+        }
     }
+}
+
+// Yardımcı fonksiyon: Element yüklenmesini bekle
+function waitForElement(selector, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        
+        function checkElement() {
+            const element = document.querySelector(selector);
+            if (element) {
+                console.log(`✅ Element bulundu: ${selector}`);
+                resolve(element);
+            } else if (Date.now() - startTime >= timeout) {
+                console.warn(`⚠️ Element bulunamadı: ${selector} (timeout)`);
+                resolve(null);
+            } else {
+                setTimeout(checkElement, 100);
+            }
+        }
+        
+        checkElement();
+    });
+}
+
+// DOMContentLoaded event listener'ını da güvenli hale getirelim:
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 ParenaTrade - Uygulama başlatılıyor...');
+    
+    // ÖNCE global değişkenleri initialize et
+    initializeGlobalVariables();
+    
+    // Ana uygulamayı başlat (hata yakalama ile)
+    try {
+        initializeApp();
+    } catch (error) {
+        console.error('❌ Ana uygulama başlatma hatası:', error);
+    }
+    
+    // Debug ve kontrol işlemleri - sıralı ve gecikmeli
+    const debugTasks = [
+        { fn: checkTableStatus, delay: 500, name: 'Tablo durumu' },
+        { fn: debugServiceTypes, delay: 1000, name: 'Servis tipleri' },
+        { fn: debugServiceMatching, delay: 1500, name: 'Servis eşleşmesi' },
+        { fn: checkSystemStatus, delay: 2000, name: 'Sistem durumu' },
+        { 
+            fn: () => checkAPIStatus().then(status => {
+                if (!status) {
+                    console.warn('⚠️ API servisi kullanılamıyor');
+                } else {
+                    console.log('✅ API servisi çalışıyor');
+                }
+            }), 
+            delay: 2500, 
+            name: 'API durumu' 
+        }
+    ];
+    
+    debugTasks.forEach(task => {
+        setTimeout(() => {
+            try {
+                console.log(`🔍 ${task.name} kontrolü...`);
+                task.fn();
+            } catch (e) {
+                console.error(`${task.name} kontrol hatası:`, e);
+            }
+        }, task.delay);
+    });
+    
+    // EXTRA: Sayfa yüklendikten sonra formData kontrolü
+    setTimeout(() => {
+        console.log('🔍 Final FormData Check:', {
+            formData: window.formData,
+            formDataType: typeof window.formData,
+            selectedTemplate: window.selectedTemplate,
+            serviceCart: window.serviceCart
+        });
+    }, 3000);
+});
+
+// Double initialization koruması
+if (window.parenaTradeInitialized) {
+    console.log('ℹ️ ParenaTrade zaten yüklenmiş');
+} else {
+    window.parenaTradeInitialized = true;
 }
 
 // GLOBAL DEĞİŞKENLERİ INITIALIZE ET
@@ -2052,17 +2155,27 @@ function initializeFormData() {
     return window.formData;
 }
 
-// SETUP QUICK REPORT FORM'U GÜNCELLE
 function setupQuickReportForm() {
-    // Önce formData'yı initialize et
-    initializeFormData();
-    
     const templateSelect = document.getElementById('report-template-select');
     const generateBtn = document.getElementById('generate-report-btn');
     
     if (!templateSelect) {
         console.error('❌ Template select bulunamadı');
         return;
+    }
+    
+    // Template select'i boşsa, doldurmayı dene
+    if (templateSelect.options.length <= 1 && window.reportTemplates && window.reportTemplates.length > 0) {
+        console.log('🔄 Template select dolduruluyor...');
+        templateSelect.innerHTML = '<option value="">Rapor türü seçin</option>';
+        
+        window.reportTemplates.forEach(template => {
+            const option = document.createElement('option');
+            option.value = template.id;
+            option.textContent = `${template.report_name} - $${template.report_price || 0} ${template.report_currency || 'USD'}`;
+            option.setAttribute('data-description', template.report_description);
+            templateSelect.appendChild(option);
+        });
     }
     
     // Template değişim event'i
@@ -2073,8 +2186,10 @@ function setupQuickReportForm() {
         if (!templateId) {
             // Temizleme
             window.selectedTemplate = null;
-            document.getElementById('dynamic-form-fields').classList.add('hidden');
-            document.getElementById('criteria-list').classList.add('hidden');
+            const dynamicForm = document.getElementById('dynamic-form-fields');
+            const criteriaList = document.getElementById('criteria-list');
+            if (dynamicForm) dynamicForm.classList.add('hidden');
+            if (criteriaList) criteriaList.classList.add('hidden');
             if (generateBtn) generateBtn.classList.add('hidden');
             return;
         }
@@ -2129,7 +2244,6 @@ function setupQuickReportForm() {
     
     console.log('✅ Quick report form kuruldu');
 }
-
 // Tüm başlatma işlemleri tek bir DOMContentLoaded içinde
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 ParenaTrade - Uygulama başlatılıyor...');
@@ -2962,18 +3076,34 @@ function loadServicePackages() {
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        // Firma Analiz Sohbeti - GÜNCELLENMİŞ
+ // setupCompanyAnalysisChat fonksiyonunu düzelt
 function setupCompanyAnalysisChat() {
     const serviceSelect = document.getElementById('service-select');
     const chatInput = document.getElementById('chat-input');
     const sendTextButton = document.getElementById('send-text');
     const goBackBtn = document.getElementById('go-back-btn');
     const chatInputArea = document.getElementById('chat-input-area');
-
+    
+    // Elementlerin var olduğunu kontrol et
+    if (!serviceSelect || !chatInput || !sendTextButton || !chatInputArea) {
+        console.error('❌ Sohbet elementi bulunamadı:', {
+            serviceSelect: !!serviceSelect,
+            chatInput: !!chatInput,
+            sendTextButton: !!sendTextButton,
+            chatInputArea: !!chatInputArea
+        });
+        return; // Elementler yoksa fonksiyondan çık
+    }
+    
+    console.log('✅ Sohbet elementleri bulundu, listenerlar kuruluyor...');
+    
     // Event listener'ları temizle ve yeniden ekle
     serviceSelect.addEventListener('change', handleServiceChange);
     sendTextButton.addEventListener('click', handleAnswerSubmit);
-    goBackBtn.addEventListener('click', handleGoBack);
+    
+    if (goBackBtn) {
+        goBackBtn.addEventListener('click', handleGoBack);
+    }
     
     chatInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
@@ -2983,8 +3113,6 @@ function setupCompanyAnalysisChat() {
 
     async function handleServiceChange() {
         const selectedServiceId = this.value;
-        const chatInputArea = document.getElementById('chat-input-area');
-        const goBackBtn = document.getElementById('go-back-btn');
         
         if (!selectedServiceId) {
             chatInputArea.classList.add('hidden');
@@ -2999,9 +3127,11 @@ function setupCompanyAnalysisChat() {
             
             // Sohbeti temizle (ilk mesaj hariç)
             const chatContainer = document.getElementById('chat-container');
-            const initialMessage = chatContainer.querySelector('.chat-bubble:first-child');
-            chatContainer.innerHTML = '';
-            if (initialMessage) chatContainer.appendChild(initialMessage);
+            if (chatContainer) {
+                const initialMessage = chatContainer.querySelector('.chat-bubble:first-child');
+                chatContainer.innerHTML = '';
+                if (initialMessage) chatContainer.appendChild(initialMessage);
+            }
             
             const selectedServiceName = this.options[this.selectedIndex].text;
             addMessageToChat(`"${selectedServiceName}" hizmeti için analiz başlatılıyor...`);
@@ -3013,7 +3143,7 @@ function setupCompanyAnalysisChat() {
                 setTimeout(() => {
                     addMessageToChat(serviceQuestions[0].question);
                     chatInputArea.classList.remove('hidden');
-                    goBackBtn.classList.add('hidden');
+                    if (goBackBtn) goBackBtn.classList.add('hidden');
                 }, 1000);
             }
             
@@ -3023,25 +3153,27 @@ function setupCompanyAnalysisChat() {
         }
     }
     
-    function handleGoBack() {
+     function handleGoBack() {
         if (currentQuestionIndex > 0) {
             currentQuestionIndex--;
             const previousQuestion = serviceQuestions[currentQuestionIndex].question;
             
             // Sohbeti düzenle
             const chatContainer = document.getElementById('chat-container');
-            const messages = chatContainer.querySelectorAll('.chat-bubble');
-            if (messages.length >= 2) {
-                chatContainer.removeChild(messages[messages.length - 1]);
-                chatContainer.removeChild(messages[messages.length - 2]);
+            if (chatContainer) {
+                const messages = chatContainer.querySelectorAll('.chat-bubble');
+                if (messages.length >= 2) {
+                    chatContainer.removeChild(messages[messages.length - 1]);
+                    chatContainer.removeChild(messages[messages.length - 2]);
+                }
+                
+                // Önceki soruyu tekrar sor
+                addMessageToChat(previousQuestion);
+                if (goBackBtn) goBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
+                
+                // Form alanını temizle
+                if (chatInput) chatInput.value = '';
             }
-            
-            // Önceki soruyu tekrar sor
-            addMessageToChat(previousQuestion);
-            goBackBtn.classList.toggle('hidden', currentQuestionIndex === 0);
-            
-            // Form alanını temizle
-            chatInput.value = '';
         }
     }
 }
