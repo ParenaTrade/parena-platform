@@ -5,276 +5,471 @@ import { createClient } from "@supabase/supabase-js";
 
 // --- YARDIMCI FONKSİYONLAR ---
 
-// 1. GTIP Raporundan Kritik Verileri Ayıklama Fonksiyonu (REVİZE EDİLDİ)
-function parseGtipReport(gtipReportContent) {
-  const data = {};
+// 1. GTIP Raporundan Kritik Verileri Ayıklama Fonksiyonu (GÜNCELLENDİ)
+function parseGtipReport(gtipReportContent, gtipCode, country) {
+  const data = {
+    maliyetAvantaji: "araştırma tabanlı tahmini avantaj",
+    roi: "araştırma tabanlı tahmini ROI aralığı",
+    rekabetDurumu: "araştırma tabanlı düşük rekabet",
+    pazarBuyuklugu: "araştırma tabanlı pazar büyüklüğü",
+    buyumeOrani: "araştırma tabanlı büyüme oranı"
+  };
 
-  // Regex desenleri
-  const maliyetMatch = gtipReportContent.match(/Yerel Üretim Maliyet Avantajı:\s*([^\n]+)/i);
-  const roiMatch = gtipReportContent.match(/Tahmini Yatırım Geri Dönüş Süresi \(ROI\):\s*([^\n]+)/i);
-  const rekabetMatch = gtipReportContent.match(/Pazar Rekabet Durumu \(Yerel Üretici Sayısı\):\s*([^\n]+)/i);
+  // Regex desenleri
+  const maliyetMatch = gtipReportContent.match(/Yerel Üretim Maliyet Avantajı:\s*([^\n]+)/i);
+  const roiMatch = gtipReportContent.match(/Tahmini Yatırım Geri Dönüş Süresi \(ROI\):\s*([^\n]+)/i);
+  const rekabetMatch = gtipReportContent.match(/Pazar Rekabet Durumu \(Yerel Üretici Sayısı\):\s*([^\n]+)/i);
+  const pazarMatch = gtipReportContent.match(/Pazar Büyüklüğü:\s*([^\n]+)/i);
+  const buyumeMatch = gtipReportContent.match(/Büyüme Oranı:\s*([^\n]+)/i);
 
-  data.maliyetAvantaji = maliyetMatch ? maliyetMatch[1].trim() : "araştırma tabanlı tahmini avantaj";
-  data.roi = roiMatch ? roiMatch[1].trim() : "araştırma tabanlı tahmini ROI aralığı";
-  data.rekabetDurumu = rekabetMatch ? rekabetMatch[1].trim() : "araştırma tabanlı düşük rekabet";
+  // Eşleşen verileri al
+  if (maliyetMatch) data.maliyetAvantaji = maliyetMatch[1].trim();
+  if (roiMatch) data.roi = roiMatch[1].trim();
+  if (rekabetMatch) data.rekabetDurumu = rekabetMatch[1].trim();
+  if (pazarMatch) data.pazarBuyuklugu = pazarMatch[1].trim();
+  if (buyumeMatch) data.buyumeOrani = buyumeMatch[1].trim();
 
-  // Sabit verinin gelip gelmediğini kontrol etmek için kesinleşen verilerimizle kontrol (392321 ve %66.30)
-  if (data.roi.includes('12-18 ay') && data.maliyetAvantaji.includes('%66.30')) {
-      data.maliyetAvantaji = "Kanıtlanmış %66.30 Brüt Kâr Potansiyeli";
-      data.roi = "12-18 ay (Yüksek Marj ve Hızlı ROI)";
-      data.rekabetDurumu = "Yıllık 5 Milyon USD Pazarında %25.4 Pazar Payı Hedefi";
-  } else if (data.roi.includes('12-18 ay')) { 
-        // Eski veya varsayılan 12-18 ay kontrolü için fallback
-        data.maliyetAvantaji = "kanıtlanmış %40-%60 aralığındaki";
-        data.rekabetDurumu = "%15'in altındaki düşük rekabet";
-    }
+  // GTIP 392321 ve Gürcistan için özel veriler
+  if (gtipCode === "392321" && country === "Gürcistan") {
+    data.maliyetAvantaji = "Kanıtlanmış %66.30 Brüt Kâr Potansiyeli";
+    data.roi = "12-18 ay (Yüksek Marj ve Hızlı ROI)";
+    data.rekabetDurumu = "Yıllık 5 Milyon USD Pazarında %25.4 Pazar Payı Hedefi";
+    data.pazarBuyuklugu = "5 Milyon USD (yıllık)";
+    data.buyumeOrani = "+8% yıllık büyüme";
+  }
 
-  return data;
+  return data;
 }
 
-// 2. GTIP Raporu Prompt Şablonu (KESİNLEŞEN VERİLERLE REVİZE EDİLDİ)
-// GTIP Kodu 392321 ve kesinleşen %66.30 kâr potansiyeli entegre edildi.
+// 2. GTIP Raporu Prompt Şablonu (GÜNCELLENDİ)
 const gtipReportPromptTemplate = (params) => {
-    // Sadece Fizibilite bölümünün mantığı basitleştirilmiştir.
-    return `Sen bir dış ticaret ve gümrük veri analistisin. GTIP: ${params.gtip} ve Ülke: ${params.ulke} için bir ticaret raporu oluştur. Sadece 7. bölüm için koşullu veri kullan:
-    
-    7️⃣ Yatırım İkamesi Potansiyeli ve Fizibilite (Hibrit Veri Modeli):
-    - ZORUNLU İÇERİK: Aşağıdaki alanları doldururken: Eğer GTIP Kodu 392321 ise ve ${params.ulke} "Gürcistan" ise, Eşleşen Sabit Veri değerlerini kullan. Aksi halde, ilgili alanları genel pazar araştırması yaparak doldur.
-    
-    İthalat İkamesi Fizibilite Veri Alanları:
-    - Yerel Üretim Maliyet Avantajı: GTIP 392321 Eşleşiyorsa: Kanıtlanmış %66.30 Brüt Kâr Potansiyeli (Tüm Piyasa Ortalaması). Eşleşmiyorsa: Araştırma tabanlı tahmini ikame maliyeti.
-    - Tahmini Yatırım Geri Dönüş Süresi (ROI): GTIP 392321 Eşleşiyorsa: 12-18 ay (Yüksek Marj ve Hızlı ROI). Eşleşmiyorsa: Araştırma tabanlı tahmini ROI aralığı.
-    - Pazar Rekabet Durumu (Yerel Üretici Sayısı): GTIP 392321 Eşleşiyorsa: Yıllık 5 Milyon USD Pazarında %25.4 Pazar Payı Hedefi. Eşleşmiyorsa: Araştırma tabanlı rekabet tahmini.
-    
-    Raporun diğer tüm bölümlerini (1-6) de doldur.`;
+  return `Sen bir dış ticaret ve gümrük veri analistisin. GTIP: ${params.gtip} ve Ülke: ${params.ulke} için bir ticaret raporu oluştur.
+
+7️⃣ Yatırım İkamesi Potansiyeli ve Fizibilite (Hibrit Veri Modeli):
+- ZORUNLU İÇERİK: Aşağıdaki alanları doldururken: Eğer GTIP Kodu ${params.gtip} ve Ülke "${params.ulke}" için belirli veriler varsa, bunları kullan. Aksi halde, ilgili alanları genel pazar araştırması yaparak doldur.
+
+İthalat İkamesi Fizibilite Veri Alanları:
+- Yerel Üretim Maliyet Avantajı: ${params.gtip} için araştırma tabanlı brüt kâr potansiyeli.
+- Tahmini Yatırım Geri Dönüş Süresi (ROI): ${params.gtip} için araştırma tabanlı ROI aralığı.
+- Pazar Rekabet Durumu (Yerel Üretici Sayısı): ${params.ulke} pazarı için rekabet analizi.
+- Pazar Büyüklüğü: ${params.gtip} ürünü için ${params.ulke} pazar büyüklüğü.
+- Büyüme Oranı: ${params.gtip} ürünü için ${params.ulke} pazar büyüme oranı.
+
+Diğer bölümler:
+1️⃣ Genel Ticaret Görünümü
+2️⃣ İthalat/İhracat Trendleri
+3️⃣ Ana Tedarikçi Ülkeler
+4️⃣ Fiyat Dinamikleri
+5️⃣ Yasal Düzenlemeler
+6️⃣ Pazar Fırsatları
+7️⃣ Yukarıdaki Yatırım İkamesi Potansiyeli
+
+Tüm bölümleri doldur ve verileri mümkün olduğunca spesifik yap.`;
 };
 
+// 3. Supabase'den Template Verilerini Getir
+async function getTemplateData(supabase, templateCode) {
+  try {
+    const { data: template, error } = await supabase
+      .from('ai_report_templates')
+      .select('*')
+      .eq('report_code', templateCode)
+      .single();
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ success: false, error: "Sadece POST metodu destekleniyor." });
-  }
+    if (error) {
+      console.error('Template getirme hatası:', error);
+      return null;
+    }
 
-  const { OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY } = process.env;
-  if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
-    return res.status(500).json({
-      success: false,
-      error: "Environment değişkenleri eksik.",
-    });
-  }
-
-  const { prompt, template, parameters } = req.body;
-  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-  const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-
-  let finalPrompt = prompt;
-  let parsedData = { maliyetAvantaji: "bilinmeyen", roi: "bilinmeyen", rekabetDurumu: "bilinmeyen" };
-
-  try {
-    console.log("🧠 OpenAI rapor oluşturma başladı. Talep Edilen Şablon:", template);
-
-    // --- AŞAMA 1: GTIP Raporu (Veri Doğrulama ve Çekme) ---
-    if (template === "Kapsamlı Pazar Raporu") {
-        console.log("🔍 Kapsamlı Rapor istendi. Önce GTIP raporu çalıştırılıyor...");
-
-        // GTIP Raporu için prompt oluşturuluyor
-        const gtipPrompt = gtipReportPromptTemplate(parameters);
-
-        // GPT'ye ilk çağrı: GTIP Raporu verilerini üret
-        const gtipCompletion = await openai.chat.completions.create({
-            model: "gpt-4o-mini", // Veri çekme için uygun model
-            messages: [{ role: "user", content: gtipPrompt }],
-            max_tokens: 3000,
-            temperature: 0.1, // Düşük sıcaklık, kesin veri için
-        });
-        
-        const gtipReportContent = gtipCompletion.choices?.[0]?.message?.content || "";
-        
-        // Üretilen rapordan kritik veriler ayıklanıyor
-        parsedData = parseGtipReport(gtipReportContent);
-        
-        console.log("✅ GTIP Verileri Ayıklandı:", parsedData);
-
-        // --- AŞAMA 2: Kapsamlı Rapor Prompt'una Veri Enjeksiyonu ---
-        
-        // Kapsamlı Rapor prompt'undaki yer tutucular dolduruluyor 
-        finalPrompt = finalPrompt
-            .replace(/\(GTIP Raporu'ndan çekilen Maliyet Avantajı\)/g, parsedData.maliyetAvantaji)
-            .replace(/\(GTIP Raporu'ndan çekilen ROI\)/g, parsedData.roi)
-            .replace(/\(GTIP Raporu'ndan çekilen Rekabet Durumu\)/g, parsedData.rekabetDurumu)
-            // Diğer yer tutucular burada devam edebilir...
-        
-        console.log("📝 Prompt Güncellendi. Nihai Rapor Üretimine Geçiliyor...");
-
-    } else {
-        // Kapsamlı Rapor değilse (Örn: GTIP Bazlı veya Firma Bazlı), tek adımda ilerle
-        finalPrompt = prompt;
-    }
-
-
-    // 1️⃣ GPT ile final rapor metni oluştur (İkinci GPT Çağrısı)
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `Sen bir uluslararası ticaret ve pazar analizi uzmanısın. 
-          Profesyonel, veri odaklı, yönetim sunumuna uygun, Türkçe rapor üret.
-          Raporu aşağıdaki yapıda oluştur:
-          
-          # [RAPOR BAŞLIĞI]
-          
-          ## Özet
-          [Kısa özet buraya]
-          
-          ## Pazar Analizi
-          [Detaylı pazar analizi]
-          
-          ## Rakip Analizi
-          [Rakip değerlendirmesi]
-          
-          ## Fiyat Trendleri
-          [Fiyat analizi]
-          
-          ## Öneriler
-          [Stratejik öneriler]
-          
-          ## Sonuç
-          [Genel değerlendirme]`,
-        },
-        { role: "user", content: finalPrompt }, // finalPrompt, GTIP verileri enjekte edilmiş prompt'tur
-      ],
-      max_tokens: 4000,
-      temperature: 0.7,
-    });
-
-    const reportContent = completion.choices?.[0]?.message?.content || "Rapor oluşturulamadı.";
-
-    // 2️⃣ PDF oluştur
-    const pdfBuffer = await createPDF(reportContent, template);
-    const fileName = `report_${Date.now()}.pdf`;
-
-    // 3️⃣ Supabase Storage'a yükle
-    // ... (Yükleme ve URL alma kısmı değişmedi)
-    const { error: uploadError } = await supabase.storage
-      .from("reports")
-      .upload(fileName, pdfBuffer, {
-        contentType: "application/pdf",
-        upsert: false,
-      });
-
-    let pdf_url = null;
-    if (!uploadError) {
-      const { data: publicURL } = supabase.storage.from("reports").getPublicUrl(fileName);
-      pdf_url = publicURL?.publicUrl;
-    } else {
-      console.warn("PDF yükleme hatası:", uploadError);
-    }
-
-    console.log("✅ Rapor başarıyla oluşturuldu");
-
-    return res.status(200).json({
-      success: true,
-      result: reportContent,
-      pdf_url: pdf_url,
-    });
-
-  } catch (error) {
-    console.error("❌ Rapor oluşturma hatası:", error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || "Bilinmeyen hata oluştu.",
-    });
-  }
+    return template;
+  } catch (error) {
+    console.error('Template verisi alınamadı:', error);
+    return null;
+  }
 }
 
-// createPDF fonksiyonu aynı kalır.
-async function createPDF(content, templateName = "Pazar Analiz Raporu") {
-    // ... (PDF oluşturma mantığı değişmedi)
-    return new Promise((resolve, reject) => {
-        try {
-            const doc = new PDFDocument({
-                margin: 50,
-                size: 'A4'
-            });
+// 4. Prompt'taki Yer Tutucuları Doldur
+function fillPromptTemplate(templatePrompt, variables, gtipData) {
+  let filledPrompt = templatePrompt;
+  
+  // Değişkenleri yerleştir
+  Object.entries(variables).forEach(([key, value]) => {
+    if (value && value.trim() !== '') {
+      const patterns = [
+        `{{${key}}}`,
+        `%${key}%`,
+        `\\[${key}\\]`
+      ];
+      
+      patterns.forEach(pattern => {
+        const regex = new RegExp(pattern, 'g');
+        filledPrompt = filledPrompt.replace(regex, value.trim());
+      });
+    }
+  });
+  
+  // current_year'i ekle
+  const currentYear = new Date().getFullYear();
+  filledPrompt = filledPrompt.replace(/\{\{current_year\}\}/g, currentYear);
+  filledPrompt = filledPrompt.replace(/\%current_year\%/g, currentYear);
+  
+  // GTIP verilerini yerleştir
+  if (gtipData) {
+    filledPrompt = filledPrompt
+      .replace(/\(GTIP Raporu'ndan çekilen Maliyet Avantajı\)/g, gtipData.maliyetAvantaji)
+      .replace(/\(GTIP Raporu'ndan çekilen ROI\)/g, gtipData.roi)
+      .replace(/\(GTIP Raporu'ndan çekilen Rekabet Durumu\)/g, gtipData.rekabetDurumu)
+      .replace(/\(GTIP Raporu'ndan çekilen Pazar Büyüklüğü\)/g, gtipData.pazarBuyuklugu)
+      .replace(/\(GTIP Raporu'ndan çekilen Büyüme Oranı\)/g, gtipData.buyumeOrani);
+  }
+  
+  // Sample data ekle (eğer template'de varsa)
+  if (variables.sample_data) {
+    try {
+      const sampleData = JSON.parse(variables.sample_data);
+      let sampleText = '\n\n**SEKTÖREL GERÇEK VERİLER:**\n';
+      
+      Object.entries(sampleData).forEach(([key, value]) => {
+        if (typeof value === 'number') {
+          // Büyük sayıları formatla
+          if (value >= 1000000) {
+            sampleText += `- ${key}: $${(value / 1000000).toFixed(1)}M\n`;
+          } else if (value >= 1000) {
+            sampleText += `- ${key}: $${(value / 1000).toFixed(1)}K\n`;
+          } else {
+            sampleText += `- ${key}: ${value}\n`;
+          }
+        } else {
+          sampleText += `- ${key}: ${value}\n`;
+        }
+      });
+      
+      filledPrompt += sampleText;
+    } catch (e) {
+      console.error('Sample data parse hatası:', e);
+    }
+  }
+  
+  // Eksik değişkenleri temizle
+  filledPrompt = filledPrompt.replace(/\{\{\w+\}\}/g, 'Belirtilmemiş');
+  filledPrompt = filledPrompt.replace(/\%\w+\%/g, 'Belirtilmemiş');
+  
+  return filledPrompt;
+}
 
-            const buffers = [];
-            doc.on("data", (chunk) => buffers.push(chunk));
-            doc.on("end", () => resolve(Buffer.concat(buffers)));
-            doc.on("error", reject);
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ success: false, error: "Sadece POST metodu destekleniyor." });
+  }
 
-            let currentPage = 1;
+  const { OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY } = process.env;
+  if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
+    return res.status(500).json({
+      success: false,
+      error: "Environment değişkenleri eksik.",
+    });
+  }
 
-            const addFooter = () => {
-                doc.fontSize(8)
-                    .font('Helvetica')
-                    .text(`ParenaTrade - Akıllı Pazar Analiz Platformu - Sayfa ${currentPage}`, 50, 800, {
-                        align: "center",
-                        width: 500
-                    });
-            };
+  const { prompt, template, template_code, parameters, sector, country, gtip } = req.body;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-            // İlk sayfa içeriği
-            doc.fontSize(20).font('Helvetica-Bold')
-                .text(`📊 ${templateName}`, { align: "center" });
+  let finalPrompt = prompt;
+  let gtipData = null;
+  let templateData = null;
 
-            doc.moveDown(0.5);
-            doc.fontSize(10).font('Helvetica')
-                .text(`Oluşturulma Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, { align: "center" });
+  try {
+    console.log("🧠 OpenAI rapor oluşturma başladı.");
+    console.log("📋 Talep Detayları:", { 
+      template, 
+      template_code, 
+      sector, 
+      country, 
+      gtip,
+      parameters_count: parameters ? Object.keys(parameters).length : 0
+    });
 
-            doc.moveDown();
-            doc.lineWidth(1).strokeColor('#cccccc')
-                .moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    // --- AŞAMA 1: Template Verilerini Getir ---
+    if (template_code) {
+      templateData = await getTemplateData(supabase, template_code);
+      
+      if (templateData) {
+        console.log(`✅ Template bulundu: ${templateData.report_name}`);
+        
+        // Template'den sample_data'yı parameters'e ekle
+        if (templateData.sample_data) {
+          parameters.sample_data = templateData.sample_data;
+        }
+      }
+    }
 
-            doc.moveDown();
+    // --- AŞAMA 2: GTIP Raporu (Veri Doğrulama ve Çekme) ---
+    if (gtip && (template === "Kapsamlı Pazar Raporu" || 
+                 template === "Plastik Ambalaj İthalat Analizi" ||
+                 template === "Tekstil Üretim Yatırımı Analizi")) {
+      
+      console.log(`🔍 GTIP raporu çalıştırılıyor: ${gtip} için ${country}`);
+      
+      // GTIP Raporu için prompt oluştur
+      const gtipPrompt = gtipReportPromptTemplate({
+        gtip: gtip,
+        ulke: country || parameters.ulke || "Gürcistan",
+        urun: parameters.urun || "Belirtilmemiş"
+      });
 
-            // İlk sayfa footer'ı
-            addFooter();
+      // GPT'ye ilk çağrı: GTIP Raporu verilerini üret
+      const gtipCompletion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: gtipPrompt }],
+        max_tokens: 2000,
+        temperature: 0.1,
+      });
+      
+      const gtipReportContent = gtipCompletion.choices?.[0]?.message?.content || "";
+      
+      // Üretilen rapordan kritik veriler ayıklanıyor
+      gtipData = parseGtipReport(gtipReportContent, gtip, country || parameters.ulke);
+      
+      console.log("✅ GTIP Verileri Ayıklandı:", gtipData);
+    }
 
-            // İçerik işleme
-            const lines = content.split('\n');
-            doc.fontSize(12).font('Helvetica');
+    // --- AŞAMA 3: Final Prompt'u Hazırla ---
+    if (templateData && templateData.report_prompt) {
+      // Template prompt'u kullan
+      finalPrompt = fillPromptTemplate(templateData.report_prompt, parameters, gtipData);
+      console.log("📝 Template prompt'u kullanılıyor");
+    } else if (gtipData) {
+      // GTIP verilerini orijinal prompt'a enjekte et
+      finalPrompt = fillPromptTemplate(prompt, parameters, gtipData);
+      console.log("📝 GTIP verileri enjekte edildi");
+    } else {
+      // Orijinal prompt'u kullan
+      finalPrompt = prompt;
+      console.log("📝 Orijinal prompt kullanılıyor");
+    }
 
-            lines.forEach(line => {
-                if (line.startsWith('# ')) {
-                    doc.fontSize(16).font('Helvetica-Bold')
-                        .text(line.replace('# ', ''), { align: "left" });
-                    doc.moveDown(0.5);
-                } else if (line.startsWith('## ')) {
-                    doc.fontSize(14).font('Helvetica-Bold')
-                        .text(line.replace('## ', ''), { align: "left" });
-                    doc.moveDown(0.3);
-                } else if (line.startsWith('### ')) {
-                    doc.fontSize(12).font('Helvetica-Bold')
-                        .text(line.replace('### ', ''), { align: "left" });
-                    doc.moveDown(0.2);
-                } else if (line.trim() === '') {
-                    doc.moveDown(0.5);
-                } else {
-                    doc.fontSize(11).font('Helvetica')
-                        .text(line, {
-                            align: "left",
-                            width: 500,
-                            indent: 20
-                        });
-                    doc.moveDown(0.3);
-                }
+    // --- AŞAMA 4: Final Raporu Oluştur ---
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `Sen bir uluslararası ticaret ve pazar analizi uzmanısın. 
+          Profesyonel, veri odaklı, yönetim sunumuna uygun rapor üret.
+          
+          RAPOR FORMATI:
+          # [RAPOR BAŞLIĞI]
+          
+          ## 📊 Özet
+          [Kısa özet - 3-4 paragraf]
+          
+          ## 🎯 Pazar Analizi
+          [Pazar büyüklüğü, trendler, segmentasyon]
+          
+          ## ⚔️ Rakip Analizi
+          [Ana rakipler, pazar payları, SWOT]
+          
+          ## 💰 Fiyat Trendleri ve Maliyet Analizi
+          [Fiyat analizi, maliyet karşılaştırması]
+          
+          ## 📈 Finansal Projeksiyon
+          [ROI, yatırım maliyeti, gelir projeksiyonu]
+          
+          ## 🏛️ Yasal ve Vergi Çerçevesi
+          [Yasal düzenlemeler, vergi avantajları]
+          
+          ## 🚀 Stratejik Öneriler
+          [Pazar giriş stratejisi, risk yönetimi]
+          
+          ## ✅ Sonuç
+          [Genel değerlendirme ve aksiyon planı]
+          
+          **ÖNEMLİ:** Verileri tablolar ve madde işaretleri ile sun. Rakamları USD cinsinden belirt.`,
+        },
+        { role: "user", content: finalPrompt },
+      ],
+      max_tokens: 6000,
+      temperature: 0.7,
+    });
 
-                // Sayfa sonu kontrolü - YENİ SAYFA EKLE
-                if (doc.y > 700) {
-                    currentPage++;
-                    doc.addPage();
+    const reportContent = completion.choices?.[0]?.message?.content || "Rapor oluşturulamadı.";
 
-                    // Yeni sayfa footer'ı
-                    addFooter();
+    // --- AŞAMA 5: PDF Oluştur ---
+    const pdfBuffer = await createPDF(
+      reportContent, 
+      templateData?.report_name || template || "Pazar Analiz Raporu",
+      templateData?.report_code || ""
+    );
+    
+    const fileName = `report_${Date.now()}_${template_code || 'genel'}.pdf`;
 
-                    doc.fontSize(11).font('Helvetica');
-                }
-            });
+    // --- AŞAMA 6: Supabase Storage'a Yükle ---
+    const { error: uploadError } = await supabase.storage
+      .from("reports")
+      .upload(fileName, pdfBuffer, {
+        contentType: "application/pdf",
+        upsert: false,
+      });
 
-            doc.end();
-        } catch (err) {
-            reject(err);
-        }
-    });
+    let pdf_url = null;
+    if (!uploadError) {
+      const { data: publicURL } = supabase.storage.from("reports").getPublicUrl(fileName);
+      pdf_url = publicURL?.publicUrl;
+      console.log("✅ PDF başarıyla yüklendi:", pdf_url);
+    } else {
+      console.warn("⚠️ PDF yükleme hatası:", uploadError);
+    }
+
+    // --- AŞAMA 7: Raporu Veritabanına Kaydet ---
+    try {
+      const reportRecord = {
+        template_id: templateData?.id || null,
+        report_title: templateData?.report_name || template,
+        report_code: templateData?.report_code || null,
+        report_content: reportContent,
+        report_prompt: finalPrompt,
+        country: country || parameters.ulke || null,
+        sector: sector || parameters.sektor || null,
+        product: parameters.urun || null,
+        gtip: gtip || parameters.gtip || null,
+        pdf_url: pdf_url,
+        status: 'completed',
+        created_at: new Date().toISOString()
+      };
+
+      const { error: dbError } = await supabase
+        .from('ai_reports')
+        .insert(reportRecord);
+
+      if (dbError) {
+        console.error("❌ Rapor veritabanına kaydedilemedi:", dbError);
+      } else {
+        console.log("✅ Rapor veritabanına kaydedildi");
+      }
+    } catch (dbError) {
+      console.error("❌ Rapor kayıt hatası:", dbError);
+    }
+
+    console.log("✅ Rapor başarıyla oluşturuldu");
+
+    return res.status(200).json({
+      success: true,
+      result: reportContent,
+      pdf_url: pdf_url,
+      template_used: templateData?.report_name || template,
+      gtip_data: gtipData
+    });
+
+  } catch (error) {
+    console.error("❌ Rapor oluşturma hatası:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Bilinmeyen hata oluştu.",
+      template_code: template_code,
+      gtip: gtip
+    });
+  }
+}
+
+// createPDF fonksiyonu (güncellendi)
+async function createPDF(content, templateName = "Pazar Analiz Raporu", templateCode = "") {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        margin: 50,
+        size: 'A4'
+      });
+
+      const buffers = [];
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
+      doc.on("error", reject);
+
+      let currentPage = 1;
+
+      const addFooter = () => {
+        const footerText = `ParenaTrade - Akıllı Pazar Analiz Platformu`;
+        const pageText = `Sayfa ${currentPage}`;
+        const templateText = templateCode ? `Kod: ${templateCode}` : '';
+        
+        doc.fontSize(8)
+          .font('Helvetica')
+          .text(footerText, 50, 800, { align: "left", width: 200 });
+        
+        if (templateText) {
+          doc.text(templateText, 250, 800, { align: "center", width: 200 });
+        }
+        
+        doc.text(pageText, 450, 800, { align: "right", width: 100 });
+      };
+
+      // Başlık sayfası
+      doc.fontSize(24).font('Helvetica-Bold')
+        .text(templateName, { align: "center" });
+
+      doc.moveDown(0.5);
+      doc.fontSize(12).font('Helvetica')
+        .text(`Oluşturulma Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, { align: "center" });
+      
+      doc.text(`Rapor Kodu: ${templateCode || 'GENEL'}`, { align: "center" });
+
+      doc.moveDown();
+      doc.lineWidth(1).strokeColor('#cccccc')
+        .moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+
+      doc.moveDown();
+
+      // İlk sayfa footer'ı
+      addFooter();
+
+      // İçerik işleme
+      const lines = content.split('\n');
+      doc.fontSize(12).font('Helvetica');
+
+      lines.forEach(line => {
+        if (line.startsWith('# ')) {
+          doc.fontSize(18).font('Helvetica-Bold')
+            .text(line.replace('# ', ''), { align: "left" });
+          doc.moveDown(0.5);
+        } else if (line.startsWith('## ')) {
+          doc.fontSize(16).font('Helvetica-Bold')
+            .text(line.replace('## ', ''), { align: "left" });
+          doc.moveDown(0.3);
+        } else if (line.startsWith('### ')) {
+          doc.fontSize(14).font('Helvetica-Bold')
+            .text(line.replace('### ', ''), { align: "left" });
+          doc.moveDown(0.2);
+        } else if (line.startsWith('#### ')) {
+          doc.fontSize(12).font('Helvetica-Bold')
+            .text(line.replace('#### ', ''), { align: "left" });
+          doc.moveDown(0.1);
+        } else if (line.trim() === '') {
+          doc.moveDown(0.5);
+        } else {
+          doc.fontSize(11).font('Helvetica')
+            .text(line, {
+              align: "left",
+              width: 500,
+              indent: line.startsWith('- ') || line.startsWith('• ') ? 20 : 0
+            });
+          doc.moveDown(0.3);
+        }
+
+        // Sayfa sonu kontrolü
+        if (doc.y > 750) {
+          currentPage++;
+          doc.addPage();
+          
+          // Yeni sayfa footer'ı
+          addFooter();
+          
+          doc.fontSize(11).font('Helvetica');
+        }
+      });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
